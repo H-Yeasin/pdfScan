@@ -6,6 +6,10 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "metaData": {
+      "com.google.mlkit.vision.DEPENDENCIES": "ocr"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -27,6 +31,14 @@
         "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan documents."
+        }
+      ],
+      "expo-font",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to import documents."
         }
       ]
     ]

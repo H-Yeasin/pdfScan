@@ -1,10 +1,12 @@
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { CaptureScreen } from './src/screens/CaptureScreen';
+import { AppProviders } from './src/bootstrap/AppProviders';
+import { AppNavigator } from './src/bootstrap/AppNavigator';
+import { Snackbar } from './src/components/shared/Snackbar';
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <CaptureScreen />
-    </SafeAreaProvider>
+    <AppProviders>
+      <AppNavigator />
+      <Snackbar />
+    </AppProviders>
   );
 }

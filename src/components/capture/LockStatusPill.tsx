@@ -1,24 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
-import { colors } from '../../theme';
-import type { LockState } from '../../types/capture';
-import { StatusPill } from './StatusPill';
-
-const LABEL: Record<LockState, string> = {
-  searching: 'Searching for document…',
-  locked: 'Page locked — hold still',
-  capturing: 'Capturing…',
-};
+import { useCaptureChrome } from '../../theme/captureChrome';
+import { Pill } from '../shared/Pill';
 
 type LockStatusPillProps = {
-  lockState: LockState;
+  locked: boolean;
 };
 
-export function LockStatusPill({ lockState }: LockStatusPillProps) {
+export function LockStatusPill({ locked }: LockStatusPillProps) {
+  const chrome = useCaptureChrome();
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (lockState !== 'locked') {
+    if (!locked) {
       pulse.setValue(1);
       return;
     }
@@ -30,21 +24,21 @@ export function LockStatusPill({ lockState }: LockStatusPillProps) {
     );
     loop.start();
     return () => loop.stop();
-  }, [lockState, pulse]);
+  }, [locked, pulse]);
 
   return (
-    <StatusPill
+    <Pill
+      backgroundColor={chrome.pillBg}
+      borderColor={chrome.pillBorder}
+      textColor={chrome.text}
       icon={
         <Animated.View
-          style={[
-            styles.dot,
-            { backgroundColor: lockState === 'locked' ? colors.accent : colors.textDim, opacity: pulse },
-          ]}
+          style={[styles.dot, { backgroundColor: locked ? chrome.accent : chrome.textDim, opacity: pulse }]}
         />
       }
     >
-      {LABEL[lockState]}
-    </StatusPill>
+      {locked ? 'Page locked — hold still' : 'Fit the page in frame'}
+    </Pill>
   );
 }
 

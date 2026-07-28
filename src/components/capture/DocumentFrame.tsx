@@ -1,30 +1,31 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, useWindowDimensions } from 'react-native';
-import { colors, radii } from '../../theme';
-import type { LockState } from '../../types/capture';
+import { radii } from '../../theme';
+import { useCaptureChrome } from '../../theme/captureChrome';
 
 const DOCUMENT_ASPECT_RATIO = 1.32; // height / width, close to A4/letter
 const FRAME_WIDTH_RATIO = 0.66;
 
 type DocumentFrameProps = {
-  lockState: LockState;
+  locked: boolean;
 };
 
-export function DocumentFrame({ lockState }: DocumentFrameProps) {
+export function DocumentFrame({ locked }: DocumentFrameProps) {
+  const chrome = useCaptureChrome();
   const { width: screenWidth } = useWindowDimensions();
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(locked ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.timing(progress, {
-      toValue: lockState === 'searching' ? 0 : 1,
+      toValue: locked ? 1 : 0,
       duration: 260,
       useNativeDriver: false,
     }).start();
-  }, [lockState, progress]);
+  }, [locked, progress]);
 
   const borderColor = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [colors.frameIdle, colors.frameLocked],
+    outputRange: [chrome.frameIdle, chrome.accent],
   });
 
   const frameWidth = screenWidth * FRAME_WIDTH_RATIO;
@@ -39,7 +40,8 @@ export function DocumentFrame({ lockState }: DocumentFrameProps) {
           width: frameWidth,
           height: frameHeight,
           borderColor,
-          borderWidth: lockState === 'searching' ? 2 : 3,
+          borderWidth: locked ? 3 : 2,
+          borderStyle: locked ? 'solid' : 'dashed',
         },
       ]}
     />
@@ -49,6 +51,6 @@ export function DocumentFrame({ lockState }: DocumentFrameProps) {
 const styles = StyleSheet.create({
   frame: {
     alignSelf: 'center',
-    borderRadius: radii.lg,
+    borderRadius: radii.card,
   },
 });

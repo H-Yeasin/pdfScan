@@ -3,14 +3,13 @@ export const spacing = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
+  xl: 24,
+  xxl: 32,
 } as const;
 
 export const radii = {
-  sm: 8,
-  md: 14,
-  lg: 20,
+  chip: 8,
+  card: 12,
+  thumb: 6,
   full: 999,
 } as const;

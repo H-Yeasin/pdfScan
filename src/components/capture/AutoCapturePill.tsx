@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { colors } from '../../theme';
-import { StatusPill } from './StatusPill';
+import { useCaptureChrome } from '../../theme/captureChrome';
+import { Pill } from '../shared/Pill';
 
 type AutoCapturePillProps = {
   enabled: boolean;
@@ -8,23 +8,26 @@ type AutoCapturePillProps = {
 };
 
 export function AutoCapturePill({ enabled, onToggle }: AutoCapturePillProps) {
+  const chrome = useCaptureChrome();
+
   return (
     <Pressable onPress={onToggle} hitSlop={8}>
-      <StatusPill
-        variant={enabled ? 'solid' : 'translucent'}
-        textColor={enabled ? colors.onAccent : colors.textSecondary}
-        icon={<View style={[styles.dot, { backgroundColor: enabled ? colors.onAccent : colors.textDim }]} />}
+      <Pill
+        backgroundColor={chrome.pillBg}
+        borderColor={chrome.pillBorder}
+        textColor={chrome.text}
+        icon={<View style={[styles.dot, { backgroundColor: enabled ? chrome.text : chrome.textDim }]} />}
       >
         {enabled ? 'Auto-capture on · free' : 'Auto-capture off'}
-      </StatusPill>
+      </Pill>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

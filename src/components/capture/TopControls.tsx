@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { FlashMode } from 'expo-camera';
-import { colors, radii, spacing } from '../../theme';
-import { StatusPill } from './StatusPill';
+import { radii, spacing } from '../../theme';
+import { useCaptureChrome } from '../../theme/captureChrome';
+import { Pill } from '../shared/Pill';
 
 const FLASH_ICON: Record<FlashMode, keyof typeof Ionicons.glyphMap> = {
   auto: 'flash-outline',
@@ -21,20 +22,31 @@ const FLASH_LABEL: Record<FlashMode, string> = {
 type TopControlsProps = {
   flashMode: FlashMode;
   onCycleFlash: () => void;
-  onSettingsPress?: () => void;
+  onSettingsPress: () => void;
 };
 
 export function TopControls({ flashMode, onCycleFlash, onSettingsPress }: TopControlsProps) {
+  const chrome = useCaptureChrome();
+
   return (
     <View style={styles.row}>
       <Pressable onPress={onCycleFlash} hitSlop={8}>
-        <StatusPill icon={<Ionicons name={FLASH_ICON[flashMode]} size={16} color={colors.textPrimary} />}>
+        <Pill
+          backgroundColor={chrome.pillBg}
+          borderColor={chrome.pillBorder}
+          textColor={chrome.text}
+          icon={<Ionicons name={FLASH_ICON[flashMode]} size={16} color={chrome.text} />}
+        >
           {FLASH_LABEL[flashMode]}
-        </StatusPill>
+        </Pill>
       </Pressable>
 
-      <Pressable onPress={onSettingsPress} hitSlop={8} style={styles.settingsButton}>
-        <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
+      <Pressable
+        onPress={onSettingsPress}
+        hitSlop={8}
+        style={[styles.settingsButton, { backgroundColor: chrome.pillBg, borderColor: chrome.pillBorder }]}
+      >
+        <Ionicons name="settings-outline" size={20} color={chrome.text} />
       </Pressable>
     </View>
   );
@@ -53,8 +65,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceTranslucent,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
   },
 });
