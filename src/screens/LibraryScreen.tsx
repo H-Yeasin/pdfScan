@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '../components/library/EmptyState';
@@ -7,9 +7,10 @@ import { FileRow } from '../components/library/FileRow';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar, type SelectionToolId } from '../components/library/SelectionBar';
+import { SignatureModal } from '../components/shared/SignatureModal';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
-import { compressDocument, mergeDocuments, splitDocument } from '../services/persistence/libraryOperations';
+import { applySignedPage, compressDocument, mergeDocuments, splitDocument } from '../services/persistence/libraryOperations';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
 import { useAppState } from '../store/AppStateContext';
@@ -21,6 +22,7 @@ export function LibraryScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { files, selection, selMode, tab, search, searchOpen } = state.library;
+  const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
 
   const visibleFiles = useMemo(() => {
     const tabbed = tab === 'starred' ? files.filter((f) => f.star) : files;
@@ -76,11 +78,23 @@ export function LibraryScreen() {
         selectedDocs.forEach((doc) => dispatch({ type: 'library/TOGGLE_LOCKED', id: doc.id }));
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Protect only marks the file — it does not encrypt it yet' });
-      } else if (id === 'sign') {
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signing is coming in a later update' });
+      } else if (id === 'sign' && selectedDocs.length === 1) {
+        setSignTarget(selectedDocs[0]);
       }
     },
     [files, selection, dispatch]
+  );
+
+  const handleSignConfirm = useCallback(
+    async (flattenedUri: string) => {
+      if (!signTarget) return;
+      const updated = await applySignedPage(signTarget, 0, flattenedUri);
+      dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
+      dispatch({ type: 'library/CLEAR_SELECTION' });
+      setSignTarget(null);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
+    },
+    [signTarget, dispatch]
   );
 
   const isEmptyLibrary = files.length === 0;
@@ -160,6 +174,17 @@ export function LibraryScreen() {
           activeColor={tokens.ink}
           inactiveColor={tokens.muted}
           accent={tokens.accent}
+        />
+      )}
+
+      {signTarget && (
+        <SignatureModal
+          visible
+          uri={signTarget.pages[0].fileUri}
+          naturalWidth={signTarget.pages[0].width}
+          naturalHeight={signTarget.pages[0].height}
+          onCancel={() => setSignTarget(null)}
+          onConfirm={handleSignConfirm}
         />
       )}
     </SafeAreaView>

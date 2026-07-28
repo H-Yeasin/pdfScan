@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatBytes, formatRelativeDate } from '../../utils/format';
+
+const LOCK_DISCLOSURE =
+  "This marks the file as protected in your library — it doesn't encrypt the PDF itself.";
 
 const LONG_PRESS_MS = 400;
 
@@ -33,9 +36,13 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, onPress, o
       <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
         {cover ? <Image source={{ uri: cover.fileUri }} style={styles.coverImage} resizeMode="cover" /> : null}
         {doc.locked && (
-          <View style={styles.lockOverlay}>
+          <Pressable
+            style={styles.lockOverlay}
+            onPress={() => Alert.alert('Not actually encrypted', LOCK_DISCLOSURE)}
+            hitSlop={4}
+          >
             <Ionicons name="lock-closed-outline" size={16} color="#fff" />
-          </View>
+          </Pressable>
         )}
       </View>
 

@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import { Dimensions, FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, View } from 'react-native';
+import { NightImage } from './NightImage';
 import { ZoomableImage } from '../shared/ZoomableImage';
 import type { LibraryPage } from '../../types/models';
 
@@ -33,8 +34,7 @@ export const PageList = forwardRef<FlatList<LibraryPage>, PageListProps>(functio
       renderItem={({ item, index }) => (
         <Pressable onPress={onTapCenter} style={styles.pageWrap}>
           <View style={[styles.page, highlightedIndex === index && styles.pageHighlighted]}>
-            <ZoomableImage uri={item.fileUri} panEnabled={false} />
-            {night && <View style={styles.nightOverlay} pointerEvents="none" />}
+            {night ? <NightImage uri={item.fileUri} /> : <ZoomableImage uri={item.fileUri} panEnabled={false} />}
           </View>
         </Pressable>
       )}
@@ -61,15 +61,5 @@ const styles = StyleSheet.create({
   pageHighlighted: {
     borderWidth: 2,
     borderColor: '#1abc9c',
-  },
-  nightOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // Simplified-real: a warm dark dimming overlay rather than a true per-pixel invert
-    // (that needs Skia, deferred to a later pass — see Reader Night mode in the plan).
-    backgroundColor: 'rgba(20,15,10,0.55)',
   },
 });

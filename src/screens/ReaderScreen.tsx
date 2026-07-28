@@ -4,8 +4,10 @@ import { OverflowSheet, type OverflowItemId } from '../components/reader/Overflo
 import { PageList, PAGE_SLOT } from '../components/reader/PageList';
 import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
+import { SignatureModal } from '../components/shared/SignatureModal';
 import { useRouter } from '../navigation/router';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { applySignedPage } from '../services/persistence/libraryOperations';
 import { printDocument, shareDocument, shareFileUri } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { useTheme } from '../theme';
@@ -26,6 +28,7 @@ export function ReaderScreen() {
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [signing, setSigning] = useState(false);
   const listRef = useRef<FlatList<LibraryPage>>(null);
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export function ReaderScreen() {
         const page = doc.pages[activeIndex];
         if (page) await shareFileUri(page.fileUri, 'image/jpeg', `${doc.name} - page ${activeIndex + 1}`);
       } else if (id === 'sign') {
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signing is coming in a later update' });
+        setSigning(true);
       } else if (id === 'delete') {
         Alert.alert(
           'Delete document?',
@@ -93,6 +96,17 @@ export function ReaderScreen() {
       }
     },
     [doc, activeIndex, dispatch, go]
+  );
+
+  const handleSignConfirm = useCallback(
+    async (flattenedUri: string) => {
+      if (!doc) return;
+      const updated = await applySignedPage(doc, activeIndex, flattenedUri);
+      dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
+      setSigning(false);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
+    },
+    [doc, activeIndex, dispatch]
   );
 
   if (!doc) {
@@ -136,6 +150,17 @@ export function ReaderScreen() {
       />
 
       <OverflowSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)} onSelect={handleOverflowSelect} />
+
+      {signing && doc.pages[activeIndex] && (
+        <SignatureModal
+          visible
+          uri={doc.pages[activeIndex].fileUri}
+          naturalWidth={doc.pages[activeIndex].width}
+          naturalHeight={doc.pages[activeIndex].height}
+          onCancel={() => setSigning(false)}
+          onConfirm={handleSignConfirm}
+        />
+      )}
     </View>
   );
 }

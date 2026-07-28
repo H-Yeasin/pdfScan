@@ -24,7 +24,7 @@ export function SelectionBar({ selectionCount, onPress }: SelectionBarProps) {
 
   const disabled = (id: SelectionToolId) => {
     if (id === 'merge') return selectionCount < 2;
-    if (id === 'split') return selectionCount !== 1;
+    if (id === 'split' || id === 'sign') return selectionCount !== 1;
     return false;
   };
 

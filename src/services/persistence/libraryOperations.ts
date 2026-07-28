@@ -117,3 +117,31 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
 export function deleteDocuments(ids: string[]): void {
   ids.forEach(deleteDocumentFiles);
 }
+
+// Replaces one page's image with a signed (flattened) version, in place, and rebuilds the
+// PDF if the document is PDF-format so the signature survives into the exported file.
+export async function applySignedPage(
+  doc: LibraryDocument,
+  pageIndex: number,
+  flattenedUri: string
+): Promise<LibraryDocument> {
+  const dir = getDocumentDir(doc.id);
+  const dest = new File(dir, `page_${pageIndex + 1}.jpg`);
+  if (dest.exists) dest.delete();
+  new File(flattenedUri).move(dest);
+
+  const pages = doc.pages.map((page, i) => (i === pageIndex ? { ...page, fileUri: dest.uri } : page));
+
+  let pdfUri = doc.pdfUri;
+  let sizeBytes = doc.sizeBytes;
+  if (doc.format === 'PDF') {
+    const pdfResult = await buildPdfFromPages(
+      doc.id,
+      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height }))
+    );
+    pdfUri = pdfResult.uri;
+    sizeBytes = pdfResult.sizeBytes;
+  }
+
+  return { ...doc, pages, pdfUri, sizeBytes };
+}
