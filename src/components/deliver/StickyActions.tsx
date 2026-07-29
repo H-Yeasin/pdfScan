@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 
 type StickyActionsProps = {
@@ -22,6 +22,11 @@ export function StickyActions({ saving, onSave, onSaveShare }: StickyActionsProp
       <Pressable style={styles.ghost} onPress={onSaveShare} disabled={saving}>
         <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>Save & Share</Text>
       </Pressable>
+      {Platform.OS === 'ios' && (
+        <Text style={[styles.shareHint, { color: tokens.muted }]}>
+          Share also lets you save to Files, iCloud Drive, or another app.
+        </Text>
+      )}
       <Text style={[styles.footnote, { color: tokens.muted }]}>No watermark. No account. Nothing leaves your phone.</Text>
     </View>
   );
@@ -52,6 +57,11 @@ const styles = StyleSheet.create({
   ghostLabel: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  shareHint: {
+    textAlign: 'center',
+    fontSize: 12,
+    marginTop: 2,
   },
   footnote: {
     textAlign: 'center',

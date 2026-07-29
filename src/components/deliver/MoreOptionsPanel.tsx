@@ -2,14 +2,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
 
+type ExportCopyProps = {
+  enabled: boolean;
+  onToggle: () => void;
+  folderLabel: string | null;
+  onSetup: () => void;
+};
+
 type MoreOptionsPanelProps = {
   open: boolean;
   onToggleOpen: () => void;
   passwordEnabled: boolean;
   onTogglePassword: () => void;
+  // Android-only: omitted entirely on iOS, which has no SAF equivalent.
+  exportCopy?: ExportCopyProps;
 };
 
-export function MoreOptionsPanel({ open, onToggleOpen, passwordEnabled, onTogglePassword }: MoreOptionsPanelProps) {
+export function MoreOptionsPanel({
+  open,
+  onToggleOpen,
+  passwordEnabled,
+  onTogglePassword,
+  exportCopy,
+}: MoreOptionsPanelProps) {
   const { tokens } = useTheme();
 
   return (
@@ -47,6 +62,29 @@ export function MoreOptionsPanel({ open, onToggleOpen, passwordEnabled, onToggle
             <Text style={[styles.rowLabel, { color: tokens.ink }]}>Margin</Text>
             <Text style={{ color: tokens.muted }}>Small</Text>
           </View>
+          {exportCopy && (
+            <View style={styles.row}>
+              <View style={styles.rowTextWrap}>
+                <Text style={[styles.rowLabel, { color: tokens.ink }]}>Also save a copy to device</Text>
+                <Text style={[styles.disclosure, { color: tokens.muted }]}>
+                  {exportCopy.folderLabel
+                    ? `Copies the export to ${exportCopy.folderLabel}.`
+                    : 'Set up a default export folder in Settings first.'}
+                </Text>
+              </View>
+              {exportCopy.folderLabel ? (
+                <Switch
+                  value={exportCopy.enabled}
+                  onValueChange={exportCopy.onToggle}
+                  trackColor={{ true: tokens.accent, false: tokens.surface2 }}
+                />
+              ) : (
+                <Pressable onPress={exportCopy.onSetup}>
+                  <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Set up →</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
       )}
     </View>

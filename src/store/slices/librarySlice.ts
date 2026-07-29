@@ -1,9 +1,13 @@
-import type { LibraryDocument } from '../../types/models';
+import type { LibraryDocument, LibraryFolder } from '../../types/models';
 
 export type LibraryTab = 'starred' | 'recent' | 'folders';
 
 export type LibraryState = {
   files: LibraryDocument[];
+  folders: LibraryFolder[];
+  // UI-only drill-in state for the Folders tab: null = showing the folder list,
+  // a folder id = showing that folder's contents. Not persisted, same category as `tab`.
+  activeFolderId: string | null;
   selection: string[];
   selMode: boolean;
   tab: LibraryTab;
@@ -15,6 +19,8 @@ export type LibraryState = {
 
 export const initialLibraryState: LibraryState = {
   files: [],
+  folders: [],
+  activeFolderId: null,
   selection: [],
   selMode: false,
   tab: 'recent',
@@ -37,7 +43,13 @@ export type LibraryAction =
   | { type: 'library/SET_TAB'; tab: LibraryTab }
   | { type: 'library/SET_SEARCH'; search: string }
   | { type: 'library/TOGGLE_SEARCH_OPEN' }
-  | { type: 'library/SET_SEARCH_RESULT_IDS'; ids: string[] | null };
+  | { type: 'library/SET_SEARCH_RESULT_IDS'; ids: string[] | null }
+  | { type: 'library/SET_FOLDERS'; folders: LibraryFolder[] }
+  | { type: 'library/CREATE_FOLDER'; id: string; name: string }
+  | { type: 'library/RENAME_FOLDER'; id: string; name: string }
+  | { type: 'library/DELETE_FOLDER'; id: string }
+  | { type: 'library/ASSIGN_FOLDER'; ids: string[]; folderId: string | null }
+  | { type: 'library/SET_ACTIVE_FOLDER'; id: string | null };
 
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
@@ -86,7 +98,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/CLEAR_SELECTION':
       return { ...state, selection: [], selMode: false };
     case 'library/SET_TAB':
-      return { ...state, tab: action.tab };
+      return { ...state, tab: action.tab, activeFolderId: null };
     case 'library/SET_SEARCH':
       return { ...state, search: action.search, searchResultIds: action.search.trim() ? state.searchResultIds : null };
     case 'library/TOGGLE_SEARCH_OPEN':
@@ -98,6 +110,31 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       };
     case 'library/SET_SEARCH_RESULT_IDS':
       return { ...state, searchResultIds: action.ids };
+    case 'library/SET_FOLDERS':
+      return { ...state, folders: action.folders };
+    case 'library/CREATE_FOLDER':
+      return { ...state, folders: [...state.folders, { id: action.id, name: action.name, createdAt: Date.now() }] };
+    case 'library/RENAME_FOLDER':
+      return {
+        ...state,
+        folders: state.folders.map((f) => (f.id === action.id ? { ...f, name: action.name } : f)),
+      };
+    case 'library/DELETE_FOLDER':
+      return {
+        ...state,
+        folders: state.folders.filter((f) => f.id !== action.id),
+        files: state.files.map((f) => (f.folderId === action.id ? { ...f, folderId: undefined } : f)),
+        activeFolderId: state.activeFolderId === action.id ? null : state.activeFolderId,
+      };
+    case 'library/ASSIGN_FOLDER':
+      return {
+        ...state,
+        files: state.files.map((f) =>
+          action.ids.includes(f.id) ? { ...f, folderId: action.folderId ?? undefined } : f
+        ),
+      };
+    case 'library/SET_ACTIVE_FOLDER':
+      return { ...state, activeFolderId: action.id };
     default:
       return state;
   }

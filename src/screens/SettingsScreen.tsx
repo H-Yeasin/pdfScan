@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LanguageRow } from '../components/settings/LanguageRow';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
+import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
 import type { OcrScript } from '../types/models';
@@ -27,7 +30,20 @@ export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { ocrScript } = state.settings;
+  const { ocrScript, androidExportFolderUri, androidExportFolderLabel } = state.settings;
+
+  const handlePickExportFolder = useCallback(async () => {
+    const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!result.granted) {
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'No folder selected' });
+      return;
+    }
+    dispatch({
+      type: 'settings/SET_ANDROID_EXPORT_FOLDER',
+      uri: result.directoryUri,
+      label: deriveFolderLabel(result.directoryUri),
+    });
+  }, [dispatch]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -61,6 +77,33 @@ export function SettingsScreen() {
             Devanagari covers Hindi, Marathi, Nepali and Sanskrit; Bengali script isn't supported yet.
           </Text>
         </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Organization</Text>
+          <SettingRow
+            title="Manage folders"
+            subtitle="Create, rename, and organize save locations"
+            chevron
+            onPress={() => go('manageFolders')}
+          />
+        </View>
+
+        {Platform.OS === 'android' && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Export</Text>
+            <SettingRow
+              title="Default export folder"
+              subtitle="Copy exported files here automatically"
+              trailing={androidExportFolderLabel ?? 'Not set'}
+              onPress={handlePickExportFolder}
+            />
+            {androidExportFolderUri ? (
+              <Text style={[styles.footnote, { color: tokens.muted }]}>
+                Turn on "Also save a copy" in Deliver to write exports here too.
+              </Text>
+            ) : null}
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Backup</Text>

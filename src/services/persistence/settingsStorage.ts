@@ -8,6 +8,8 @@ export type PersistedSettings = {
   themePref: ThemePref;
   firstRun: boolean;
   ocrScript: OcrScript;
+  androidExportFolderUri?: string | null;
+  androidExportFolderLabel?: string | null;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

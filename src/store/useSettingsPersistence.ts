@@ -14,6 +14,11 @@ export function useSettingsPersistence() {
         setThemePref(settings.themePref);
         dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: settings.firstRun });
         dispatch({ type: 'settings/SET_OCR_SCRIPT', script: settings.ocrScript });
+        dispatch({
+          type: 'settings/SET_ANDROID_EXPORT_FOLDER',
+          uri: settings.androidExportFolderUri ?? null,
+          label: settings.androidExportFolderLabel ?? null,
+        });
       }
       loaded.current = true;
     });
@@ -21,6 +26,18 @@ export function useSettingsPersistence() {
 
   useEffect(() => {
     if (!loaded.current) return;
-    persistSettings({ themePref, firstRun: state.settings.firstRun, ocrScript: state.settings.ocrScript });
-  }, [themePref, state.settings.firstRun, state.settings.ocrScript]);
+    persistSettings({
+      themePref,
+      firstRun: state.settings.firstRun,
+      ocrScript: state.settings.ocrScript,
+      androidExportFolderUri: state.settings.androidExportFolderUri,
+      androidExportFolderLabel: state.settings.androidExportFolderLabel,
+    });
+  }, [
+    themePref,
+    state.settings.firstRun,
+    state.settings.ocrScript,
+    state.settings.androidExportFolderUri,
+    state.settings.androidExportFolderLabel,
+  ]);
 }

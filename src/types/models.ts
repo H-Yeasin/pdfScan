@@ -46,9 +46,26 @@ export type LibraryDocument = {
   // this badge must also show the "not actually protected" disclosure.
   locked: boolean;
   searchHaystack: string;
+  // Undefined means "unfiled" — every document saved before folders shipped has no
+  // key here at all, so undefined and null must be treated identically everywhere.
+  folderId?: string;
 };
 
-export type LibraryIndex = {
+export type LibraryFolder = {
+  id: string;
+  name: string;
+  createdAt: number;
+};
+
+export type LibraryIndexV1 = {
   version: 1;
   documents: LibraryDocument[];
 };
+
+export type LibraryIndexV2 = {
+  version: 2;
+  documents: LibraryDocument[];
+  folders: LibraryFolder[];
+};
+
+export type LibraryIndex = LibraryIndexV1 | LibraryIndexV2;

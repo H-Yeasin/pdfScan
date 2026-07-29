@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
+import { FolderList, UNFILED_FOLDER_ID } from '../components/library/FolderList';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar, type SelectionToolId } from '../components/library/SelectionBar';
@@ -26,12 +27,13 @@ import { getMatchSnippet, searchDocuments } from '../services/search/searchServi
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument } from '../types/models';
+import { createId } from '../utils/id';
 
 export function LibraryScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
+  const { files, folders, activeFolderId, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
@@ -51,12 +53,46 @@ export function LibraryScreen() {
   }, [search, dispatch]);
 
   const visibleFiles = useMemo(() => {
-    const tabbed = tab === 'starred' ? files.filter((f) => f.star) : files;
+    let tabbed = files;
+    if (tab === 'starred') tabbed = files.filter((f) => f.star);
+    else if (tab === 'folders') {
+      if (activeFolderId === UNFILED_FOLDER_ID) tabbed = files.filter((f) => !f.folderId);
+      else if (activeFolderId) tabbed = files.filter((f) => f.folderId === activeFolderId);
+      else tabbed = [];
+    }
     if (!search.trim()) return tabbed;
     if (searchResultIds === null) return searchDocuments(tabbed, search);
     const idSet = new Set(searchResultIds);
     return tabbed.filter((f) => idSet.has(f.id));
-  }, [files, tab, search, searchResultIds]);
+  }, [files, tab, activeFolderId, search, searchResultIds]);
+
+  const folderCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    files.forEach((f) => {
+      if (f.folderId) counts[f.folderId] = (counts[f.folderId] ?? 0) + 1;
+    });
+    return counts;
+  }, [files]);
+
+  const unfiledCount = useMemo(() => files.filter((f) => !f.folderId).length, [files]);
+
+  const activeFolderName = useMemo(() => {
+    if (activeFolderId === UNFILED_FOLDER_ID) return 'Unfiled';
+    return folders.find((f) => f.id === activeFolderId)?.name ?? 'Folder';
+  }, [activeFolderId, folders]);
+
+  const handleCreateFolder = useCallback(
+    (name: string) => dispatch({ type: 'library/CREATE_FOLDER', id: createId('folder'), name }),
+    [dispatch]
+  );
+  const handleRenameFolder = useCallback(
+    (id: string, name: string) => dispatch({ type: 'library/RENAME_FOLDER', id, name }),
+    [dispatch]
+  );
+  const handleDeleteFolder = useCallback(
+    (id: string) => dispatch({ type: 'library/DELETE_FOLDER', id }),
+    [dispatch]
+  );
 
   const handlePressRow = useCallback(
     (doc: LibraryDocument) => {
@@ -214,7 +250,19 @@ export function LibraryScreen() {
 
       <LibraryTabs value={tab} onChange={(value) => dispatch({ type: 'library/SET_TAB', tab: value })} />
 
-      {isEmptyLibrary ? (
+      {tab === 'folders' && activeFolderId === null ? (
+        <ScrollView>
+          <FolderList
+            folders={folders}
+            counts={folderCounts}
+            unfiledCount={unfiledCount}
+            onOpenFolder={(id) => dispatch({ type: 'library/SET_ACTIVE_FOLDER', id })}
+            onCreate={handleCreateFolder}
+            onRename={handleRenameFolder}
+            onDelete={handleDeleteFolder}
+          />
+        </ScrollView>
+      ) : isEmptyLibrary ? (
         <EmptyState
           title="Your scans will appear here."
           actionLabel="Scan now"
@@ -226,22 +274,33 @@ export function LibraryScreen() {
           body="Search also looks inside scans — OCR text is indexed for every document, free."
         />
       ) : (
-        <FlatList
-          data={visibleFiles}
-          keyExtractor={(doc) => doc.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <FileRow
-              doc={item}
-              selected={selection.includes(item.id)}
-              selectionMode={selMode}
-              matchSnippet={getMatchSnippet(item, search)}
-              onPress={() => handlePressRow(item)}
-              onLongPress={() => handleLongPress(item)}
-              onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
-            />
+        <>
+          {tab === 'folders' && (
+            <Pressable
+              style={styles.folderBack}
+              onPress={() => dispatch({ type: 'library/SET_ACTIVE_FOLDER', id: null })}
+            >
+              <Ionicons name="chevron-back" size={18} color={tokens.ink} />
+              <Text style={[styles.folderBackLabel, { color: tokens.ink }]}>{activeFolderName}</Text>
+            </Pressable>
           )}
-        />
+          <FlatList
+            data={visibleFiles}
+            keyExtractor={(doc) => doc.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <FileRow
+                doc={item}
+                selected={selection.includes(item.id)}
+                selectionMode={selMode}
+                matchSnippet={getMatchSnippet(item, search)}
+                onPress={() => handlePressRow(item)}
+                onLongPress={() => handleLongPress(item)}
+                onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
+              />
+            )}
+          />
+        </>
       )}
 
       {selMode ? (
@@ -306,6 +365,17 @@ const styles = StyleSheet.create({
   headerIcons: {
     flexDirection: 'row',
     gap: 2,
+  },
+  folderBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  folderBackLabel: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   iconButton: {
     width: 44,

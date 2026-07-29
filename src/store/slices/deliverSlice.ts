@@ -6,6 +6,9 @@ export type DeliverState = {
   quality: number; // 1-5
   more: boolean;
   pw: boolean;
+  folderId: string | null;
+  // Android-only: also write a copy to the user's chosen device folder via SAF.
+  exportCopy: boolean;
 };
 
 export const initialDeliverState: DeliverState = {
@@ -14,6 +17,8 @@ export const initialDeliverState: DeliverState = {
   quality: 3,
   more: false,
   pw: false,
+  folderId: null,
+  exportCopy: false,
 };
 
 export type DeliverAction =
@@ -22,6 +27,8 @@ export type DeliverAction =
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/TOGGLE_MORE' }
   | { type: 'deliver/TOGGLE_PW' }
+  | { type: 'deliver/SET_FOLDER'; folderId: string | null }
+  | { type: 'deliver/TOGGLE_EXPORT_COPY' }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -36,6 +43,10 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, more: !state.more };
     case 'deliver/TOGGLE_PW':
       return { ...state, pw: !state.pw };
+    case 'deliver/SET_FOLDER':
+      return { ...state, folderId: action.folderId };
+    case 'deliver/TOGGLE_EXPORT_COPY':
+      return { ...state, exportCopy: !state.exportCopy };
     case 'deliver/RESET':
       return initialDeliverState;
     default:

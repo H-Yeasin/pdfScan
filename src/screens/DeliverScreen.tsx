@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { FormatSegmented } from '../components/deliver/FormatSegmented';
 import { MoreOptionsPanel } from '../components/deliver/MoreOptionsPanel';
 import { NameField } from '../components/deliver/NameField';
@@ -9,6 +10,7 @@ import { QualitySlider } from '../components/deliver/QualitySlider';
 import { StickyActions } from '../components/deliver/StickyActions';
 import { useRouter } from '../navigation/router';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
+import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
 import { bakeEnhance, isBakeableEnhance } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -37,8 +39,25 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, pw } = state.deliver;
+  const { name, format, quality, more, pw, folderId, exportCopy } = state.deliver;
+  const { folders } = state.library;
+  const { androidExportFolderUri, androidExportFolderLabel } = state.settings;
   const [saving, setSaving] = useState(false);
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false);
+
+  const folderName = useMemo(
+    () => folders.find((f) => f.id === folderId)?.name ?? 'My Scans',
+    [folders, folderId]
+  );
+
+  const handleCreateFolder = useCallback(
+    (folderName: string) => {
+      const id = createId('folder');
+      dispatch({ type: 'library/CREATE_FOLDER', id, name: folderName });
+      return id;
+    },
+    [dispatch]
+  );
 
   useEffect(() => {
     if (name || pages.length === 0) return;
@@ -108,6 +127,7 @@ export function DeliverScreen() {
           tag: finalName.slice(0, 4).toUpperCase(),
           locked: pw,
           searchHaystack: haystack,
+          folderId: folderId ?? undefined,
         };
 
         insertScannedDocument(doc).catch((e) => console.warn('dbService.insertScannedDocument failed', e));
@@ -116,9 +136,21 @@ export function DeliverScreen() {
         dispatch({ type: 'review/RESET' });
         dispatch({ type: 'deliver/RESET' });
         go('library');
+
+        // The device-folder copy runs after the in-app save has already succeeded and never
+        // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.
+        let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${folderName}`;
+        if (!shareAfter && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
+          const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
+          snackMsg =
+            result.failed === 0
+              ? `Saved · ${folderName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
+              : `Saved · ${folderName} · copy to device folder failed`;
+        }
+
         dispatch({
           type: 'ui/SHOW_SNACK',
-          msg: shareAfter ? 'Saved · sharing…' : 'Saved · My Scans',
+          msg: snackMsg,
           action: 'Undo',
           onAction: () => {
             dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
@@ -131,7 +163,22 @@ export function DeliverScreen() {
         setSaving(false);
       }
     },
-    [pages, saving, quality, format, name, pw, state.capture.mode, dispatch, go]
+    [
+      pages,
+      saving,
+      quality,
+      format,
+      name,
+      pw,
+      folderId,
+      folderName,
+      exportCopy,
+      androidExportFolderUri,
+      androidExportFolderLabel,
+      state.capture.mode,
+      dispatch,
+      go,
+    ]
   );
 
   return (
@@ -169,18 +216,40 @@ export function DeliverScreen() {
           onToggleOpen={() => dispatch({ type: 'deliver/TOGGLE_MORE' })}
           passwordEnabled={pw}
           onTogglePassword={() => dispatch({ type: 'deliver/TOGGLE_PW' })}
+          exportCopy={
+            Platform.OS === 'android'
+              ? {
+                  enabled: exportCopy,
+                  onToggle: () => dispatch({ type: 'deliver/TOGGLE_EXPORT_COPY' }),
+                  folderLabel: androidExportFolderLabel,
+                  onSetup: () => go('settings'),
+                }
+              : undefined
+          }
         />
 
-        <View style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+        <Pressable
+          style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
+          onPress={() => setFolderPickerOpen(true)}
+        >
           <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
-          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>My Scans</Text>
-        </View>
+          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{folderName}</Text>
+        </Pressable>
       </ScrollView>
 
       <StickyActions
         saving={saving}
         onSave={() => handleSaveInternal(false)}
         onSaveShare={() => handleSaveInternal(true)}
+      />
+
+      <FolderPickerModal
+        visible={folderPickerOpen}
+        folders={folders}
+        selectedFolderId={folderId}
+        onSelect={(id) => dispatch({ type: 'deliver/SET_FOLDER', folderId: id })}
+        onCreate={handleCreateFolder}
+        onClose={() => setFolderPickerOpen(false)}
       />
     </SafeAreaView>
   );

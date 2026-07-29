@@ -10,6 +10,7 @@ import { LibraryScreen } from '../screens/LibraryScreen';
 import { ReaderScreen } from '../screens/ReaderScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ProScreen } from '../screens/ProScreen';
+import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
@@ -23,6 +24,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   reader: ReaderScreen,
   settings: SettingsScreen,
   pro: ProScreen,
+  manageFolders: ManageFoldersScreen,
 };
 
 export function AppNavigator() {
