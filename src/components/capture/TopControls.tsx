@@ -23,17 +23,9 @@ type TopControlsProps = {
   flashMode: FlashMode;
   onCycleFlash: () => void;
   onSettingsPress: () => void;
-  onSmartScanPress: () => void;
-  smartScanDisabled?: boolean;
 };
 
-export function TopControls({
-  flashMode,
-  onCycleFlash,
-  onSettingsPress,
-  onSmartScanPress,
-  smartScanDisabled,
-}: TopControlsProps) {
+export function TopControls({ flashMode, onCycleFlash, onSettingsPress }: TopControlsProps) {
   const chrome = useCaptureChrome();
 
   return (
@@ -47,19 +39,6 @@ export function TopControls({
         >
           {FLASH_LABEL[flashMode]}
         </Pill>
-      </Pressable>
-
-      <Pressable
-        onPress={onSmartScanPress}
-        disabled={smartScanDisabled}
-        hitSlop={8}
-        style={[
-          styles.settingsButton,
-          { backgroundColor: chrome.pillBg, borderColor: chrome.pillBorder },
-          smartScanDisabled && styles.buttonDisabled,
-        ]}
-      >
-        <Ionicons name="scan-outline" size={20} color={chrome.text} />
       </Pressable>
 
       <Pressable
@@ -87,8 +66,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
 });

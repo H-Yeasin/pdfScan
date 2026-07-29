@@ -4,11 +4,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { AutoCapturePill } from '../components/capture/AutoCapturePill';
 import { CaptureControls } from '../components/capture/CaptureControls';
 import { DocumentFrame } from '../components/capture/DocumentFrame';
 import { FirstRunSheet } from '../components/capture/FirstRunSheet';
-import { LockStatusPill } from '../components/capture/LockStatusPill';
 import { PermissionGate } from '../components/capture/PermissionGate';
 import { TopControls } from '../components/capture/TopControls';
 import { TabBar } from '../components/shared/TabBar';
@@ -26,7 +24,7 @@ export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { flash, auto, pages, processingStatus, errorMessage } = state.capture;
+  const { flash, pages, processingStatus, errorMessage } = state.capture;
   const { firstRun } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
 
@@ -44,6 +42,7 @@ export function CaptureScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [capturing, setCapturing] = useState(false);
   const flashOpacity = useRef(new Animated.Value(0)).current;
+  const busy = busyScanning || capturing;
 
   const addPagesFromAssets = useCallback(
     (assets: { uri: string; width: number; height: number }[]) => {
@@ -77,9 +76,9 @@ export function CaptureScreen() {
     go('review');
   }, [addPagesFromAssets, go]);
 
-  const handleCapture = useCallback(async () => {
+  const handleQuickCapture = useCallback(async () => {
     const camera = cameraRef.current;
-    if (!camera || capturing) return;
+    if (!camera || busy) return;
 
     setCapturing(true);
     flashOpacity.setValue(0.85);
@@ -93,7 +92,12 @@ export function CaptureScreen() {
     } finally {
       setCapturing(false);
     }
-  }, [capturing, flashOpacity, addPagesFromAssets]);
+  }, [busy, flashOpacity, addPagesFromAssets]);
+
+  const handleScan = useCallback(() => {
+    if (busy) return;
+    runNativeScannerPipeline(dispatch);
+  }, [busy, dispatch]);
 
   const handleAllowFirstRun = useCallback(async () => {
     dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: false });
@@ -137,25 +141,19 @@ export function CaptureScreen() {
           flashMode={flash}
           onCycleFlash={() => dispatch({ type: 'capture/TOGGLE_FLASH' })}
           onSettingsPress={() => go('settings')}
-          onSmartScanPress={() => runNativeScannerPipeline(dispatch)}
-          smartScanDisabled={busyScanning}
         />
 
         <View style={styles.frameArea}>
-          <DocumentFrame locked={auto} />
-        </View>
-
-        <View style={styles.statusArea}>
-          <LockStatusPill locked={auto} />
-          <AutoCapturePill enabled={auto} onToggle={() => dispatch({ type: 'capture/TOGGLE_AUTO' })} />
+          <DocumentFrame />
         </View>
 
         <View style={styles.controlsArea}>
           <CaptureControls
-            onCapturePress={handleCapture}
+            onQuickCapturePress={handleQuickCapture}
+            onScanPress={handleScan}
             onGalleryPress={handleImport}
             onTrayPress={() => go('review')}
-            disabled={capturing}
+            busy={busy}
             pageCount={pages.length}
             lastPage={pages[pages.length - 1]}
           />
@@ -178,7 +176,7 @@ export function CaptureScreen() {
         <View style={[StyleSheet.absoluteFill, styles.scanOverlay]}>
           <ActivityIndicator color="#fff" size="large" />
           <Text style={styles.scanOverlayLabel}>
-            {processingStatus === 'scanning' ? 'Scanning…' : 'Processing pages…'}
+            {processingStatus === 'scanning' ? 'Opening scanner…' : 'Processing pages…'}
           </Text>
         </View>
       )}
@@ -214,11 +212,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  statusArea: {
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingBottom: spacing.xl,
   },
   controlsArea: {
     paddingBottom: spacing.lg,

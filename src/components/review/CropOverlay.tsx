@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { radii, spacing, useTheme } from '../../theme';
 
 const HANDLE_SIZE = 28;
+const HANDLE_HIT_SLOP = 16;
 const MIN_CROP = 40;
 
 type CropOverlayProps = {
@@ -37,15 +38,68 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
   const right = useSharedValue(displayWidth);
   const bottom = useSharedValue(displayHeight);
 
-  const topLeftPan = Gesture.Pan().onUpdate((e) => {
-    left.value = clamp(e.x, 0, right.value - MIN_CROP);
-    top.value = clamp(e.y, 0, bottom.value - MIN_CROP);
-  });
+  // Snapshot of the rect at gesture-start, read by every pan below. `event.translationX/Y` is an
+  // accumulated delta from the *finger's* initial touch point, not the (moving) handle view's own
+  // position, so anchoring every update to this fixed snapshot — rather than the previous approach
+  // of reading `event.x/y`, which is relative to the handle view and drifts every time that view
+  // is repositioned mid-drag — keeps the drag 1:1 with the finger instead of jittering/running away.
+  const startLeft = useSharedValue(0);
+  const startTop = useSharedValue(0);
+  const startRight = useSharedValue(0);
+  const startBottom = useSharedValue(0);
 
-  const bottomRightPan = Gesture.Pan().onUpdate((e) => {
-    right.value = clamp(e.x, left.value + MIN_CROP, displayWidth);
-    bottom.value = clamp(e.y, top.value + MIN_CROP, displayHeight);
-  });
+  const captureStart = () => {
+    'worklet';
+    startLeft.value = left.value;
+    startTop.value = top.value;
+    startRight.value = right.value;
+    startBottom.value = bottom.value;
+  };
+
+  const topLeftPan = Gesture.Pan()
+    .hitSlop(HANDLE_HIT_SLOP)
+    .onStart(captureStart)
+    .onUpdate((e) => {
+      left.value = clamp(startLeft.value + e.translationX, 0, right.value - MIN_CROP);
+      top.value = clamp(startTop.value + e.translationY, 0, bottom.value - MIN_CROP);
+    });
+
+  const topRightPan = Gesture.Pan()
+    .hitSlop(HANDLE_HIT_SLOP)
+    .onStart(captureStart)
+    .onUpdate((e) => {
+      right.value = clamp(startRight.value + e.translationX, left.value + MIN_CROP, displayWidth);
+      top.value = clamp(startTop.value + e.translationY, 0, bottom.value - MIN_CROP);
+    });
+
+  const bottomLeftPan = Gesture.Pan()
+    .hitSlop(HANDLE_HIT_SLOP)
+    .onStart(captureStart)
+    .onUpdate((e) => {
+      left.value = clamp(startLeft.value + e.translationX, 0, right.value - MIN_CROP);
+      bottom.value = clamp(startBottom.value + e.translationY, top.value + MIN_CROP, displayHeight);
+    });
+
+  const bottomRightPan = Gesture.Pan()
+    .hitSlop(HANDLE_HIT_SLOP)
+    .onStart(captureStart)
+    .onUpdate((e) => {
+      right.value = clamp(startRight.value + e.translationX, left.value + MIN_CROP, displayWidth);
+      bottom.value = clamp(startBottom.value + e.translationY, top.value + MIN_CROP, displayHeight);
+    });
+
+  const movePan = Gesture.Pan()
+    .onStart(captureStart)
+    .onUpdate((e) => {
+      const w = startRight.value - startLeft.value;
+      const h = startBottom.value - startTop.value;
+      const newLeft = clamp(startLeft.value + e.translationX, 0, displayWidth - w);
+      const newTop = clamp(startTop.value + e.translationY, 0, displayHeight - h);
+      left.value = newLeft;
+      top.value = newTop;
+      right.value = newLeft + w;
+      bottom.value = newTop + h;
+    });
 
   const rectStyle = useAnimatedStyle(() => ({
     left: left.value,
@@ -65,10 +119,25 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
     left: left.value - HANDLE_SIZE / 2,
     top: top.value - HANDLE_SIZE / 2,
   }));
+  const topRightHandleStyle = useAnimatedStyle(() => ({
+    left: right.value - HANDLE_SIZE / 2,
+    top: top.value - HANDLE_SIZE / 2,
+  }));
+  const bottomLeftHandleStyle = useAnimatedStyle(() => ({
+    left: left.value - HANDLE_SIZE / 2,
+    top: bottom.value - HANDLE_SIZE / 2,
+  }));
   const bottomRightHandleStyle = useAnimatedStyle(() => ({
     left: right.value - HANDLE_SIZE / 2,
     top: bottom.value - HANDLE_SIZE / 2,
   }));
+
+  const handleReset = () => {
+    left.value = 0;
+    top.value = 0;
+    right.value = displayWidth;
+    bottom.value = displayHeight;
+  };
 
   const handleConfirm = () => {
     const scale = naturalWidth / displayWidth;
@@ -89,10 +158,20 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
           <Animated.View pointerEvents="none" style={[styles.curtain, styles.curtainBottom, bottomCurtain]} />
           <Animated.View pointerEvents="none" style={[styles.curtain, leftCurtain]} />
           <Animated.View pointerEvents="none" style={[styles.curtain, rightCurtain, { right: 0, left: undefined }]} />
+
+          <GestureDetector gesture={movePan}>
+            <Animated.View style={[styles.moveArea, rectStyle]} />
+          </GestureDetector>
           <Animated.View pointerEvents="none" style={[styles.rectBorder, { borderColor: tokens.accent }, rectStyle]} />
 
           <GestureDetector gesture={topLeftPan}>
             <Animated.View style={[styles.handle, { borderColor: tokens.accent }, topLeftHandleStyle]} />
+          </GestureDetector>
+          <GestureDetector gesture={topRightPan}>
+            <Animated.View style={[styles.handle, { borderColor: tokens.accent }, topRightHandleStyle]} />
+          </GestureDetector>
+          <GestureDetector gesture={bottomLeftPan}>
+            <Animated.View style={[styles.handle, { borderColor: tokens.accent }, bottomLeftHandleStyle]} />
           </GestureDetector>
           <GestureDetector gesture={bottomRightPan}>
             <Animated.View style={[styles.handle, { borderColor: tokens.accent }, bottomRightHandleStyle]} />
@@ -102,6 +181,9 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
             <Text style={styles.ghostLabel}>Cancel</Text>
+          </Pressable>
+          <Pressable style={styles.ghostButton} onPress={handleReset}>
+            <Text style={styles.ghostLabel}>Reset</Text>
           </Pressable>
           <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
             <Text style={styles.primaryLabel}>Crop</Text>
@@ -133,6 +215,9 @@ const styles = StyleSheet.create({
   },
   curtainTop: { top: 0 },
   curtainBottom: { bottom: 0 },
+  moveArea: {
+    position: 'absolute',
+  },
   rectBorder: {
     position: 'absolute',
     borderWidth: 2,

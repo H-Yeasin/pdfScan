@@ -1,37 +1,76 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 import { radii, spacing } from '../../theme';
 import { useCaptureChrome } from '../../theme/captureChrome';
 import type { SessionPage } from '../../types/models';
 
-const SHUTTER_SIZE = 76;
-const SHUTTER_INNER_SIZE = 60;
 const SIDE_BUTTON_SIZE = 48;
+const SWITCH_TRACK_WIDTH = 104;
+const SWITCH_TRACK_HEIGHT = 52;
+const SWITCH_KNOB_SIZE = 44;
+const SWITCH_KNOB_PADDING = (SWITCH_TRACK_HEIGHT - SWITCH_KNOB_SIZE) / 2;
+const SWITCH_KNOB_TRAVEL = SWITCH_TRACK_WIDTH - SWITCH_KNOB_SIZE - SWITCH_KNOB_PADDING * 2;
+
+type Side = 'left' | 'right';
 
 type CaptureControlsProps = {
-  onCapturePress: () => void;
+  onQuickCapturePress: () => void;
+  onScanPress: () => void;
   onGalleryPress: () => void;
   onTrayPress: () => void;
-  disabled?: boolean;
+  busy?: boolean;
   pageCount: number;
   lastPage?: SessionPage;
 };
 
 export function CaptureControls({
-  onCapturePress,
+  onQuickCapturePress,
+  onScanPress,
   onGalleryPress,
   onTrayPress,
-  disabled,
+  busy,
   pageCount,
   lastPage,
 }: CaptureControlsProps) {
   const chrome = useCaptureChrome();
   const scale = useRef(new Animated.Value(1)).current;
+  const knobProgress = useRef(new Animated.Value(0)).current;
+  const [activeSide, setActiveSide] = useState<Side>('left');
   const trayEmpty = pageCount === 0;
 
   const animatePress = (toValue: number) => {
     Animated.spring(scale, { toValue, useNativeDriver: true, speed: 30, bounciness: 6 }).start();
+  };
+
+  useEffect(() => {
+    if (!busy) setActiveSide('left');
+  }, [busy]);
+
+  useEffect(() => {
+    Animated.spring(knobProgress, {
+      toValue: activeSide === 'right' ? 1 : 0,
+      useNativeDriver: true,
+      speed: 18,
+      bounciness: 6,
+    }).start();
+  }, [activeSide, knobProgress]);
+
+  const knobTranslateX = knobProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, SWITCH_KNOB_TRAVEL],
+  });
+
+  const handleQuickCapture = () => {
+    if (busy) return;
+    setActiveSide('left');
+    onQuickCapturePress();
+  };
+
+  const handleScan = () => {
+    if (busy) return;
+    setActiveSide('right');
+    onScanPress();
   };
 
   return (
@@ -44,23 +83,61 @@ export function CaptureControls({
         <Ionicons name="image-outline" size={22} color={chrome.text} />
       </Pressable>
 
-      <Pressable
-        onPress={onCapturePress}
-        onPressIn={() => animatePress(0.9)}
-        onPressOut={() => animatePress(1)}
-        disabled={disabled}
-        hitSlop={8}
+      <Animated.View
+        style={[
+          styles.switchTrack,
+          { borderColor: chrome.accent, backgroundColor: chrome.pillBg, transform: [{ scale }] },
+        ]}
       >
+        <Pressable
+          style={styles.switchHalf}
+          onPress={handleQuickCapture}
+          onPressIn={() => animatePress(0.96)}
+          onPressOut={() => animatePress(1)}
+          disabled={busy}
+          hitSlop={4}
+        >
+          <Ionicons
+            name="camera-outline"
+            size={18}
+            color={chrome.text}
+            style={activeSide === 'left' ? styles.hiddenIcon : undefined}
+          />
+        </Pressable>
+        <Pressable
+          style={styles.switchHalf}
+          onPress={handleScan}
+          onPressIn={() => animatePress(0.96)}
+          onPressOut={() => animatePress(1)}
+          disabled={busy}
+          hitSlop={4}
+        >
+          <Ionicons
+            name="scan-outline"
+            size={18}
+            color={chrome.text}
+            style={activeSide === 'right' ? styles.hiddenIcon : undefined}
+          />
+        </Pressable>
+
         <Animated.View
+          pointerEvents="none"
           style={[
-            styles.shutterOuter,
-            { borderColor: chrome.accent, transform: [{ scale }] },
-            disabled && styles.shutterDisabled,
+            styles.switchKnob,
+            { backgroundColor: chrome.accent, transform: [{ translateX: knobTranslateX }] },
           ]}
         >
-          <View style={[styles.shutterInner, { backgroundColor: chrome.accent }]} />
+          {busy ? (
+            <ActivityIndicator color={chrome.accentInk} size="small" />
+          ) : (
+            <Ionicons
+              name={activeSide === 'left' ? 'camera-outline' : 'scan-outline'}
+              size={22}
+              color={chrome.accentInk}
+            />
+          )}
         </Animated.View>
-      </Pressable>
+      </Animated.View>
 
       <Pressable
         style={[
@@ -102,21 +179,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  shutterOuter: {
-    width: SHUTTER_SIZE,
-    height: SHUTTER_SIZE,
+  switchTrack: {
+    width: SWITCH_TRACK_WIDTH,
+    height: SWITCH_TRACK_HEIGHT,
     borderRadius: radii.full,
-    borderWidth: 4,
+    borderWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  switchHalf: {
+    width: SWITCH_TRACK_WIDTH / 2,
+    height: SWITCH_TRACK_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shutterDisabled: {
-    opacity: 0.5,
+  hiddenIcon: {
+    opacity: 0,
   },
-  shutterInner: {
-    width: SHUTTER_INNER_SIZE,
-    height: SHUTTER_INNER_SIZE,
+  switchKnob: {
+    position: 'absolute',
+    left: SWITCH_KNOB_PADDING,
+    width: SWITCH_KNOB_SIZE,
+    height: SWITCH_KNOB_SIZE,
     borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thumbnail: {
     width: SIDE_BUTTON_SIZE,

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
@@ -10,6 +10,7 @@ import { ZoomableImage } from '../components/shared/ZoomableImage';
 import { useRouter } from '../navigation/router';
 import { rotatePage } from '../services/enhance/enhanceService';
 import { cropPage } from '../services/enhance/enhanceService';
+import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
 import { runOcr } from '../services/ocr/ocrService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -26,6 +27,11 @@ export function ReviewScreen() {
 
   const selectedPage = pages[sel] ?? pages[0];
   const multiPage = pages.length > 1;
+
+  const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(
+    selectedPage?.uri,
+    selectedPage?.enhance ?? 'auto'
+  );
 
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -144,7 +150,12 @@ export function ReviewScreen() {
       )}
 
       <View style={styles.previewArea}>
-        <ZoomableImage uri={selectedPage.uri} />
+        <ZoomableImage uri={previewUri ?? selectedPage.uri} />
+        {enhancePreviewLoading && (
+          <View style={styles.previewLoading} pointerEvents="none">
+            <ActivityIndicator color={tokens.accent} />
+          </View>
+        )}
       </View>
 
       {showErrHint && (
@@ -235,6 +246,15 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
     borderRadius: 10,
     overflow: 'hidden',
+  },
+  previewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errHint: {
     marginHorizontal: spacing.lg,

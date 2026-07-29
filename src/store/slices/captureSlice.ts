@@ -5,7 +5,6 @@ export type ProcessingStatus = 'idle' | 'scanning' | 'processing' | 'success' | 
 
 export type CaptureState = {
   flash: FlashMode;
-  auto: boolean;
   mode: CaptureMode;
   pages: SessionPage[];
   processingStatus: ProcessingStatus;
@@ -14,7 +13,6 @@ export type CaptureState = {
 
 export const initialCaptureState: CaptureState = {
   flash: 'auto',
-  auto: true,
   mode: 'doc',
   pages: [],
   processingStatus: 'idle',
@@ -22,7 +20,6 @@ export const initialCaptureState: CaptureState = {
 
 export type CaptureAction =
   | { type: 'capture/TOGGLE_FLASH' }
-  | { type: 'capture/TOGGLE_AUTO' }
   | { type: 'capture/SET_MODE'; mode: CaptureMode }
   | { type: 'capture/ADD_PAGE'; page: SessionPage }
   | { type: 'capture/REMOVE_PAGE'; id: string }
@@ -37,8 +34,6 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
   switch (action.type) {
     case 'capture/TOGGLE_FLASH':
       return { ...state, flash: state.flash === 'auto' ? 'on' : 'auto' };
-    case 'capture/TOGGLE_AUTO':
-      return { ...state, auto: !state.auto };
     case 'capture/SET_MODE':
       return { ...state, mode: action.mode };
     case 'capture/ADD_PAGE':
