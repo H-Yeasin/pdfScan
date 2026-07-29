@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { PermissionGate } from '../components/capture/PermissionGate';
 import { TopControls } from '../components/capture/TopControls';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
+import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { useAppState } from '../store/AppStateContext';
 import { spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
@@ -25,8 +26,19 @@ export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { flash, auto, pages } = state.capture;
+  const { flash, auto, pages, processingStatus, errorMessage } = state.capture;
   const { firstRun } = state.settings;
+  const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
+
+  useEffect(() => {
+    if (processingStatus === 'success') {
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Scan complete' });
+      dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
+    } else if (processingStatus === 'error') {
+      dispatch({ type: 'ui/SHOW_SNACK', msg: errorMessage ?? 'Scan failed' });
+      dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
+    }
+  }, [processingStatus, errorMessage, dispatch]);
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -125,6 +137,8 @@ export function CaptureScreen() {
           flashMode={flash}
           onCycleFlash={() => dispatch({ type: 'capture/TOGGLE_FLASH' })}
           onSettingsPress={() => go('settings')}
+          onSmartScanPress={() => runNativeScannerPipeline(dispatch)}
+          smartScanDisabled={busyScanning}
         />
 
         <View style={styles.frameArea}>
@@ -159,6 +173,15 @@ export function CaptureScreen() {
       {firstRun && (
         <FirstRunSheet onAllow={handleAllowFirstRun} onImportInstead={handleFirstRunImportInstead} />
       )}
+
+      {busyScanning && (
+        <View style={[StyleSheet.absoluteFill, styles.scanOverlay]}>
+          <ActivityIndicator color="#fff" size="large" />
+          <Text style={styles.scanOverlayLabel}>
+            {processingStatus === 'scanning' ? 'Scanning…' : 'Processing pages…'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -175,6 +198,17 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
+  },
+  scanOverlay: {
+    backgroundColor: 'rgba(0,0,0,.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
+  scanOverlayLabel: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   frameArea: {
     flex: 1,

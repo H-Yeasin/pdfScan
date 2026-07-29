@@ -1,11 +1,15 @@
 import type { FlashMode } from 'expo-camera';
 import type { CaptureMode, EnhanceMode, SessionPage } from '../../types/models';
 
+export type ProcessingStatus = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
+
 export type CaptureState = {
   flash: FlashMode;
   auto: boolean;
   mode: CaptureMode;
   pages: SessionPage[];
+  processingStatus: ProcessingStatus;
+  errorMessage?: string;
 };
 
 export const initialCaptureState: CaptureState = {
@@ -13,6 +17,7 @@ export const initialCaptureState: CaptureState = {
   auto: true,
   mode: 'doc',
   pages: [],
+  processingStatus: 'idle',
 };
 
 export type CaptureAction =
@@ -24,7 +29,9 @@ export type CaptureAction =
   | { type: 'capture/REORDER_PAGES'; fromIndex: number; toIndex: number }
   | { type: 'capture/SET_PAGE_ENHANCE'; id: string; enhance: EnhanceMode }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
-  | { type: 'capture/CLEAR_PAGES' };
+  | { type: 'capture/CLEAR_PAGES' }
+  | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
+  | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string };
 
 export function captureReducer(state: CaptureState, action: CaptureAction): CaptureState {
   switch (action.type) {
@@ -56,6 +63,10 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       };
     case 'capture/CLEAR_PAGES':
       return { ...state, pages: [] };
+    case 'capture/BULK_ADD_PAGES':
+      return { ...state, pages: [...state.pages, ...action.pages] };
+    case 'capture/SET_PROCESSING_STATUS':
+      return { ...state, processingStatus: action.status, errorMessage: action.errorMessage };
     default:
       return state;
   }

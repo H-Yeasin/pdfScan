@@ -11,7 +11,7 @@ import { useRouter } from '../navigation/router';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
-import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { shareDocument } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -73,6 +73,15 @@ export function DeliverScreen() {
           pdfUri = pdfResult.uri;
           sizeBytes = pdfResult.sizeBytes;
         }
+
+        // `saveImagesToLibrary` (and, for gray/bw pages, `bakeEnhance` before it) each wrote a
+        // fresh compressed copy rather than reusing the session's cache files, so the original
+        // capture-session images are now orphaned in the cache dir once the library copies
+        // above exist. Sweep them here rather than leaving them for the OS to eventually reap.
+        const staleCacheUris = new Set<string>();
+        pages.forEach((page) => staleCacheUris.add(page.uri));
+        bakedPages.forEach((page) => staleCacheUris.add(page.uri));
+        cleanTemporaryCache(Array.from(staleCacheUris));
 
         const libraryPages: LibraryPage[] = bakedPages.map((page, i) => ({
           id: page.id,
