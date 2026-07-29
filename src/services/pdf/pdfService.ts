@@ -112,6 +112,51 @@ export async function buildPdfFromPages(
   return { uri: dest.uri, sizeBytes: dest.size ?? 0 };
 }
 
+// Burns a captured signature PNG onto one page of an already-compiled PDF, in place.
+// `pageNaturalWidth` must be the natural pixel width of the SOURCE PAGE IMAGE that page was
+// built from (LibraryPage.width), not the PDF's own point-space width — it's the anchor used
+// to convert `placement` (natural pixel space, top-left origin, same convention as
+// SessionPage.cropRect) into PDF points via the page's live getWidth()/getHeight(), so this
+// stays correct even if PDF_LONG_SIDE_PT ever changes.
+export async function applySignatureToPdf(
+  documentId: string,
+  pdfUri: string,
+  pageIndex: number,
+  pageNaturalWidth: number,
+  signatureUri: string,
+  placement: { originX: number; originY: number; width: number; height: number }
+): Promise<{ uri: string; sizeBytes: number }> {
+  const existingBytes = await new File(pdfUri).bytes();
+  const pdfDoc = await PDFDocument.load(existingBytes);
+
+  const pdfPage = pdfDoc.getPages()[pageIndex];
+  if (!pdfPage) throw new Error(`applySignatureToPdf: page ${pageIndex} not found in ${pdfUri}`);
+
+  const signatureFile = new File(signatureUri);
+  const sigBytes = await signatureFile.bytes();
+  const pngImage = await pdfDoc.embedPng(sigBytes);
+  if (signatureFile.exists) signatureFile.delete(); // tmpfile cleanup, mirrors embedPageImage above
+
+  // PDF origin is bottom-left; `placement.originY` is measured from the page image's top edge
+  // (same convention as drawOcrLine's flip above), hence the flip.
+  const scale = pdfPage.getWidth() / pageNaturalWidth;
+  const widthPt = placement.width * scale;
+  const heightPt = placement.height * scale;
+  const xPt = placement.originX * scale;
+  const yPt = pdfPage.getHeight() - placement.originY * scale - heightPt;
+
+  pdfPage.drawImage(pngImage, { x: xPt, y: yPt, width: widthPt, height: heightPt });
+
+  const pdfBytes = await pdfDoc.save();
+
+  const dir = getDocumentDir(documentId);
+  const dest = new File(dir, 'document.pdf');
+  if (dest.exists) dest.delete();
+  dest.write(pdfBytes);
+
+  return { uri: dest.uri, sizeBytes: dest.size ?? 0 };
+}
+
 export function estimateSizeBytes(pages: PdfSourcePage[], quality: number): number {
   const rawBytes = pages.reduce((sum, page) => sum + (new File(page.uri).size ?? 0), 0);
   const qualityMultiplier = 0.2 + (quality - 1) * 0.2; // quality 1-5 -> 0.2-1.0

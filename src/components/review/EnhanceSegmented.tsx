@@ -6,6 +6,7 @@ const SEGMENTS: { id: EnhanceMode; label: string }[] = [
   { id: 'color', label: 'Color' },
   { id: 'gray', label: 'Gray' },
   { id: 'bw', label: 'B&W' },
+  { id: 'document_scan', label: 'Scan' },
 ];
 
 type EnhanceSegmentedProps = {

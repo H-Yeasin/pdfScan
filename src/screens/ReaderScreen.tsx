@@ -4,10 +4,13 @@ import { OverflowSheet, type OverflowItemId } from '../components/reader/Overflo
 import { PageList, PAGE_SLOT } from '../components/reader/PageList';
 import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
+import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
+import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { applySignedPage } from '../services/persistence/libraryOperations';
+import { insertScannedDocument } from '../services/persistence/dbService';
+import { applySignedPage, applySignatureToDocument } from '../services/persistence/libraryOperations';
 import { printDocument, shareDocument, shareFileUri } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { useTheme } from '../theme';
@@ -29,6 +32,8 @@ export function ReaderScreen() {
   const [findQuery, setFindQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [signing, setSigning] = useState(false);
+  const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
+  const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
   const listRef = useRef<FlatList<LibraryPage>>(null);
 
   useEffect(() => {
@@ -75,7 +80,11 @@ export function ReaderScreen() {
         const page = doc.pages[activeIndex];
         if (page) await shareFileUri(page.fileUri, 'image/jpeg', `${doc.name} - page ${activeIndex + 1}`);
       } else if (id === 'sign') {
-        setSigning(true);
+        if (doc.format === 'PDF') {
+          setSignStep('capture');
+        } else {
+          setSigning(true);
+        }
       } else if (id === 'delete') {
         Alert.alert(
           'Delete document?',
@@ -105,8 +114,32 @@ export function ReaderScreen() {
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
+      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
     [doc, activeIndex, dispatch]
+  );
+
+  const handleSignatureCaptured = useCallback((signature: { uri: string; aspectRatio: number }) => {
+    setCapturedSignature(signature);
+    setSignStep('place');
+  }, []);
+
+  const handlePlacementCancel = useCallback(() => {
+    setSignStep(null);
+    setCapturedSignature(null);
+  }, []);
+
+  const handlePlacementConfirm = useCallback(
+    async (placement: { originX: number; originY: number; width: number; height: number }) => {
+      if (!doc || !capturedSignature) return;
+      const updated = await applySignatureToDocument(doc, activeIndex, capturedSignature.uri, placement);
+      dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
+      setSignStep(null);
+      setCapturedSignature(null);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signature added — visible in exported PDF' });
+      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
+    },
+    [doc, activeIndex, capturedSignature, dispatch]
   );
 
   if (!doc) {
@@ -159,6 +192,22 @@ export function ReaderScreen() {
           naturalHeight={doc.pages[activeIndex].height}
           onCancel={() => setSigning(false)}
           onConfirm={handleSignConfirm}
+        />
+      )}
+
+      {signStep === 'capture' && (
+        <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />
+      )}
+
+      {signStep === 'place' && capturedSignature && doc.pages[activeIndex] && (
+        <SignaturePlacementOverlay
+          pageUri={doc.pages[activeIndex].fileUri}
+          pageNaturalWidth={doc.pages[activeIndex].width}
+          pageNaturalHeight={doc.pages[activeIndex].height}
+          signatureUri={capturedSignature.uri}
+          signatureAspectRatio={capturedSignature.aspectRatio}
+          onCancel={handlePlacementCancel}
+          onConfirm={handlePlacementConfirm}
         />
       )}
     </View>

@@ -1,4 +1,4 @@
-export type EnhanceMode = 'auto' | 'color' | 'gray' | 'bw';
+export type EnhanceMode = 'auto' | 'color' | 'gray' | 'bw' | 'document_scan';
 export type CaptureMode = 'doc' | 'id' | 'book';
 export type DocFormat = 'PDF' | 'JPG';
 

@@ -7,10 +7,18 @@ import { FileRow } from '../components/library/FileRow';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar, type SelectionToolId } from '../components/library/SelectionBar';
+import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
+import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
-import { applySignedPage, compressDocument, mergeDocuments, splitDocument } from '../services/persistence/libraryOperations';
+import {
+  applySignedPage,
+  applySignatureToDocument,
+  compressDocument,
+  mergeDocuments,
+  splitDocument,
+} from '../services/persistence/libraryOperations';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { deleteScannedDocument, insertScannedDocument, searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
@@ -24,6 +32,8 @@ export function LibraryScreen() {
   const { state, dispatch } = useAppState();
   const { files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
+  const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
+  const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
 
   useEffect(() => {
     const query = search.trim();
@@ -102,7 +112,9 @@ export function LibraryScreen() {
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Protect only marks the file — it does not encrypt it yet' });
       } else if (id === 'sign' && selectedDocs.length === 1) {
-        setSignTarget(selectedDocs[0]);
+        const [target] = selectedDocs;
+        setSignTarget(target);
+        if (target.format === 'PDF') setSignStep('capture');
       }
     },
     [files, selection, dispatch]
@@ -119,6 +131,32 @@ export function LibraryScreen() {
       insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
     [signTarget, dispatch]
+  );
+
+  const handleSignatureCaptured = useCallback((signature: { uri: string; aspectRatio: number }) => {
+    setCapturedSignature(signature);
+    setSignStep('place');
+  }, []);
+
+  const handlePlacementCancel = useCallback(() => {
+    setSignStep(null);
+    setCapturedSignature(null);
+    setSignTarget(null);
+  }, []);
+
+  const handlePlacementConfirm = useCallback(
+    async (placement: { originX: number; originY: number; width: number; height: number }) => {
+      if (!signTarget || !capturedSignature) return;
+      const updated = await applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement);
+      dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
+      dispatch({ type: 'library/CLEAR_SELECTION' });
+      setSignStep(null);
+      setCapturedSignature(null);
+      setSignTarget(null);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signature added — visible in exported PDF' });
+      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
+    },
+    [signTarget, capturedSignature, dispatch]
   );
 
   const isEmptyLibrary = files.length === 0;
@@ -201,7 +239,7 @@ export function LibraryScreen() {
         />
       )}
 
-      {signTarget && (
+      {signTarget && signTarget.format === 'JPG' && (
         <SignatureModal
           visible
           uri={signTarget.pages[0].fileUri}
@@ -209,6 +247,22 @@ export function LibraryScreen() {
           naturalHeight={signTarget.pages[0].height}
           onCancel={() => setSignTarget(null)}
           onConfirm={handleSignConfirm}
+        />
+      )}
+
+      {signStep === 'capture' && (
+        <SignatureCaptureModal visible onCancel={handlePlacementCancel} onCapture={handleSignatureCaptured} />
+      )}
+
+      {signStep === 'place' && signTarget && capturedSignature && (
+        <SignaturePlacementOverlay
+          pageUri={signTarget.pages[0].fileUri}
+          pageNaturalWidth={signTarget.pages[0].width}
+          pageNaturalHeight={signTarget.pages[0].height}
+          signatureUri={capturedSignature.uri}
+          signatureAspectRatio={capturedSignature.aspectRatio}
+          onCancel={handlePlacementCancel}
+          onConfirm={handlePlacementConfirm}
         />
       )}
     </SafeAreaView>

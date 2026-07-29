@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system';
-import { ImageFormat, Skia } from '@shopify/react-native-skia';
+import { FilterMode, ImageFormat, MipmapMode, Skia, TileMode } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
 
 const GRAYSCALE_MATRIX = [
@@ -19,11 +19,63 @@ function contrastMatrix(contrast: number) {
   ];
 }
 
-export type BakeableEnhance = 'gray' | 'bw';
+// Local-adaptive threshold: each pixel is compared against the average luminance of its own
+// neighborhood rather than a single global cutoff. A shadow darkens a whole neighborhood
+// together, so comparing a pixel to its *local* average cancels the shadow out, while ink
+// (meaningfully darker than its immediate surroundings) still crosses the threshold. A true
+// multi-pass box blur/integral image isn't possible in a single fragment-shader pass, so the
+// local average is approximated with a fixed 5x5 sparse tap grid; `sampleRadius` scales the tap
+// spacing so the window covers roughly the same relative neighborhood at any photo resolution.
+const DOCUMENT_SCAN_SKSL = `
+uniform shader image;
+uniform float thresholdBalance;
+uniform float sampleRadius;
 
-// Real pixel-level bake using Skia — runs the page through an offscreen GPU surface with a
-// grayscale (and, for B&W, an added contrast push) color matrix, then encodes the result to a
-// new JPEG file. Always writes a new file; never touches the source page's original image.
+float luma(vec4 c) {
+  return dot(c.rgb, vec3(0.299, 0.587, 0.114));
+}
+
+vec4 main(vec2 fragCoord) {
+  float centerLuma = luma(image.eval(fragCoord));
+
+  float sum = 0.0;
+  for (int dy = -2; dy <= 2; dy++) {
+    for (int dx = -2; dx <= 2; dx++) {
+      vec2 offset = vec2(float(dx), float(dy)) * sampleRadius;
+      sum += luma(image.eval(fragCoord + offset));
+    }
+  }
+  float localAverage = sum / 25.0;
+
+  float edge = localAverage - thresholdBalance * localAverage;
+  float isBackground = step(edge, centerLuma);
+  return vec4(isBackground, isBackground, isBackground, 1.0);
+}
+`;
+
+const THRESHOLD_BALANCE = 0.15;
+const SAMPLE_RADIUS_RATIO = 0.006; // tap spacing as a fraction of the longer image dimension
+
+// Compiled once and cached at module scope so the shader isn't recompiled on every page.
+let documentScanEffect: ReturnType<typeof Skia.RuntimeEffect.Make> | null = null;
+function getDocumentScanEffect() {
+  if (!documentScanEffect) {
+    documentScanEffect = Skia.RuntimeEffect.Make(DOCUMENT_SCAN_SKSL);
+    if (!documentScanEffect) throw new Error('Skia failed to compile the document_scan shader');
+  }
+  return documentScanEffect;
+}
+
+export type BakeableEnhance = 'gray' | 'bw' | 'document_scan';
+export const BAKEABLE_MODES: readonly BakeableEnhance[] = ['gray', 'bw', 'document_scan'];
+export function isBakeableEnhance(mode: string): mode is BakeableEnhance {
+  return (BAKEABLE_MODES as readonly string[]).includes(mode);
+}
+
+// Real pixel-level bake using Skia — runs the page through an offscreen GPU surface. gray/bw use
+// a color matrix (grayscale, plus a contrast push for bw); document_scan runs a local-adaptive
+// threshold RuntimeEffect shader instead, to strip shadows a global matrix can't tell from ink.
+// Always writes a new JPEG file; never touches the source page's original image.
 export async function bakeEnhance(
   uri: string,
   mode: BakeableEnhance
@@ -38,15 +90,24 @@ export async function bakeEnhance(
   const surface = Skia.Surface.MakeOffscreen(width, height);
   if (!surface) throw new Error('Skia failed to create an offscreen surface');
 
-  const grayscaleFilter = Skia.ColorFilter.MakeMatrix(GRAYSCALE_MATRIX);
-  const colorFilter =
-    mode === 'bw' ? Skia.ColorFilter.MakeCompose(Skia.ColorFilter.MakeMatrix(contrastMatrix(2.1)), grayscaleFilter) : grayscaleFilter;
-
   const paint = Skia.Paint();
-  paint.setColorFilter(colorFilter);
-
   const canvas = surface.getCanvas();
-  canvas.drawImage(image, 0, 0, paint);
+
+  if (mode === 'document_scan') {
+    const imageShader = image.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.None);
+    const shader = getDocumentScanEffect().makeShaderWithChildren(
+      [THRESHOLD_BALANCE, SAMPLE_RADIUS_RATIO * Math.max(width, height)],
+      [imageShader]
+    );
+    paint.setShader(shader);
+    canvas.drawRect(Skia.XYWHRect(0, 0, width, height), paint);
+  } else {
+    const grayscaleFilter = Skia.ColorFilter.MakeMatrix(GRAYSCALE_MATRIX);
+    const colorFilter =
+      mode === 'bw' ? Skia.ColorFilter.MakeCompose(Skia.ColorFilter.MakeMatrix(contrastMatrix(2.1)), grayscaleFilter) : grayscaleFilter;
+    paint.setColorFilter(colorFilter);
+    canvas.drawImage(image, 0, 0, paint);
+  }
   surface.flush();
 
   const snapshot = surface.makeImageSnapshot();

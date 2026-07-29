@@ -7,3 +7,9 @@ import { captureRef } from 'react-native-view-shot';
 export async function captureSignedPage(ref: RefObject<View | null>): Promise<string> {
   return captureRef(ref, { format: 'jpg', quality: 0.92, result: 'tmpfile' });
 }
+
+// Captures an isolated signature (ink only, no backing page image) as a transparent PNG,
+// for later placement onto a specific PDF page via pdfService's applySignatureToPdf.
+export async function captureIsolatedSignature(ref: RefObject<View | null>): Promise<string> {
+  return captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile' });
+}

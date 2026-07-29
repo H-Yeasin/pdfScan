@@ -1,5 +1,5 @@
 import { File } from 'expo-file-system';
-import { buildPdfFromPages } from '../pdf/pdfService';
+import { applySignatureToPdf, buildPdfFromPages } from '../pdf/pdfService';
 import { compressPage } from '../enhance/enhanceService';
 import { getDocumentDir, deleteDocumentFiles } from './libraryFiles';
 import { deleteScannedDocument } from './dbService';
@@ -153,4 +153,24 @@ export async function applySignedPage(
   }
 
   return { ...doc, pages, pdfUri, sizeBytes };
+}
+
+// Burns a captured signature onto one page of the document's compiled PDF, in place. Unlike
+// applySignedPage, doc.pages is untouched — only the compiled document.pdf binary changes, so
+// only pdfUri/sizeBytes are patched. The on-screen page preview (which renders doc.pages[i]
+// directly) will not reflect the signature; only an exported/shared/printed copy will.
+export async function applySignatureToDocument(
+  doc: LibraryDocument,
+  pageIndex: number,
+  signatureUri: string,
+  placement: { originX: number; originY: number; width: number; height: number }
+): Promise<LibraryDocument> {
+  if (doc.format !== 'PDF' || !doc.pdfUri) {
+    throw new Error('applySignatureToDocument: only supported for compiled PDF documents');
+  }
+  const page = doc.pages[pageIndex];
+  if (!page) throw new Error(`applySignatureToDocument: page ${pageIndex} not found`);
+
+  const pdfResult = await applySignatureToPdf(doc.id, doc.pdfUri, pageIndex, page.width, signatureUri, placement);
+  return { ...doc, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes };
 }

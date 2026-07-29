@@ -9,7 +9,7 @@ import { QualitySlider } from '../components/deliver/QualitySlider';
 import { StickyActions } from '../components/deliver/StickyActions';
 import { useRouter } from '../navigation/router';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
-import { bakeEnhance } from '../services/enhance/skiaEnhance';
+import { bakeEnhance, isBakeableEnhance } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { insertScannedDocument } from '../services/persistence/dbService';
@@ -55,11 +55,11 @@ export function DeliverScreen() {
       try {
         const documentId = createId('doc');
 
-        // Gray/B&W pages get a real pixel bake (Skia) into a fresh file before export, so the
+        // Bakeable pages get a real pixel bake (Skia) into a fresh file before export, so the
         // effect survives into the saved PDF/JPG rather than staying a UI-only selection.
         const bakedPages = await Promise.all(
           pages.map(async (page) => {
-            if (page.enhance !== 'gray' && page.enhance !== 'bw') return page;
+            if (!isBakeableEnhance(page.enhance)) return page;
             const baked = await bakeEnhance(page.uri, page.enhance);
             return { ...page, ...baked };
           })
