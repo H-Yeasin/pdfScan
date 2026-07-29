@@ -26,7 +26,8 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
 
   const pdfResult = await buildPdfFromPages(
     documentId,
-    mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height }))
+    mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    5
   );
 
   const name = `Merged_${docs.length}_files`;
@@ -62,7 +63,11 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
     let pdfUri: string | undefined;
     let sizeBytes = dest.size ?? 0;
     if (doc.format === 'PDF') {
-      const pdfResult = await buildPdfFromPages(documentId, [{ uri: dest.uri, width: source.width, height: source.height }]);
+      const pdfResult = await buildPdfFromPages(
+        documentId,
+        [{ uri: dest.uri, width: source.width, height: source.height, ocr: source.ocr }],
+        5
+      );
       pdfUri = pdfResult.uri;
       sizeBytes = pdfResult.sizeBytes;
     }
@@ -105,7 +110,8 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
   if (doc.format === 'PDF') {
     const pdfResult = await buildPdfFromPages(
       doc.id,
-      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height }))
+      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+      quality
     );
     pdfUri = pdfResult.uri;
     sizeBytes = pdfResult.sizeBytes;
@@ -137,7 +143,8 @@ export async function applySignedPage(
   if (doc.format === 'PDF') {
     const pdfResult = await buildPdfFromPages(
       doc.id,
-      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height }))
+      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+      5
     );
     pdfUri = pdfResult.uri;
     sizeBytes = pdfResult.sizeBytes;

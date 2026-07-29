@@ -69,7 +69,7 @@ export function DeliverScreen() {
         let sizeBytes = savedImages.sizeBytes;
 
         if (format === 'PDF') {
-          const pdfResult = await buildPdfFromPages(documentId, bakedPages);
+          const pdfResult = await buildPdfFromPages(documentId, bakedPages, quality);
           pdfUri = pdfResult.uri;
           sizeBytes = pdfResult.sizeBytes;
         }
