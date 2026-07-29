@@ -9,6 +9,8 @@ export type LibraryState = {
   tab: LibraryTab;
   search: string;
   searchOpen: boolean;
+  // null = no active DB-backed search result; fall back to the in-memory haystack filter.
+  searchResultIds: string[] | null;
 };
 
 export const initialLibraryState: LibraryState = {
@@ -18,6 +20,7 @@ export const initialLibraryState: LibraryState = {
   tab: 'recent',
   search: '',
   searchOpen: false,
+  searchResultIds: null,
 };
 
 export type LibraryAction =
@@ -33,7 +36,8 @@ export type LibraryAction =
   | { type: 'library/CLEAR_SELECTION' }
   | { type: 'library/SET_TAB'; tab: LibraryTab }
   | { type: 'library/SET_SEARCH'; search: string }
-  | { type: 'library/TOGGLE_SEARCH_OPEN' };
+  | { type: 'library/TOGGLE_SEARCH_OPEN' }
+  | { type: 'library/SET_SEARCH_RESULT_IDS'; ids: string[] | null };
 
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
@@ -84,9 +88,16 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/SET_TAB':
       return { ...state, tab: action.tab };
     case 'library/SET_SEARCH':
-      return { ...state, search: action.search };
+      return { ...state, search: action.search, searchResultIds: action.search.trim() ? state.searchResultIds : null };
     case 'library/TOGGLE_SEARCH_OPEN':
-      return { ...state, searchOpen: !state.searchOpen, search: state.searchOpen ? state.search : '' };
+      return {
+        ...state,
+        searchOpen: !state.searchOpen,
+        search: state.searchOpen ? state.search : '',
+        searchResultIds: state.searchOpen ? state.searchResultIds : null,
+      };
+    case 'library/SET_SEARCH_RESULT_IDS':
+      return { ...state, searchResultIds: action.ids };
     default:
       return state;
   }

@@ -12,6 +12,7 @@ import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { insertScannedDocument } from '../services/persistence/dbService';
 import { shareDocument } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -109,6 +110,7 @@ export function DeliverScreen() {
           searchHaystack: haystack,
         };
 
+        insertScannedDocument(doc).catch((e) => console.warn('dbService.insertScannedDocument failed', e));
         dispatch({ type: 'library/ADD_FILE', file: doc });
         dispatch({ type: 'capture/CLEAR_PAGES' });
         dispatch({ type: 'review/RESET' });

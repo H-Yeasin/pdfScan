@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 import { buildPdfFromPages } from '../pdf/pdfService';
 import { compressPage } from '../enhance/enhanceService';
 import { getDocumentDir, deleteDocumentFiles } from './libraryFiles';
+import { deleteScannedDocument } from './dbService';
 import type { LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 
@@ -122,6 +123,7 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
 
 export function deleteDocuments(ids: string[]): void {
   ids.forEach(deleteDocumentFiles);
+  ids.forEach((id) => deleteScannedDocument(id).catch((e) => console.warn('dbService delete failed', id, e)));
 }
 
 // Replaces one page's image with a signed (flattened) version, in place, and rebuilds the

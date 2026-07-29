@@ -12,6 +12,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { ProScreen } from '../screens/ProScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
+import { initializeDatabase } from '../services/persistence/dbService';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
   capture: CaptureScreen,
@@ -26,6 +27,9 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
 export function AppNavigator() {
   useLibraryPersistence();
   useSettingsPersistence();
+  useEffect(() => {
+    initializeDatabase().catch((e) => console.warn('DB init failed', e));
+  }, []);
   const { screen, navDir, navTick } = useRouter();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(1)).current;

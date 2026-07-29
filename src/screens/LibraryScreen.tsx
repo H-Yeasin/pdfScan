@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '../components/library/EmptyState';
@@ -12,6 +12,7 @@ import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
 import { applySignedPage, compressDocument, mergeDocuments, splitDocument } from '../services/persistence/libraryOperations';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { deleteScannedDocument, insertScannedDocument, searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -21,13 +22,30 @@ export function LibraryScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { files, selection, selMode, tab, search, searchOpen } = state.library;
+  const { files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
+
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) return;
+    const timer = setTimeout(() => {
+      searchDocumentsByText(query)
+        .then((ids) => dispatch({ type: 'library/SET_SEARCH_RESULT_IDS', ids }))
+        .catch((e) => {
+          console.warn('dbService.searchDocumentsByText failed', e);
+          dispatch({ type: 'library/SET_SEARCH_RESULT_IDS', ids: null });
+        });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [search, dispatch]);
 
   const visibleFiles = useMemo(() => {
     const tabbed = tab === 'starred' ? files.filter((f) => f.star) : files;
-    return searchDocuments(tabbed, search);
-  }, [files, tab, search]);
+    if (!search.trim()) return tabbed;
+    if (searchResultIds === null) return searchDocuments(tabbed, search);
+    const idSet = new Set(searchResultIds);
+    return tabbed.filter((f) => idSet.has(f.id));
+  }, [files, tab, search, searchResultIds]);
 
   const handlePressRow = useCallback(
     (doc: LibraryDocument) => {
@@ -60,6 +78,8 @@ export function LibraryScreen() {
         dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `${selectedDocs.length} files merged` });
+        selectedDocs.forEach((doc) => deleteScannedDocument(doc.id).catch((e) => console.warn('db delete failed', e)));
+        insertScannedDocument(merged).catch((e) => console.warn('db insert failed', e));
       } else if (id === 'split' && selectedDocs.length === 1) {
         const [doc] = selectedDocs;
         const split = await splitDocument(doc);
@@ -67,10 +87,13 @@ export function LibraryScreen() {
         dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `Split into ${split.length} files` });
+        deleteScannedDocument(doc.id).catch((e) => console.warn('db delete failed', e));
+        split.forEach((d) => insertScannedDocument(d).catch((e) => console.warn('db insert failed', e)));
       } else if (id === 'compress') {
         for (const doc of selectedDocs) {
           const compressed = await compressDocument(doc);
           dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
+          insertScannedDocument(compressed).catch((e) => console.warn('db insert failed', e));
         }
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Compressed · done' });
@@ -93,6 +116,7 @@ export function LibraryScreen() {
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
+      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
     [signTarget, dispatch]
   );
