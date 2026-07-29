@@ -13,6 +13,7 @@ export function useSettingsPersistence() {
       if (settings) {
         setThemePref(settings.themePref);
         dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: settings.firstRun });
+        dispatch({ type: 'settings/SET_OCR_SCRIPT', script: settings.ocrScript });
       }
       loaded.current = true;
     });
@@ -20,6 +21,6 @@ export function useSettingsPersistence() {
 
   useEffect(() => {
     if (!loaded.current) return;
-    persistSettings({ themePref, firstRun: state.settings.firstRun });
-  }, [themePref, state.settings.firstRun]);
+    persistSettings({ themePref, firstRun: state.settings.firstRun, ocrScript: state.settings.ocrScript });
+  }, [themePref, state.settings.firstRun, state.settings.ocrScript]);
 }

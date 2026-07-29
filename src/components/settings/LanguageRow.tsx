@@ -1,20 +1,27 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
 
 type LanguageRowProps = {
   name: string;
-  status: string;
-  available: boolean;
+  selected: boolean;
+  onPress: () => void;
 };
 
-export function LanguageRow({ name, status, available }: LanguageRowProps) {
+export function LanguageRow({ name, selected, onPress }: LanguageRowProps) {
   const { tokens } = useTheme();
 
   return (
-    <View style={[styles.row, { borderBottomColor: tokens.edge }]}>
-      <Text style={[styles.name, { color: available ? tokens.ink : tokens.muted }]}>{name}</Text>
-      <Text style={[styles.status, { color: available ? tokens.accentInk : tokens.muted }]}>{status}</Text>
-    </View>
+    <Pressable
+      style={[styles.row, { borderBottomColor: tokens.edge }]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+    >
+      <Text style={[styles.name, { color: tokens.ink }]}>{name}</Text>
+      <Text style={[styles.status, { color: selected ? tokens.accentInk : tokens.muted }]}>
+        {selected ? 'Active' : 'Select'}
+      </Text>
+    </Pressable>
   );
 }
 

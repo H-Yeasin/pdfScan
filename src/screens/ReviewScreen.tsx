@@ -69,7 +69,7 @@ export function ReviewScreen() {
   const handleOcr = useCallback(async () => {
     if (!selectedPage || ocrRunning) return;
     dispatch({ type: 'review/SET_OCR_RUNNING', running: true });
-    const ocr = await runOcr(selectedPage.uri);
+    const ocr = await runOcr(selectedPage.uri, state.settings.ocrScript);
     const err = !ocr || ocr.text.trim().length < OCR_SPARSE_THRESHOLD;
     dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: { ocr, err } });
     dispatch({ type: 'review/SET_OCR_RUNNING', running: false });
@@ -77,7 +77,7 @@ export function ReviewScreen() {
       type: 'ui/SHOW_SNACK',
       msg: ocr && !err ? 'OCR finished · text is searchable' : 'OCR finished · little or no text found',
     });
-  }, [dispatch, selectedPage, ocrRunning]);
+  }, [dispatch, selectedPage, ocrRunning, state.settings.ocrScript]);
 
   const handleContextBarPress = useCallback(
     (id: 'crop' | 'rotate' | 'retake' | 'ocr') => {

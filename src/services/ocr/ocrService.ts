@@ -1,21 +1,25 @@
-import MlkitOcr from 'react-native-mlkit-ocr';
-import type { OcrBlock, PageOcr } from '../../types/models';
+import MlkitOcr from 'rn-mlkit-ocr';
+import type { OcrBlock, OcrScript, PageOcr } from '../../types/models';
 
-// react-native-mlkit-ocr wraps Google ML Kit's on-device text recognizer, which only
-// supports Latin-script text. Callers should treat a failed/empty result as "no text
-// found" rather than a hard error — OCR is a best-effort enhancement, not load-bearing.
-export async function runOcr(uri: string): Promise<PageOcr | undefined> {
+// rn-mlkit-ocr wraps Google ML Kit's on-device text recognizer, which supports five
+// script models (Latin, Chinese, Devanagari, Japanese, Korean) — the caller passes
+// whichever one matches the document. Treat a failed/empty result as "no text found"
+// rather than a hard error — OCR is a best-effort enhancement, not load-bearing.
+export async function runOcr(uri: string, script: OcrScript): Promise<PageOcr | undefined> {
   try {
-    const result = await MlkitOcr.detectFromUri(uri);
-    if (!result || result.length === 0) return { text: '', blocks: [] };
+    const result = await MlkitOcr.recognizeText(uri, script);
+    if (!result || result.blocks.length === 0) return { text: '', blocks: [] };
 
-    const blocks: OcrBlock[] = result.map((block) => ({
+    const blocks: OcrBlock[] = result.blocks.map((block) => ({
       text: block.text,
-      bounding: block.bounding,
-      lines: block.lines.map((line) => ({ text: line.text, bounding: line.bounding })),
+      bounding: { left: block.frame.x, top: block.frame.y, width: block.frame.width, height: block.frame.height },
+      lines: block.lines.map((line) => ({
+        text: line.text,
+        bounding: { left: line.frame.x, top: line.frame.y, width: line.frame.width, height: line.frame.height },
+      })),
     }));
 
-    return { text: blocks.map((b) => b.text).join('\n'), blocks };
+    return { text: result.text, blocks };
   } catch (error) {
     console.warn('OCR failed', error);
     return undefined;

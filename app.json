@@ -7,9 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "metaData": {
-      "com.google.mlkit.vision.DEPENDENCIES": "ocr"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -45,7 +42,14 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to import documents."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "rn-mlkit-ocr",
+        {
+          "ocrModels": ["latin", "chinese", "devanagari", "japanese", "korean"],
+          "ocrUseBundled": true
+        }
+      ]
     ],
     "extra": {
       "eas": {

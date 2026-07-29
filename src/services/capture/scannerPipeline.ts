@@ -5,7 +5,7 @@ import type { AppAction } from '../../store/appReducer';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { runOcr } from '../ocr/ocrService';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
-import type { SessionPage } from '../../types/models';
+import type { OcrScript, SessionPage } from '../../types/models';
 import { createId } from '../../utils/id';
 
 const MAX_PAGES = 50;
@@ -19,7 +19,7 @@ function errorMessage(error: unknown): string {
 // Orchestrates the whole scan session outside the reducer, committing state only at clean
 // transition points (scanning -> processing -> one bulk commit -> success/error) instead of
 // once per page, so the Context doesn't re-render mid-scan.
-export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>): Promise<void> {
+export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, script: OcrScript): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'scanning' });
 
   let scannedImages: string[];
@@ -54,7 +54,7 @@ export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>): P
       const rawFile = new File(rawUri);
       if (rawFile.exists) rawFile.delete();
 
-      const ocr = await runOcr(compressed.uri);
+      const ocr = await runOcr(compressed.uri, script);
 
       processedPages.push({
         id: createId('page'),

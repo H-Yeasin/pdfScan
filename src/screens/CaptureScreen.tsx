@@ -25,7 +25,7 @@ export function CaptureScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { flash, pages, processingStatus, errorMessage } = state.capture;
-  const { firstRun } = state.settings;
+  const { firstRun, ocrScript } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
 
   useEffect(() => {
@@ -96,8 +96,8 @@ export function CaptureScreen() {
 
   const handleScan = useCallback(() => {
     if (busy) return;
-    runNativeScannerPipeline(dispatch);
-  }, [busy, dispatch]);
+    runNativeScannerPipeline(dispatch, ocrScript);
+  }, [busy, dispatch, ocrScript]);
 
   const handleAllowFirstRun = useCallback(async () => {
     dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: false });

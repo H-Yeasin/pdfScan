@@ -7,6 +7,7 @@ import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
+import type { OcrScript } from '../types/models';
 
 const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'system', label: 'System' },
@@ -14,10 +15,19 @@ const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
+const AVAILABLE_SCRIPTS: { id: OcrScript; label: string }[] = [
+  { id: 'latin', label: 'English / Western (Latin)' },
+  { id: 'devanagari', label: 'Hindi · Marathi · Nepali (Devanagari)' },
+  { id: 'chinese', label: 'Chinese' },
+  { id: 'japanese', label: 'Japanese' },
+  { id: 'korean', label: 'Korean' },
+];
+
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
   const { go } = useRouter();
-  const { dispatch } = useAppState();
+  const { state, dispatch } = useAppState();
+  const { ocrScript } = state.settings;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -35,14 +45,20 @@ export function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>OCR languages</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>OCR script</Text>
           <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-            <LanguageRow name="English" status="Installed" available />
-            <LanguageRow name="Bangla · বাংলা" status="Not available in this build" available={false} />
-            <LanguageRow name="Hindi · हिन्दी" status="Not available in this build" available={false} />
+            {AVAILABLE_SCRIPTS.map((script) => (
+              <LanguageRow
+                key={script.id}
+                name={script.label}
+                selected={ocrScript === script.id}
+                onPress={() => dispatch({ type: 'settings/SET_OCR_SCRIPT', script: script.id })}
+              />
+            ))}
           </View>
           <Text style={[styles.footnote, { color: tokens.muted }]}>
-            On-device recognition currently supports Latin-script text (English) only.
+            Recognition runs fully on-device. Pick the script that matches your document —
+            Devanagari covers Hindi, Marathi, Nepali and Sanskrit; Bengali script isn't supported yet.
           </Text>
         </View>
 

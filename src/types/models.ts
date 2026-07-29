@@ -2,9 +2,10 @@ export type EnhanceMode = 'auto' | 'color' | 'gray' | 'bw' | 'document_scan';
 export type CaptureMode = 'doc' | 'id' | 'book';
 export type DocFormat = 'PDF' | 'JPG';
 
-// Mirrors react-native-mlkit-ocr's MlkitOcrResult shape (block -> line -> element),
-// kept close to the native return value rather than flattened, so bounding-box data
-// survives for a future in-image "Find" highlight feature.
+// Mirrors rn-mlkit-ocr's OcrResult shape (block -> line), kept close to the native
+// return value rather than flattened, so bounding-box data survives for a future
+// in-image "Find" highlight feature.
+export type OcrScript = 'latin' | 'chinese' | 'devanagari' | 'japanese' | 'korean';
 export type OcrBounding = { left: number; top: number; width: number; height: number };
 export type OcrLine = { text: string; bounding: OcrBounding };
 export type OcrBlock = { text: string; lines: OcrLine[]; bounding: OcrBounding };

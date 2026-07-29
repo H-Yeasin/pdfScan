@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { OcrScript } from '../../types/models';
 import type { ThemePref } from '../../theme';
 
 const SETTINGS_KEY = 'app:settings';
@@ -6,6 +7,7 @@ const SETTINGS_KEY = 'app:settings';
 export type PersistedSettings = {
   themePref: ThemePref;
   firstRun: boolean;
+  ocrScript: OcrScript;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {
