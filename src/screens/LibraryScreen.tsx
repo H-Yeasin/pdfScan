@@ -12,6 +12,7 @@ import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
+import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import {
   applySignedPage,
   applySignatureToDocument,
@@ -114,10 +115,17 @@ export function LibraryScreen() {
       } else if (id === 'sign' && selectedDocs.length === 1) {
         const [target] = selectedDocs;
         setSignTarget(target);
-        if (target.format === 'PDF') setSignStep('capture');
+        if (target.format === 'PDF') {
+          if (state.signature.saved) {
+            setCapturedSignature(state.signature.saved);
+            setSignStep('place');
+          } else {
+            setSignStep('capture');
+          }
+        }
       }
     },
-    [files, selection, dispatch]
+    [files, selection, dispatch, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
@@ -133,9 +141,18 @@ export function LibraryScreen() {
     [signTarget, dispatch]
   );
 
-  const handleSignatureCaptured = useCallback((signature: { uri: string; aspectRatio: number }) => {
-    setCapturedSignature(signature);
-    setSignStep('place');
+  const handleSignatureCaptured = useCallback(
+    async (signature: { uri: string; aspectRatio: number }) => {
+      const saved = await saveSignatureForReuse(signature.uri, signature.aspectRatio);
+      dispatch({ type: 'signature/SET_SAVED', saved });
+      setCapturedSignature(saved);
+      setSignStep('place');
+    },
+    [dispatch]
+  );
+
+  const handleRedraw = useCallback(() => {
+    setSignStep('capture');
   }, []);
 
   const handlePlacementCancel = useCallback(() => {
@@ -263,6 +280,7 @@ export function LibraryScreen() {
           signatureAspectRatio={capturedSignature.aspectRatio}
           onCancel={handlePlacementCancel}
           onConfirm={handlePlacementConfirm}
+          onRedraw={handleRedraw}
         />
       )}
     </SafeAreaView>

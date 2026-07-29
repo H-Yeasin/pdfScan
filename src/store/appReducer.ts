@@ -4,6 +4,7 @@ import { deliverReducer, DeliverAction, DeliverState } from './slices/deliverSli
 import { libraryReducer, LibraryAction, LibraryState } from './slices/librarySlice';
 import { readerReducer, ReaderAction, ReaderState } from './slices/readerSlice';
 import { settingsReducer, SettingsAction, SettingsState } from './slices/settingsSlice';
+import { signatureReducer, SignatureAction, SignatureState } from './slices/signatureSlice';
 import { uiReducer, UiAction, UiState } from './slices/uiSlice';
 
 export type AppState = {
@@ -13,6 +14,7 @@ export type AppState = {
   library: LibraryState;
   reader: ReaderState;
   settings: SettingsState;
+  signature: SignatureState;
   ui: UiState;
 };
 
@@ -23,6 +25,7 @@ export type AppAction =
   | LibraryAction
   | ReaderAction
   | SettingsAction
+  | SignatureAction
   | UiAction;
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -33,6 +36,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     library: libraryReducer(state.library, action as LibraryAction),
     reader: readerReducer(state.reader, action as ReaderAction),
     settings: settingsReducer(state.settings, action as SettingsAction),
+    signature: signatureReducer(state.signature, action as SignatureAction),
     ui: uiReducer(state.ui, action as UiAction),
   };
 }

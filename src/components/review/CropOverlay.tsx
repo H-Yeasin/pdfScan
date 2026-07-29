@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
 
@@ -82,7 +82,7 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
 
   return (
     <Modal transparent animationType="fade">
-      <View style={styles.backdrop}>
+      <GestureHandlerRootView style={styles.backdrop}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
           <Animated.View pointerEvents="none" style={[styles.curtain, styles.curtainTop, topCurtain]} />
@@ -107,7 +107,7 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
             <Text style={styles.primaryLabel}>Crop</Text>
           </Pressable>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

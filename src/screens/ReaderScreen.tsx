@@ -12,6 +12,7 @@ import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { insertScannedDocument } from '../services/persistence/dbService';
 import { applySignedPage, applySignatureToDocument } from '../services/persistence/libraryOperations';
 import { printDocument, shareDocument, shareFileUri } from '../services/sharing/shareService';
+import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
 import { useTheme } from '../theme';
 import type { LibraryPage } from '../types/models';
@@ -81,7 +82,12 @@ export function ReaderScreen() {
         if (page) await shareFileUri(page.fileUri, 'image/jpeg', `${doc.name} - page ${activeIndex + 1}`);
       } else if (id === 'sign') {
         if (doc.format === 'PDF') {
-          setSignStep('capture');
+          if (state.signature.saved) {
+            setCapturedSignature(state.signature.saved);
+            setSignStep('place');
+          } else {
+            setSignStep('capture');
+          }
         } else {
           setSigning(true);
         }
@@ -104,7 +110,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, activeIndex, dispatch, go]
+    [doc, activeIndex, dispatch, go, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
@@ -119,9 +125,18 @@ export function ReaderScreen() {
     [doc, activeIndex, dispatch]
   );
 
-  const handleSignatureCaptured = useCallback((signature: { uri: string; aspectRatio: number }) => {
-    setCapturedSignature(signature);
-    setSignStep('place');
+  const handleSignatureCaptured = useCallback(
+    async (signature: { uri: string; aspectRatio: number }) => {
+      const saved = await saveSignatureForReuse(signature.uri, signature.aspectRatio);
+      dispatch({ type: 'signature/SET_SAVED', saved });
+      setCapturedSignature(saved);
+      setSignStep('place');
+    },
+    [dispatch]
+  );
+
+  const handleRedraw = useCallback(() => {
+    setSignStep('capture');
   }, []);
 
   const handlePlacementCancel = useCallback(() => {
@@ -208,6 +223,7 @@ export function ReaderScreen() {
           signatureAspectRatio={capturedSignature.aspectRatio}
           onCancel={handlePlacementCancel}
           onConfirm={handlePlacementConfirm}
+          onRedraw={handleRedraw}
         />
       )}
     </View>

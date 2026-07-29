@@ -12,6 +12,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { ProScreen } from '../screens/ProScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
+import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { initializeDatabase } from '../services/persistence/dbService';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
@@ -27,6 +28,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
 export function AppNavigator() {
   useLibraryPersistence();
   useSettingsPersistence();
+  useSignaturePersistence();
   useEffect(() => {
     initializeDatabase().catch((e) => console.warn('DB init failed', e));
   }, []);

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+
+export const INK_COLORS = ['#1a1a1a', '#1d4ed8', '#b91c1c'];
 
 type SignaturePadProps = {
   strokeColor?: string;
@@ -11,30 +13,25 @@ type SignaturePadProps = {
 
 // Remount this component (e.g. via a `key` prop) to clear it — simpler and more reliable
 // than imperative ref-based clearing for a component this small.
-export function SignaturePad({ strokeColor = '#1a1a1a', onChangeEmpty }: SignaturePadProps) {
+export function SignaturePad({ strokeColor = INK_COLORS[0], onChangeEmpty }: SignaturePadProps) {
   const [paths, setPaths] = useState<string[]>([]);
   const [current, setCurrent] = useState('');
 
-  const notifyEmpty = (nextPaths: string[], nextCurrent: string) => {
-    onChangeEmpty?.(nextPaths.length === 0 && nextCurrent.length === 0);
-  };
+  // Notified via effect, not from inside the setState updaters below — calling a parent
+  // setState during another component's render (which updater functions can run in) trips
+  // React's "Cannot update a component while rendering a different component" warning.
+  useEffect(() => {
+    onChangeEmpty?.(paths.length === 0 && current.length === 0);
+  }, [paths, current, onChangeEmpty]);
 
   const appendPoint = (cmd: string) => {
-    setCurrent((c) => {
-      const next = c + cmd;
-      notifyEmpty(paths, next);
-      return next;
-    });
+    setCurrent((c) => c + cmd);
   };
 
   const commitStroke = () => {
     setCurrent((c) => {
       if (!c) return c;
-      setPaths((p) => {
-        const next = [...p, c];
-        notifyEmpty(next, '');
-        return next;
-      });
+      setPaths((p) => [...p, c]);
       return '';
     });
   };

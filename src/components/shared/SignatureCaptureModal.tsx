@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureIsolatedSignature } from '../../services/signature/signatureService';
 import { radii, spacing, useTheme } from '../../theme';
-import { SignaturePad } from './SignaturePad';
+import { INK_COLORS, SignaturePad } from './SignaturePad';
 
 const SIGNATURE_CANVAS_RATIO = 0.4; // canvasHeight = canvasWidth * this — a landscape signature box
 
@@ -22,6 +23,7 @@ export function SignatureCaptureModal({ visible, onCancel, onCapture }: Signatur
   const [empty, setEmpty] = useState(true);
   const [padKey, setPadKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [strokeColor, setStrokeColor] = useState(INK_COLORS[0]);
 
   const canvasWidth = screenWidth - spacing.xl * 2;
   const canvasHeight = canvasWidth * SIGNATURE_CANVAS_RATIO;
@@ -44,11 +46,25 @@ export function SignatureCaptureModal({ visible, onCancel, onCapture }: Signatur
 
   return (
     <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.backdrop}>
+      <GestureHandlerRootView style={styles.backdrop}>
         <View style={[styles.frame, { width: canvasWidth, height: canvasHeight, borderColor: tokens.accent }]}>
           <View ref={shotRef} collapsable={false} style={{ width: canvasWidth, height: canvasHeight }}>
-            <SignaturePad key={padKey} onChangeEmpty={setEmpty} />
+            <SignaturePad key={padKey} strokeColor={strokeColor} onChangeEmpty={setEmpty} />
           </View>
+        </View>
+
+        <View style={styles.swatches}>
+          {INK_COLORS.map((color) => (
+            <Pressable
+              key={color}
+              onPress={() => setStrokeColor(color)}
+              style={[
+                styles.swatch,
+                { backgroundColor: color },
+                strokeColor === color && [styles.swatchSelected, { borderColor: tokens.accent }],
+              ]}
+            />
+          ))}
         </View>
 
         <Text style={styles.hint}>Draw your signature above</Text>
@@ -68,7 +84,7 @@ export function SignatureCaptureModal({ visible, onCancel, onCapture }: Signatur
             <Text style={styles.primaryLabel}>{saving ? 'Saving…' : 'Next'}</Text>
           </Pressable>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -84,6 +100,20 @@ const styles = StyleSheet.create({
   frame: {
     borderWidth: 1,
     borderRadius: radii.card,
+  },
+  swatches: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  swatch: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchSelected: {
+    borderWidth: 2,
   },
   hint: {
     color: 'rgba(255,255,255,.65)',

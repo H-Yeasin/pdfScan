@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
 
@@ -16,6 +16,7 @@ type SignaturePlacementOverlayProps = {
   signatureAspectRatio: number; // height / width, from the capture step
   onConfirm: (placement: { originX: number; originY: number; width: number; height: number }) => void;
   onCancel: () => void;
+  onRedraw?: () => void;
 };
 
 // Step 2 of the two-step PDF signing flow: drag/resize the captured signature over the target
@@ -30,6 +31,7 @@ export function SignaturePlacementOverlay({
   signatureAspectRatio,
   onConfirm,
   onCancel,
+  onRedraw,
 }: SignaturePlacementOverlayProps) {
   const { tokens } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -104,7 +106,7 @@ export function SignaturePlacementOverlay({
 
   return (
     <Modal transparent animationType="fade">
-      <View style={styles.backdrop}>
+      <GestureHandlerRootView style={styles.backdrop}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri: pageUri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
 
@@ -125,11 +127,16 @@ export function SignaturePlacementOverlay({
           <Pressable style={styles.ghostButton} onPress={onCancel}>
             <Text style={styles.ghostLabel}>Cancel</Text>
           </Pressable>
+          {onRedraw && (
+            <Pressable style={styles.ghostButton} onPress={onRedraw}>
+              <Text style={styles.ghostLabel}>Redraw</Text>
+            </Pressable>
+          )}
           <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
             <Text style={styles.primaryLabel}>Place signature</Text>
           </Pressable>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

@@ -5,6 +5,7 @@ import { initialDeliverState } from './slices/deliverSlice';
 import { initialLibraryState } from './slices/librarySlice';
 import { initialReaderState } from './slices/readerSlice';
 import { initialSettingsState } from './slices/settingsSlice';
+import { initialSignatureState } from './slices/signatureSlice';
 import { initialUiState } from './slices/uiSlice';
 
 export const initialAppState: AppState = {
@@ -14,5 +15,6 @@ export const initialAppState: AppState = {
   library: initialLibraryState,
   reader: initialReaderState,
   settings: initialSettingsState,
+  signature: initialSignatureState,
   ui: initialUiState,
 };

@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureSignedPage } from '../../services/signature/signatureService';
 import { radii, spacing, useTheme } from '../../theme';
-import { SignaturePad } from './SignaturePad';
+import { INK_COLORS, SignaturePad } from './SignaturePad';
 
 type SignatureModalProps = {
   visible: boolean;
@@ -20,6 +21,7 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
   const [empty, setEmpty] = useState(true);
   const [padKey, setPadKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [strokeColor, setStrokeColor] = useState(INK_COLORS[0]);
 
   const maxWidth = screenWidth - spacing.xl * 2;
   const maxHeight = screenHeight * 0.6;
@@ -49,10 +51,24 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
 
   return (
     <Modal transparent visible={visible} animationType="fade">
-      <View style={styles.backdrop}>
+      <GestureHandlerRootView style={styles.backdrop}>
         <View ref={shotRef} collapsable={false} style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
-          <SignaturePad key={padKey} onChangeEmpty={setEmpty} />
+          <SignaturePad key={padKey} strokeColor={strokeColor} onChangeEmpty={setEmpty} />
+        </View>
+
+        <View style={styles.swatches}>
+          {INK_COLORS.map((color) => (
+            <Pressable
+              key={color}
+              onPress={() => setStrokeColor(color)}
+              style={[
+                styles.swatch,
+                { backgroundColor: color },
+                strokeColor === color && [styles.swatchSelected, { borderColor: tokens.accent }],
+              ]}
+            />
+          ))}
         </View>
 
         <Text style={styles.hint}>Draw your signature above</Text>
@@ -72,7 +88,7 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
             <Text style={styles.primaryLabel}>{saving ? 'Saving…' : 'Done'}</Text>
           </Pressable>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -84,6 +100,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.lg,
+  },
+  swatches: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  swatch: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchSelected: {
+    borderWidth: 2,
   },
   hint: {
     color: 'rgba(255,255,255,.65)',
