@@ -10,7 +10,10 @@ const GRAYSCALE_MATRIX = [
 ];
 
 function contrastMatrix(contrast: number) {
-  const t = ((1 - contrast) / 2) * 255;
+  // Skia's ColorFilter.MakeMatrix operates on unpremultiplied 0.0-1.0 float components (clamped
+  // to that range), not 0-255 - a *255 term here made the translate wildly negative for any
+  // contrast > 1, clamping every pixel to black regardless of input.
+  const t = (1 - contrast) / 2;
   return [
     contrast, 0, 0, 0, t,
     0, contrast, 0, 0, t,

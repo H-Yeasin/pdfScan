@@ -19,11 +19,10 @@ type ThumbnailStripProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddMore: () => void;
   // Leads the strip (page 0 in the final document) so the strip's visual order matches the
-  // exported PDF's actual page order. Tapping it selects the cover as the active preview target
-  // in the main viewer above (like tapping any other thumbnail) - it never navigates away by
-  // itself; Academic Options stays a separate, explicit entry point.
+  // exported PDF's actual page order. Tapping it always jumps straight to Academic Options to
+  // add/edit the cover - same "tap to configure" behavior as the "+" add-page tile jumping to
+  // Capture, not a selectable preview target.
   cover: CoverSlot;
-  coverSelected: boolean;
   onPressCover: () => void;
 };
 
@@ -34,19 +33,23 @@ export function ThumbnailStrip({
   onReorder,
   onAddMore,
   cover,
-  coverSelected,
   onPressCover,
 }: ThumbnailStripProps) {
   const { tokens } = useTheme();
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scrollView}
+      contentContainerStyle={styles.content}
+    >
       <Pressable
         onPress={onPressCover}
         style={[
           styles.thumb,
           styles.coverTile,
-          { backgroundColor: tokens.surface, borderColor: coverSelected ? tokens.accent : tokens.edge },
+          { backgroundColor: tokens.surface, borderColor: cover ? tokens.accent : tokens.edge },
           !cover && styles.coverTileEmpty,
         ]}
       >
@@ -147,6 +150,14 @@ function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt }
 }
 
 const styles = StyleSheet.create({
+  // Without an explicit height, a horizontal ScrollView with no `style` can end up stretching to
+  // fill the flex column's remaining space (its cross-axis sizing default), leaving a tall empty
+  // scrollable area below the actual thumbnail row. Bounding it to exactly the content's own
+  // height keeps the strip pinned to just its tiles.
+  scrollView: {
+    height: THUMB_HEIGHT + spacing.md * 2,
+    flexGrow: 0,
+  },
   content: {
     flexDirection: 'row',
     gap: GAP,

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, typeScale, useTheme } from '../../theme';
 
 type ContextBarItem = {
-  id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'academic';
+  id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'sign';
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   active?: boolean;
@@ -12,12 +12,9 @@ type ContextBarItem = {
 type ContextBarProps = {
   onPress: (id: ContextBarItem['id']) => void;
   ocrRunning: boolean;
-  // Items that don't apply to whatever's currently selected in the main viewer (e.g. crop/rotate/
-  // OCR make no sense while the cover page is the active preview target) - dimmed and inert.
-  disabledIds?: ContextBarItem['id'][];
 };
 
-export function ContextBar({ onPress, ocrRunning, disabledIds = [] }: ContextBarProps) {
+export function ContextBar({ onPress, ocrRunning }: ContextBarProps) {
   const { tokens } = useTheme();
 
   const items: ContextBarItem[] = [
@@ -25,25 +22,18 @@ export function ContextBar({ onPress, ocrRunning, disabledIds = [] }: ContextBar
     { id: 'rotate', label: 'Rotate', icon: 'reload-outline' },
     { id: 'retake', label: 'Retake', icon: 'camera-outline' },
     { id: 'ocr', label: 'OCR', icon: 'text-outline', active: ocrRunning },
-    { id: 'academic', label: 'Academic', icon: 'school-outline' },
+    // Same icon as OverflowSheet's "Sign" action in ReaderScreen, for visual consistency.
+    { id: 'sign', label: 'Sign', icon: 'create-outline' },
   ];
 
   return (
     <View style={[styles.row, { backgroundColor: tokens.surface, borderTopColor: tokens.edge }]}>
-      {items.map((item) => {
-        const disabled = disabledIds.includes(item.id);
-        const color = disabled ? tokens.muted : item.active ? tokens.accent : tokens.ink;
-        return (
-          <Pressable
-            key={item.id}
-            style={[styles.item, disabled && styles.itemDisabled]}
-            onPress={() => !disabled && onPress(item.id)}
-          >
-            <Ionicons name={item.icon} size={21} color={color} />
-            <Text style={[styles.label, { color }]}>{item.label}</Text>
-          </Pressable>
-        );
-      })}
+      {items.map((item) => (
+        <Pressable key={item.id} style={styles.item} onPress={() => onPress(item.id)}>
+          <Ionicons name={item.icon} size={21} color={item.active ? tokens.accent : tokens.ink} />
+          <Text style={[styles.label, { color: item.active ? tokens.accent : tokens.ink }]}>{item.label}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -61,9 +51,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-  },
-  itemDisabled: {
-    opacity: 0.4,
   },
   label: {
     fontSize: 12,

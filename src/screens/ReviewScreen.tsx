@@ -6,13 +6,17 @@ import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
+import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
+import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { ZoomableImage } from '../components/shared/ZoomableImage';
 import { useRouter } from '../navigation/router';
 import { rotatePage } from '../services/enhance/enhanceService';
 import { cropPage } from '../services/enhance/enhanceService';
 import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
 import { runOcr } from '../services/ocr/ocrService';
-import { useAcademicCoverPreview, useAcademicStampPreview } from '../services/pdf/useAcademicPreview';
+import { useAcademicStampPreview } from '../services/pdf/useAcademicPreview';
+import { applySignatureToPage } from '../services/signature/signatureCompositeService';
+import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 
@@ -26,7 +30,8 @@ export function ReviewScreen() {
   const { sel, ocrRunning } = state.review;
   const { academicConfig } = state.deliver;
   const [cropTarget, setCropTarget] = useState<string | null>(null);
-  const [coverSelected, setCoverSelected] = useState(false);
+  const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
+  const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
 
   const selectedPage = pages[sel] ?? pages[0];
   const multiPage = pages.length > 1;
@@ -46,10 +51,8 @@ export function ReviewScreen() {
     pages.length
   );
 
-  const { previewUri: coverPreviewUri, loading: coverPreviewLoading } = useAcademicCoverPreview(coverConfig);
-
-  const mainPreviewUri = coverSelected ? coverPreviewUri : stampedUri ?? selectedPage?.uri;
-  const mainPreviewLoading = coverSelected ? coverPreviewLoading : enhancePreviewLoading || stampLoading;
+  const mainPreviewUri = stampedUri ?? selectedPage?.uri;
+  const mainPreviewLoading = enhancePreviewLoading || stampLoading;
 
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -97,15 +100,26 @@ export function ReviewScreen() {
     });
   }, [dispatch, selectedPage, ocrRunning, state.settings.ocrScript]);
 
+  // Mirrors ReaderScreen's PDF-signing flow (SignatureCaptureModal -> SignaturePlacementOverlay),
+  // but applied to the in-memory SessionPage directly, before the document is ever saved.
+  const handleSignPress = useCallback(() => {
+    if (state.signature.saved) {
+      setCapturedSignature(state.signature.saved);
+      setSignStep('place');
+    } else {
+      setSignStep('capture');
+    }
+  }, [state.signature.saved]);
+
   const handleContextBarPress = useCallback(
-    (id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'academic') => {
+    (id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'sign') => {
       if (id === 'crop') setCropTarget(selectedPage?.id ?? null);
       else if (id === 'rotate') handleRotate();
       else if (id === 'retake') go('capture', 'back');
       else if (id === 'ocr') handleOcr();
-      else if (id === 'academic') go('academicOptions');
+      else if (id === 'sign') handleSignPress();
     },
-    [selectedPage, handleRotate, handleOcr, go]
+    [selectedPage, handleRotate, handleOcr, go, handleSignPress]
   );
 
   const handleCropConfirm = useCallback(
@@ -116,6 +130,41 @@ export function ReviewScreen() {
       setCropTarget(null);
     },
     [dispatch, selectedPage]
+  );
+
+  const handleSignatureCaptured = useCallback(
+    async (signature: { uri: string; aspectRatio: number }) => {
+      const saved = await saveSignatureForReuse(signature.uri, signature.aspectRatio);
+      dispatch({ type: 'signature/SET_SAVED', saved });
+      setCapturedSignature(saved);
+      setSignStep('place');
+    },
+    [dispatch]
+  );
+
+  const handleRedraw = useCallback(() => {
+    setSignStep('capture');
+  }, []);
+
+  const handlePlacementCancel = useCallback(() => {
+    setSignStep(null);
+    setCapturedSignature(null);
+  }, []);
+
+  const handlePlacementConfirm = useCallback(
+    async (placement: { originX: number; originY: number; width: number; height: number }) => {
+      if (!selectedPage || !capturedSignature) return;
+      const signed = await applySignatureToPage(selectedPage.uri, capturedSignature.uri, placement);
+      dispatch({
+        type: 'capture/UPDATE_PAGE',
+        id: selectedPage.id,
+        patch: { uri: signed.uri, width: signed.width, height: signed.height },
+      });
+      setSignStep(null);
+      setCapturedSignature(null);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${sel + 1}` });
+    },
+    [selectedPage, capturedSignature, dispatch, sel]
   );
 
   const showErrHint = !!selectedPage?.err && selectedPage.enhance !== 'bw';
@@ -162,30 +211,16 @@ export function ReviewScreen() {
         <ThumbnailStrip
           pages={pages}
           selectedIndex={sel}
-          onSelect={(index) => {
-            setCoverSelected(false);
-            dispatch({ type: 'review/SELECT_PAGE', index });
-          }}
+          onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
           onReorder={handleReorder}
           onAddMore={() => go('capture')}
           cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
-          coverSelected={coverSelected}
-          onPressCover={() => setCoverSelected(true)}
+          onPressCover={() => go('academicOptions')}
         />
       )}
 
-      <View style={styles.previewArea}>
-        {coverSelected && !coverConfig ? (
-          <Pressable style={styles.coverEmptyState} onPress={() => go('academicOptions')}>
-            <Ionicons name="document-text-outline" size={40} color={tokens.muted} />
-            <Text style={[styles.coverEmptyTitle, { color: tokens.ink }]}>No cover page yet</Text>
-            <Text style={[styles.coverEmptySubtitle, { color: tokens.muted }]}>
-              Tap to add a title, student name, or import a photo.
-            </Text>
-          </Pressable>
-        ) : (
-          <ZoomableImage uri={mainPreviewUri ?? selectedPage.uri} />
-        )}
+      <View style={[styles.previewArea, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+        <ZoomableImage uri={mainPreviewUri ?? selectedPage.uri} />
         {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
             <ActivityIndicator color={tokens.accent} />
@@ -193,7 +228,7 @@ export function ReviewScreen() {
         )}
       </View>
 
-      {showErrHint && !coverSelected && (
+      {showErrHint && (
         <View style={[styles.errHint, { backgroundColor: `${tokens.danger}1A` }]}>
           <Text style={{ color: tokens.danger, fontSize: 13, fontWeight: '500' }}>
             Low contrast on page {sel + 1} — try B&W.
@@ -201,17 +236,11 @@ export function ReviewScreen() {
         </View>
       )}
 
-      {!coverSelected && (
-        <View style={styles.enhanceWrap}>
-          <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
-        </View>
-      )}
+      <View style={styles.enhanceWrap}>
+        <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
+      </View>
 
-      <ContextBar
-        onPress={handleContextBarPress}
-        ocrRunning={ocrRunning}
-        disabledIds={coverSelected ? ['crop', 'rotate', 'ocr'] : []}
-      />
+      <ContextBar onPress={handleContextBarPress} ocrRunning={ocrRunning} />
 
       {cropTarget && selectedPage && (
         <CropOverlay
@@ -220,6 +249,23 @@ export function ReviewScreen() {
           naturalHeight={selectedPage.height}
           onConfirm={handleCropConfirm}
           onCancel={() => setCropTarget(null)}
+        />
+      )}
+
+      {signStep === 'capture' && (
+        <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />
+      )}
+
+      {signStep === 'place' && capturedSignature && selectedPage && (
+        <SignaturePlacementOverlay
+          pageUri={selectedPage.uri}
+          pageNaturalWidth={selectedPage.width}
+          pageNaturalHeight={selectedPage.height}
+          signatureUri={capturedSignature.uri}
+          signatureAspectRatio={capturedSignature.aspectRatio}
+          onCancel={handlePlacementCancel}
+          onConfirm={handlePlacementConfirm}
+          onRedraw={handleRedraw}
         />
       )}
     </SafeAreaView>
@@ -286,6 +332,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.xl,
     marginVertical: spacing.sm,
     borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   previewLoading: {
@@ -306,20 +353,5 @@ const styles = StyleSheet.create({
   enhanceWrap: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-  },
-  coverEmptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.xl,
-  },
-  coverEmptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  coverEmptySubtitle: {
-    fontSize: 13,
-    textAlign: 'center',
   },
 });
