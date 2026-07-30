@@ -12,6 +12,7 @@ import { rotatePage } from '../services/enhance/enhanceService';
 import { cropPage } from '../services/enhance/enhanceService';
 import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
 import { runOcr } from '../services/ocr/ocrService';
+import { useAcademicCoverPreview, useAcademicStampPreview } from '../services/pdf/useAcademicPreview';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 
@@ -25,14 +26,30 @@ export function ReviewScreen() {
   const { sel, ocrRunning } = state.review;
   const { academicConfig } = state.deliver;
   const [cropTarget, setCropTarget] = useState<string | null>(null);
+  const [coverSelected, setCoverSelected] = useState(false);
 
   const selectedPage = pages[sel] ?? pages[0];
   const multiPage = pages.length > 1;
+  const coverConfig = academicConfig?.coverPage;
 
   const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(
     selectedPage?.uri,
     selectedPage?.enhance ?? 'auto'
   );
+
+  // Runs border/header-footer stamping on top of the already-enhanced preview, so this mirrors
+  // the real save pipeline's order (bake enhance, then stamp) - not just the raw enhance preview.
+  const { previewUri: stampedUri, loading: stampLoading } = useAcademicStampPreview(
+    previewUri ?? selectedPage?.uri,
+    academicConfig,
+    sel + 1,
+    pages.length
+  );
+
+  const { previewUri: coverPreviewUri, loading: coverPreviewLoading } = useAcademicCoverPreview(coverConfig);
+
+  const mainPreviewUri = coverSelected ? coverPreviewUri : stampedUri ?? selectedPage?.uri;
+  const mainPreviewLoading = coverSelected ? coverPreviewLoading : enhancePreviewLoading || stampLoading;
 
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -145,28 +162,38 @@ export function ReviewScreen() {
         <ThumbnailStrip
           pages={pages}
           selectedIndex={sel}
-          onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
+          onSelect={(index) => {
+            setCoverSelected(false);
+            dispatch({ type: 'review/SELECT_PAGE', index });
+          }}
           onReorder={handleReorder}
           onAddMore={() => go('capture')}
-          cover={
-            academicConfig?.coverPage
-              ? { mode: academicConfig.coverPage.mode, importedUri: academicConfig.coverPage.importedUri }
-              : null
-          }
-          onPressCover={() => go('academicOptions')}
+          cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
+          coverSelected={coverSelected}
+          onPressCover={() => setCoverSelected(true)}
         />
       )}
 
       <View style={styles.previewArea}>
-        <ZoomableImage uri={previewUri ?? selectedPage.uri} />
-        {enhancePreviewLoading && (
+        {coverSelected && !coverConfig ? (
+          <Pressable style={styles.coverEmptyState} onPress={() => go('academicOptions')}>
+            <Ionicons name="document-text-outline" size={40} color={tokens.muted} />
+            <Text style={[styles.coverEmptyTitle, { color: tokens.ink }]}>No cover page yet</Text>
+            <Text style={[styles.coverEmptySubtitle, { color: tokens.muted }]}>
+              Tap to add a title, student name, or import a photo.
+            </Text>
+          </Pressable>
+        ) : (
+          <ZoomableImage uri={mainPreviewUri ?? selectedPage.uri} />
+        )}
+        {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
             <ActivityIndicator color={tokens.accent} />
           </View>
         )}
       </View>
 
-      {showErrHint && (
+      {showErrHint && !coverSelected && (
         <View style={[styles.errHint, { backgroundColor: `${tokens.danger}1A` }]}>
           <Text style={{ color: tokens.danger, fontSize: 13, fontWeight: '500' }}>
             Low contrast on page {sel + 1} — try B&W.
@@ -174,11 +201,17 @@ export function ReviewScreen() {
         </View>
       )}
 
-      <View style={styles.enhanceWrap}>
-        <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
-      </View>
+      {!coverSelected && (
+        <View style={styles.enhanceWrap}>
+          <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
+        </View>
+      )}
 
-      <ContextBar onPress={handleContextBarPress} ocrRunning={ocrRunning} />
+      <ContextBar
+        onPress={handleContextBarPress}
+        ocrRunning={ocrRunning}
+        disabledIds={coverSelected ? ['crop', 'rotate', 'ocr'] : []}
+      />
 
       {cropTarget && selectedPage && (
         <CropOverlay
@@ -273,5 +306,20 @@ const styles = StyleSheet.create({
   enhanceWrap: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  coverEmptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xl,
+  },
+  coverEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  coverEmptySubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

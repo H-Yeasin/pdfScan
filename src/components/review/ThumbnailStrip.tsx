@@ -19,9 +19,11 @@ type ThumbnailStripProps = {
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddMore: () => void;
   // Leads the strip (page 0 in the final document) so the strip's visual order matches the
-  // exported PDF's actual page order. Tapping it opens the same academic-options screen whether
-  // a cover is configured yet or not, so it doubles as both the "add cover" and "edit cover" entry.
+  // exported PDF's actual page order. Tapping it selects the cover as the active preview target
+  // in the main viewer above (like tapping any other thumbnail) - it never navigates away by
+  // itself; Academic Options stays a separate, explicit entry point.
   cover: CoverSlot;
+  coverSelected: boolean;
   onPressCover: () => void;
 };
 
@@ -32,6 +34,7 @@ export function ThumbnailStrip({
   onReorder,
   onAddMore,
   cover,
+  coverSelected,
   onPressCover,
 }: ThumbnailStripProps) {
   const { tokens } = useTheme();
@@ -43,7 +46,7 @@ export function ThumbnailStrip({
         style={[
           styles.thumb,
           styles.coverTile,
-          { backgroundColor: tokens.surface, borderColor: cover ? tokens.accent : tokens.edge },
+          { backgroundColor: tokens.surface, borderColor: coverSelected ? tokens.accent : tokens.edge },
           !cover && styles.coverTileEmpty,
         ]}
       >
@@ -56,7 +59,7 @@ export function ThumbnailStrip({
             color={cover ? tokens.accent : tokens.muted}
           />
         )}
-        <View style={[styles.coverLabel, cover && { backgroundColor: tokens.accent }]}>
+        <View style={styles.coverLabel}>
           <Text style={styles.coverLabelText}>Cover</Text>
         </View>
       </Pressable>
