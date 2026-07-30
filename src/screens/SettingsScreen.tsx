@@ -1,15 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
-import {
-  LayoutAnimation,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Text,
-  UIManager,
-  View,
-} from 'react-native';
+import { useCallback } from 'react';
+import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LanguageRow } from '../components/settings/LanguageRow';
@@ -35,22 +26,11 @@ const AVAILABLE_SCRIPTS: { id: OcrScript; label: string }[] = [
   { id: 'korean', label: 'Korean' },
 ];
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { ocrScript, androidExportFolderUri, androidExportFolderLabel } = state.settings;
-  const [ocrExpanded, setOcrExpanded] = useState(false);
-  const selectedScriptLabel = AVAILABLE_SCRIPTS.find((script) => script.id === ocrScript)?.label;
-
-  const toggleOcrExpanded = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setOcrExpanded((prev) => !prev);
-  }, []);
 
   const handlePickExportFolder = useCallback(async () => {
     const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -82,37 +62,20 @@ export function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>OCR script</Text>
-          <Pressable
-            style={[styles.card, styles.collapsibleHeader, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
-            onPress={toggleOcrExpanded}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: ocrExpanded }}
-          >
-            <Text style={[styles.collapsibleTitle, { color: tokens.ink }]}>{selectedScriptLabel}</Text>
-            <Ionicons
-              name={ocrExpanded ? 'chevron-up' : 'chevron-down'}
-              size={18}
-              color={tokens.muted}
-            />
-          </Pressable>
-          {ocrExpanded ? (
-            <>
-              <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-                {AVAILABLE_SCRIPTS.map((script) => (
-                  <LanguageRow
-                    key={script.id}
-                    name={script.label}
-                    selected={ocrScript === script.id}
-                    onPress={() => dispatch({ type: 'settings/SET_OCR_SCRIPT', script: script.id })}
-                  />
-                ))}
-              </View>
-              <Text style={[styles.footnote, { color: tokens.muted }]}>
-                Recognition runs fully on-device. Pick the script that matches your document —
-                Devanagari covers Hindi, Marathi, Nepali and Sanskrit; Bengali script isn't supported yet.
-              </Text>
-            </>
-          ) : null}
+          <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+            {AVAILABLE_SCRIPTS.map((script) => (
+              <LanguageRow
+                key={script.id}
+                name={script.label}
+                selected={ocrScript === script.id}
+                onPress={() => dispatch({ type: 'settings/SET_OCR_SCRIPT', script: script.id })}
+              />
+            ))}
+          </View>
+          <Text style={[styles.footnote, { color: tokens.muted }]}>
+            Recognition runs fully on-device. Pick the script that matches your document —
+            Devanagari covers Hindi, Marathi, Nepali and Sanskrit; Bengali script isn't supported yet.
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -124,6 +87,24 @@ export function SettingsScreen() {
             onPress={() => go('manageFolders')}
           />
         </View>
+
+        {Platform.OS === 'android' && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Export</Text>
+            <SettingRow
+              title="Default export folder"
+              subtitle="Copy exported files here automatically"
+              trailing={androidExportFolderLabel ?? 'Not set'}
+              onPress={handlePickExportFolder}
+            />
+            {androidExportFolderUri ? (
+              <Text style={[styles.footnote, { color: tokens.muted }]}>
+                Turn on "Also save a copy" in Deliver to write exports here too.
+              </Text>
+            ) : null}
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>About</Text>
           <Text style={[styles.aboutText, { color: tokens.muted }]}>
@@ -174,17 +155,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-  },
-  collapsibleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    padding: spacing.lg,
-  },
-  collapsibleTitle: {
-    flex: 1,
-    fontSize: 15.5,
   },
   footnote: {
     fontSize: 12.5,

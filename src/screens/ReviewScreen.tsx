@@ -23,6 +23,7 @@ export function ReviewScreen() {
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
   const { sel, ocrRunning } = state.review;
+  const { academicConfig } = state.deliver;
   const [cropTarget, setCropTarget] = useState<string | null>(null);
 
   const selectedPage = pages[sel] ?? pages[0];
@@ -80,11 +81,12 @@ export function ReviewScreen() {
   }, [dispatch, selectedPage, ocrRunning, state.settings.ocrScript]);
 
   const handleContextBarPress = useCallback(
-    (id: 'crop' | 'rotate' | 'retake' | 'ocr') => {
+    (id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'academic') => {
       if (id === 'crop') setCropTarget(selectedPage?.id ?? null);
       else if (id === 'rotate') handleRotate();
       else if (id === 'retake') go('capture', 'back');
       else if (id === 'ocr') handleOcr();
+      else if (id === 'academic') go('academicOptions');
     },
     [selectedPage, handleRotate, handleOcr, go]
   );
@@ -146,6 +148,12 @@ export function ReviewScreen() {
           onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
           onReorder={handleReorder}
           onAddMore={() => go('capture')}
+          cover={
+            academicConfig?.coverPage
+              ? { mode: academicConfig.coverPage.mode, importedUri: academicConfig.coverPage.importedUri }
+              : null
+          }
+          onPressCover={() => go('academicOptions')}
         />
       )}
 

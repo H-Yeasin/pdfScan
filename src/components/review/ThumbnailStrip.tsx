@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -9,19 +10,57 @@ const THUMB_HEIGHT = (THUMB_WIDTH * 4) / 3;
 const GAP = spacing.sm;
 const SLOT = THUMB_WIDTH + GAP;
 
+type CoverSlot = { mode: 'template' | 'imported_image'; importedUri?: string } | null;
+
 type ThumbnailStripProps = {
   pages: SessionPage[];
   selectedIndex: number;
   onSelect: (index: number) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddMore: () => void;
+  // Leads the strip (page 0 in the final document) so the strip's visual order matches the
+  // exported PDF's actual page order. Tapping it opens the same academic-options screen whether
+  // a cover is configured yet or not, so it doubles as both the "add cover" and "edit cover" entry.
+  cover: CoverSlot;
+  onPressCover: () => void;
 };
 
-export function ThumbnailStrip({ pages, selectedIndex, onSelect, onReorder, onAddMore }: ThumbnailStripProps) {
+export function ThumbnailStrip({
+  pages,
+  selectedIndex,
+  onSelect,
+  onReorder,
+  onAddMore,
+  cover,
+  onPressCover,
+}: ThumbnailStripProps) {
   const { tokens } = useTheme();
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <Pressable
+        onPress={onPressCover}
+        style={[
+          styles.thumb,
+          styles.coverTile,
+          { backgroundColor: tokens.surface, borderColor: cover ? tokens.accent : tokens.edge },
+          !cover && styles.coverTileEmpty,
+        ]}
+      >
+        {cover?.mode === 'imported_image' && cover.importedUri ? (
+          <Image source={{ uri: cover.importedUri }} style={styles.thumbImage} resizeMode="cover" />
+        ) : (
+          <Ionicons
+            name={cover ? 'document-text-outline' : 'add-outline'}
+            size={22}
+            color={cover ? tokens.accent : tokens.muted}
+          />
+        )}
+        <View style={[styles.coverLabel, cover && { backgroundColor: tokens.accent }]}>
+          <Text style={styles.coverLabelText}>Cover</Text>
+        </View>
+      </Pressable>
+
       {pages.map((page, index) => (
         <DraggableThumbnail
           key={page.id}
@@ -158,5 +197,29 @@ const styles = StyleSheet.create({
   },
   addLabel: {
     fontSize: 24,
+  },
+  coverTile: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  coverTileEmpty: {
+    borderStyle: 'dashed',
+  },
+  coverLabel: {
+    position: 'absolute',
+    left: 2,
+    right: 2,
+    bottom: 4,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverLabelText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
   },
 });

@@ -1,4 +1,5 @@
 import type { DocFormat } from '../../types/models';
+import type { AcademicConfig } from '../../services/pdf/pdfService';
 
 export type DeliverState = {
   name: string;
@@ -9,6 +10,9 @@ export type DeliverState = {
   folderId: string | null;
   // Android-only: also write a copy to the user's chosen device folder via SAF.
   exportCopy: boolean;
+  // Premium academic PDF export options (cover page, border, header/footer). No UI sets this yet;
+  // it's plumbed through so buildPdfFromPages can receive it once that UI exists.
+  academicConfig: AcademicConfig | null;
 };
 
 export const initialDeliverState: DeliverState = {
@@ -19,6 +23,7 @@ export const initialDeliverState: DeliverState = {
   pw: false,
   folderId: null,
   exportCopy: false,
+  academicConfig: null,
 };
 
 export type DeliverAction =
@@ -29,6 +34,7 @@ export type DeliverAction =
   | { type: 'deliver/TOGGLE_PW' }
   | { type: 'deliver/SET_FOLDER'; folderId: string | null }
   | { type: 'deliver/TOGGLE_EXPORT_COPY' }
+  | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -47,6 +53,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, folderId: action.folderId };
     case 'deliver/TOGGLE_EXPORT_COPY':
       return { ...state, exportCopy: !state.exportCopy };
+    case 'deliver/SET_ACADEMIC_CONFIG':
+      return { ...state, academicConfig: action.config };
     case 'deliver/RESET':
       return initialDeliverState;
     default:

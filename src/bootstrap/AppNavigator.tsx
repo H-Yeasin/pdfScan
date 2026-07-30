@@ -11,6 +11,7 @@ import { ReaderScreen } from '../screens/ReaderScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ProScreen } from '../screens/ProScreen';
 import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
+import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
@@ -25,6 +26,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   settings: SettingsScreen,
   pro: ProScreen,
   manageFolders: ManageFoldersScreen,
+  academicOptions: AcademicOptionsScreen,
 };
 
 export function AppNavigator() {

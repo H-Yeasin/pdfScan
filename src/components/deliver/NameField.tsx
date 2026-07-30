@@ -5,14 +5,16 @@ type NameFieldProps = {
   value: string;
   onChange: (value: string) => void;
   helperText?: string;
+  label?: string;
+  placeholder?: string;
 };
 
-export function NameField({ value, onChange, helperText }: NameFieldProps) {
+export function NameField({ value, onChange, helperText, label = 'Name', placeholder = 'Untitled scan' }: NameFieldProps) {
   const { tokens } = useTheme();
 
   return (
     <View>
-      <Text style={[styles.label, { color: tokens.ink }]}>Name</Text>
+      <Text style={[styles.label, { color: tokens.ink }]}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -20,7 +22,7 @@ export function NameField({ value, onChange, helperText }: NameFieldProps) {
           styles.input,
           { borderColor: tokens.edge, backgroundColor: tokens.surface, color: tokens.ink },
         ]}
-        placeholder="Untitled scan"
+        placeholder={placeholder}
         placeholderTextColor={tokens.muted}
       />
       {helperText ? <Text style={[styles.helper, { color: tokens.muted }]}>{helperText}</Text> : null}

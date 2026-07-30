@@ -9,16 +9,18 @@ import { NameField } from '../components/deliver/NameField';
 import { QualitySlider } from '../components/deliver/QualitySlider';
 import { StickyActions } from '../components/deliver/StickyActions';
 import { useRouter } from '../navigation/router';
+import { summarizeAcademicConfig } from './AcademicOptionsScreen';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
 import { bakeEnhance, isBakeableEnhance } from '../services/enhance/skiaEnhance';
+import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { insertScannedDocument } from '../services/persistence/dbService';
 import { shareDocument } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
-import type { LibraryDocument, LibraryPage } from '../types/models';
+import type { LibraryDocument, LibraryPage, PageOcr } from '../types/models';
 import { formatBytes } from '../utils/format';
 import { createId } from '../utils/id';
 
@@ -34,12 +36,16 @@ function firstOcrLine(text?: string): string | undefined {
   return line;
 }
 
+// The normalized shape fed into saveImagesToLibrary + the final LibraryPage[] build - lighter
+// than SessionPage since a rasterized cover page has no rotation/cropRect/enhance of its own.
+type LibraryInputPage = { id: string; uri: string; width: number; height: number; ocr?: PageOcr };
+
 export function DeliverScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, pw, folderId, exportCopy } = state.deliver;
+  const { name, format, quality, more, pw, folderId, exportCopy, academicConfig } = state.deliver;
   const { folders } = state.library;
   const { androidExportFolderUri, androidExportFolderLabel } = state.settings;
   const [saving, setSaving] = useState(false);
@@ -84,26 +90,62 @@ export function DeliverScreen() {
           })
         );
 
-        const savedImages = await saveImagesToLibrary(documentId, bakedPages, quality);
+        // ReaderScreen (the in-app page-by-page viewer, both right after saving and whenever this
+        // document is reopened from the Library later) renders each LibraryPage's own raw image -
+        // it never renders the compiled PDF. So an academic cover/border/header-footer needs to
+        // also exist as real pixels in a SEPARATE set of images used only for the library, baked
+        // via academicRasterService (Skia). bakedPages itself is left untouched and still goes
+        // into buildPdfFromPages below unchanged, so the actual PDF keeps its crisp vector version.
+        let contentPagesForLibrary: LibraryInputPage[] = bakedPages.map((page) => ({
+          id: page.id,
+          uri: page.uri,
+          width: page.width,
+          height: page.height,
+          ocr: page.ocr,
+        }));
+        let coverPageForLibrary: LibraryInputPage | null = null;
+
+        if (format === 'PDF' && academicConfig) {
+          if (academicConfig.enableBorder || academicConfig.headerText || academicConfig.footerText) {
+            const total = bakedPages.length;
+            contentPagesForLibrary = await Promise.all(
+              bakedPages.map(async (page, i) => {
+                const stamped = await stampContentPageImage(page.uri, academicConfig, i + 1, total);
+                return { id: page.id, uri: stamped.uri, width: stamped.width, height: stamped.height, ocr: page.ocr };
+              })
+            );
+          }
+          if (academicConfig.coverPage) {
+            const rendered = await renderCoverPageImage(academicConfig.coverPage);
+            if (rendered) coverPageForLibrary = { id: createId('page'), uri: rendered.uri, width: rendered.width, height: rendered.height };
+          }
+        }
+
+        const libraryInputPages: LibraryInputPage[] = coverPageForLibrary
+          ? [coverPageForLibrary, ...contentPagesForLibrary]
+          : contentPagesForLibrary;
+
+        const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality);
         let pdfUri: string | undefined;
         let sizeBytes = savedImages.sizeBytes;
 
         if (format === 'PDF') {
-          const pdfResult = await buildPdfFromPages(documentId, bakedPages, quality);
+          const pdfResult = await buildPdfFromPages(documentId, bakedPages, quality, academicConfig ?? undefined);
           pdfUri = pdfResult.uri;
           sizeBytes = pdfResult.sizeBytes;
         }
 
-        // `saveImagesToLibrary` (and, for gray/bw pages, `bakeEnhance` before it) each wrote a
-        // fresh compressed copy rather than reusing the session's cache files, so the original
-        // capture-session images are now orphaned in the cache dir once the library copies
-        // above exist. Sweep them here rather than leaving them for the OS to eventually reap.
+        // `saveImagesToLibrary` (and, for gray/bw pages, `bakeEnhance` / academicRasterService
+        // before it) each wrote a fresh compressed copy rather than reusing the session's cache
+        // files, so the originals are now orphaned in the cache dir once the library copies above
+        // exist. Sweep them here rather than leaving them for the OS to eventually reap.
         const staleCacheUris = new Set<string>();
         pages.forEach((page) => staleCacheUris.add(page.uri));
         bakedPages.forEach((page) => staleCacheUris.add(page.uri));
+        libraryInputPages.forEach((page) => staleCacheUris.add(page.uri));
         cleanTemporaryCache(Array.from(staleCacheUris));
 
-        const libraryPages: LibraryPage[] = bakedPages.map((page, i) => ({
+        const libraryPages: LibraryPage[] = libraryInputPages.map((page, i) => ({
           id: page.id,
           fileUri: savedImages.uris[i],
           width: page.width,
@@ -173,6 +215,7 @@ export function DeliverScreen() {
       folderId,
       folderName,
       exportCopy,
+      academicConfig,
       androidExportFolderUri,
       androidExportFolderLabel,
       state.capture.mode,
@@ -234,6 +277,16 @@ export function DeliverScreen() {
         >
           <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
           <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{folderName}</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
+          onPress={() => go('academicOptions')}
+        >
+          <Text style={{ color: tokens.ink, fontSize: 15 }}>Academic export</Text>
+          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>
+            {summarizeAcademicConfig(academicConfig)}
+          </Text>
         </Pressable>
       </ScrollView>
 

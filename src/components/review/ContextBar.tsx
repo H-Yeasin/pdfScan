@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, typeScale, useTheme } from '../../theme';
 
 type ContextBarItem = {
-  id: 'crop' | 'rotate' | 'retake' | 'ocr';
+  id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'academic';
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   active?: boolean;
@@ -22,6 +22,7 @@ export function ContextBar({ onPress, ocrRunning }: ContextBarProps) {
     { id: 'rotate', label: 'Rotate', icon: 'reload-outline' },
     { id: 'retake', label: 'Retake', icon: 'camera-outline' },
     { id: 'ocr', label: 'OCR', icon: 'text-outline', active: ocrRunning },
+    { id: 'academic', label: 'Academic', icon: 'school-outline' },
   ];
 
   return (

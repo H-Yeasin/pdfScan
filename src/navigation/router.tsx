@@ -3,6 +3,10 @@ import type { NavDir, ScreenName } from '../types/navigation';
 
 type RouterState = {
   screen: ScreenName;
+  // The screen `go()` was called FROM, one hop back - lets a screen reachable from more than one
+  // place (e.g. academicOptions, opened from both Review and Deliver) send its own "Back" button
+  // to wherever the user actually came from, instead of a single hardcoded destination.
+  previousScreen: ScreenName | null;
   navDir: NavDir;
   navTick: number;
 };
@@ -13,13 +17,13 @@ type RouterContextValue = RouterState & {
 
 const RouterContext = createContext<RouterContextValue | null>(null);
 
-const INITIAL_STATE: RouterState = { screen: 'capture', navDir: 'fwd', navTick: 0 };
+const INITIAL_STATE: RouterState = { screen: 'capture', previousScreen: null, navDir: 'fwd', navTick: 0 };
 
 export function RouterProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<RouterState>(INITIAL_STATE);
 
   const go = useCallback((to: ScreenName, dir: NavDir = 'fwd') => {
-    setState((s) => ({ screen: to, navDir: dir, navTick: s.navTick + 1 }));
+    setState((s) => ({ screen: to, previousScreen: s.screen, navDir: dir, navTick: s.navTick + 1 }));
   }, []);
 
   const value = useMemo<RouterContextValue>(() => ({ ...state, go }), [state, go]);
