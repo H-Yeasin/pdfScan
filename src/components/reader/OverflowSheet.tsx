@@ -7,13 +7,9 @@ export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete';
 
 type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
-const ITEMS: Item[] = [
-  { id: 'share', label: 'Share', icon: 'share-outline' },
-  { id: 'sign', label: 'Sign', icon: 'create-outline' },
-  { id: 'export', label: 'Export pages', icon: 'download-outline' },
-  { id: 'print', label: 'Print', icon: 'print-outline' },
-  { id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true },
-];
+// Share/Sign/Export/Print now live in the persistent ReaderActionBar; Delete stays here so
+// there's exactly one, deliberately-gated path to a destructive action.
+const ITEMS: Item[] = [{ id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true }];
 
 type OverflowSheetProps = {
   visible: boolean;

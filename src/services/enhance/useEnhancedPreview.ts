@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { File } from 'expo-file-system';
-import { bakeEnhance, isBakeableEnhance } from './skiaEnhance';
-import type { EnhanceMode } from '../../types/models';
+import { DEFAULT_ADJUST } from './adjust';
+import { bakeEnhance, needsBake } from './skiaEnhance';
+import type { AdjustValues, EnhanceMode } from '../../types/models';
 
 function deleteIfExists(uri: string) {
   const file = new File(uri);
   if (file.exists) file.delete();
 }
 
-// Live preview for the Review screen's Auto/Color/Gray/B&W/Scan segmented control. gray/bw/
-// document_scan have no cheap non-destructive preview (document_scan in particular is a
-// RuntimeEffect shader, not a color matrix), so this runs the same `bakeEnhance` used at export
-// time against a scratch cache file whenever the mode changes, keeping the preview pixel-identical
-// to what Deliver will actually produce. auto/color are pass-through and never bake.
-export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode) {
+// Live preview for the Review screen's Auto/Color/Gray/B&W/Scan control plus its brightness/
+// contrast/saturation sliders. gray/bw/document_scan have no cheap non-destructive preview
+// (document_scan in particular is a RuntimeEffect shader, not a color matrix), and neither does
+// any non-default adjust value, so this runs the same `bakeEnhance` used at export time against a
+// scratch cache file whenever mode or adjust changes, keeping the preview pixel-identical to what
+// Deliver will actually produce. auto/color with untouched sliders stay pass-through and never bake.
+export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, adjust: AdjustValues = DEFAULT_ADJUST) {
   const [previewUri, setPreviewUri] = useState<string | undefined>(uri);
   const [loading, setLoading] = useState(false);
   const bakedRef = useRef<string | null>(null);
@@ -21,7 +23,7 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode) {
   useEffect(() => {
     let cancelled = false;
 
-    if (!uri || !isBakeableEnhance(mode)) {
+    if (!uri || !needsBake(mode, adjust)) {
       if (bakedRef.current) {
         deleteIfExists(bakedRef.current);
         bakedRef.current = null;
@@ -32,7 +34,7 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode) {
     }
 
     setLoading(true);
-    bakeEnhance(uri, mode).then((baked) => {
+    bakeEnhance(uri, mode, adjust).then((baked) => {
       if (cancelled) {
         deleteIfExists(baked.uri);
         return;
@@ -46,7 +48,7 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode) {
     return () => {
       cancelled = true;
     };
-  }, [uri, mode]);
+  }, [uri, mode, adjust.brightness, adjust.contrast, adjust.saturation]);
 
   // Unmount-only cleanup of whatever the last successful bake produced.
   useEffect(() => {

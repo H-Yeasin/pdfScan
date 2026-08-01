@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
-import { bakeEnhance, isBakeableEnhance } from '../services/enhance/skiaEnhance';
+import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { bakeEnhance, needsBake } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages } from '../services/pdf/pdfService';
 import type { AcademicConfig, CoverPageConfig } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -116,22 +117,36 @@ export function AcademicOptionsScreen() {
   // session pages, then hands it to expo-print - on both iOS and Android this opens a native
   // preview/print sheet rendering the real PDF, cover page/border/header-footer included, so the
   // user can see exactly what export will produce before saving anything. Nothing here touches
-  // the library; the scratch document dir is deleted again once the preview sheet is dismissed.
+  // the library.
+  //
+  // On Android, printAsync's promise resolves once the print job is handed off, but the OS print
+  // spooler (PrintDocumentAdapter) reads the file lazily afterwards - deleting the scratch dir
+  // right away races with that read and crashes the spooler with CannotLoadUriException. So the
+  // previous preview's scratch dir is only cleaned up lazily, once a new preview starts (or on
+  // unmount), by which point the spooler is done with it.
+  const lastPreviewIdRef = useRef<string | null>(null);
+
   const handlePreview = useCallback(async () => {
     if (pages.length === 0 || previewing) return;
     setPreviewing(true);
+    if (lastPreviewIdRef.current) {
+      deleteDocumentFiles(lastPreviewIdRef.current);
+      lastPreviewIdRef.current = null;
+    }
     const previewId = createId('preview');
     try {
       const bakedPages = await Promise.all(
         pages.map(async (page) => {
-          if (!isBakeableEnhance(page.enhance)) return page;
-          const baked = await bakeEnhance(page.uri, page.enhance);
+          const adjust = page.adjust ?? DEFAULT_ADJUST;
+          if (!needsBake(page.enhance, adjust)) return page;
+          const baked = await bakeEnhance(page.uri, page.enhance, adjust);
           return { ...page, ...baked };
         })
       );
 
       const result = await buildPdfFromPages(previewId, bakedPages, state.deliver.quality, cfg ?? undefined);
       await Print.printAsync({ uri: result.uri });
+      lastPreviewIdRef.current = previewId;
 
       const staleCacheUris = bakedPages
         .filter((page, i) => page.uri !== pages[i].uri)
@@ -139,8 +154,8 @@ export function AcademicOptionsScreen() {
       cleanTemporaryCache(staleCacheUris);
     } catch (error) {
       console.warn('AcademicOptionsScreen: preview failed', error);
-    } finally {
       deleteDocumentFiles(previewId);
+    } finally {
       setPreviewing(false);
     }
   }, [pages, previewing, state.deliver.quality, cfg]);

@@ -13,6 +13,11 @@ type ReaderBottomChromeProps = {
   nightOn: boolean;
 };
 
+// Approximate rendered height of ReaderActionBar's content (paddingTop + item row), so this
+// pill floats just above the persistent action bar instead of overlapping it. The action bar's
+// own safe-area inset is accounted for separately below.
+const ACTION_BAR_CLEARANCE = 68;
+
 export function ReaderBottomChrome({
   visible,
   pageCount,
@@ -32,7 +37,7 @@ export function ReaderBottomChrome({
         {
           backgroundColor: tokens.surface,
           borderColor: tokens.edge,
-          bottom: Math.max(insets.bottom, spacing.md),
+          bottom: Math.max(insets.bottom, spacing.md) + ACTION_BAR_CLEARANCE,
           opacity: visible,
           transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
         },

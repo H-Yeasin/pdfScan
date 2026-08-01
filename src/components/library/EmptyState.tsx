@@ -26,6 +26,7 @@ export function EmptyState({ title, body, actionLabel, onAction }: EmptyStatePro
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     alignItems: 'center',
     paddingVertical: 48,
     paddingHorizontal: spacing.xl,

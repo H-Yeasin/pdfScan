@@ -11,6 +11,10 @@ export type OcrLine = { text: string; bounding: OcrBounding };
 export type OcrBlock = { text: string; lines: OcrLine[]; bounding: OcrBounding };
 export type PageOcr = { text: string; blocks: OcrBlock[] };
 
+// Manual tone adjustments layered on top of `enhance`. Each field is -1..1, where 0 is a no-op;
+// see skiaEnhance.ts's composeAdjustFilter for how these map to actual color-matrix math.
+export type AdjustValues = { brightness: number; contrast: number; saturation: number };
+
 export type SessionPage = {
   id: string;
   uri: string;
@@ -19,6 +23,7 @@ export type SessionPage = {
   rotation: 0 | 90 | 180 | 270;
   cropRect?: { originX: number; originY: number; width: number; height: number };
   enhance: EnhanceMode;
+  adjust?: AdjustValues;
   err?: boolean;
   ocr?: PageOcr;
 };

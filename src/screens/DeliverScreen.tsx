@@ -12,7 +12,8 @@ import { useRouter } from '../navigation/router';
 import { summarizeAcademicConfig } from './AcademicOptionsScreen';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
-import { bakeEnhance, isBakeableEnhance } from '../services/enhance/skiaEnhance';
+import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { bakeEnhance, needsBake } from '../services/enhance/skiaEnhance';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -84,8 +85,9 @@ export function DeliverScreen() {
         // effect survives into the saved PDF/JPG rather than staying a UI-only selection.
         const bakedPages = await Promise.all(
           pages.map(async (page) => {
-            if (!isBakeableEnhance(page.enhance)) return page;
-            const baked = await bakeEnhance(page.uri, page.enhance);
+            const adjust = page.adjust ?? DEFAULT_ADJUST;
+            if (!needsBake(page.enhance, adjust)) return page;
+            const baked = await bakeEnhance(page.uri, page.enhance, adjust);
             return { ...page, ...baked };
           })
         );

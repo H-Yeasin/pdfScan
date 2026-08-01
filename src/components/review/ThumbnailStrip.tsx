@@ -18,6 +18,7 @@ type ThumbnailStripProps = {
   onSelect: (index: number) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onAddMore: () => void;
+  onDelete: (id: string) => void;
   // Leads the strip (page 0 in the final document) so the strip's visual order matches the
   // exported PDF's actual page order. Tapping it always jumps straight to Academic Options to
   // add/edit the cover - same "tap to configure" behavior as the "+" add-page tile jumping to
@@ -32,6 +33,7 @@ export function ThumbnailStrip({
   onSelect,
   onReorder,
   onAddMore,
+  onDelete,
   cover,
   onPressCover,
 }: ThumbnailStripProps) {
@@ -76,6 +78,7 @@ export function ThumbnailStrip({
           selected={index === selectedIndex}
           onSelect={onSelect}
           onDropAt={onReorder}
+          onDelete={onDelete}
         />
       ))}
       <Pressable
@@ -95,9 +98,10 @@ type DraggableThumbnailProps = {
   selected: boolean;
   onSelect: (index: number) => void;
   onDropAt: (fromIndex: number, toIndex: number) => void;
+  onDelete: (id: string) => void;
 };
 
-function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt }: DraggableThumbnailProps) {
+function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt, onDelete }: DraggableThumbnailProps) {
   const { tokens } = useTheme();
   const translateX = useSharedValue(0);
   const dragging = useSharedValue(0);
@@ -144,6 +148,13 @@ function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt }
           <Text style={styles.indexBadgeText}>{index + 1}</Text>
         </View>
         {page.err ? <View style={[styles.errDot, { backgroundColor: tokens.danger }]} /> : null}
+        <Pressable
+          hitSlop={8}
+          style={[styles.deleteBadge, { backgroundColor: tokens.danger }]}
+          onPress={() => onDelete(page.id)}
+        >
+          <Ionicons name="close" size={11} color="#fff" />
+        </Pressable>
       </Animated.View>
     </GestureDetector>
   );
@@ -199,6 +210,16 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
+  },
+  deleteBadge: {
+    position: 'absolute',
+    right: 3,
+    top: 3,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addTile: {
     width: THUMB_WIDTH,

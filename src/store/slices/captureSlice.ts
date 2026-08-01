@@ -1,5 +1,5 @@
 import type { FlashMode } from 'expo-camera';
-import type { CaptureMode, EnhanceMode, SessionPage } from '../../types/models';
+import type { AdjustValues, CaptureMode, EnhanceMode, SessionPage } from '../../types/models';
 
 export type ProcessingStatus = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
 
@@ -25,6 +25,9 @@ export type CaptureAction =
   | { type: 'capture/REMOVE_PAGE'; id: string }
   | { type: 'capture/REORDER_PAGES'; fromIndex: number; toIndex: number }
   | { type: 'capture/SET_PAGE_ENHANCE'; id: string; enhance: EnhanceMode }
+  | { type: 'capture/SET_ALL_PAGES_ENHANCE'; enhance: EnhanceMode }
+  | { type: 'capture/SET_PAGE_ADJUST'; id: string; adjust: AdjustValues }
+  | { type: 'capture/SET_ALL_PAGES_ADJUST'; adjust: AdjustValues }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
@@ -50,6 +53,21 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       return {
         ...state,
         pages: state.pages.map((p) => (p.id === action.id ? { ...p, enhance: action.enhance } : p)),
+      };
+    case 'capture/SET_ALL_PAGES_ENHANCE':
+      return {
+        ...state,
+        pages: state.pages.map((p) => ({ ...p, enhance: action.enhance })),
+      };
+    case 'capture/SET_PAGE_ADJUST':
+      return {
+        ...state,
+        pages: state.pages.map((p) => (p.id === action.id ? { ...p, adjust: action.adjust } : p)),
+      };
+    case 'capture/SET_ALL_PAGES_ADJUST':
+      return {
+        ...state,
+        pages: state.pages.map((p) => ({ ...p, adjust: action.adjust })),
       };
     case 'capture/UPDATE_PAGE':
       return {

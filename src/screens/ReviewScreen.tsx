@@ -2,14 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AdjustPanel } from '../components/review/AdjustPanel';
 import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
+import { GridPagesModal } from '../components/review/GridPagesModal';
+import { PreviewControls } from '../components/review/PreviewControls';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { ZoomableImage } from '../components/shared/ZoomableImage';
 import { useRouter } from '../navigation/router';
+import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { rotatePage } from '../services/enhance/enhanceService';
 import { cropPage } from '../services/enhance/enhanceService';
 import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
@@ -19,6 +23,7 @@ import { applySignatureToPage } from '../services/signature/signatureCompositeSe
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import type { AdjustValues, EnhanceMode } from '../types/models';
 
 const OCR_SPARSE_THRESHOLD = 6;
 
@@ -32,14 +37,21 @@ export function ReviewScreen() {
   const [cropTarget, setCropTarget] = useState<string | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
+  const [gridOpen, setGridOpen] = useState(false);
+  const [applyToAll, setApplyToAll] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
 
   const selectedPage = pages[sel] ?? pages[0];
   const multiPage = pages.length > 1;
   const coverConfig = academicConfig?.coverPage;
+  const currentAdjust = selectedPage?.adjust ?? DEFAULT_ADJUST;
+  const adjustable = selectedPage?.enhance !== 'document_scan';
 
   const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(
     selectedPage?.uri,
-    selectedPage?.enhance ?? 'auto'
+    selectedPage?.enhance ?? 'auto',
+    currentAdjust
   );
 
   // Runs border/header-footer stamping on top of the already-enhanced preview, so this mirrors
@@ -53,6 +65,8 @@ export function ReviewScreen() {
 
   const mainPreviewUri = stampedUri ?? selectedPage?.uri;
   const mainPreviewLoading = enhancePreviewLoading || stampLoading;
+  const showCompare = !!selectedPage && mainPreviewUri !== selectedPage.uri;
+  const displayUri = comparing && selectedPage ? selectedPage.uri : mainPreviewUri ?? selectedPage?.uri;
 
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -73,13 +87,44 @@ export function ReviewScreen() {
     [dispatch]
   );
 
-  const handleEnhanceChange = useCallback(
-    (enhance: typeof selectedPage.enhance) => {
-      if (!selectedPage) return;
-      dispatch({ type: 'capture/SET_PAGE_ENHANCE', id: selectedPage.id, enhance });
+  const handleDeletePage = useCallback(
+    (id: string) => {
+      const removedIndex = pages.findIndex((p) => p.id === id);
+      if (removedIndex === -1) return;
+      dispatch({ type: 'capture/REMOVE_PAGE', id });
+      const nextLength = pages.length - 1;
+      const nextSel = Math.max(0, Math.min(sel, nextLength - 1));
+      dispatch({ type: 'review/SELECT_PAGE', index: nextSel });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: `Page removed · ${nextLength} left` });
     },
-    [dispatch, selectedPage]
+    [dispatch, pages, sel]
   );
+
+  const handleEnhanceChange = useCallback(
+    (enhance: EnhanceMode) => {
+      if (!selectedPage) return;
+      if (applyToAll) dispatch({ type: 'capture/SET_ALL_PAGES_ENHANCE', enhance });
+      else dispatch({ type: 'capture/SET_PAGE_ENHANCE', id: selectedPage.id, enhance });
+    },
+    [dispatch, selectedPage, applyToAll]
+  );
+
+  const handleAdjustCommit = useCallback(
+    (adjust: AdjustValues) => {
+      if (!selectedPage) return;
+      if (applyToAll) dispatch({ type: 'capture/SET_ALL_PAGES_ADJUST', adjust });
+      else dispatch({ type: 'capture/SET_PAGE_ADJUST', id: selectedPage.id, adjust });
+    },
+    [dispatch, selectedPage, applyToAll]
+  );
+
+  const goPrevPage = useCallback(() => {
+    if (sel > 0) dispatch({ type: 'review/SELECT_PAGE', index: sel - 1 });
+  }, [dispatch, sel]);
+
+  const goNextPage = useCallback(() => {
+    if (sel < pages.length - 1) dispatch({ type: 'review/SELECT_PAGE', index: sel + 1 });
+  }, [dispatch, sel, pages.length]);
 
   const handleRotate = useCallback(async () => {
     if (!selectedPage) return;
@@ -185,10 +230,20 @@ export function ReviewScreen() {
           <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>Back</Text>
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>Review</Text>
-        <Pressable style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
-          <Text style={styles.nextLabel}>Next</Text>
-          <Ionicons name="chevron-forward" size={18} color="#fff" />
-        </Pressable>
+        <View style={styles.headerRight}>
+          {multiPage && (
+            <Pressable
+              style={[styles.gridToggle, { borderColor: tokens.edge }]}
+              onPress={() => setGridOpen(true)}
+            >
+              <Ionicons name="grid-outline" size={18} color={tokens.ink} />
+            </Pressable>
+          )}
+          <Pressable style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
+            <Text style={styles.nextLabel}>Next</Text>
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
+          </Pressable>
+        </View>
       </View>
 
       <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: ocrRunning ? 1 : 0 }]}>
@@ -214,18 +269,29 @@ export function ReviewScreen() {
           onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
           onReorder={handleReorder}
           onAddMore={() => go('capture')}
+          onDelete={handleDeletePage}
           cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
           onPressCover={() => go('academicOptions')}
         />
       )}
 
       <View style={[styles.previewArea, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-        <ZoomableImage uri={mainPreviewUri ?? selectedPage.uri} />
+        <ZoomableImage uri={displayUri ?? selectedPage.uri} />
         {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
             <ActivityIndicator color={tokens.accent} />
           </View>
         )}
+        <PreviewControls
+          index={sel}
+          total={pages.length}
+          onPrev={goPrevPage}
+          onNext={goNextPage}
+          showCompare={showCompare}
+          comparing={comparing}
+          onCompareIn={() => setComparing(true)}
+          onCompareOut={() => setComparing(false)}
+        />
       </View>
 
       {showErrHint && (
@@ -237,6 +303,31 @@ export function ReviewScreen() {
       )}
 
       <View style={styles.enhanceWrap}>
+        {(multiPage || adjustable) && (
+          <View style={styles.enhanceHeaderRow}>
+            {multiPage && (
+              <Pressable style={styles.headerToggle} onPress={() => setApplyToAll((v) => !v)} hitSlop={4}>
+                <Ionicons
+                  name={applyToAll ? 'checkbox' : 'square-outline'}
+                  size={18}
+                  color={applyToAll ? tokens.accent : tokens.muted}
+                />
+                <Text style={[styles.headerToggleLabel, { color: applyToAll ? tokens.accent : tokens.muted }]}>
+                  Apply to all pages
+                </Text>
+              </Pressable>
+            )}
+            {adjustable && (
+              <Pressable style={styles.headerToggle} onPress={() => setAdjustOpen((v) => !v)} hitSlop={4}>
+                <Ionicons name="options-outline" size={18} color={adjustOpen ? tokens.accent : tokens.muted} />
+                <Text style={[styles.headerToggleLabel, { color: adjustOpen ? tokens.accent : tokens.muted }]}>
+                  Adjust
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+        {adjustOpen && adjustable && <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} />}
         <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
       </View>
 
@@ -255,6 +346,15 @@ export function ReviewScreen() {
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />
       )}
+
+      <GridPagesModal
+        visible={gridOpen}
+        pages={pages}
+        selectedIndex={sel}
+        onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
+        onDelete={handleDeletePage}
+        onClose={() => setGridOpen(false)}
+      />
 
       {signStep === 'place' && capturedSignature && selectedPage && (
         <SignaturePlacementOverlay
@@ -306,6 +406,19 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.heading,
     fontSize: typeScale.title.fontSize,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  gridToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,6 +442,7 @@ const styles = StyleSheet.create({
   },
   previewArea: {
     flex: 1,
+    position: 'relative',
     marginHorizontal: spacing.xl,
     marginVertical: spacing.sm,
     borderRadius: 10,
@@ -353,5 +467,21 @@ const styles = StyleSheet.create({
   enhanceWrap: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  enhanceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  headerToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  headerToggleLabel: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

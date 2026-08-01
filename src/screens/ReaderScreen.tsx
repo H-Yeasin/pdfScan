@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, FlatList, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
 import { OverflowSheet, type OverflowItemId } from '../components/reader/OverflowSheet';
 import { PageList, PAGE_SLOT } from '../components/reader/PageList';
+import { ReaderActionBar } from '../components/reader/ReaderActionBar';
 import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
@@ -196,6 +197,8 @@ export function ReaderScreen() {
         onNight={() => dispatch({ type: 'reader/TOGGLE_NIGHT' })}
         nightOn={night}
       />
+
+      <ReaderActionBar visible={chromeVisible} onPress={handleOverflowSelect} />
 
       <OverflowSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)} onSelect={handleOverflowSelect} />
 

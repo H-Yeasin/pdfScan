@@ -1,6 +1,8 @@
 import { File, Paths } from 'expo-file-system';
 import { FilterMode, ImageFormat, MipmapMode, Skia, TileMode } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
+import { DEFAULT_ADJUST, isDefaultAdjust } from './adjust';
+import type { AdjustValues, EnhanceMode } from '../../types/models';
 
 const GRAYSCALE_MATRIX = [
   0.299, 0.587, 0.114, 0, 0,
@@ -20,6 +22,49 @@ function contrastMatrix(contrast: number) {
     0, 0, contrast, 0, t,
     0, 0, 0, 1, 0,
   ];
+}
+
+// brightness in -1..1, scaled to a max ±0.3 additive shift in Skia's unpremultiplied 0.0-1.0
+// pixel space (same convention as contrastMatrix above).
+function brightnessMatrix(brightness: number) {
+  const t = brightness * 0.3;
+  return [
+    1, 0, 0, 0, t,
+    0, 1, 0, 0, t,
+    0, 0, 1, 0, t,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+// saturation in -1..1 maps to a 0..2 multiplier (0 = grayscale, 1 = unchanged, 2 = oversaturated),
+// interpolating each channel against the same luminance weights used by GRAYSCALE_MATRIX. Applied
+// to an already-grayscale image this is a no-op (R=G=B collapses the interpolation to identity),
+// so it's safe to compose unconditionally even when the enhance mode is gray/bw.
+function saturationMatrix(saturation: number) {
+  const s = 1 + saturation;
+  const lumR = 0.299;
+  const lumG = 0.587;
+  const lumB = 0.114;
+  const sr = (1 - s) * lumR;
+  const sg = (1 - s) * lumG;
+  const sb = (1 - s) * lumB;
+  return [
+    sr + s, sg, sb, 0, 0,
+    sr, sg + s, sb, 0, 0,
+    sr, sg, sb + s, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+// Composes brightness -> contrast -> saturation into a single ColorFilter, or null when every
+// slider is at its default (so callers can skip the extra compose work entirely). contrast/
+// saturation reuse the same 0..2-multiplier convention as contrastMatrix's `contrast` param.
+function composeAdjustFilter(adjust: AdjustValues) {
+  if (isDefaultAdjust(adjust)) return null;
+  let filter = Skia.ColorFilter.MakeMatrix(brightnessMatrix(adjust.brightness));
+  filter = Skia.ColorFilter.MakeCompose(Skia.ColorFilter.MakeMatrix(contrastMatrix(1 + adjust.contrast)), filter);
+  filter = Skia.ColorFilter.MakeCompose(Skia.ColorFilter.MakeMatrix(saturationMatrix(adjust.saturation)), filter);
+  return filter;
 }
 
 // Local-adaptive threshold: each pixel is compared against the average luminance of its own
@@ -75,13 +120,25 @@ export function isBakeableEnhance(mode: string): mode is BakeableEnhance {
   return (BAKEABLE_MODES as readonly string[]).includes(mode);
 }
 
+// Whether a page needs a real pixel bake at all: either its enhance mode does (gray/bw/
+// document_scan), or the user has moved a brightness/contrast/saturation slider off center.
+// auto/color stay pass-through when adjust is untouched, same as before this existed.
+export function needsBake(mode: EnhanceMode, adjust: AdjustValues): boolean {
+  return isBakeableEnhance(mode) || !isDefaultAdjust(adjust);
+}
+
 // Real pixel-level bake using Skia — runs the page through an offscreen GPU surface. gray/bw use
 // a color matrix (grayscale, plus a contrast push for bw); document_scan runs a local-adaptive
 // threshold RuntimeEffect shader instead, to strip shadows a global matrix can't tell from ink.
-// Always writes a new JPEG file; never touches the source page's original image.
+// Manual brightness/contrast/saturation adjustments are composed in as an extra color matrix
+// ahead of the mode's own filter (so they act as pre-processing on the original color image);
+// document_scan's shader already collapses everything to pure black/white, so adjust is ignored
+// there — there's no continuous tone left to adjust. Always writes a new JPEG file; never touches
+// the source page's original image.
 export async function bakeEnhance(
   uri: string,
-  mode: BakeableEnhance
+  mode: EnhanceMode,
+  adjust: AdjustValues = DEFAULT_ADJUST
 ): Promise<{ uri: string; width: number; height: number }> {
   const data = await Skia.Data.fromURI(uri);
   const image = Skia.Image.MakeImageFromEncoded(data);
@@ -105,10 +162,15 @@ export async function bakeEnhance(
     paint.setShader(shader);
     canvas.drawRect(Skia.XYWHRect(0, 0, width, height), paint);
   } else {
-    const grayscaleFilter = Skia.ColorFilter.MakeMatrix(GRAYSCALE_MATRIX);
-    const colorFilter =
-      mode === 'bw' ? Skia.ColorFilter.MakeCompose(Skia.ColorFilter.MakeMatrix(contrastMatrix(2.1)), grayscaleFilter) : grayscaleFilter;
-    paint.setColorFilter(colorFilter);
+    const adjustFilter = composeAdjustFilter(adjust);
+    let colorFilter = adjustFilter;
+    if (mode === 'gray' || mode === 'bw') {
+      const grayscaleFilter = Skia.ColorFilter.MakeMatrix(GRAYSCALE_MATRIX);
+      const modeFilter =
+        mode === 'bw' ? Skia.ColorFilter.MakeCompose(Skia.ColorFilter.MakeMatrix(contrastMatrix(2.1)), grayscaleFilter) : grayscaleFilter;
+      colorFilter = colorFilter ? Skia.ColorFilter.MakeCompose(modeFilter, colorFilter) : modeFilter;
+    }
+    if (colorFilter) paint.setColorFilter(colorFilter);
     canvas.drawImage(image, 0, 0, paint);
   }
   surface.flush();
