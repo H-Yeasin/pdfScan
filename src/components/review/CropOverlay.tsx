@@ -1,21 +1,46 @@
 import { useMemo } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  type SharedValue,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
+import Svg, { Path, Polygon } from 'react-native-svg';
 import { radii, spacing, useTheme } from '../../theme';
+import type { Point } from '../../services/enhance/perspective';
 
 const HANDLE_SIZE = 28;
 const HANDLE_HIT_SLOP = 16;
-const MIN_CROP = 40;
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
 
 type CropOverlayProps = {
   uri: string;
   naturalWidth: number;
   naturalHeight: number;
-  onConfirm: (cropRect: { originX: number; originY: number; width: number; height: number }) => void;
+  // Natural-pixel-space corners, topLeft/topRight/bottomRight/bottomLeft order — the caller runs
+  // the actual perspective warp (mirrors how rotatePage/cropPage are invoked from ReviewScreen).
+  onConfirm: (points: [Point, Point, Point, Point]) => void;
   onCancel: () => void;
 };
 
+type Corner = { x: SharedValue<number>; y: SharedValue<number>; startX: SharedValue<number>; startY: SharedValue<number> };
+
+function useCornerPoint(initX: number, initY: number): Corner {
+  return {
+    x: useSharedValue(initX),
+    y: useSharedValue(initY),
+    startX: useSharedValue(0),
+    startY: useSharedValue(0),
+  };
+}
+
+// Four independently draggable corners (not constrained to a rectangle) so the user can trace
+// a document's actual edges even when the photo was taken at an angle; onConfirm hands the raw
+// quad back to the caller, which runs a perspective warp to straighten it into a rectangle.
 export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCancel }: CropOverlayProps) {
   const { tokens } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -33,120 +58,75 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
     return { displayWidth: w, displayHeight: h };
   }, [screenWidth, screenHeight, naturalWidth, naturalHeight]);
 
-  const left = useSharedValue(0);
-  const top = useSharedValue(0);
-  const right = useSharedValue(displayWidth);
-  const bottom = useSharedValue(displayHeight);
+  const topLeft = useCornerPoint(0, 0);
+  const topRight = useCornerPoint(displayWidth, 0);
+  const bottomRight = useCornerPoint(displayWidth, displayHeight);
+  const bottomLeft = useCornerPoint(0, displayHeight);
 
-  // Snapshot of the rect at gesture-start, read by every pan below. `event.translationX/Y` is an
-  // accumulated delta from the *finger's* initial touch point, not the (moving) handle view's own
-  // position, so anchoring every update to this fixed snapshot — rather than the previous approach
-  // of reading `event.x/y`, which is relative to the handle view and drifts every time that view
-  // is repositioned mid-drag — keeps the drag 1:1 with the finger instead of jittering/running away.
-  const startLeft = useSharedValue(0);
-  const startTop = useSharedValue(0);
-  const startRight = useSharedValue(0);
-  const startBottom = useSharedValue(0);
+  const makeCornerPan = (corner: Corner) =>
+    Gesture.Pan()
+      .hitSlop(HANDLE_HIT_SLOP)
+      .onStart(() => {
+        corner.startX.value = corner.x.value;
+        corner.startY.value = corner.y.value;
+      })
+      .onUpdate((e) => {
+        corner.x.value = clamp(corner.startX.value + e.translationX, 0, displayWidth);
+        corner.y.value = clamp(corner.startY.value + e.translationY, 0, displayHeight);
+      });
 
-  const captureStart = () => {
-    'worklet';
-    startLeft.value = left.value;
-    startTop.value = top.value;
-    startRight.value = right.value;
-    startBottom.value = bottom.value;
-  };
+  const topLeftPan = makeCornerPan(topLeft);
+  const topRightPan = makeCornerPan(topRight);
+  const bottomRightPan = makeCornerPan(bottomRight);
+  const bottomLeftPan = makeCornerPan(bottomLeft);
 
-  const topLeftPan = Gesture.Pan()
-    .hitSlop(HANDLE_HIT_SLOP)
-    .onStart(captureStart)
-    .onUpdate((e) => {
-      left.value = clamp(startLeft.value + e.translationX, 0, right.value - MIN_CROP);
-      top.value = clamp(startTop.value + e.translationY, 0, bottom.value - MIN_CROP);
-    });
-
-  const topRightPan = Gesture.Pan()
-    .hitSlop(HANDLE_HIT_SLOP)
-    .onStart(captureStart)
-    .onUpdate((e) => {
-      right.value = clamp(startRight.value + e.translationX, left.value + MIN_CROP, displayWidth);
-      top.value = clamp(startTop.value + e.translationY, 0, bottom.value - MIN_CROP);
-    });
-
-  const bottomLeftPan = Gesture.Pan()
-    .hitSlop(HANDLE_HIT_SLOP)
-    .onStart(captureStart)
-    .onUpdate((e) => {
-      left.value = clamp(startLeft.value + e.translationX, 0, right.value - MIN_CROP);
-      bottom.value = clamp(startBottom.value + e.translationY, top.value + MIN_CROP, displayHeight);
-    });
-
-  const bottomRightPan = Gesture.Pan()
-    .hitSlop(HANDLE_HIT_SLOP)
-    .onStart(captureStart)
-    .onUpdate((e) => {
-      right.value = clamp(startRight.value + e.translationX, left.value + MIN_CROP, displayWidth);
-      bottom.value = clamp(startBottom.value + e.translationY, top.value + MIN_CROP, displayHeight);
-    });
-
-  const movePan = Gesture.Pan()
-    .onStart(captureStart)
-    .onUpdate((e) => {
-      const w = startRight.value - startLeft.value;
-      const h = startBottom.value - startTop.value;
-      const newLeft = clamp(startLeft.value + e.translationX, 0, displayWidth - w);
-      const newTop = clamp(startTop.value + e.translationY, 0, displayHeight - h);
-      left.value = newLeft;
-      top.value = newTop;
-      right.value = newLeft + w;
-      bottom.value = newTop + h;
-    });
-
-  const rectStyle = useAnimatedStyle(() => ({
-    left: left.value,
-    top: top.value,
-    width: right.value - left.value,
-    height: bottom.value - top.value,
-  }));
-  const topCurtain = useAnimatedStyle(() => ({ height: top.value }));
-  const bottomCurtain = useAnimatedStyle(() => ({ height: displayHeight - bottom.value }));
-  const leftCurtain = useAnimatedStyle(() => ({ top: top.value, height: bottom.value - top.value, width: left.value }));
-  const rightCurtain = useAnimatedStyle(() => ({
-    top: top.value,
-    height: bottom.value - top.value,
-    width: displayWidth - right.value,
-  }));
   const topLeftHandleStyle = useAnimatedStyle(() => ({
-    left: left.value - HANDLE_SIZE / 2,
-    top: top.value - HANDLE_SIZE / 2,
+    left: topLeft.x.value - HANDLE_SIZE / 2,
+    top: topLeft.y.value - HANDLE_SIZE / 2,
   }));
   const topRightHandleStyle = useAnimatedStyle(() => ({
-    left: right.value - HANDLE_SIZE / 2,
-    top: top.value - HANDLE_SIZE / 2,
-  }));
-  const bottomLeftHandleStyle = useAnimatedStyle(() => ({
-    left: left.value - HANDLE_SIZE / 2,
-    top: bottom.value - HANDLE_SIZE / 2,
+    left: topRight.x.value - HANDLE_SIZE / 2,
+    top: topRight.y.value - HANDLE_SIZE / 2,
   }));
   const bottomRightHandleStyle = useAnimatedStyle(() => ({
-    left: right.value - HANDLE_SIZE / 2,
-    top: bottom.value - HANDLE_SIZE / 2,
+    left: bottomRight.x.value - HANDLE_SIZE / 2,
+    top: bottomRight.y.value - HANDLE_SIZE / 2,
+  }));
+  const bottomLeftHandleStyle = useAnimatedStyle(() => ({
+    left: bottomLeft.x.value - HANDLE_SIZE / 2,
+    top: bottomLeft.y.value - HANDLE_SIZE / 2,
+  }));
+
+  const maskProps = useAnimatedProps(() => ({
+    d:
+      `M0,0 H${displayWidth} V${displayHeight} H0 Z ` +
+      `M${topLeft.x.value},${topLeft.y.value} L${topRight.x.value},${topRight.y.value} ` +
+      `L${bottomRight.x.value},${bottomRight.y.value} L${bottomLeft.x.value},${bottomLeft.y.value} Z`,
+  }));
+  const polygonProps = useAnimatedProps(() => ({
+    points:
+      `${topLeft.x.value},${topLeft.y.value} ${topRight.x.value},${topRight.y.value} ` +
+      `${bottomRight.x.value},${bottomRight.y.value} ${bottomLeft.x.value},${bottomLeft.y.value}`,
   }));
 
   const handleReset = () => {
-    left.value = 0;
-    top.value = 0;
-    right.value = displayWidth;
-    bottom.value = displayHeight;
+    topLeft.x.value = 0;
+    topLeft.y.value = 0;
+    topRight.x.value = displayWidth;
+    topRight.y.value = 0;
+    bottomRight.x.value = displayWidth;
+    bottomRight.y.value = displayHeight;
+    bottomLeft.x.value = 0;
+    bottomLeft.y.value = displayHeight;
   };
 
   const handleConfirm = () => {
     const scale = naturalWidth / displayWidth;
-    onConfirm({
-      originX: Math.round(left.value * scale),
-      originY: Math.round(top.value * scale),
-      width: Math.round((right.value - left.value) * scale),
-      height: Math.round((bottom.value - top.value) * scale),
+    const toNatural = (corner: Corner): Point => ({
+      x: Math.round(corner.x.value * scale),
+      y: Math.round(corner.y.value * scale),
     });
+    onConfirm([toNatural(topLeft), toNatural(topRight), toNatural(bottomRight), toNatural(bottomLeft)]);
   };
 
   return (
@@ -154,15 +134,11 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
       <GestureHandlerRootView style={styles.backdrop}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
-          <Animated.View pointerEvents="none" style={[styles.curtain, styles.curtainTop, topCurtain]} />
-          <Animated.View pointerEvents="none" style={[styles.curtain, styles.curtainBottom, bottomCurtain]} />
-          <Animated.View pointerEvents="none" style={[styles.curtain, leftCurtain]} />
-          <Animated.View pointerEvents="none" style={[styles.curtain, rightCurtain, { right: 0, left: undefined }]} />
 
-          <GestureDetector gesture={movePan}>
-            <Animated.View style={[styles.moveArea, rectStyle]} />
-          </GestureDetector>
-          <Animated.View pointerEvents="none" style={[styles.rectBorder, { borderColor: tokens.accent }, rectStyle]} />
+          <Svg width={displayWidth} height={displayHeight} style={StyleSheet.absoluteFill} pointerEvents="none">
+            <AnimatedPath animatedProps={maskProps} fill="rgba(0,0,0,.6)" fillRule="evenodd" />
+            <AnimatedPolygon animatedProps={polygonProps} stroke={tokens.accent} strokeWidth={2} fill="none" />
+          </Svg>
 
           <GestureDetector gesture={topLeftPan}>
             <Animated.View style={[styles.handle, { borderColor: tokens.accent }, topLeftHandleStyle]} />
@@ -170,13 +146,15 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
           <GestureDetector gesture={topRightPan}>
             <Animated.View style={[styles.handle, { borderColor: tokens.accent }, topRightHandleStyle]} />
           </GestureDetector>
-          <GestureDetector gesture={bottomLeftPan}>
-            <Animated.View style={[styles.handle, { borderColor: tokens.accent }, bottomLeftHandleStyle]} />
-          </GestureDetector>
           <GestureDetector gesture={bottomRightPan}>
             <Animated.View style={[styles.handle, { borderColor: tokens.accent }, bottomRightHandleStyle]} />
           </GestureDetector>
+          <GestureDetector gesture={bottomLeftPan}>
+            <Animated.View style={[styles.handle, { borderColor: tokens.accent }, bottomLeftHandleStyle]} />
+          </GestureDetector>
         </View>
+
+        <Text style={styles.hint}>Drag each corner to match the page edges</Text>
 
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
@@ -205,22 +183,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xl,
-  },
-  curtain: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,.6)',
-  },
-  curtainTop: { top: 0 },
-  curtainBottom: { bottom: 0 },
-  moveArea: {
-    position: 'absolute',
-  },
-  rectBorder: {
-    position: 'absolute',
-    borderWidth: 2,
+    gap: spacing.lg,
   },
   handle: {
     position: 'absolute',
@@ -229,6 +192,10 @@ const styles = StyleSheet.create({
     borderRadius: HANDLE_SIZE / 2,
     borderWidth: 4,
     backgroundColor: '#fff',
+  },
+  hint: {
+    color: 'rgba(255,255,255,.65)',
+    fontSize: 13,
   },
   actions: {
     flexDirection: 'row',

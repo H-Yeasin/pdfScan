@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CaptureControls } from '../components/capture/CaptureControls';
-import { DocumentFrame } from '../components/capture/DocumentFrame';
+import { DocumentFrame, type FrameRect } from '../components/capture/DocumentFrame';
 import { FirstRunSheet } from '../components/capture/FirstRunSheet';
 import { PermissionGate } from '../components/capture/PermissionGate';
 import { TopControls } from '../components/capture/TopControls';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
+import { mapFrameToPhotoCropRect } from '../services/capture/guideCrop';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
+import { cropPage } from '../services/enhance/enhanceService';
 import { useAppState } from '../store/AppStateContext';
 import { spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
@@ -41,6 +43,8 @@ export function CaptureScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [capturing, setCapturing] = useState(false);
+  const [frameRect, setFrameRect] = useState<FrameRect | null>(null);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const busy = busyScanning || capturing;
 
@@ -86,13 +90,31 @@ export function CaptureScreen() {
 
     try {
       const photo = await camera.takePictureAsync({ quality: 0.9 });
-      if (photo) {
-        addPagesFromAssets([{ uri: photo.uri, width: photo.width, height: photo.height }]);
+      if (!photo) return;
+
+      let asset = { uri: photo.uri, width: photo.width, height: photo.height };
+      if (frameRect) {
+        const crop = mapFrameToPhotoCropRect(
+          frameRect,
+          { width: screenWidth, height: screenHeight },
+          { width: photo.width, height: photo.height }
+        );
+        try {
+          asset = await cropPage(photo.uri, {
+            originX: crop.x,
+            originY: crop.y,
+            width: crop.width,
+            height: crop.height,
+          });
+        } catch {
+          // Guide-crop failed — fall back to the uncropped photo rather than losing the capture.
+        }
       }
+      addPagesFromAssets([asset]);
     } finally {
       setCapturing(false);
     }
-  }, [busy, flashOpacity, addPagesFromAssets]);
+  }, [busy, flashOpacity, addPagesFromAssets, frameRect, screenWidth, screenHeight]);
 
   const handleScan = useCallback(() => {
     if (busy) return;
@@ -144,7 +166,7 @@ export function CaptureScreen() {
         />
 
         <View style={styles.frameArea}>
-          <DocumentFrame />
+          <DocumentFrame onMeasured={setFrameRect} />
         </View>
 
         <View style={styles.controlsArea}>

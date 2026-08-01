@@ -15,7 +15,8 @@ import { ZoomableImage } from '../components/shared/ZoomableImage';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { rotatePage } from '../services/enhance/enhanceService';
-import { cropPage } from '../services/enhance/enhanceService';
+import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
+import type { Point } from '../services/enhance/perspective';
 import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
 import { runOcr } from '../services/ocr/ocrService';
 import { useAcademicStampPreview } from '../services/pdf/useAcademicPreview';
@@ -168,9 +169,9 @@ export function ReviewScreen() {
   );
 
   const handleCropConfirm = useCallback(
-    async (cropRect: { originX: number; originY: number; width: number; height: number }) => {
+    async (points: [Point, Point, Point, Point]) => {
       if (!selectedPage) return;
-      const cropped = await cropPage(selectedPage.uri, cropRect);
+      const cropped = await warpPerspectiveCrop(selectedPage.uri, points);
       dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: cropped });
       setCropTarget(null);
     },
