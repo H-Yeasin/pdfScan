@@ -8,7 +8,7 @@ import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
-import { bakeEnhance, needsBake } from '../services/enhance/skiaEnhance';
+import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages } from '../services/pdf/pdfService';
 import type { AcademicConfig, CoverPageConfig } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -137,9 +137,7 @@ export function AcademicOptionsScreen() {
     try {
       const bakedPages = await Promise.all(
         pages.map(async (page) => {
-          const adjust = page.adjust ?? DEFAULT_ADJUST;
-          if (!needsBake(page.enhance, adjust)) return page;
-          const baked = await bakeEnhance(page.uri, page.enhance, adjust);
+          const baked = await bakeEnhance(page.uri, page.enhance, page.adjust ?? DEFAULT_ADJUST);
           return { ...page, ...baked };
         })
       );

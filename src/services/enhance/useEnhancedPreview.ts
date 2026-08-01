@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { File } from 'expo-file-system';
 import { DEFAULT_ADJUST } from './adjust';
-import { bakeEnhance, needsBake } from './skiaEnhance';
+import { bakeEnhance } from './skiaEnhance';
 import type { AdjustValues, EnhanceMode } from '../../types/models';
 
 function deleteIfExists(uri: string) {
@@ -10,11 +10,10 @@ function deleteIfExists(uri: string) {
 }
 
 // Live preview for the Review screen's Auto/Color/Gray/B&W/Scan control plus its brightness/
-// contrast/saturation sliders. gray/bw/document_scan have no cheap non-destructive preview
-// (document_scan in particular is a RuntimeEffect shader, not a color matrix), and neither does
-// any non-default adjust value, so this runs the same `bakeEnhance` used at export time against a
-// scratch cache file whenever mode or adjust changes, keeping the preview pixel-identical to what
-// Deliver will actually produce. auto/color with untouched sliders stay pass-through and never bake.
+// contrast/saturation sliders. Every mode now derives a content-adaptive matrix from the page's
+// own histogram (see skiaEnhance.ts), so none of them have a cheap non-destructive preview - this
+// runs the same `bakeEnhance` used at export time against a scratch cache file whenever mode or
+// adjust changes, keeping the preview pixel-identical to what Deliver will actually produce.
 export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, adjust: AdjustValues = DEFAULT_ADJUST) {
   const [previewUri, setPreviewUri] = useState<string | undefined>(uri);
   const [loading, setLoading] = useState(false);
@@ -23,7 +22,7 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, a
   useEffect(() => {
     let cancelled = false;
 
-    if (!uri || !needsBake(mode, adjust)) {
+    if (!uri) {
       if (bakedRef.current) {
         deleteIfExists(bakedRef.current);
         bakedRef.current = null;

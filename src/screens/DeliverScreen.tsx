@@ -13,7 +13,7 @@ import { summarizeAcademicConfig } from './AcademicOptionsScreen';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
-import { bakeEnhance, needsBake } from '../services/enhance/skiaEnhance';
+import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -81,13 +81,11 @@ export function DeliverScreen() {
       try {
         const documentId = createId('doc');
 
-        // Bakeable pages get a real pixel bake (Skia) into a fresh file before export, so the
+        // Every page gets a real pixel bake (Skia) into a fresh file before export, so the
         // effect survives into the saved PDF/JPG rather than staying a UI-only selection.
         const bakedPages = await Promise.all(
           pages.map(async (page) => {
-            const adjust = page.adjust ?? DEFAULT_ADJUST;
-            if (!needsBake(page.enhance, adjust)) return page;
-            const baked = await bakeEnhance(page.uri, page.enhance, adjust);
+            const baked = await bakeEnhance(page.uri, page.enhance, page.adjust ?? DEFAULT_ADJUST);
             return { ...page, ...baked };
           })
         );
