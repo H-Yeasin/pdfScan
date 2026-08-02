@@ -103,7 +103,7 @@ export function ReaderScreen() {
               style: 'destructive',
               onPress: () => {
                 dispatch({ type: 'library/REMOVE_FILES', ids: [doc.id] });
-                deleteDocumentFiles(doc.id);
+                deleteDocumentFiles(doc.id, doc.courseFolder);
                 go('library', 'back');
               },
             },
@@ -117,13 +117,13 @@ export function ReaderScreen() {
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!doc) return;
-      const updated = await applySignedPage(doc, activeIndex, flattenedUri);
+      const updated = await applySignedPage(doc, activeIndex, flattenedUri, state.settings.ocrScript);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
       insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
-    [doc, activeIndex, dispatch]
+    [doc, activeIndex, dispatch, state.settings.ocrScript]
   );
 
   const handleSignatureCaptured = useCallback(

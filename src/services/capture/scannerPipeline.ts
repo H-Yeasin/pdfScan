@@ -22,8 +22,17 @@ function errorMessage(error: unknown): string {
 export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, script: OcrScript): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'scanning' });
 
+  dispatch({
+    type: 'ui/SHOW_SNACK',
+    msg: 'Align the notebook page inside the camera frame and hold steady for auto-capture.',
+  });
+
   let scannedImages: string[];
   try {
+    // Edge detection, auto-capture on a steady quadrilateral, and perspective-correction
+    // cropping all happen inside Google's closed-source on-device Document Scanner
+    // (Play Services GmsDocumentScanner, hardcoded to SCANNER_MODE_FULL by this plugin's
+    // native module) — this app has no code path into or visibility over that internal logic.
     const result = await DocumentScanner.scanDocument({
       maxNumDocuments: MAX_PAGES,
       responseType: ResponseType.ImageFilePath,

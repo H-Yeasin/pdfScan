@@ -1,10 +1,8 @@
-import type { FlashMode } from 'expo-camera';
 import type { AdjustValues, CaptureMode, EnhanceMode, SessionPage } from '../../types/models';
 
 export type ProcessingStatus = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
 
 export type CaptureState = {
-  flash: FlashMode;
   mode: CaptureMode;
   pages: SessionPage[];
   processingStatus: ProcessingStatus;
@@ -12,14 +10,12 @@ export type CaptureState = {
 };
 
 export const initialCaptureState: CaptureState = {
-  flash: 'auto',
   mode: 'doc',
   pages: [],
   processingStatus: 'idle',
 };
 
 export type CaptureAction =
-  | { type: 'capture/TOGGLE_FLASH' }
   | { type: 'capture/SET_MODE'; mode: CaptureMode }
   | { type: 'capture/ADD_PAGE'; page: SessionPage }
   | { type: 'capture/REMOVE_PAGE'; id: string }
@@ -35,8 +31,6 @@ export type CaptureAction =
 
 export function captureReducer(state: CaptureState, action: CaptureAction): CaptureState {
   switch (action.type) {
-    case 'capture/TOGGLE_FLASH':
-      return { ...state, flash: state.flash === 'auto' ? 'on' : 'auto' };
     case 'capture/SET_MODE':
       return { ...state, mode: action.mode };
     case 'capture/ADD_PAGE':

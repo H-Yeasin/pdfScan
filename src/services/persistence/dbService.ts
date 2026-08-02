@@ -11,7 +11,8 @@ const SCHEMA_SQL = `
     updated_at INTEGER NOT NULL,
     file_path TEXT NOT NULL,
     page_count INTEGER NOT NULL,
-    file_size INTEGER NOT NULL
+    file_size INTEGER NOT NULL,
+    course_folder TEXT
   );
 
   CREATE TABLE IF NOT EXISTS document_pages (
@@ -49,6 +50,17 @@ const SCHEMA_SQL = `
 // same open+migrate work instead of racing to open/migrate the connection twice.
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+// `CREATE TABLE IF NOT EXISTS` only covers fresh installs - an already-existing `documents` table
+// from before Courses routing shipped needs this column added explicitly. Guarded via
+// `PRAGMA table_info` (rather than a version counter) so it's idempotent and self-verifying on
+// every startup instead of relying on a separately-tracked schema version staying in sync.
+async function ensureCourseFolderColumn(db: SQLite.SQLiteDatabase): Promise<void> {
+  const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(documents)');
+  if (!columns.some((c) => c.name === 'course_folder')) {
+    await db.execAsync('ALTER TABLE documents ADD COLUMN course_folder TEXT');
+  }
+}
+
 function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = SQLite.openDatabaseAsync(DATABASE_NAME).then(async (db) => {
@@ -57,6 +69,7 @@ function getDb(): Promise<SQLite.SQLiteDatabase> {
       // ON DELETE CASCADE (and therefore the FTS delete trigger) actually fire.
       await db.execAsync('PRAGMA foreign_keys = ON;');
       await db.execAsync(SCHEMA_SQL);
+      await ensureCourseFolderColumn(db);
       return db;
     });
   }
@@ -73,9 +86,9 @@ export async function insertScannedDocument(doc: LibraryDocument): Promise<void>
 
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT OR REPLACE INTO documents (id, title, created_at, updated_at, file_path, page_count, file_size)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [doc.id, doc.name, doc.createdAt, Date.now(), filePath, doc.pages.length, doc.sizeBytes]
+      `INSERT OR REPLACE INTO documents (id, title, created_at, updated_at, file_path, page_count, file_size, course_folder)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [doc.id, doc.name, doc.createdAt, Date.now(), filePath, doc.pages.length, doc.sizeBytes, doc.courseFolder ?? null]
     );
 
     const pageStmt = await db.prepareAsync(

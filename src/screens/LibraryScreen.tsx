@@ -120,8 +120,8 @@ export function LibraryScreen() {
       if (selectedDocs.length === 0) return;
 
       if (id === 'merge' && selectedDocs.length >= 2) {
-        const merged = await mergeDocuments(selectedDocs);
-        selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
+        const merged = await mergeDocuments(selectedDocs, state.settings.ocrScript);
+        selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id, doc.courseFolder));
         dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `${selectedDocs.length} files merged` });
@@ -129,8 +129,8 @@ export function LibraryScreen() {
         insertScannedDocument(merged).catch((e) => console.warn('db insert failed', e));
       } else if (id === 'split' && selectedDocs.length === 1) {
         const [doc] = selectedDocs;
-        const split = await splitDocument(doc);
-        deleteDocumentFiles(doc.id);
+        const split = await splitDocument(doc, state.settings.ocrScript);
+        deleteDocumentFiles(doc.id, doc.courseFolder);
         dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `Split into ${split.length} files` });
@@ -138,7 +138,7 @@ export function LibraryScreen() {
         split.forEach((d) => insertScannedDocument(d).catch((e) => console.warn('db insert failed', e)));
       } else if (id === 'compress') {
         for (const doc of selectedDocs) {
-          const compressed = await compressDocument(doc);
+          const compressed = await compressDocument(doc, state.settings.ocrScript);
           dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
           insertScannedDocument(compressed).catch((e) => console.warn('db insert failed', e));
         }
@@ -161,20 +161,20 @@ export function LibraryScreen() {
         }
       }
     },
-    [files, selection, dispatch, state.signature.saved]
+    [files, selection, dispatch, state.signature.saved, state.settings.ocrScript]
   );
 
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!signTarget) return;
-      const updated = await applySignedPage(signTarget, 0, flattenedUri);
+      const updated = await applySignedPage(signTarget, 0, flattenedUri, state.settings.ocrScript);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
       insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
-    [signTarget, dispatch]
+    [signTarget, dispatch, state.settings.ocrScript]
   );
 
   const handleSignatureCaptured = useCallback(

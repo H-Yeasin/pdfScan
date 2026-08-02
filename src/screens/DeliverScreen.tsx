@@ -4,6 +4,7 @@ import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { FormatSegmented } from '../components/deliver/FormatSegmented';
+import { LayoutModeSegmented } from '../components/deliver/LayoutModeSegmented';
 import { MoreOptionsPanel } from '../components/deliver/MoreOptionsPanel';
 import { NameField } from '../components/deliver/NameField';
 import { QualitySlider } from '../components/deliver/QualitySlider';
@@ -46,9 +47,9 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, pw, folderId, exportCopy, academicConfig } = state.deliver;
+  const { name, format, quality, more, pw, folderId, courseFolder, exportCopy, academicConfig, layoutMode } = state.deliver;
   const { folders } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, ocrScript } = state.settings;
   const [saving, setSaving] = useState(false);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
 
@@ -80,6 +81,7 @@ export function DeliverScreen() {
       setSaving(true);
       try {
         const documentId = createId('doc');
+        const trimmedCourseFolder = courseFolder.trim() || undefined;
 
         // Every page gets a real pixel bake (Skia) into a fresh file before export, so the
         // effect survives into the saved PDF/JPG rather than staying a UI-only selection.
@@ -125,12 +127,20 @@ export function DeliverScreen() {
           ? [coverPageForLibrary, ...contentPagesForLibrary]
           : contentPagesForLibrary;
 
-        const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality);
+        const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality, trimmedCourseFolder);
         let pdfUri: string | undefined;
         let sizeBytes = savedImages.sizeBytes;
 
         if (format === 'PDF') {
-          const pdfResult = await buildPdfFromPages(documentId, bakedPages, quality, academicConfig ?? undefined);
+          const pdfResult = await buildPdfFromPages(
+            documentId,
+            bakedPages,
+            quality,
+            academicConfig ?? undefined,
+            ocrScript,
+            trimmedCourseFolder,
+            layoutMode
+          );
           pdfUri = pdfResult.uri;
           sizeBytes = pdfResult.sizeBytes;
         }
@@ -170,6 +180,7 @@ export function DeliverScreen() {
           locked: pw,
           searchHaystack: haystack,
           folderId: folderId ?? undefined,
+          courseFolder: trimmedCourseFolder,
         };
 
         insertScannedDocument(doc).catch((e) => console.warn('dbService.insertScannedDocument failed', e));
@@ -196,7 +207,7 @@ export function DeliverScreen() {
           action: 'Undo',
           onAction: () => {
             dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
-            deleteDocumentFiles(documentId);
+            deleteDocumentFiles(documentId, doc.courseFolder);
           },
         });
 
@@ -214,8 +225,11 @@ export function DeliverScreen() {
       pw,
       folderId,
       folderName,
+      courseFolder,
+      ocrScript,
       exportCopy,
       academicConfig,
+      layoutMode,
       androidExportFolderUri,
       androidExportFolderLabel,
       state.capture.mode,
@@ -244,6 +258,19 @@ export function DeliverScreen() {
         <View>
           <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Format</Text>
           <FormatSegmented value={format} onChange={(value) => dispatch({ type: 'deliver/SET_FORMAT', format: value })} />
+        </View>
+
+        <View>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Page Layout</Text>
+          <LayoutModeSegmented
+            value={layoutMode}
+            onChange={(value) => dispatch({ type: 'deliver/SET_LAYOUT_MODE', layoutMode: value })}
+          />
+          <Text style={[styles.helperText, { color: tokens.muted }]}>
+            {layoutMode === '2_in_1'
+              ? 'Eco-Save (2 Pages per Sheet - Side-by-Side): fewer sheets to print, PDF only.'
+              : 'Standard (1 Page per Sheet).'}
+          </Text>
         </View>
 
         <View>
@@ -278,6 +305,14 @@ export function DeliverScreen() {
           <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
           <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{folderName}</Text>
         </Pressable>
+
+        <NameField
+          label="Courses folder (optional)"
+          value={courseFolder}
+          onChange={(value) => dispatch({ type: 'deliver/SET_COURSE_FOLDER', courseFolder: value })}
+          placeholder="e.g. CS 101"
+          helperText="Routes this file into Library ▸ Courses ▸ <name> on disk — separate from the 'Course code' printed on the Academic export cover page."
+        />
 
         <Pressable
           style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
@@ -342,6 +377,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: spacing.sm,
+  },
+  helperText: {
+    marginTop: spacing.xs,
+    fontSize: 13,
   },
   qualityHeader: {
     flexDirection: 'row',

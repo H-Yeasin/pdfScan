@@ -54,6 +54,12 @@ export type LibraryDocument = {
   // Undefined means "unfiled" — every document saved before folders shipped has no
   // key here at all, so undefined and null must be treated identically everywhere.
   folderId?: string;
+  // Additive "Courses" physical routing - separate from folderId's logical library-folder system,
+  // and unrelated to AcademicConfig.coverPage.courseCode (which only prints on the PDF cover page).
+  // Raw display name (e.g. "CS 101"); undefined/"" both mean "no course, flat layout." See
+  // sanitizeFolderSegment (utils/sanitize.ts) for how this becomes a physical directory segment,
+  // and libraryFiles.ts's getDocumentDir for where that segment is actually used.
+  courseFolder?: string;
 };
 
 export type LibraryFolder = {

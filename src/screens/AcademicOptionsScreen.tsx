@@ -142,7 +142,13 @@ export function AcademicOptionsScreen() {
         })
       );
 
-      const result = await buildPdfFromPages(previewId, bakedPages, state.deliver.quality, cfg ?? undefined);
+      const result = await buildPdfFromPages(
+        previewId,
+        bakedPages,
+        state.deliver.quality,
+        cfg ?? undefined,
+        state.settings.ocrScript
+      );
       await Print.printAsync({ uri: result.uri });
       lastPreviewIdRef.current = previewId;
 
@@ -156,7 +162,7 @@ export function AcademicOptionsScreen() {
     } finally {
       setPreviewing(false);
     }
-  }, [pages, previewing, state.deliver.quality, cfg]);
+  }, [pages, previewing, state.deliver.quality, state.settings.ocrScript, cfg]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>

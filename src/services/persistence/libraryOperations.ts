@@ -3,14 +3,17 @@ import { applySignatureToPdf, buildPdfFromPages } from '../pdf/pdfService';
 import { compressPage } from '../enhance/enhanceService';
 import { getDocumentDir, deleteDocumentFiles } from './libraryFiles';
 import { deleteScannedDocument } from './dbService';
-import type { LibraryDocument, LibraryPage } from '../../types/models';
+import type { LibraryDocument, LibraryPage, OcrScript } from '../../types/models';
 import { createId } from '../../utils/id';
 
 function buildHaystack(name: string, pages: LibraryPage[]): string {
   return [name, ...pages.map((p) => p.ocr?.text ?? '')].join(' ').toLowerCase();
 }
 
-export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDocument> {
+// Merged output lands unfiled/flat regardless of the source docs' courseFolder, mirroring the
+// existing precedent for folderId (already dropped below) - a merge combining docs from different
+// courses has no single obviously-correct destination, so it isn't silently assigned one.
+export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScript): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const dir = getDocumentDir(documentId);
 
@@ -28,7 +31,9 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
   const pdfResult = await buildPdfFromPages(
     documentId,
     mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-    5
+    5,
+    undefined,
+    ocrScript
   );
 
   const name = `Merged_${docs.length}_files`;
@@ -48,7 +53,8 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
   };
 }
 
-export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocument[]> {
+// Split output lands unfiled/flat too, same rationale as mergeDocuments above.
+export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript): Promise<LibraryDocument[]> {
   const results: LibraryDocument[] = [];
 
   for (let i = 0; i < doc.pages.length; i++) {
@@ -67,7 +73,9 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
       const pdfResult = await buildPdfFromPages(
         documentId,
         [{ uri: dest.uri, width: source.width, height: source.height, ocr: source.ocr }],
-        5
+        5,
+        undefined,
+        ocrScript
       );
       pdfUri = pdfResult.uri;
       sizeBytes = pdfResult.sizeBytes;
@@ -92,8 +100,11 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
   return results;
 }
 
-export async function compressDocument(doc: LibraryDocument, quality = 2): Promise<LibraryDocument> {
-  const dir = getDocumentDir(doc.id);
+// In-place operation on an already-saved doc - resolves the directory from doc.courseFolder
+// (never a live/current UI value) so a course-routed document's recompressed pages land back in
+// the SAME directory it already lives in, not a freshly-recomputed flat one.
+export async function compressDocument(doc: LibraryDocument, ocrScript: OcrScript, quality = 2): Promise<LibraryDocument> {
+  const dir = getDocumentDir(doc.id, doc.courseFolder);
   const compressQuality = 0.2 + (quality - 1) * 0.2;
 
   const pages: LibraryPage[] = [];
@@ -112,7 +123,10 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
     const pdfResult = await buildPdfFromPages(
       doc.id,
       pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-      quality
+      quality,
+      undefined,
+      ocrScript,
+      doc.courseFolder
     );
     pdfUri = pdfResult.uri;
     sizeBytes = pdfResult.sizeBytes;
@@ -121,8 +135,11 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
   return { ...doc, pages, pdfUri, sizeBytes };
 }
 
+// Dead code: no screen imports this today (LibraryScreen/ReaderScreen call deleteDocumentFiles
+// directly per already-in-scope doc objects). Left as-is rather than "fixed" for consistency,
+// since nothing exercises this path.
 export function deleteDocuments(ids: string[]): void {
-  ids.forEach(deleteDocumentFiles);
+  ids.forEach((id) => deleteDocumentFiles(id));
   ids.forEach((id) => deleteScannedDocument(id).catch((e) => console.warn('dbService delete failed', id, e)));
 }
 
@@ -131,9 +148,10 @@ export function deleteDocuments(ids: string[]): void {
 export async function applySignedPage(
   doc: LibraryDocument,
   pageIndex: number,
-  flattenedUri: string
+  flattenedUri: string,
+  ocrScript: OcrScript
 ): Promise<LibraryDocument> {
-  const dir = getDocumentDir(doc.id);
+  const dir = getDocumentDir(doc.id, doc.courseFolder);
   const dest = new File(dir, `page_${pageIndex + 1}.jpg`);
   if (dest.exists) dest.delete();
   new File(flattenedUri).move(dest);
@@ -146,7 +164,10 @@ export async function applySignedPage(
     const pdfResult = await buildPdfFromPages(
       doc.id,
       pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-      5
+      5,
+      undefined,
+      ocrScript,
+      doc.courseFolder
     );
     pdfUri = pdfResult.uri;
     sizeBytes = pdfResult.sizeBytes;
@@ -171,6 +192,6 @@ export async function applySignatureToDocument(
   const page = doc.pages[pageIndex];
   if (!page) throw new Error(`applySignatureToDocument: page ${pageIndex} not found`);
 
-  const pdfResult = await applySignatureToPdf(doc.id, doc.pdfUri, pageIndex, page.width, signatureUri, placement);
+  const pdfResult = await applySignatureToPdf(doc.id, doc.pdfUri, pageIndex, page.width, signatureUri, placement, doc.courseFolder);
   return { ...doc, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes };
 }

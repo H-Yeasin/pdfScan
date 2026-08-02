@@ -46,10 +46,17 @@
       [
         "rn-mlkit-ocr",
         {
-          "ocrModels": ["latin", "chinese", "devanagari", "japanese", "korean"],
+          "ocrModels": [
+            "latin",
+            "chinese",
+            "devanagari",
+            "japanese",
+            "korean"
+          ],
           "ocrUseBundled": true
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {
