@@ -7,11 +7,11 @@ import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
 import { GridPagesModal } from '../components/review/GridPagesModal';
+import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
-import { ZoomableImage } from '../components/shared/ZoomableImage';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { rotatePage } from '../services/enhance/enhanceService';
@@ -303,7 +303,13 @@ export function ReviewScreen() {
       )}
 
       <View style={[styles.previewArea, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-        <ZoomableImage uri={displayUri ?? selectedPage.uri} onSwipeLeft={goNextPage} onSwipeRight={goPrevPage} />
+        <PagePeekCarousel
+          pages={pages}
+          sel={sel}
+          displayUri={displayUri}
+          onCommitPrev={goPrevPage}
+          onCommitNext={goNextPage}
+        />
         {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
             <ActivityIndicator color={tokens.accent} />

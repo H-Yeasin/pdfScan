@@ -9,8 +9,8 @@ type PreviewControlsProps = {
   onCompareOut: () => void;
 };
 
-// Compare stays as its own bottom-center pill. Page navigation is handled by swiping the
-// preview itself (see ZoomableImage's onSwipeLeft/onSwipeRight) rather than on-screen buttons.
+// Compare stays as its own bottom-center pill. Page navigation is handled by dragging the
+// preview itself (see PagePeekCarousel) rather than on-screen buttons.
 export function PreviewControls({ showCompare, comparing, onCompareIn, onCompareOut }: PreviewControlsProps) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
