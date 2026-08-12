@@ -1,8 +1,10 @@
 import { StyleSheet, ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 const MAX_SCALE = 5;
+const SWIPE_DISTANCE_THRESHOLD = 50;
+const SWIPE_VELOCITY_THRESHOLD = 300;
 
 type ZoomableImageProps = {
   uri: string;
@@ -10,9 +12,14 @@ type ZoomableImageProps = {
   // Pan-while-zoomed is disabled by default when an image sits inside a scrollable list
   // (e.g. Reader) to avoid the drag gesture fighting the list's own vertical scroll.
   panEnabled?: boolean;
+  // Opt-in horizontal swipe-to-navigate, only recognized at scale 1 so it never fights the
+  // pan-while-zoomed gesture above. Omitted entirely (e.g. by Reader's PageList) means no swipe
+  // gesture is composed at all, leaving pinch/pan/double-tap behavior untouched there.
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
 };
 
-export function ZoomableImage({ uri, style, panEnabled = true }: ZoomableImageProps) {
+export function ZoomableImage({ uri, style, panEnabled = true, onSwipeLeft, onSwipeRight }: ZoomableImageProps) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -57,7 +64,21 @@ export function ZoomableImage({ uri, style, panEnabled = true }: ZoomableImagePr
       if (next === 1) resetTranslation();
     });
 
-  const composed = Gesture.Exclusive(doubleTap, panEnabled ? Gesture.Simultaneous(pan, pinch) : pinch);
+  const handleSwipeLeft = () => onSwipeLeft?.();
+  const handleSwipeRight = () => onSwipeRight?.();
+
+  const swipeNav = Gesture.Pan().onEnd((e) => {
+    if (scale.value > 1) return;
+    if (e.translationX <= -SWIPE_DISTANCE_THRESHOLD || e.velocityX <= -SWIPE_VELOCITY_THRESHOLD) {
+      runOnJS(handleSwipeLeft)();
+    } else if (e.translationX >= SWIPE_DISTANCE_THRESHOLD || e.velocityX >= SWIPE_VELOCITY_THRESHOLD) {
+      runOnJS(handleSwipeRight)();
+    }
+  });
+
+  const zoomGestures = Gesture.Exclusive(doubleTap, panEnabled ? Gesture.Simultaneous(pan, pinch) : pinch);
+  const composed =
+    onSwipeLeft || onSwipeRight ? Gesture.Simultaneous(swipeNav, zoomGestures) : zoomGestures;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [

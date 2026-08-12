@@ -303,17 +303,13 @@ export function ReviewScreen() {
       )}
 
       <View style={[styles.previewArea, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-        <ZoomableImage uri={displayUri ?? selectedPage.uri} />
+        <ZoomableImage uri={displayUri ?? selectedPage.uri} onSwipeLeft={goNextPage} onSwipeRight={goPrevPage} />
         {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
             <ActivityIndicator color={tokens.accent} />
           </View>
         )}
         <PreviewControls
-          index={sel}
-          total={pages.length}
-          onPrev={goPrevPage}
-          onNext={goNextPage}
           showCompare={showCompare}
           comparing={comparing}
           onCompareIn={() => setComparing(true)}
