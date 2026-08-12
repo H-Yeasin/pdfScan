@@ -266,7 +266,10 @@ export function LibraryScreen() {
         <EmptyState
           title="Your scans will appear here."
           actionLabel="Scan now"
-          onAction={() => go('capture')}
+          onAction={() => {
+            dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+            go('capture');
+          }}
         />
       ) : isNoResults ? (
         <EmptyState

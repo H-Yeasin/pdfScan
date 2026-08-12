@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from '../../navigation/router';
+import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, typeScale } from '../../theme';
 
 type TabBarProps = {
@@ -14,10 +15,16 @@ type TabBarProps = {
 export function TabBar({ active, background, activeColor, inactiveColor, accent }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { go } = useRouter();
+  const { dispatch } = useAppState();
+
+  const goToCapture = () => {
+    dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+    go('capture', 'back');
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: background, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-      <Pressable style={styles.tab} onPress={() => active !== 'capture' && go('capture', 'back')}>
+      <Pressable style={styles.tab} onPress={() => active !== 'capture' && goToCapture()}>
         <Text style={[styles.label, { color: active === 'capture' ? activeColor : inactiveColor }]}>Capture</Text>
         {active === 'capture' && <View style={[styles.indicator, { backgroundColor: accent }]} />}
       </Pressable>

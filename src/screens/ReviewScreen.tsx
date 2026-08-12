@@ -32,8 +32,9 @@ export function ReviewScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { pages } = state.capture;
+  const { pages, processingStatus } = state.capture;
   const { sel, ocrRunning } = state.review;
+  const scanProcessing = processingStatus === 'scanning' || processingStatus === 'processing';
   const { academicConfig } = state.deliver;
   const [cropTarget, setCropTarget] = useState<string | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
@@ -69,16 +70,19 @@ export function ReviewScreen() {
   const showCompare = !!selectedPage && mainPreviewUri !== selectedPage.uri;
   const displayUri = comparing && selectedPage ? selectedPage.uri : mainPreviewUri ?? selectedPage?.uri;
 
+  // Also animates while new pages are still being scanned/processed in the background (e.g. the
+  // "Add more" flow), so there's a visible signal even though this screen already has pages to show.
+  const showRibbon = ocrRunning || scanProcessing;
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!ocrRunning) return;
+    if (!showRibbon) return;
     ribbon.setValue(0);
     const loop = Animated.loop(
       Animated.timing(ribbon, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
-  }, [ocrRunning, ribbon]);
+  }, [showRibbon, ribbon]);
 
   const handleReorder = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -157,15 +161,21 @@ export function ReviewScreen() {
     }
   }, [state.signature.saved]);
 
+  const handleRetake = useCallback(() => {
+    if (!selectedPage) return;
+    dispatch({ type: 'capture/SET_RETAKE_TARGET', id: selectedPage.id });
+    go('capture', 'back');
+  }, [dispatch, selectedPage, go]);
+
   const handleContextBarPress = useCallback(
     (id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'sign') => {
       if (id === 'crop') setCropTarget(selectedPage?.id ?? null);
       else if (id === 'rotate') handleRotate();
-      else if (id === 'retake') go('capture', 'back');
+      else if (id === 'retake') handleRetake();
       else if (id === 'ocr') handleOcr();
       else if (id === 'sign') handleSignPress();
     },
-    [selectedPage, handleRotate, handleOcr, go, handleSignPress]
+    [selectedPage, handleRotate, handleOcr, handleRetake, handleSignPress]
   );
 
   const handleCropConfirm = useCallback(
@@ -218,7 +228,14 @@ export function ReviewScreen() {
   if (!selectedPage) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>No pages captured yet.</Text>
+        {scanProcessing ? (
+          <>
+            <ActivityIndicator color={tokens.accent} size="large" />
+            <Text style={{ color: tokens.muted, marginTop: spacing.md }}>Processing pages…</Text>
+          </>
+        ) : (
+          <Text style={{ color: tokens.muted }}>No pages captured yet.</Text>
+        )}
       </View>
     );
   }
@@ -226,7 +243,13 @@ export function ReviewScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('capture', 'back')}>
+        <Pressable
+          style={styles.headerButton}
+          onPress={() => {
+            dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+            go('capture', 'back');
+          }}
+        >
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
           <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>Back</Text>
         </Pressable>
@@ -247,7 +270,7 @@ export function ReviewScreen() {
         </View>
       </View>
 
-      <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: ocrRunning ? 1 : 0 }]}>
+      <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: showRibbon ? 1 : 0 }]}>
         <Animated.View
           style={[
             styles.ribbonFill,
@@ -269,7 +292,10 @@ export function ReviewScreen() {
           selectedIndex={sel}
           onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
           onReorder={handleReorder}
-          onAddMore={() => go('capture')}
+          onAddMore={() => {
+            dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+            go('capture');
+          }}
           onDelete={handleDeletePage}
           cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
           onPressCover={() => go('academicOptions')}

@@ -18,35 +18,27 @@ export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { pages, processingStatus, errorMessage } = state.capture;
+  const { pages, processingStatus } = state.capture;
   const { ocrScript } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
   const hasAutoLaunched = useRef(false);
 
-  useEffect(() => {
-    if (processingStatus === 'success') {
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Scan complete' });
-      dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
-      go('review');
-    } else if (processingStatus === 'error') {
-      dispatch({ type: 'ui/SHOW_SNACK', msg: errorMessage ?? 'Scan failed' });
-      dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
-    }
-  }, [processingStatus, errorMessage, dispatch, go]);
+  // Success/error handling and the post-scan navigation to Review now live in AppNavigator
+  // (always mounted), not here - this screen unmounts as soon as the native scan hands off raw
+  // images (status flips to 'processing'), so it can no longer be the one reacting to the
+  // eventual 'success'/'error' that lands after the slow downscale/OCR loop finishes.
 
   const addPagesFromAssets = useCallback(
     (assets: { uri: string; width: number; height: number }[]) => {
-      assets.forEach((asset) => {
-        const page: SessionPage = {
-          id: createId('page'),
-          uri: asset.uri,
-          width: asset.width,
-          height: asset.height,
-          rotation: 0,
-          enhance: 'auto',
-        };
-        dispatch({ type: 'capture/ADD_PAGE', page });
-      });
+      const newPages: SessionPage[] = assets.map((asset) => ({
+        id: createId('page'),
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
+        rotation: 0,
+        enhance: 'auto',
+      }));
+      dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
     },
     [dispatch]
   );
