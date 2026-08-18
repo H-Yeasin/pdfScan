@@ -3,23 +3,38 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 
-export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete';
+export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete' | 'addToLibrary';
 
 type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
-// Share/Sign/Export/Print now live in the persistent ReaderActionBar; Delete stays here so
-// there's exactly one, deliberately-gated path to a destructive action.
-const ITEMS: Item[] = [{ id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true }];
+// Share/Sign/Export/Print live in the persistent ReaderActionBar; management/destructive actions
+// stay here so there's exactly one, deliberately-gated path to each.
+const DELETE_ITEM: Item = { id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true };
+const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', label: 'Add to Library', icon: 'add-circle-outline' };
 
 type OverflowSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSelect: (id: OverflowItemId) => void;
+  // An externally-opened PDF (not yet in the library) has nothing to delete and needs the promote
+  // action instead - these two are mutually exclusive in practice (see ReaderScreen's usage).
+  showDelete?: boolean;
+  showAddToLibrary?: boolean;
 };
 
-export function OverflowSheet({ visible, onClose, onSelect }: OverflowSheetProps) {
+export function OverflowSheet({
+  visible,
+  onClose,
+  onSelect,
+  showDelete = true,
+  showAddToLibrary = false,
+}: OverflowSheetProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const items: Item[] = [
+    ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
+    ...(showDelete ? [DELETE_ITEM] : []),
+  ];
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -28,7 +43,7 @@ export function OverflowSheet({ visible, onClose, onSelect }: OverflowSheetProps
           style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.md }]}
         >
           <View style={[styles.handle, { backgroundColor: tokens.edge }]} />
-          {ITEMS.map((item) => (
+          {items.map((item) => (
             <Pressable
               key={item.id}
               style={styles.item}

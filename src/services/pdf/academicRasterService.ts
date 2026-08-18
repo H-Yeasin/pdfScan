@@ -3,12 +3,12 @@ import { FontStyle, ImageFormat, PaintStyle, Skia } from '@shopify/react-native-
 import { createId } from '../../utils/id';
 import type { AcademicConfig, CoverPageConfig } from './pdfService';
 
-// ReaderScreen never renders the compiled PDF - it scrolls through each LibraryPage's own raw
-// image (see PageList). So the vector cover/border/header-footer buildPdfFromPages draws straight
-// into document.pdf are invisible there. This module bakes the same visual content as real pixels
-// onto a SEPARATE copy of each page image, purely so the in-app library viewer matches the PDF.
-// It never touches the images fed into buildPdfFromPages, which keeps drawing its own crisp vector
-// version for the actual exported/shared/printed file.
+// ReaderScreen now renders the real compiled PDF (via PdfPageView), so this module's cover/
+// border/header-footer visuals are no longer needed to make the in-app reader match the export.
+// It's still load-bearing for two other things that DO consume LibraryPage.fileUri directly:
+// FileRow's library-list thumbnail (doc.pages[0].fileUri), and the JPG-format Sign flow (which
+// edits doc.pages[i].fileUri in place). This module never touches the images fed into
+// buildPdfFromPages, which keeps drawing its own crisp vector version for the actual PDF.
 
 // Ratios of the long side, derived directly from pdfService.ts's own border/header/footer point
 // constants (divided by 792, content pages' pre-A4 long side), so this raster rendering stays

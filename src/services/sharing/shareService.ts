@@ -29,3 +29,7 @@ export async function printDocument(doc: LibraryDocument): Promise<void> {
     await Print.printAsync({ uri: doc.pages[0].fileUri });
   }
 }
+
+export async function printFileUri(uri: string): Promise<void> {
+  await Print.printAsync({ uri });
+}

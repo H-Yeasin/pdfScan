@@ -16,14 +16,16 @@ const ITEMS: Item[] = [
 type ReaderActionBarProps = {
   visible: Animated.Value;
   onPress: (id: OverflowItemId) => void;
+  hiddenIds?: OverflowItemId[];
 };
 
 // Persistent, full-width icon row for the reader's non-destructive actions (Share/Sign/Export/
 // Print), styled after CamScanner's bottom toolbar. Delete stays behind the overflow sheet so
 // there's exactly one, deliberately-gated path to a destructive action.
-export function ReaderActionBar({ visible, onPress }: ReaderActionBarProps) {
+export function ReaderActionBar({ visible, onPress, hiddenIds }: ReaderActionBarProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
+  const items = hiddenIds?.length ? ITEMS.filter((item) => !hiddenIds.includes(item.id)) : ITEMS;
 
   return (
     <Animated.View
@@ -40,7 +42,7 @@ export function ReaderActionBar({ visible, onPress }: ReaderActionBarProps) {
       pointerEvents="box-none"
     >
       <View style={styles.row}>
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <Pressable key={item.id} style={styles.item} onPress={() => onPress(item.id)}>
             <Ionicons name={item.icon} size={21} color={tokens.ink} />
             <Text style={[styles.label, { color: tokens.ink }]}>{item.label}</Text>
