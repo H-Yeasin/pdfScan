@@ -7,8 +7,20 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "pdfscan",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.pdfScan",
+      "infoPlist": {
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "PDF Document",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["com.adobe.pdf"]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,6 +34,23 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["DEFAULT", "BROWSABLE"],
+          "data": [{ "mimeType": "application/pdf" }]
+        },
+        {
+          "action": "VIEW",
+          "category": ["DEFAULT", "BROWSABLE"],
+          "data": [{ "scheme": "file", "host": "*", "pathPattern": ".*\\\\.pdf" }]
+        },
+        {
+          "action": "SEND",
+          "category": ["DEFAULT"],
+          "data": [{ "mimeType": "application/pdf" }]
+        }
       ]
     },
     "web": {
@@ -56,7 +85,8 @@
           "ocrUseBundled": true
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "react-native-pdf-jsi"
     ],
     "extra": {
       "eas": {

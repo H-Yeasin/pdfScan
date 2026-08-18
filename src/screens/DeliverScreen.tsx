@@ -128,22 +128,22 @@ export function DeliverScreen() {
           : contentPagesForLibrary;
 
         const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality, trimmedCourseFolder);
-        let pdfUri: string | undefined;
-        let sizeBytes = savedImages.sizeBytes;
 
-        if (format === 'PDF') {
-          const pdfResult = await buildPdfFromPages(
-            documentId,
-            bakedPages,
-            quality,
-            academicConfig ?? undefined,
-            ocrScript,
-            trimmedCourseFolder,
-            layoutMode
-          );
-          pdfUri = pdfResult.uri;
-          sizeBytes = pdfResult.sizeBytes;
-        }
+        // Always build a document.pdf now, regardless of the chosen export `format` - the unified
+        // reader (ReaderScreen) renders every library doc through the real PDF engine, so a
+        // JPG-format doc needs a real PDF behind it too, not just its export copy. `sizeBytes`
+        // still reflects the format the user actually picked (unchanged JPG display size).
+        const pdfResult = await buildPdfFromPages(
+          documentId,
+          bakedPages,
+          quality,
+          academicConfig ?? undefined,
+          ocrScript,
+          trimmedCourseFolder,
+          layoutMode
+        );
+        const pdfUri: string = pdfResult.uri;
+        const sizeBytes = format === 'PDF' ? pdfResult.sizeBytes : savedImages.sizeBytes;
 
         // `saveImagesToLibrary` (and, for gray/bw pages, `bakeEnhance` / academicRasterService
         // before it) each wrote a fresh compressed copy rather than reusing the session's cache
@@ -181,6 +181,9 @@ export function DeliverScreen() {
           searchHaystack: haystack,
           folderId: folderId ?? undefined,
           courseFolder: trimmedCourseFolder,
+          // Only set when a cover page actually made it into libraryPages[0] - mirrors
+          // coverPageForLibrary's own condition, not just whether academicConfig exists.
+          coverKind: coverPageForLibrary ? academicConfig?.coverPage?.mode : undefined,
         };
 
         insertScannedDocument(doc).catch((e) => console.warn('dbService.insertScannedDocument failed', e));

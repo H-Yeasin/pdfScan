@@ -60,6 +60,34 @@ export type LibraryDocument = {
   // sanitizeFolderSegment (utils/sanitize.ts) for how this becomes a physical directory segment,
   // and libraryFiles.ts's getDocumentDir for where that segment is actually used.
   courseFolder?: string;
+  // Mirrors the AcademicConfig.coverPage.mode this document's page 0 was built with, if any.
+  // undefined means "no cover page" OR "saved before this field existed" - both are treated
+  // identically (fitToMarginBox=true) by applySignatureToDocument, since a missing cover is far
+  // more common than a pre-migration template cover. See pdfService.ts's applySignatureToPdf for
+  // why this distinction matters (a template cover has no placed image and isn't fit into
+  // CONTENT_MARGIN_PT, unlike every other page).
+  coverKind?: 'template' | 'imported_image';
+  // undefined ≡ 'scanned' (every document saved before this field existed, or made via the
+  // capture pipeline). 'imported_pdf' marks a document promoted from an externally-opened PDF
+  // (see promoteExternalToLibrary in libraryOperations.ts) — its `pages` array is a single
+  // synthetic entry, not one real image per PDF page, so page-count/Sign/etc. must branch on this.
+  sourceKind?: 'scanned' | 'imported_pdf';
+};
+
+// A PDF opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —
+// never persisted to AsyncStorage/SQLite. `uri` is always a stable local copy under
+// Paths.document/external-open/<id>/, never the original incoming URI (see externalPdfService.ts
+// for why: content:// / security-scoped grants from the source app aren't reliably durable).
+export type ExternalPdfDocument = {
+  uri: string;
+  name: string;
+  sizeBytes: number;
+  sourceUri: string;
+  importedAt: number;
+  // Best-effort page count from a pdf-lib probe at import time (see externalPdfService.ts).
+  // Undefined for a genuinely encrypted PDF pdf-lib couldn't parse - the PDF engine's own
+  // onLoadComplete is the real source of truth once the reader actually mounts the file.
+  pageCount?: number;
 };
 
 export type LibraryFolder = {

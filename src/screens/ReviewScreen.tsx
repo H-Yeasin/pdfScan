@@ -14,19 +14,28 @@ import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModa
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
 import { rotatePage } from '../services/enhance/enhanceService';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
 import type { Point } from '../services/enhance/perspective';
 import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
 import { runOcr } from '../services/ocr/ocrService';
+import { cleanTemporaryCache } from '../services/persistence/libraryFiles';
 import { useAcademicStampPreview } from '../services/pdf/useAcademicPreview';
 import { applySignatureToPage } from '../services/signature/signatureCompositeService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
-import type { AdjustValues, EnhanceMode } from '../types/models';
+import { createId } from '../utils/id';
+import type { AdjustValues, EnhanceMode, SessionPage } from '../types/models';
 
 const OCR_SPARSE_THRESHOLD = 6;
+
+type MergeCropState = {
+  ids: [string, string];
+  stage: 'first' | 'second';
+  firstResult?: { uri: string; width: number; height: number };
+} | null;
 
 export function ReviewScreen() {
   const { tokens } = useTheme();
@@ -43,6 +52,7 @@ export function ReviewScreen() {
   const [applyToAll, setApplyToAll] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [mergeCrop, setMergeCrop] = useState<MergeCropState>(null);
 
   const selectedPage = pages[sel] ?? pages[0];
   const multiPage = pages.length > 1;
@@ -188,6 +198,53 @@ export function ReviewScreen() {
     [dispatch, selectedPage]
   );
 
+  const handleMergeRequest = useCallback((ids: [string, string]) => {
+    setMergeCrop({ ids, stage: 'first' });
+  }, []);
+
+  const mergeCropPage = mergeCrop
+    ? pages.find((p) => p.id === mergeCrop.ids[mergeCrop.stage === 'first' ? 0 : 1])
+    : undefined;
+
+  const handleMergeCropCancel = useCallback(() => {
+    // The first crop step's own output is a real file already written to cache - if the user
+    // cancels at stage 2, sweep it or it leaks (it never got baked into a final composite).
+    if (mergeCrop?.firstResult) cleanTemporaryCache([mergeCrop.firstResult.uri]);
+    setMergeCrop(null);
+  }, [mergeCrop]);
+
+  const handleMergeCropConfirm = useCallback(
+    async (points: [Point, Point, Point, Point]) => {
+      if (!mergeCrop || !mergeCropPage) return;
+      const cropped = await warpPerspectiveCrop(mergeCropPage.uri, points);
+
+      if (mergeCrop.stage === 'first') {
+        setMergeCrop({ ids: mergeCrop.ids, stage: 'second', firstResult: cropped });
+        return;
+      }
+
+      const firstResult = mergeCrop.firstResult;
+      if (!firstResult) return;
+      const merged = await compositeHalfPages(firstResult, cropped);
+      const newPage: SessionPage = {
+        id: createId('page'),
+        uri: merged.uri,
+        width: merged.width,
+        height: merged.height,
+        rotation: 0,
+        enhance: 'auto',
+      };
+      const insertIndex = pages.findIndex((p) => p.id === mergeCrop.ids[0]);
+
+      dispatch({ type: 'capture/REPLACE_PAGES', ids: mergeCrop.ids, page: newPage });
+      dispatch({ type: 'review/SELECT_PAGE', index: Math.max(0, insertIndex) });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Pages merged into 1' });
+      cleanTemporaryCache([firstResult.uri, cropped.uri]);
+      setMergeCrop(null);
+    },
+    [dispatch, mergeCrop, mergeCropPage, pages]
+  );
+
   const handleSignatureCaptured = useCallback(
     async (signature: { uri: string; aspectRatio: number }) => {
       const saved = await saveSignatureForReuse(signature.uri, signature.aspectRatio);
@@ -234,7 +291,19 @@ export function ReviewScreen() {
             <Text style={{ color: tokens.muted, marginTop: spacing.md }}>Processing pages…</Text>
           </>
         ) : (
-          <Text style={{ color: tokens.muted }}>No pages captured yet.</Text>
+          <>
+            <Text style={{ color: tokens.muted }}>No pages captured yet.</Text>
+            <Pressable
+              style={[styles.startButton, { backgroundColor: tokens.accent }]}
+              onPress={() => {
+                dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+                go('capture');
+              }}
+            >
+              <Ionicons name="camera" size={18} color="#fff" />
+              <Text style={styles.startButtonLabel}>Start Capture</Text>
+            </Pressable>
+          </>
         )}
       </View>
     );
@@ -286,23 +355,21 @@ export function ReviewScreen() {
         />
       </View>
 
-      {multiPage && (
-        <ThumbnailStrip
-          pages={pages}
-          selectedIndex={sel}
-          onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
-          onReorder={handleReorder}
-          onAddMore={() => {
-            dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
-            go('capture');
-          }}
-          onDelete={handleDeletePage}
-          cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
-          onPressCover={() => go('academicOptions')}
-        />
-      )}
+      <ThumbnailStrip
+        pages={pages}
+        selectedIndex={sel}
+        onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
+        onReorder={handleReorder}
+        onAddMore={() => {
+          dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+          go('capture');
+        }}
+        onDelete={handleDeletePage}
+        cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
+        onPressCover={() => go('academicOptions')}
+      />
 
-      <View style={[styles.previewArea, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+      <View style={styles.previewArea}>
         <PagePeekCarousel
           pages={pages}
           sel={sel}
@@ -372,6 +439,17 @@ export function ReviewScreen() {
         />
       )}
 
+      {mergeCrop && mergeCropPage && (
+        <CropOverlay
+          uri={mergeCropPage.uri}
+          naturalWidth={mergeCropPage.width}
+          naturalHeight={mergeCropPage.height}
+          stepLabel={mergeCrop.stage === 'first' ? 'Page 1 of 2' : 'Page 2 of 2'}
+          onConfirm={handleMergeCropConfirm}
+          onCancel={handleMergeCropCancel}
+        />
+      )}
+
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />
       )}
@@ -382,6 +460,7 @@ export function ReviewScreen() {
         selectedIndex={sel}
         onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
         onDelete={handleDeletePage}
+        onMerge={handleMergeRequest}
         onClose={() => setGridOpen(false)}
       />
 
@@ -409,6 +488,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 48,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 999,
+    marginTop: spacing.lg,
+  },
+  startButtonLabel: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
@@ -475,7 +568,6 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.xl,
     marginVertical: spacing.sm,
     borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   previewLoading: {

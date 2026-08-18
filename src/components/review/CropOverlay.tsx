@@ -21,6 +21,9 @@ type CropOverlayProps = {
   uri: string;
   naturalWidth: number;
   naturalHeight: number;
+  // Optional step indicator (e.g. "Page 1 of 2") for a multi-crop flow like the merge-two-pages
+  // feature. Omitted by the single-crop call site, so its layout is unaffected.
+  stepLabel?: string;
   // Natural-pixel-space corners, topLeft/topRight/bottomRight/bottomLeft order — the caller runs
   // the actual perspective warp (mirrors how rotatePage/cropPage are invoked from ReviewScreen).
   onConfirm: (points: [Point, Point, Point, Point]) => void;
@@ -41,7 +44,7 @@ function useCornerPoint(initX: number, initY: number): Corner {
 // Four independently draggable corners (not constrained to a rectangle) so the user can trace
 // a document's actual edges even when the photo was taken at an angle; onConfirm hands the raw
 // quad back to the caller, which runs a perspective warp to straighten it into a rectangle.
-export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCancel }: CropOverlayProps) {
+export function CropOverlay({ uri, naturalWidth, naturalHeight, stepLabel, onConfirm, onCancel }: CropOverlayProps) {
   const { tokens } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
@@ -154,6 +157,7 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, onConfirm, onCan
           </GestureDetector>
         </View>
 
+        {stepLabel && <Text style={styles.stepLabel}>{stepLabel}</Text>}
         <Text style={styles.hint}>Drag each corner to match the page edges</Text>
 
         <View style={styles.actions}>
@@ -192,6 +196,11 @@ const styles = StyleSheet.create({
     borderRadius: HANDLE_SIZE / 2,
     borderWidth: 4,
     backgroundColor: '#fff',
+  },
+  stepLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   hint: {
     color: 'rgba(255,255,255,.65)',

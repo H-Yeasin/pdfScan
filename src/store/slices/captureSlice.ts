@@ -31,6 +31,7 @@ export type CaptureAction =
   | { type: 'capture/SET_PAGE_ADJUST'; id: string; adjust: AdjustValues }
   | { type: 'capture/SET_ALL_PAGES_ADJUST'; adjust: AdjustValues }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
+  | { type: 'capture/REPLACE_PAGES'; ids: string[]; page: SessionPage }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
   | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string };
@@ -74,6 +75,17 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
         ...state,
         pages: state.pages.map((p) => (p.id === action.id ? { ...p, ...action.patch } : p)),
       };
+    case 'capture/REPLACE_PAGES': {
+      // firstIndex is the position of the FIRST (in array order) matching page, so every page
+      // before it is untouched and occupies the same prefix positions after filtering - splicing
+      // the merged page in there reproduces exactly where the earlier source page used to sit,
+      // regardless of the order the two ids appear in `action.ids`.
+      const firstIndex = state.pages.findIndex((p) => action.ids.includes(p.id));
+      if (firstIndex === -1) return state;
+      const pages = state.pages.filter((p) => !action.ids.includes(p.id));
+      pages.splice(firstIndex, 0, action.page);
+      return { ...state, pages };
+    }
     case 'capture/CLEAR_PAGES':
       return { ...state, pages: [] };
     case 'capture/BULK_ADD_PAGES': {

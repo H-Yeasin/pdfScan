@@ -10,9 +10,12 @@ import type { AcademicConfig, CoverPageConfig } from './pdfService';
 // It never touches the images fed into buildPdfFromPages, which keeps drawing its own crisp vector
 // version for the actual exported/shared/printed file.
 
-// Ratios of the long side, derived directly from pdfService.ts's own PDF_LONG_SIDE_PT-relative
-// constants (divided by 792), so this raster rendering stays visually proportioned like the PDF's
-// vector version despite being produced by an entirely different engine (Skia here, pdf-lib there).
+// Ratios of the long side, derived directly from pdfService.ts's own border/header/footer point
+// constants (divided by 792, content pages' pre-A4 long side), so this raster rendering stays
+// visually proportioned like the PDF's vector version despite being produced by an entirely
+// different engine (Skia here, pdf-lib there). These stamp a COPY of the page's own source image
+// at its own native size (see stampContentPageImage below), so they're unaffected by the cover
+// canvas size change just below.
 const STAMP_INSET_RATIO = 25 / 792;
 const STAMP_BORDER_WIDTH_RATIO = 1.5 / 792;
 const HEADER_Y_RATIO = 40 / 792; // distance from the TOP edge (raster is top-down; pdf-lib is bottom-up)
@@ -20,11 +23,20 @@ const FOOTER_Y_RATIO = 30 / 792; // distance from the BOTTOM edge
 const STAMP_FONT_SIZE_RATIO = 9 / 792;
 const STAMP_TEXT_COLOR = '#1a1a1a';
 
-const COVER_RASTER_WIDTH_PX = 612;
-const COVER_RASTER_HEIGHT_PX = 792;
-const COVER_TITLE_FONT_SIZE = 24;
-const COVER_SUBTITLE_FONT_SIZE = 14;
-const COVER_META_FONT_SIZE = 12;
+// A4-ratio pixel canvas (1200 matches scannerPipeline.ts's MAX_DIMENSION convention for a normal
+// scanned page's long side), matching pdfService.ts's real A4 cover page's proportions.
+const COVER_RASTER_WIDTH_PX = 849;
+const COVER_RASTER_HEIGHT_PX = 1200;
+// Ratios (of COVER_RASTER_HEIGHT_PX) rather than absolute pixel sizes, unlike pdfService.ts's own
+// COVER_TITLE_FONT_SIZE/etc (which are absolute PDF points - a real physical unit, independent of
+// page size). This raster canvas's pixel grid has no such fixed physical meaning, so its text size
+// must scale with the canvas or it renders cramped/tiny relative to the page - same reasoning as
+// STAMP_FONT_SIZE_RATIO just above.
+const COVER_TITLE_FONT_SIZE_RATIO = 24 / 792;
+const COVER_SUBTITLE_FONT_SIZE_RATIO = 14 / 792;
+const COVER_META_FONT_SIZE_RATIO = 12 / 792;
+const COVER_SUBTITLE_Y_OFFSET_RATIO = 40 / 792;
+const COVER_META_Y_OFFSET_RATIO = 64 / 792;
 
 // No bundled font file / fontkit exists in this project (see pdfService.ts's own StandardFonts-
 // only convention), so text is drawn with the platform's default system font via FontMgr.System()
@@ -81,9 +93,13 @@ export async function renderCoverPageImage(
       canvas.drawText(text, (width - textWidth) / 2, y, textPaint, font);
     };
 
-    if (cover.title) drawCentered(cover.title, height * 0.4, COVER_TITLE_FONT_SIZE, true);
-    if (cover.studentName) drawCentered(cover.studentName, height * 0.4 + 40, COVER_SUBTITLE_FONT_SIZE, false);
-    if (cover.courseCode) drawCentered(cover.courseCode, height * 0.4 + 64, COVER_META_FONT_SIZE, false);
+    if (cover.title) drawCentered(cover.title, height * 0.4, COVER_TITLE_FONT_SIZE_RATIO * height, true);
+    if (cover.studentName) {
+      drawCentered(cover.studentName, height * 0.4 + COVER_SUBTITLE_Y_OFFSET_RATIO * height, COVER_SUBTITLE_FONT_SIZE_RATIO * height, false);
+    }
+    if (cover.courseCode) {
+      drawCentered(cover.courseCode, height * 0.4 + COVER_META_Y_OFFSET_RATIO * height, COVER_META_FONT_SIZE_RATIO * height, false);
+    }
 
     const uri = await writeJpeg(surface, 'cover');
     return { uri, width, height };

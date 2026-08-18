@@ -2,14 +2,23 @@ import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues
 import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 import fontkit from '@pdf-lib/fontkit';
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { compressPage } from '../enhance/enhanceService';
 import { getDocumentDir } from '../persistence/libraryFiles';
-import type { OcrLine, OcrScript, PageOcr } from '../../types/models';
+import { fitBox } from '../../utils/fitBox';
+import type { LibraryDocument, OcrLine, OcrScript, PageOcr } from '../../types/models';
 
-// A page's longer pixel dimension is mapped to this many PDF points, so each page's MediaBox
-// stays exactly proportional to its source image (replaces the old fixed 612x792 + letterboxing)
-// while still landing close to familiar Letter/A4 proportions for typical portrait scans.
+// Standard-mode pages and the cover page are both fixed at true ISO A4 size, with each image
+// uniformly scaled to fit inside CONTENT_MARGIN_PT on every side (never stretched, never
+// cropped) - see fitBox. This is what MoreOptionsPanel.tsx's "Page size: A4 · fit to content" /
+// "Margin: Small" copy already promises; every page in a document now shares the same physical
+// size instead of being shaped around its own source image.
+const [A4_WIDTH_PT, A4_HEIGHT_PT] = PageSizes.A4;
+const CONTENT_MARGIN_PT = 24; // matches LAYOUT_2IN1_MARGIN_PT's existing convention below
+
+// Long side of a 2-in-1 ("Eco-Save") landscape sheet - that layout is a deliberately separate,
+// fixed physical print size (see LAYOUT_2IN1_* below), unrelated to standard/cover pages' own A4
+// sizing above.
 const PDF_LONG_SIDE_PT = 792;
 
 // Heuristics for turning an OCR line's pixel box into an invisible text run. ML Kit's line
@@ -21,19 +30,17 @@ const FONT_SIZE_TO_BOX_HEIGHT_RATIO = 0.85;
 const BASELINE_INSET_RATIO = 0.2;
 
 // --- 2-in-1 ("Eco-Save") layout tuning ---
-// Unlike standard mode's per-page proportional sizing (pageScale, above), a 2-in-1 sheet is a
-// fixed physical page meant to be printed - its whole point is a consistent, plannable paper size
-// rather than one shaped around whatever a given pair of scans happens to be. LAYOUT_2IN1_WIDTH_PT
-// reuses PDF_LONG_SIDE_PT (792) and LAYOUT_2IN1_HEIGHT_PT reuses COVER_TEMPLATE_WIDTH_PT (612) -
-// together that's exactly US Letter, landscape, the same sheet as the portrait cover just rotated.
+// A 2-in-1 sheet is a fixed physical page meant to be printed - its whole point is a consistent,
+// plannable paper size rather than one shaped around whatever a given pair of scans happens to
+// be. This is deliberately kept at US Letter, landscape (792x612, i.e. LAYOUT_2IN1_WIDTH_PT reuses
+// PDF_LONG_SIDE_PT), independent of standard/cover pages' own A4 sizing above - it's a distinct,
+// opt-in print layout, not part of the "every page is the same size" standard-mode guarantee.
 const LAYOUT_2IN1_WIDTH_PT = PDF_LONG_SIDE_PT;
 const LAYOUT_2IN1_HEIGHT_PT = 612;
 const LAYOUT_2IN1_GUTTER_PT = 15; // dividing gap between the two half-columns
 const LAYOUT_2IN1_MARGIN_PT = 24; // outer margin - most printers can't print edge-to-edge anyway
 
 // --- Academic export tuning ---
-const COVER_TEMPLATE_WIDTH_PT = 612; // US Letter width
-const COVER_TEMPLATE_HEIGHT_PT = PDF_LONG_SIDE_PT; // reuse the existing 792pt long-side convention
 const STAMP_INSET_PT = 25;
 const STAMP_BORDER_WIDTH_PT = 1.5;
 const HEADER_Y_FROM_TOP_PT = 40;
@@ -105,39 +112,11 @@ export type AcademicConfig = {
   coverPage?: CoverPageConfig;
 };
 
-function pageScale(widthPx: number, heightPx: number): number {
-  return PDF_LONG_SIDE_PT / Math.max(widthPx, heightPx);
-}
-
-// Fits one image into a column box, uniformly scaled (same factor on both axes, so the aspect
-// ratio drawn always matches the source pixels exactly) and centered - the column's own box may
-// be wider or taller than the image's own aspect ratio, in either direction, since a 2-in-1 sheet
-// pairs two independently-sized scans. Returns the same scale/origin used to draw the image so the
-// OCR layer (drawOcrLayer) can reuse it verbatim and land glued to the image's glyphs.
-function fitImageInColumn(
-  imageWidthPx: number,
-  imageHeightPx: number,
-  columnX: number,
-  columnY: number,
-  columnWidthPt: number,
-  columnHeightPt: number
-): { origin: { x: number; y: number }; scale: number; widthPt: number; heightPt: number } {
-  const scale = Math.min(columnWidthPt / imageWidthPx, columnHeightPt / imageHeightPx);
-  const widthPt = imageWidthPx * scale;
-  const heightPt = imageHeightPx * scale;
-  const origin = {
-    x: columnX + (columnWidthPt - widthPt) / 2,
-    y: columnY + (columnHeightPt - heightPt) / 2,
-  };
-  return { origin, scale, widthPt, heightPt };
-}
-
-// Where the embedded image was actually drawn on the page, in PDF points. In standard mode the
-// image fills the whole page (origin (0,0), heightPt === the page's own height), so passing that
-// through unchanged reproduces the pre-existing single-page math exactly. In 2-in-1 mode the image
-// is drawn into a half-column at some (originX, originY) offset with its own independently-scaled
-// heightPt - `origin`/`heightPt` are exactly the same values the image itself was drawn with, so
-// the OCR text lands glued to the image's glyphs no matter where or how small it was placed.
+// Where the embedded image was actually drawn on the page, in PDF points - always some margin-
+// inset box now (standard/cover pages via CONTENT_MARGIN_PT, 2-in-1 pages via a half-column), never
+// the full page. `origin`/`heightPt` are exactly the values the image itself was drawn with (from
+// fitBox's `origin`/`height`), so the OCR text lands glued to the image's glyphs no matter where or
+// how small it was placed.
 type ImagePlacement = { origin: { x: number; y: number }; heightPt: number };
 
 // PDF's origin is bottom-left; OCR `top` is measured from the image's top edge, hence the flip.
@@ -215,14 +194,24 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Prom
       const kind = sniffImageKind(bytes);
       const image = kind === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
 
-      // Reuse the same long-side scaling convention as content pages so a photographed cover
-      // sheet ends up proportioned like the rest of the deck instead of an arbitrary size.
-      const scale = pageScale(image.width, image.height);
-      const pageWidthPt = image.width * scale;
-      const pageHeightPt = image.height * scale;
+      // Same fixed-A4-box, fit-to-content placement as standard content pages, so a photographed
+      // cover sheet shares the exact same page size as the rest of the deck.
+      const placement = fitBox(
+        image.width,
+        image.height,
+        CONTENT_MARGIN_PT,
+        CONTENT_MARGIN_PT,
+        A4_WIDTH_PT - CONTENT_MARGIN_PT * 2,
+        A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2
+      );
 
-      const page = pdfDoc.addPage([pageWidthPt, pageHeightPt]);
-      page.drawImage(image, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
+      const page = pdfDoc.addPage(PageSizes.A4);
+      page.drawImage(image, {
+        x: placement.origin.x,
+        y: placement.origin.y,
+        width: placement.width,
+        height: placement.height,
+      });
     } catch (error) {
       // A bad/missing imported cover image must never sink the whole export - same best-effort
       // philosophy as drawOcrLine's catch above. Fall back to no cover page at all.
@@ -232,24 +221,24 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Prom
   }
 
   // mode === 'template'
-  const page = pdfDoc.addPage([COVER_TEMPLATE_WIDTH_PT, COVER_TEMPLATE_HEIGHT_PT]);
+  const page = pdfDoc.addPage(PageSizes.A4);
   const titleFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
   const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   const drawCentered = (text: string, y: number, font: PDFFont, size: number) => {
     const width = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: (COVER_TEMPLATE_WIDTH_PT - width) / 2, y, size, font });
+    page.drawText(text, { x: (A4_WIDTH_PT - width) / 2, y, size, font });
   };
 
-  // Fields are optional and drawn independently, so an all-empty config degrades to a blank
-  // Letter-sized page rather than an error. Vertical anchors are relative to page height so the
-  // layout holds even if COVER_TEMPLATE_HEIGHT_PT changes.
-  if (cover.title) drawCentered(cover.title, COVER_TEMPLATE_HEIGHT_PT * 0.4, titleFont, COVER_TITLE_FONT_SIZE);
+  // Fields are optional and drawn independently, so an all-empty config degrades to a blank A4
+  // page rather than an error. Vertical anchors are relative to page height so the layout holds
+  // regardless of the exact page size constant in play.
+  if (cover.title) drawCentered(cover.title, A4_HEIGHT_PT * 0.4, titleFont, COVER_TITLE_FONT_SIZE);
   if (cover.studentName) {
-    drawCentered(cover.studentName, COVER_TEMPLATE_HEIGHT_PT * 0.4 - 40, bodyFont, COVER_SUBTITLE_FONT_SIZE);
+    drawCentered(cover.studentName, A4_HEIGHT_PT * 0.4 - 40, bodyFont, COVER_SUBTITLE_FONT_SIZE);
   }
   if (cover.courseCode) {
-    drawCentered(cover.courseCode, COVER_TEMPLATE_HEIGHT_PT * 0.4 - 64, bodyFont, COVER_META_FONT_SIZE);
+    drawCentered(cover.courseCode, A4_HEIGHT_PT * 0.4 - 64, bodyFont, COVER_META_FONT_SIZE);
   }
 }
 
@@ -301,10 +290,11 @@ function stampAcademicPage(
   }
 }
 
-// Standard layout: one source page per PDF page, sized to that page's own aspect ratio (unchanged
-// from the pre-2-in-1 implementation). Sequential loop on purpose - a Promise.all here would hold
-// every page's raw JPEG bytes in memory at once, defeating the point (same rationale as
-// scannerPipeline.ts's own OCR loop).
+// Standard layout: one source page per PDF page, every page fixed at A4 size with its image fit
+// (uniformly scaled, centered, never stretched/cropped) inside CONTENT_MARGIN_PT - so every page
+// in the document shares the same physical size regardless of its source image's own aspect
+// ratio. Sequential loop on purpose - a Promise.all here would hold every page's raw JPEG bytes in
+// memory at once, defeating the point (same rationale as scannerPipeline.ts's own OCR loop).
 async function buildStandardContentPages(
   pdfDoc: PDFDocument,
   pages: PdfSourcePage[],
@@ -313,35 +303,40 @@ async function buildStandardContentPages(
   stampFont: PDFFont,
   ocrFont: PDFFont
 ): Promise<void> {
+  const boxWidthPt = A4_WIDTH_PT - CONTENT_MARGIN_PT * 2;
+  const boxHeightPt = A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2;
   let contentPageNumber = 0;
   const totalContentPages = pages.length;
   for (const page of pages) {
     contentPageNumber += 1;
     const jpgImage = await embedPageImage(pdfDoc, page.uri, compressQuality);
 
-    const scale = pageScale(page.width, page.height);
-    const pageWidthPt = page.width * scale;
-    const pageHeightPt = page.height * scale;
+    const placement = fitBox(page.width, page.height, CONTENT_MARGIN_PT, CONTENT_MARGIN_PT, boxWidthPt, boxHeightPt);
 
-    const pdfPage = pdfDoc.addPage([pageWidthPt, pageHeightPt]);
-    pdfPage.drawImage(jpgImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
+    const pdfPage = pdfDoc.addPage(PageSizes.A4);
+    pdfPage.drawImage(jpgImage, {
+      x: placement.origin.x,
+      y: placement.origin.y,
+      width: placement.width,
+      height: placement.height,
+    });
 
     if (page.ocr && page.ocr.blocks.length > 0) {
-      drawOcrLayer(pdfPage, page.ocr, scale, { origin: { x: 0, y: 0 }, heightPt: pageHeightPt }, ocrFont);
+      drawOcrLayer(pdfPage, page.ocr, placement.scale, { origin: placement.origin, heightPt: placement.height }, ocrFont);
     }
 
     // Cover page (if any) is intentionally excluded from this stamping and from the X/Y count -
     // it's not part of `pages`, and this block only ever runs for entries of that array.
     if (academicConfig) {
-      stampAcademicPage(pdfPage, pageWidthPt, pageHeightPt, stampFont, academicConfig, contentPageNumber, totalContentPages);
+      stampAcademicPage(pdfPage, A4_WIDTH_PT, A4_HEIGHT_PT, stampFont, academicConfig, contentPageNumber, totalContentPages);
     }
   }
 }
 
 // One source page drawn into one half-column of a 2-in-1 sheet, embedding its image and (if
 // present) drawing its OCR layer with the exact same scale/origin the image itself was placed
-// with - see fitImageInColumn and the ImagePlacement comment above drawOcrLine for why that's
-// what keeps the invisible searchable text glued to the visible glyphs after the resize+shift.
+// with - see fitBox and the ImagePlacement comment above drawOcrLine for why that's what keeps the
+// invisible searchable text glued to the visible glyphs after the resize+shift.
 async function drawTwoUpColumn(
   pdfDoc: PDFDocument,
   pdfPage: PDFPage,
@@ -354,17 +349,17 @@ async function drawTwoUpColumn(
   const columnHeightPt = LAYOUT_2IN1_HEIGHT_PT - LAYOUT_2IN1_MARGIN_PT * 2;
 
   const image = await embedPageImage(pdfDoc, page.uri, compressQuality);
-  const placement = fitImageInColumn(page.width, page.height, columnX, LAYOUT_2IN1_MARGIN_PT, columnWidthPt, columnHeightPt);
+  const placement = fitBox(page.width, page.height, columnX, LAYOUT_2IN1_MARGIN_PT, columnWidthPt, columnHeightPt);
 
   pdfPage.drawImage(image, {
     x: placement.origin.x,
     y: placement.origin.y,
-    width: placement.widthPt,
-    height: placement.heightPt,
+    width: placement.width,
+    height: placement.height,
   });
 
   if (page.ocr && page.ocr.blocks.length > 0) {
-    drawOcrLayer(pdfPage, page.ocr, placement.scale, { origin: placement.origin, heightPt: placement.heightPt }, ocrFont);
+    drawOcrLayer(pdfPage, page.ocr, placement.scale, { origin: placement.origin, heightPt: placement.height }, ocrFont);
   }
 }
 
@@ -430,9 +425,9 @@ export async function buildPdfFromPages(
   // pdfDoc's page index 0 and every content page shifts one slot later in the final document.
   // This is safe because none of the per-content-page math below (in either
   // buildStandardContentPages or buildTwoUpContentPages) is indexed by page position at all:
-  //   - pageScale/fitImageInColumn are computed fresh, per iteration, purely from that one (or
-  //     two) PdfSourcePage's own natural pixel dimensions - never from pdfDoc.getPages().length or
-  //     any running page counter.
+  //   - fitBox is computed fresh, per iteration, purely from that one (or two) PdfSourcePage's own
+  //     natural pixel dimensions and the fixed A4/column box - never from pdfDoc.getPages().length
+  //     or any running page counter.
   //   - drawOcrLine takes the specific PDFPage object for THIS sheet and a placement derived from
   //     THAT SAME page's own scale computed one line above it. Its x/y math is entirely local to
   //     that one page object and scale value; it has no concept of "this is document page N" and
@@ -462,16 +457,21 @@ export async function buildPdfFromPages(
 }
 
 // Burns a captured signature PNG onto one page of an already-compiled PDF, in place.
-// `pageNaturalWidth` must be the natural pixel width of the SOURCE PAGE IMAGE that page was
-// built from (LibraryPage.width), not the PDF's own point-space width — it's the anchor used
-// to convert `placement` (natural pixel space, top-left origin, same convention as
-// SessionPage.cropRect) into PDF points via the page's live getWidth()/getHeight(), so this
-// stays correct even if PDF_LONG_SIDE_PT ever changes.
+// `pageNaturalWidth`/`pageNaturalHeight` must be the natural pixel dimensions of the SOURCE PAGE
+// IMAGE that page was built from (LibraryPage.width/height), not the PDF's own point-space size —
+// they're the anchor used to convert `placement` (natural pixel space, top-left origin, same
+// convention as SessionPage.cropRect) into PDF points.
+// `fitToMarginBox` must be true for any page whose image was placed via fitBox inside
+// CONTENT_MARGIN_PT (every standard content page, and an 'imported_image' cover), and false only
+// for a 'template' cover page (text-only, no placed image, still sized full-page-proportional) —
+// see applySignatureToDocument in libraryOperations.ts for how callers determine which.
 export async function applySignatureToPdf(
   documentId: string,
   pdfUri: string,
   pageIndex: number,
   pageNaturalWidth: number,
+  pageNaturalHeight: number,
+  fitToMarginBox: boolean,
   signatureUri: string,
   placement: { originX: number; originY: number; width: number; height: number },
   courseFolder?: string
@@ -489,11 +489,35 @@ export async function applySignatureToPdf(
 
   // PDF origin is bottom-left; `placement.originY` is measured from the page image's top edge
   // (same convention as drawOcrLine's flip above), hence the flip.
-  const scale = pdfPage.getWidth() / pageNaturalWidth;
-  const widthPt = placement.width * scale;
-  const heightPt = placement.height * scale;
-  const xPt = placement.originX * scale;
-  const yPt = pdfPage.getHeight() - placement.originY * scale - heightPt;
+  let xPt: number;
+  let yPt: number;
+  let widthPt: number;
+  let heightPt: number;
+  if (fitToMarginBox) {
+    // Reproduces the exact same fitBox placement the image itself was drawn with at build time
+    // (purely a function of the page's own natural dimensions + the fixed A4/margin box, so it's
+    // safe to recompute here rather than needing to store it), then maps `placement` through that
+    // box the same way drawOcrLine maps an OCR line's box - generalized here from a text line to
+    // an arbitrary signature rect.
+    const box = fitBox(
+      pageNaturalWidth,
+      pageNaturalHeight,
+      CONTENT_MARGIN_PT,
+      CONTENT_MARGIN_PT,
+      A4_WIDTH_PT - CONTENT_MARGIN_PT * 2,
+      A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2
+    );
+    widthPt = placement.width * box.scale;
+    heightPt = placement.height * box.scale;
+    xPt = box.origin.x + placement.originX * box.scale;
+    yPt = box.origin.y + box.height - (placement.originY + placement.height) * box.scale;
+  } else {
+    const scale = pdfPage.getWidth() / pageNaturalWidth;
+    widthPt = placement.width * scale;
+    heightPt = placement.height * scale;
+    xPt = placement.originX * scale;
+    yPt = pdfPage.getHeight() - placement.originY * scale - heightPt;
+  }
 
   pdfPage.drawImage(pngImage, { x: xPt, y: yPt, width: widthPt, height: heightPt });
 
@@ -505,6 +529,24 @@ export async function applySignatureToPdf(
   dest.write(pdfBytes);
 
   return { uri: dest.uri, sizeBytes: dest.size ?? 0 };
+}
+
+// Backfills a `document.pdf` for a library doc saved before every doc always got one (pre-unified
+// reader). Every OTHER path that produces a LibraryDocument (DeliverScreen, mergeDocuments,
+// splitDocument, compressDocument, applySignedPage) already always sets pdfUri now, so this only
+// ever fires for a genuinely pre-existing AsyncStorage record — a no-op for anything saved after
+// that change shipped.
+export async function ensureDocumentPdf(doc: LibraryDocument, ocrScript: OcrScript): Promise<LibraryDocument> {
+  if (doc.pdfUri) return doc;
+  const result = await buildPdfFromPages(
+    doc.id,
+    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    5,
+    undefined,
+    ocrScript,
+    doc.courseFolder
+  );
+  return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes };
 }
 
 export function estimateSizeBytes(pages: PdfSourcePage[], quality: number): number {

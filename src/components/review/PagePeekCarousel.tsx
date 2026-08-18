@@ -9,6 +9,10 @@ const SWIPE_DISTANCE_THRESHOLD = 50;
 const SWIPE_VELOCITY_THRESHOLD = 300;
 const SETTLE_DURATION = 220;
 const RUBBER_BAND_FACTOR = 0.35;
+// How much of the neighboring page peeks in from each edge at rest, Instagram-carousel style,
+// and the breathing room between panels so the peek reads as a separate card, not a cut-off crop.
+const PEEK_WIDTH = 28;
+const PANEL_GAP = 10;
 
 type PagePeekCarouselProps = {
   pages: SessionPage[];
@@ -20,6 +24,8 @@ type PagePeekCarouselProps = {
 
 // Drives an interactive, drag-following page transition (like the Photos app): the current page's
 // image slides with the finger while a raw peek of the neighboring page slides in from that edge.
+// Even at rest, the prev/next panels are sized to leave a PEEK_WIDTH sliver visible at each edge,
+// hinting that the page is swipeable before the user touches it.
 // Only the "current" panel gets the expensive enhanced/stamped `displayUri` - the peek panels use
 // the page's raw (already-captured) uri, same cheap source ThumbnailStrip renders for thumbnails.
 export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommitNext }: PagePeekCarouselProps) {
@@ -37,6 +43,10 @@ export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommi
 
   const { gesture: zoomGesture, animatedStyle: zoomStyle, scale } = useZoomableImageGesture({ panEnabled: true });
 
+  // Panel width leaves PEEK_WIDTH visible from each neighbor at rest.
+  const mainWidth = width > 0 ? Math.max(width - PEEK_WIDTH * 2 - PANEL_GAP * 2, 1) : 0;
+  const baseLeft = PEEK_WIDTH - mainWidth;
+
   const pagingPan = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .failOffsetY([-15, 15])
@@ -49,17 +59,19 @@ export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommi
     })
     .onEnd((e) => {
       if (scale.value > 1 || isAnimating.value) return;
+      const w = widthShared.value || 1;
+      const pitch = Math.max(w - PEEK_WIDTH * 2 - PANEL_GAP * 2, 1) + PANEL_GAP;
       const wantsNext = e.translationX <= -SWIPE_DISTANCE_THRESHOLD || e.velocityX <= -SWIPE_VELOCITY_THRESHOLD;
       const wantsPrev = e.translationX >= SWIPE_DISTANCE_THRESHOLD || e.velocityX >= SWIPE_VELOCITY_THRESHOLD;
       if (wantsNext && hasNext) {
         isAnimating.value = true;
-        dragX.value = withTiming(-widthShared.value, { duration: SETTLE_DURATION }, (finished) => {
+        dragX.value = withTiming(-pitch, { duration: SETTLE_DURATION }, (finished) => {
           if (finished) runOnJS(onCommitNext)();
           else isAnimating.value = false;
         });
       } else if (wantsPrev && hasPrev) {
         isAnimating.value = true;
-        dragX.value = withTiming(widthShared.value, { duration: SETTLE_DURATION }, (finished) => {
+        dragX.value = withTiming(pitch, { duration: SETTLE_DURATION }, (finished) => {
           if (finished) runOnJS(onCommitPrev)();
           else isAnimating.value = false;
         });
@@ -94,18 +106,20 @@ export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommi
     <View style={styles.fill} onLayout={handleLayout}>
       {width > 0 && (
         <GestureDetector gesture={gesture}>
-          <Animated.View style={[styles.track, { width: width * 3, left: -width }, trackStyle]}>
-            <View style={[styles.panel, { width }]}>
+          <Animated.View
+            style={[styles.track, { width: mainWidth * 3 + PANEL_GAP * 2, left: baseLeft }, trackStyle]}
+          >
+            <View style={[styles.panel, { width: mainWidth, marginRight: PANEL_GAP }]}>
               {prevPage && <Image source={{ uri: prevPage.uri }} style={styles.image} resizeMode="contain" />}
             </View>
-            <View style={[styles.panel, { width }]}>
+            <View style={[styles.panel, { width: mainWidth, marginRight: PANEL_GAP }]}>
               <Animated.Image
                 source={{ uri: displayUri ?? currentPage.uri }}
                 style={[styles.image, zoomStyle]}
                 resizeMode="contain"
               />
             </View>
-            <View style={[styles.panel, { width }]}>
+            <View style={[styles.panel, { width: mainWidth }]}>
               {nextPage && <Image source={{ uri: nextPage.uri }} style={styles.image} resizeMode="contain" />}
             </View>
           </Animated.View>
@@ -127,6 +141,7 @@ const styles = StyleSheet.create({
   },
   panel: {
     height: '100%',
+    borderRadius: 10,
     overflow: 'hidden',
   },
   image: {

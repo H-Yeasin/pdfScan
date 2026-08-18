@@ -3,7 +3,7 @@ import { applySignatureToPdf, buildPdfFromPages } from '../pdf/pdfService';
 import { compressPage } from '../enhance/enhanceService';
 import { getDocumentDir, deleteDocumentFiles } from './libraryFiles';
 import { deleteScannedDocument } from './dbService';
-import type { LibraryDocument, LibraryPage, OcrScript } from '../../types/models';
+import type { ExternalPdfDocument, LibraryDocument, LibraryPage, OcrScript } from '../../types/models';
 import { createId } from '../../utils/id';
 
 function buildHaystack(name: string, pages: LibraryPage[]): string {
@@ -67,19 +67,17 @@ export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript):
     const page: LibraryPage = { id: createId('page'), fileUri: dest.uri, width: source.width, height: source.height, ocr: source.ocr };
     const name = `${doc.name}_p${i + 1}`;
 
-    let pdfUri: string | undefined;
-    let sizeBytes = dest.size ?? 0;
-    if (doc.format === 'PDF') {
-      const pdfResult = await buildPdfFromPages(
-        documentId,
-        [{ uri: dest.uri, width: source.width, height: source.height, ocr: source.ocr }],
-        5,
-        undefined,
-        ocrScript
-      );
-      pdfUri = pdfResult.uri;
-      sizeBytes = pdfResult.sizeBytes;
-    }
+    // Always rebuilds a document.pdf, regardless of doc.format - the unified reader needs a real
+    // PDF for every library document (see DeliverScreen.tsx's matching change).
+    const pdfResult = await buildPdfFromPages(
+      documentId,
+      [{ uri: dest.uri, width: source.width, height: source.height, ocr: source.ocr }],
+      5,
+      undefined,
+      ocrScript
+    );
+    const pdfUri: string = pdfResult.uri;
+    const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : dest.size ?? 0;
 
     results.push({
       id: documentId,
@@ -118,21 +116,24 @@ export async function compressDocument(doc: LibraryDocument, ocrScript: OcrScrip
     pages.push({ ...doc.pages[i], fileUri: dest.uri });
   }
 
-  let pdfUri = doc.pdfUri;
-  if (doc.format === 'PDF') {
-    const pdfResult = await buildPdfFromPages(
-      doc.id,
-      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-      quality,
-      undefined,
-      ocrScript,
-      doc.courseFolder
-    );
-    pdfUri = pdfResult.uri;
-    sizeBytes = pdfResult.sizeBytes;
-  }
+  // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
+  const pdfResult = await buildPdfFromPages(
+    doc.id,
+    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    quality,
+    undefined,
+    ocrScript,
+    doc.courseFolder
+  );
+  const pdfUri: string = pdfResult.uri;
+  if (doc.format === 'PDF') sizeBytes = pdfResult.sizeBytes;
 
-  return { ...doc, pages, pdfUri, sizeBytes };
+  // Rebuilds by feeding doc.pages (including any former cover raster at index 0) straight through
+  // buildPdfFromPages with academicConfig: undefined - a cover page is never re-emitted via
+  // buildCoverPage here, so page 0 becomes a plain fit-to-margin-box content page same as every
+  // other page. coverKind must be cleared to match, or applySignatureToDocument would wrongly
+  // treat a rebuilt PDF's page 0 as an unfit, full-page template cover.
+  return { ...doc, pages, pdfUri, sizeBytes, coverKind: undefined };
 }
 
 // Dead code: no screen imports this today (LibraryScreen/ReaderScreen call deleteDocumentFiles
@@ -158,22 +159,61 @@ export async function applySignedPage(
 
   const pages = doc.pages.map((page, i) => (i === pageIndex ? { ...page, fileUri: dest.uri } : page));
 
-  let pdfUri = doc.pdfUri;
-  let sizeBytes = doc.sizeBytes;
-  if (doc.format === 'PDF') {
-    const pdfResult = await buildPdfFromPages(
-      doc.id,
-      pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-      5,
-      undefined,
-      ocrScript,
-      doc.courseFolder
-    );
-    pdfUri = pdfResult.uri;
-    sizeBytes = pdfResult.sizeBytes;
-  }
+  // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
+  const pdfResult = await buildPdfFromPages(
+    doc.id,
+    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    5,
+    undefined,
+    ocrScript,
+    doc.courseFolder
+  );
+  const pdfUri: string = pdfResult.uri;
+  const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
-  return { ...doc, pages, pdfUri, sizeBytes };
+  // Same rebuild-demotes-the-cover reasoning as compressDocument above - clear coverKind so a
+  // later applySignatureToDocument call doesn't misjudge page 0's placement.
+  return { ...doc, pages, pdfUri, sizeBytes, coverKind: undefined };
+}
+
+// Promotes an ephemerally-opened external PDF (§4 of the PDF-reader plan) into a real, permanent
+// library document. Deliberately does NOT rasterize every page into LibraryPage[] the way a scan
+// does - there's no general PDF-rasterization path in this app (pdf-lib can't do it, and doing it
+// page-by-page via the reader engine would be slow for a large import) - so `pages` is a synthetic
+// stub array sized to match the probed page count purely so FileRow's "N pages" meta text reads
+// correctly; every entry's fileUri is '' (renders as a blank cover thumbnail, not a broken image).
+export async function promoteExternalToLibrary(ext: ExternalPdfDocument): Promise<LibraryDocument> {
+  const documentId = createId('doc');
+  const dir = getDocumentDir(documentId);
+  const dest = new File(dir, 'document.pdf');
+  new File(ext.uri).copy(dest);
+
+  const pageCount = ext.pageCount && ext.pageCount > 0 ? ext.pageCount : 1;
+  const pages: LibraryPage[] = Array.from({ length: pageCount }, () => ({
+    id: createId('page'),
+    fileUri: '',
+    width: 850,
+    height: 1100,
+  }));
+
+  const name = ext.name.trim() || 'Imported PDF';
+  return {
+    id: documentId,
+    name,
+    format: 'PDF',
+    mode: 'doc',
+    sourceKind: 'imported_pdf',
+    pages,
+    pdfUri: dest.uri,
+    sizeBytes: dest.size ?? 0,
+    createdAt: Date.now(),
+    star: false,
+    tag: 'PDF',
+    locked: false,
+    // No text-extraction pipeline exists for arbitrary imports - filename-only searchability at
+    // the library level is an accepted MVP gap (dbService's title-LIKE search still finds it).
+    searchHaystack: name.toLowerCase(),
+  };
 }
 
 // Burns a captured signature onto one page of the document's compiled PDF, in place. Unlike
@@ -192,6 +232,20 @@ export async function applySignatureToDocument(
   const page = doc.pages[pageIndex];
   if (!page) throw new Error(`applySignatureToDocument: page ${pageIndex} not found`);
 
-  const pdfResult = await applySignatureToPdf(doc.id, doc.pdfUri, pageIndex, page.width, signatureUri, placement, doc.courseFolder);
+  // Only a template cover (text-only, no placed image) skips the fit-to-margin-box placement math
+  // - every other page, including page 0 when there's no cover or an imported-image cover, was
+  // built with its image fit inside CONTENT_MARGIN_PT. See coverKind's doc comment in models.ts.
+  const isTemplateCover = pageIndex === 0 && doc.coverKind === 'template';
+  const pdfResult = await applySignatureToPdf(
+    doc.id,
+    doc.pdfUri,
+    pageIndex,
+    page.width,
+    page.height,
+    !isTemplateCover,
+    signatureUri,
+    placement,
+    doc.courseFolder
+  );
   return { ...doc, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes };
 }
