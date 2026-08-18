@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
-import { importExternalPdf } from '../services/pdf/externalPdfService';
+import { importExternalPdf, pruneExternalOpens } from '../services/pdf/externalPdfService';
 import { useAppState } from './AppStateContext';
 import { useRouter } from '../navigation/router';
 
@@ -36,6 +36,7 @@ export function useExternalPdfLinking(libraryLoaded: boolean): void {
   useEffect(() => {
     if (!libraryLoaded || handledInitial.current) return;
     handledInitial.current = true;
+    pruneExternalOpens();
     Linking.getInitialURL().then((url) => {
       if (url) openUri(url);
     });

@@ -53,12 +53,18 @@ export async function importExternalPdf(
 
 // Housekeeping so external-open/ doesn't grow unbounded across repeated "Open with" launches that
 // never get promoted to the library. Not safety-critical - best-effort, called opportunistically.
+// Directory instances have no modificationTime of their own in this expo-file-system version
+// (only File does), so recency is read off each entry's source.pdf file instead.
 export function pruneExternalOpens(keepMostRecent = 5): void {
   const root = new Directory(Paths.document, EXTERNAL_OPEN_ROOT);
   if (!root.exists) return;
   const entries = root
     .list()
     .filter((entry): entry is Directory => entry instanceof Directory)
-    .sort((a, b) => (b.modificationTime ?? 0) - (a.modificationTime ?? 0));
+    .sort((a, b) => {
+      const aTime = new File(a, 'source.pdf').lastModified ?? 0;
+      const bTime = new File(b, 'source.pdf').lastModified ?? 0;
+      return bTime - aTime;
+    });
   entries.slice(keepMostRecent).forEach((entry) => entry.delete());
 }

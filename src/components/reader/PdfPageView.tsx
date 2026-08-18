@@ -64,7 +64,11 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   pdf: { flex: 1 },
   nightOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(10,8,6,0.72)',
   },
 });
