@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { FolderList, UNFILED_FOLDER_ID } from '../components/library/FolderList';
@@ -24,6 +25,7 @@ import {
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { deleteScannedDocument, insertScannedDocument, searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
+import { importExternalPdf } from '../services/pdf/externalPdfService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument } from '../types/models';
@@ -105,6 +107,19 @@ export function LibraryScreen() {
     },
     [selMode, dispatch, go]
   );
+
+  const handleOpenPdf = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+    if (result.canceled || !result.assets[0]) return;
+    try {
+      const ext = await importExternalPdf(result.assets[0].uri, { originalFileName: result.assets[0].name });
+      dispatch({ type: 'reader/SET_EXTERNAL', doc: ext });
+      go('reader');
+    } catch (e) {
+      console.warn('LibraryScreen.handleOpenPdf failed', e);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't open that PDF" });
+    }
+  }, [dispatch, go]);
 
   const handleLongPress = useCallback(
     (doc: LibraryDocument) => {
@@ -221,6 +236,9 @@ export function LibraryScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: tokens.ink }]}>Library</Text>
           <View style={styles.headerIcons}>
+            <Pressable style={styles.iconButton} onPress={handleOpenPdf}>
+              <Ionicons name="document-outline" size={21} color={tokens.ink} />
+            </Pressable>
             <Pressable
               style={styles.iconButton}
               onPress={() => dispatch({ type: 'library/TOGGLE_SEARCH_OPEN' })}

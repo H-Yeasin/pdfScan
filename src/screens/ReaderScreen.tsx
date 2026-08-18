@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { searchTextDirect, type PDFSearchResultItem } from 'react-native-pdf-jsi';
 import { OverflowSheet, type OverflowItemId } from '../components/reader/OverflowSheet';
-import { PageList, PAGE_SLOT } from '../components/reader/PageList';
+import { PdfPageView, type PdfPageViewHandle } from '../components/reader/PdfPageView';
 import { ReaderActionBar } from '../components/reader/ReaderActionBar';
 import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
@@ -11,77 +12,146 @@ import { SignaturePlacementOverlay } from '../components/shared/SignaturePlaceme
 import { useRouter } from '../navigation/router';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { insertScannedDocument } from '../services/persistence/dbService';
-import { applySignedPage, applySignatureToDocument } from '../services/persistence/libraryOperations';
-import { printDocument, shareDocument, shareFileUri } from '../services/sharing/shareService';
+import {
+  applySignedPage,
+  applySignatureToDocument,
+  promoteExternalToLibrary,
+} from '../services/persistence/libraryOperations';
+import { ensureDocumentPdf } from '../services/pdf/pdfService';
+import { printDocument, printFileUri, shareDocument, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
-import { useTheme } from '../theme';
-import type { LibraryPage } from '../types/models';
+import { spacing, useTheme } from '../theme';
 
-const HIDE_CHROME_SCROLL_THRESHOLD = 70;
+const SEARCH_DEBOUNCE_MS = 200;
 
 export function ReaderScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
+
+  const external = state.reader.external;
   const doc = state.library.files.find((f) => f.id === state.reader.readerId);
   const night = state.reader.night;
+  const isImportedOrExternal = !!external || doc?.sourceKind === 'imported_pdf';
 
   const chromeVisible = useRef(new Animated.Value(1)).current;
   const [chrome, setChrome] = useState(true);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PDFSearchResultItem[]>([]);
+  const [pageCount, setPageCount] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [backfilling, setBackfilling] = useState(false);
+  const [password, setPassword] = useState<string | undefined>(undefined);
+  const [passwordDraft, setPasswordDraft] = useState('');
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [signing, setSigning] = useState(false);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
-  const listRef = useRef<FlatList<LibraryPage>>(null);
+  const pdfRef = useRef<PdfPageViewHandle>(null);
+
+  const pdfUri = external?.uri ?? doc?.pdfUri;
+  const title = external?.name ?? doc?.name ?? '';
+  const pdfId = external?.uri ?? doc?.id ?? '';
 
   useEffect(() => {
     Animated.timing(chromeVisible, { toValue: chrome ? 1 : 0, duration: 180, useNativeDriver: true }).start();
   }, [chrome, chromeVisible]);
 
-  const handleScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      const hide = y > HIDE_CHROME_SCROLL_THRESHOLD;
-      setChrome((current) => (hide === current ? !hide : current));
-      const index = Math.round(y / PAGE_SLOT);
-      setActiveIndex((current) => {
-        const clamped = Math.max(0, Math.min((doc?.pages.length ?? 1) - 1, index));
-        return clamped === current ? current : clamped;
-      });
-    },
-    [doc]
-  );
+  // Backfills document.pdf for a library doc saved before every doc always got one. A no-op for
+  // anything saved after that change shipped (doc.pdfUri is already set).
+  useEffect(() => {
+    if (!doc || external || doc.pdfUri) return;
+    let cancelled = false;
+    setBackfilling(true);
+    ensureDocumentPdf(doc, state.settings.ocrScript).then((updated) => {
+      if (cancelled) return;
+      dispatch({ type: 'library/UPDATE_FILE', id: updated.id, patch: updated });
+      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
+      setBackfilling(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [doc, external, state.settings.ocrScript, dispatch]);
 
-  const matchingIndices = useMemo(() => {
-    if (!doc || !findQuery.trim()) return [];
-    const q = findQuery.trim().toLowerCase();
-    return doc.pages
-      .map((page, index) => ({ index, text: page.ocr?.text?.toLowerCase() ?? '' }))
-      .filter((p) => p.text.includes(q))
-      .map((p) => p.index);
-  }, [doc, findQuery]);
+  // Resets all per-document viewer state when a different document/external file is opened.
+  useEffect(() => {
+    setPageCount(0);
+    setActiveIndex(0);
+    setFindOpen(false);
+    setFindQuery('');
+    setSearchResults([]);
+    setPassword(undefined);
+    setPasswordDraft('');
+    setNeedsPassword(false);
+    setReloadKey(0);
+  }, [pdfUri]);
 
   useEffect(() => {
-    if (matchingIndices.length > 0) {
-      listRef.current?.scrollToIndex({ index: matchingIndices[0], animated: true });
+    const query = findQuery.trim();
+    if (!query || !pdfUri) {
+      setSearchResults([]);
+      return;
     }
-  }, [matchingIndices]);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchTextDirect(pdfId, query, 1, Math.max(pageCount, 1));
+        setSearchResults(results);
+        if (results[0]) pdfRef.current?.goToPage(results[0].page);
+      } catch (e) {
+        console.warn('ReaderScreen: searchTextDirect failed', e);
+        setSearchResults([]);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [findQuery, pdfUri, pdfId, pageCount]);
+
+  const highlightRects = useMemo(
+    () => searchResults.map((r) => ({ page: r.page, rect: r.rect })),
+    [searchResults]
+  );
+
+  const handleLoad = useCallback((count: number) => {
+    setPageCount(count);
+    setNeedsPassword(false);
+  }, []);
+
+  const handlePageChanged = useCallback((page: number, count: number) => {
+    setActiveIndex(page - 1);
+    setPageCount(count);
+  }, []);
+
+  const handleTap = useCallback(() => setChrome((v) => !v), []);
+
+  const handlePdfError = useCallback(() => {
+    // This package's onError is an opaque `object` with no confirmed error-code shape for the
+    // installed version, so a password prompt is the best-effort default for any load failure
+    // rather than only ones confirmed to be password-related.
+    setNeedsPassword(true);
+  }, []);
+
+  const handleSubmitPassword = useCallback(() => {
+    setPassword(passwordDraft);
+    setNeedsPassword(false);
+    setReloadKey((k) => k + 1);
+  }, [passwordDraft]);
 
   const handleOverflowSelect = useCallback(
     async (id: OverflowItemId) => {
-      if (!doc) return;
       if (id === 'share') {
-        await shareDocument(doc);
+        if (external) await shareFileUri(external.uri, 'application/pdf', external.name);
+        else if (doc) await shareDocument(doc);
       } else if (id === 'print') {
-        await printDocument(doc);
+        if (external) await printFileUri(external.uri);
+        else if (doc) await printDocument(doc);
       } else if (id === 'export') {
-        const page = doc.pages[activeIndex];
-        if (page) await shareFileUri(page.fileUri, 'image/jpeg', `${doc.name} - page ${activeIndex + 1}`);
+        if (pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
       } else if (id === 'sign') {
+        if (!doc || isImportedOrExternal) return;
         if (doc.format === 'PDF') {
           if (state.signature.saved) {
             setCapturedSignature(state.signature.saved);
@@ -92,7 +162,15 @@ export function ReaderScreen() {
         } else {
           setSigning(true);
         }
+      } else if (id === 'addToLibrary') {
+        if (!external) return;
+        const promoted = await promoteExternalToLibrary(external);
+        insertScannedDocument(promoted).catch((e) => console.warn('db insert failed', e));
+        dispatch({ type: 'library/ADD_FILE', file: promoted });
+        dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Added to Library' });
       } else if (id === 'delete') {
+        if (!doc) return;
         Alert.alert(
           'Delete document?',
           `"${doc.name}" and its files will be permanently removed. This can't be undone.`,
@@ -111,7 +189,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, activeIndex, dispatch, go, state.signature.saved]
+    [doc, external, pdfUri, title, isImportedOrExternal, dispatch, go, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
@@ -158,7 +236,7 @@ export function ReaderScreen() {
     [doc, activeIndex, capturedSignature, dispatch]
   );
 
-  if (!doc) {
+  if (!doc && !external) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         <Text style={{ color: tokens.muted }}>Document not found.</Text>
@@ -166,31 +244,73 @@ export function ReaderScreen() {
     );
   }
 
+  if (doc && !external && !pdfUri) {
+    return (
+      <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
+        <Text style={{ color: tokens.muted }}>{backfilling ? 'Preparing preview…' : 'Loading…'}</Text>
+      </View>
+    );
+  }
+
+  const activePdfUri = pdfUri!;
+
   return (
-    <View style={[styles.container, { backgroundColor: night ? '#0b0a09' : tokens.bg }]}>
-      <PageList
-        ref={listRef}
-        pages={doc.pages}
+    <View style={[styles.container, { backgroundColor: tokens.bg }]}>
+      <PdfPageView
+        key={`${activePdfUri}:${reloadKey}`}
+        ref={pdfRef}
+        uri={activePdfUri}
+        pdfId={pdfId}
+        password={password}
         night={night}
-        onTapCenter={() => setChrome((v) => !v)}
-        onScroll={handleScroll}
-        highlightedIndex={matchingIndices.includes(activeIndex) ? activeIndex : undefined}
+        highlightRects={highlightRects}
+        onLoad={handleLoad}
+        onPageChanged={handlePageChanged}
+        onTap={handleTap}
+        onError={handlePdfError}
       />
+
+      {needsPassword && (
+        <View style={styles.passwordOverlay} pointerEvents="box-none">
+          <View style={[styles.passwordCard, { backgroundColor: tokens.surface }]}>
+            <Text style={[styles.passwordTitle, { color: tokens.ink }]}>
+              Couldn't open this PDF. It may be password protected.
+            </Text>
+            <TextInput
+              style={[styles.passwordInput, { color: tokens.ink, borderColor: tokens.edge }]}
+              placeholder="Password"
+              placeholderTextColor={tokens.muted}
+              secureTextEntry
+              value={passwordDraft}
+              onChangeText={setPasswordDraft}
+              onSubmitEditing={handleSubmitPassword}
+            />
+            <View style={styles.passwordActions}>
+              <Pressable onPress={() => go('library', 'back')}>
+                <Text style={{ color: tokens.muted }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={handleSubmitPassword}>
+                <Text style={{ color: tokens.accent, fontWeight: '600' }}>Unlock</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
 
       <ReaderTopChrome
         visible={chromeVisible}
-        name={doc.name}
+        name={title}
         onBack={() => go('library', 'back')}
         onOverflow={() => setOverflowOpen(true)}
         findOpen={findOpen}
         findQuery={findQuery}
         onChangeFindQuery={setFindQuery}
-        matchCount={matchingIndices.length}
+        matchCount={searchResults.length}
       />
 
       <ReaderBottomChrome
         visible={chromeVisible}
-        pageCount={doc.pages.length}
+        pageCount={pageCount}
         activeIndex={activeIndex}
         onFind={() => setFindOpen((v) => !v)}
         findOpen={findOpen}
@@ -198,11 +318,21 @@ export function ReaderScreen() {
         nightOn={night}
       />
 
-      <ReaderActionBar visible={chromeVisible} onPress={handleOverflowSelect} />
+      <ReaderActionBar
+        visible={chromeVisible}
+        onPress={handleOverflowSelect}
+        hiddenIds={isImportedOrExternal ? ['sign'] : []}
+      />
 
-      <OverflowSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)} onSelect={handleOverflowSelect} />
+      <OverflowSheet
+        visible={overflowOpen}
+        onClose={() => setOverflowOpen(false)}
+        onSelect={handleOverflowSelect}
+        showDelete={!external}
+        showAddToLibrary={!!external}
+      />
 
-      {signing && doc.pages[activeIndex] && (
+      {signing && doc && doc.pages[activeIndex] && (
         <SignatureModal
           visible
           uri={doc.pages[activeIndex].fileUri}
@@ -217,7 +347,7 @@ export function ReaderScreen() {
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />
       )}
 
-      {signStep === 'place' && capturedSignature && doc.pages[activeIndex] && (
+      {signStep === 'place' && capturedSignature && doc && doc.pages[activeIndex] && (
         <SignaturePlacementOverlay
           pageUri={doc.pages[activeIndex].fileUri}
           pageNaturalWidth={doc.pages[activeIndex].width}
@@ -241,5 +371,33 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  passwordOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  passwordCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  passwordTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  passwordInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    height: 44,
+  },
+  passwordActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
   },
 });

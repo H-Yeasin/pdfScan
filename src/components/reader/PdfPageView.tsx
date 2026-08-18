@@ -6,18 +6,12 @@ export type PdfPageViewHandle = {
   goToPage: (pageNumber: number) => void; // 1-indexed, matches react-native-pdf-jsi's own convention
 };
 
-export type PdfOutlineNode = {
-  children: PdfOutlineNode[];
-  pageIdx: number;
-  title: string;
-};
-
 type PdfPageViewProps = {
   uri: string;
   pdfId: string;
   password?: string;
   night: boolean;
-  onLoad: (pageCount: number, outline: PdfOutlineNode[] | undefined) => void;
+  onLoad: (pageCount: number) => void;
   onPageChanged: (page: number, pageCount: number) => void; // 1-indexed
   onTap?: (page: number) => void;
   onError: (message: string) => void;
@@ -56,9 +50,7 @@ export const PdfPageView = forwardRef<PdfPageViewHandle, PdfPageViewProps>(funct
         enableAnnotationRendering
         fitPolicy={0}
         highlightRects={highlightRects}
-        onLoadComplete={(numberOfPages, _path, _size, tableContents) =>
-          onLoad(numberOfPages, tableContents as PdfOutlineNode[] | undefined)
-        }
+        onLoadComplete={(numberOfPages) => onLoad(numberOfPages)}
         onPageChanged={(page, numberOfPages) => onPageChanged(page, numberOfPages)}
         onPageSingleTap={(page) => onTap?.(page)}
         onError={(error) => onError(typeof error === 'string' ? error : JSON.stringify(error))}
