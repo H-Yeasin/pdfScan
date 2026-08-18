@@ -15,6 +15,7 @@ import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
+import { useExternalPdfLinking } from '../store/useExternalPdfLinking';
 import { useAppState } from '../store/AppStateContext';
 import { initializeDatabase } from '../services/persistence/dbService';
 
@@ -31,9 +32,10 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
 };
 
 export function AppNavigator() {
-  useLibraryPersistence();
+  const libraryLoaded = useLibraryPersistence();
   useSettingsPersistence();
   useSignaturePersistence();
+  useExternalPdfLinking(libraryLoaded);
   useEffect(() => {
     initializeDatabase().catch((e) => console.warn('DB init failed', e));
   }, []);
