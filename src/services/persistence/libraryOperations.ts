@@ -3,8 +3,10 @@ import { applySignatureToPdf, buildPdfFromPages } from '../pdf/pdfService';
 import { compressPage } from '../enhance/enhanceService';
 import { getDocumentDir, deleteDocumentFiles } from './libraryFiles';
 import { deleteScannedDocument } from './dbService';
-import type { ExternalPdfDocument, LibraryDocument, LibraryPage, OcrScript } from '../../types/models';
+import { readTextWithEncodingFallback } from '../documents/txtService';
+import type { ExternalFileDocument, LibraryDocument, LibraryPage, OcrScript } from '../../types/models';
 import { createId } from '../../utils/id';
+import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
 
 function buildHaystack(name: string, pages: LibraryPage[]): string {
   return [name, ...pages.map((p) => p.ocr?.text ?? '')].join(' ').toLowerCase();
@@ -176,42 +178,88 @@ export async function applySignedPage(
   return { ...doc, pages, pdfUri, sizeBytes, coverKind: undefined };
 }
 
-// Promotes an ephemerally-opened external PDF (§4 of the PDF-reader plan) into a real, permanent
-// library document. Deliberately does NOT rasterize every page into LibraryPage[] the way a scan
-// does - there's no general PDF-rasterization path in this app (pdf-lib can't do it, and doing it
-// page-by-page via the reader engine would be slow for a large import) - so `pages` is a synthetic
-// stub array sized to match the probed page count purely so FileRow's "N pages" meta text reads
-// correctly; every entry's fileUri is '' (renders as a blank cover thumbnail, not a broken image).
-export async function promoteExternalToLibrary(ext: ExternalPdfDocument): Promise<LibraryDocument> {
+// Promotes an ephemerally-opened external file (§4 of the PDF-reader plan) into a real, permanent
+// library document. Branches by format:
+//  - PDF: deliberately does NOT rasterize every page into LibraryPage[] the way a scan does -
+//    there's no general PDF-rasterization path in this app (pdf-lib can't do it, and doing it
+//    page-by-page via the reader engine would be slow for a large import) - so `pages` is a
+//    synthetic stub array sized to match the probed page count purely so FileRow's "N pages" meta
+//    text reads correctly; every entry's fileUri is '' (renders a fallback icon, not a broken image).
+//  - CSV/TXT: a single synthetic page whose ocr.text holds the whole file's decoded text, reusing
+//    the existing OCR-text search plumbing (buildHaystack, dbService's FTS indexing) for free.
+//  - DOCX/DOC/XLSX/XLS: no text-extraction pipeline exists for these - pages stays empty and search
+//    is filename-only, the same accepted MVP gap as the PDF path above (title-LIKE search still
+//    finds it).
+export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const dir = getDocumentDir(documentId);
-  const dest = new File(dir, 'document.pdf');
+  const name = ext.name.trim() || 'Imported file';
+
+  if (ext.format === 'PDF') {
+    const dest = new File(dir, 'document.pdf');
+    new File(ext.uri).copy(dest);
+
+    const pageCount = ext.pageCount && ext.pageCount > 0 ? ext.pageCount : 1;
+    const pages: LibraryPage[] = Array.from({ length: pageCount }, () => ({
+      id: createId('page'),
+      fileUri: '',
+      width: 850,
+      height: 1100,
+    }));
+
+    return {
+      id: documentId,
+      name,
+      format: 'PDF',
+      mode: 'doc',
+      sourceKind: 'imported_pdf',
+      pages,
+      pdfUri: dest.uri,
+      sizeBytes: dest.size ?? 0,
+      createdAt: Date.now(),
+      star: false,
+      tag: 'PDF',
+      locked: false,
+      searchHaystack: name.toLowerCase(),
+    };
+  }
+
+  const dest = new File(dir, `document${EXTENSION_BY_FORMAT[ext.format]}`);
   new File(ext.uri).copy(dest);
 
-  const pageCount = ext.pageCount && ext.pageCount > 0 ? ext.pageCount : 1;
-  const pages: LibraryPage[] = Array.from({ length: pageCount }, () => ({
-    id: createId('page'),
-    fileUri: '',
-    width: 850,
-    height: 1100,
-  }));
+  if (ext.format === 'CSV' || ext.format === 'TXT') {
+    const { text } = await readTextWithEncodingFallback(dest.uri);
+    const pages: LibraryPage[] = [
+      { id: createId('page'), fileUri: '', width: 850, height: 1100, ocr: { text, blocks: [] } },
+    ];
+    return {
+      id: documentId,
+      name,
+      format: ext.format,
+      mode: 'doc',
+      pages,
+      contentUri: dest.uri,
+      sizeBytes: dest.size ?? 0,
+      createdAt: Date.now(),
+      star: false,
+      tag: ext.format,
+      locked: false,
+      searchHaystack: buildHaystack(name, pages),
+    };
+  }
 
-  const name = ext.name.trim() || 'Imported PDF';
   return {
     id: documentId,
     name,
-    format: 'PDF',
+    format: ext.format,
     mode: 'doc',
-    sourceKind: 'imported_pdf',
-    pages,
-    pdfUri: dest.uri,
+    pages: [],
+    contentUri: dest.uri,
     sizeBytes: dest.size ?? 0,
     createdAt: Date.now(),
     star: false,
-    tag: 'PDF',
+    tag: ext.format,
     locked: false,
-    // No text-extraction pipeline exists for arbitrary imports - filename-only searchability at
-    // the library level is an accepted MVP gap (dbService's title-LIKE search still finds it).
     searchHaystack: name.toLowerCase(),
   };
 }

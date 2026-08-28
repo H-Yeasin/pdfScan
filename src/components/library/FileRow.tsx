@@ -3,6 +3,8 @@ import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatBytes, formatRelativeDate } from '../../utils/format';
+import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
+import { FileTypeIcon } from './FileTypeIcon';
 
 const LOCK_DISCLOSURE =
   "This marks the file as protected in your library — it doesn't encrypt the PDF itself.";
@@ -34,7 +36,11 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, onPress, o
       ]}
     >
       <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
-        {cover ? <Image source={{ uri: cover.fileUri }} style={styles.coverImage} resizeMode="cover" /> : null}
+        {cover?.fileUri ? (
+          <Image source={{ uri: cover.fileUri }} style={styles.coverImage} resizeMode="cover" />
+        ) : (
+          <FileTypeIcon format={doc.format} size={18} />
+        )}
         {doc.locked && (
           <Pressable
             style={styles.lockOverlay}
@@ -51,8 +57,10 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, onPress, o
           {doc.name}
         </Text>
         <Text style={[styles.meta, { color: tokens.muted }]}>
-          {doc.pages.length} {doc.pages.length === 1 ? 'page' : 'pages'} · {formatBytes(doc.sizeBytes)} ·{' '}
-          {formatRelativeDate(doc.createdAt)}
+          {isPageRasterFormat(doc.format)
+            ? `${doc.pages.length} ${doc.pages.length === 1 ? 'page' : 'pages'}`
+            : doc.format}{' '}
+          · {formatBytes(doc.sizeBytes)} · {formatRelativeDate(doc.createdAt)}
         </Text>
         {matchSnippet ? (
           <Text style={[styles.snippet, { color: tokens.accentInk }]} numberOfLines={1}>

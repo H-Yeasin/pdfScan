@@ -1,0 +1,190 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { File } from 'expo-file-system';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
+import { spacing, useTheme } from '../../theme';
+import { readTextWithEncodingFallback } from '../../services/documents/txtService';
+import type { DocFormat } from '../../types/models';
+
+const MAX_COLUMNS = 200;
+const SAMPLE_ROWS_FOR_WIDTH = 50;
+const MIN_COL_WIDTH = 60;
+const MAX_COL_WIDTH = 240;
+const CHAR_WIDTH = 8;
+
+type Sheet = { name: string; rows: string[][] };
+
+async function loadSheets(uri: string, format: DocFormat): Promise<Sheet[]> {
+  if (format === 'CSV') {
+    const { text } = await readTextWithEncodingFallback(uri);
+    const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true });
+    return [{ name: 'Sheet1', rows: parsed.data }];
+  }
+  // XLSX/XLS - array-of-arrays (header: 1) avoids SheetJS guessing header-row keys.
+  const arrayBuffer = await new File(uri).arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  return workbook.SheetNames.map((name) => ({
+    name,
+    rows: XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[name], { header: 1 }),
+  }));
+}
+
+// Computed once per sheet load and kept static rather than live-measured per cell - real
+// auto-fit text measurement would defeat FlatList's row virtualization.
+function computeColumnWidths(rows: string[][]): { widths: number[]; totalColumns: number } {
+  const sample = rows.slice(0, SAMPLE_ROWS_FOR_WIDTH);
+  const totalColumns = sample.reduce((max, row) => Math.max(max, row.length), 0);
+  const colCount = Math.min(totalColumns, MAX_COLUMNS);
+  const widths = new Array(colCount).fill(MIN_COL_WIDTH);
+  sample.forEach((row) => {
+    row.slice(0, colCount).forEach((cell, i) => {
+      const len = String(cell ?? '').length;
+      widths[i] = Math.min(Math.max(widths[i], len * CHAR_WIDTH), MAX_COL_WIDTH);
+    });
+  });
+  return { widths, totalColumns };
+}
+
+function findMatches(rows: string[][], query: string): { total: number; firstRowIndex: number } {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return { total: 0, firstRowIndex: -1 };
+  let total = 0;
+  let firstRowIndex = -1;
+  rows.forEach((row, i) => {
+    const hit = row.some((cell) => String(cell ?? '').toLowerCase().includes(needle));
+    if (hit) {
+      total += 1;
+      if (firstRowIndex === -1) firstRowIndex = i;
+    }
+  });
+  return { total, firstRowIndex };
+}
+
+type SheetViewProps = {
+  uri: string;
+  format: 'XLSX' | 'XLS' | 'CSV';
+  night: boolean;
+  findQuery: string;
+  onMatchCount: (count: number) => void;
+  onTap?: () => void;
+};
+
+export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }: SheetViewProps) {
+  const { tokens } = useTheme();
+  const [sheets, setSheets] = useState<Sheet[] | null>(null);
+  const [error, setError] = useState(false);
+  const [activeSheet, setActiveSheet] = useState(0);
+  const listRef = useRef<FlatList<string[]>>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSheets(null);
+    setError(false);
+    setActiveSheet(0);
+    loadSheets(uri, format)
+      .then((loaded) => {
+        if (cancelled) return;
+        setSheets(loaded);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        console.warn('SheetView: failed to load', uri, e);
+        setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uri, format]);
+
+  const rows = sheets?.[activeSheet]?.rows ?? [];
+  const { widths: columnWidths, totalColumns } = useMemo(() => computeColumnWidths(rows), [rows]);
+  const { total, firstRowIndex } = useMemo(() => findMatches(rows, findQuery), [rows, findQuery]);
+
+  useEffect(() => {
+    onMatchCount(total);
+  }, [total, onMatchCount]);
+
+  useEffect(() => {
+    if (firstRowIndex >= 0) listRef.current?.scrollToIndex({ index: firstRowIndex, viewPosition: 0.2 });
+  }, [firstRowIndex]);
+
+  if (error) {
+    return (
+      <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
+        <Text style={{ color: tokens.muted }}>Couldn't open this file.</Text>
+      </View>
+    );
+  }
+
+  if (!sheets) {
+    return (
+      <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
+        <Text style={{ color: tokens.muted }}>Loading…</Text>
+      </View>
+    );
+  }
+
+  const bg = night ? '#14120f' : tokens.bg;
+  const ink = night ? '#f2eade' : tokens.ink;
+
+  return (
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      {sheets.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabStrip}>
+          {sheets.map((sheet, i) => (
+            <Pressable
+              key={sheet.name}
+              onPress={() => setActiveSheet(i)}
+              style={[styles.tab, i === activeSheet && { borderBottomColor: tokens.accent, borderBottomWidth: 2 }]}
+            >
+              <Text style={{ color: i === activeSheet ? tokens.accent : tokens.muted, fontWeight: '600' }}>
+                {sheet.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      {totalColumns > MAX_COLUMNS && (
+        <Text style={[styles.truncNote, { color: tokens.muted }]}>Showing the first {MAX_COLUMNS} columns.</Text>
+      )}
+      <ScrollView horizontal>
+        <FlatList
+          ref={listRef}
+          data={rows}
+          keyExtractor={(_, i) => String(i)}
+          renderItem={({ item: row }) => (
+            <Pressable style={styles.row} onPress={onTap}>
+              {columnWidths.map((width, i) => (
+                <Text
+                  key={i}
+                  numberOfLines={1}
+                  style={[styles.cell, { width, color: ink, borderColor: tokens.edge }]}
+                >
+                  {row[i] ?? ''}
+                </Text>
+              ))}
+            </Pressable>
+          )}
+          onScrollToIndexFailed={() => {}}
+        />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tabStrip: { flexGrow: 0, flexDirection: 'row' },
+  tab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  truncNote: { fontSize: 11.5, paddingHorizontal: spacing.sm, paddingTop: 4 },
+  row: { flexDirection: 'row' },
+  cell: {
+    fontSize: 13,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+});

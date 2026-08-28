@@ -5,7 +5,7 @@ import { useAppState } from './AppStateContext';
 // Loads the persisted library index once on mount, then mirrors any change to
 // state.library.files/folders back to disk. The `loaded` guard stops the very first
 // (pre-load) render's empty state from overwriting what's already on disk.
-// Returns `loaded` (as tracked state, not a ref) so callers like useExternalPdfLinking can
+// Returns `loaded` (as tracked state, not a ref) so callers like useExternalFileLinking can
 // depend on it to sequence their own boot-time work after the library index is in place.
 export function useLibraryPersistence(): boolean {
   const { state, dispatch } = useAppState();

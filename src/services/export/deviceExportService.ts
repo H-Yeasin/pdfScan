@@ -7,6 +7,8 @@
 // already calls takePersistableUriPermission natively, so the granted tree URI survives restarts
 // with no extra JS-side bookkeeping.
 import { EncodingType, readAsStringAsync, StorageAccessFramework } from 'expo-file-system/legacy';
+import { isPageRasterFormat } from '../documents/formatCapabilities';
+import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import type { LibraryDocument } from '../../types/models';
 
 export type DeviceExportResult = { ok: number; failed: number };
@@ -50,6 +52,13 @@ export async function exportCopyToDeviceFolder(treeUri: string, doc: LibraryDocu
 
   if (doc.format === 'PDF' && doc.pdfUri) {
     const success = await writeFileToTree(treeUri, doc.name, 'application/pdf', doc.pdfUri);
+    if (success) ok++;
+    else failed++;
+    return { ok, failed };
+  }
+
+  if (!isPageRasterFormat(doc.format) && doc.contentUri) {
+    const success = await writeFileToTree(treeUri, doc.name, MIME_BY_FORMAT[doc.format], doc.contentUri);
     if (success) ok++;
     else failed++;
     return { ok, failed };

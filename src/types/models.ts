@@ -1,6 +1,6 @@
 export type EnhanceMode = 'auto' | 'color' | 'gray' | 'bw' | 'document_scan';
 export type CaptureMode = 'doc' | 'id' | 'book';
-export type DocFormat = 'PDF' | 'JPG';
+export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' | 'TXT';
 
 // Mirrors rn-mlkit-ocr's OcrResult shape (block -> line), kept close to the native
 // return value rather than flattened, so bounding-box data survives for a future
@@ -43,6 +43,11 @@ export type LibraryDocument = {
   mode: CaptureMode;
   pages: LibraryPage[];
   pdfUri?: string;
+  // Durable local copy of the original file, real extension preserved (source.docx, source.xlsx,
+  // source.txt, ...), for formats rendered by their own viewer rather than through the PDF engine.
+  // Always undefined for 'PDF'/'JPG' (which use pdfUri/pages instead); always set for every other
+  // format. See formatCapabilities.ts's isPageRasterFormat for the PDF/JPG vs. everything-else split.
+  contentUri?: string;
   sizeBytes: number;
   createdAt: number;
   star: boolean;
@@ -74,19 +79,21 @@ export type LibraryDocument = {
   sourceKind?: 'scanned' | 'imported_pdf';
 };
 
-// A PDF opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —
+// A file opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —
 // never persisted to AsyncStorage/SQLite. `uri` is always a stable local copy under
-// Paths.document/external-open/<id>/, never the original incoming URI (see externalPdfService.ts
+// Paths.document/external-open/<id>/, never the original incoming URI (see externalFileService.ts
 // for why: content:// / security-scoped grants from the source app aren't reliably durable).
-export type ExternalPdfDocument = {
+export type ExternalFileDocument = {
   uri: string;
   name: string;
+  format: DocFormat;
   sizeBytes: number;
   sourceUri: string;
   importedAt: number;
-  // Best-effort page count from a pdf-lib probe at import time (see externalPdfService.ts).
-  // Undefined for a genuinely encrypted PDF pdf-lib couldn't parse - the PDF engine's own
-  // onLoadComplete is the real source of truth once the reader actually mounts the file.
+  // Best-effort page count from a pdf-lib probe at import time (see externalFileService.ts).
+  // PDF-only - always undefined for every other format. Undefined for a genuinely encrypted PDF
+  // pdf-lib couldn't parse too - the PDF engine's own onLoadComplete is the real source of truth
+  // once the reader actually mounts the file.
   pageCount?: number;
 };
 

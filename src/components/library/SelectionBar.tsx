@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
+import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
+import type { LibraryDocument } from '../../types/models';
 
 export type SelectionToolId = 'merge' | 'split' | 'compress' | 'protect' | 'sign';
 
@@ -14,15 +16,23 @@ const TOOLS: Tool[] = [
   { id: 'sign', label: 'Sign', icon: 'create-outline' },
 ];
 
+// Merge/Split/Compress/Sign all rebuild a PDF from doc.pages' raster images - meaningless (and, for
+// Compress/Sign, actively corrupting) for a format with no real page images. Protect is a UI-only
+// flag toggle and stays available for every format.
+const RASTER_ONLY_TOOLS: SelectionToolId[] = ['merge', 'split', 'compress', 'sign'];
+
 type SelectionBarProps = {
-  selectionCount: number;
+  selectedDocs: LibraryDocument[];
   onPress: (id: SelectionToolId) => void;
 };
 
-export function SelectionBar({ selectionCount, onPress }: SelectionBarProps) {
+export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
   const { tokens } = useTheme();
+  const selectionCount = selectedDocs.length;
+  const allRaster = selectedDocs.every((doc) => isPageRasterFormat(doc.format));
 
   const disabled = (id: SelectionToolId) => {
+    if (RASTER_ONLY_TOOLS.includes(id) && !allRaster) return true;
     if (id === 'merge') return selectionCount < 2;
     if (id === 'split' || id === 'sign') return selectionCount !== 1;
     return false;

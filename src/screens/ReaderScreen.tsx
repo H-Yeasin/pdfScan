@@ -6,6 +6,8 @@ import { PdfPageView, type PdfPageViewHandle } from '../components/reader/PdfPag
 import { ReaderActionBar } from '../components/reader/ReaderActionBar';
 import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
+import { SheetView } from '../components/reader/SheetView';
+import { TxtView } from '../components/reader/TxtView';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
@@ -20,6 +22,8 @@ import {
 import { ensureDocumentPdf } from '../services/pdf/pdfService';
 import { printDocument, printFileUri, shareDocument, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
+import { canFindInDoc, canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
 
@@ -33,7 +37,9 @@ export function ReaderScreen() {
   const external = state.reader.external;
   const doc = state.library.files.find((f) => f.id === state.reader.readerId);
   const night = state.reader.night;
-  const isImportedOrExternal = !!external || doc?.sourceKind === 'imported_pdf';
+  const format = external?.format ?? doc?.format;
+  const isPageRaster = format ? isPageRasterFormat(format) : false;
+  const signVisible = !external && !!doc && canSign(doc);
 
   const chromeVisible = useRef(new Animated.Value(1)).current;
   const [chrome, setChrome] = useState(true);
@@ -51,20 +57,28 @@ export function ReaderScreen() {
   const [signing, setSigning] = useState(false);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
+  const [localMatchCount, setLocalMatchCount] = useState(0);
   const pdfRef = useRef<PdfPageViewHandle>(null);
 
-  const pdfUri = external?.uri ?? doc?.pdfUri;
+  // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
+  // compiled PDF, see buildPdfFromPages). nativeUri is for every other format's own viewer, reading
+  // straight from the copied source file instead of a PDF conversion that doesn't exist for them.
+  const pdfUri = isPageRaster ? (external?.uri ?? doc?.pdfUri) : undefined;
+  const nativeUri = !isPageRaster ? (external?.uri ?? doc?.contentUri) : undefined;
   const title = external?.name ?? doc?.name ?? '';
   const pdfId = external?.uri ?? doc?.id ?? '';
+  const contentKey = pdfUri ?? nativeUri;
 
   useEffect(() => {
     Animated.timing(chromeVisible, { toValue: chrome ? 1 : 0, duration: 180, useNativeDriver: true }).start();
   }, [chrome, chromeVisible]);
 
   // Backfills document.pdf for a library doc saved before every doc always got one. A no-op for
-  // anything saved after that change shipped (doc.pdfUri is already set).
+  // anything saved after that change shipped (doc.pdfUri is already set), and for any non-raster
+  // format (DOCX/XLSX/CSV/TXT), which never gets a pdfUri at all - ensureDocumentPdf assumes a
+  // pages[] of real raster images to compile, which those formats don't have.
   useEffect(() => {
-    if (!doc || external || doc.pdfUri) return;
+    if (!doc || external || doc.pdfUri || !isPageRaster) return;
     let cancelled = false;
     setBackfilling(true);
     ensureDocumentPdf(doc, state.settings.ocrScript).then((updated) => {
@@ -76,7 +90,7 @@ export function ReaderScreen() {
     return () => {
       cancelled = true;
     };
-  }, [doc, external, state.settings.ocrScript, dispatch]);
+  }, [doc, external, isPageRaster, state.settings.ocrScript, dispatch]);
 
   // Resets all per-document viewer state when a different document/external file is opened.
   useEffect(() => {
@@ -85,11 +99,12 @@ export function ReaderScreen() {
     setFindOpen(false);
     setFindQuery('');
     setSearchResults([]);
+    setLocalMatchCount(0);
     setPassword(undefined);
     setPasswordDraft('');
     setNeedsPassword(false);
     setReloadKey(0);
-  }, [pdfUri]);
+  }, [contentKey]);
 
   useEffect(() => {
     const query = findQuery.trim();
@@ -143,7 +158,7 @@ export function ReaderScreen() {
   const handleOverflowSelect = useCallback(
     async (id: OverflowItemId) => {
       if (id === 'share') {
-        if (external) await shareFileUri(external.uri, 'application/pdf', external.name);
+        if (external) await shareFileUri(external.uri, MIME_BY_FORMAT[external.format], external.name);
         else if (doc) await shareDocument(doc);
       } else if (id === 'print') {
         if (external) await printFileUri(external.uri);
@@ -151,7 +166,7 @@ export function ReaderScreen() {
       } else if (id === 'export') {
         if (pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
       } else if (id === 'sign') {
-        if (!doc || isImportedOrExternal) return;
+        if (!doc || !signVisible) return;
         if (doc.format === 'PDF') {
           if (state.signature.saved) {
             setCapturedSignature(state.signature.saved);
@@ -189,7 +204,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, isImportedOrExternal, dispatch, go, state.signature.saved]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
@@ -244,7 +259,7 @@ export function ReaderScreen() {
     );
   }
 
-  if (doc && !external && !pdfUri) {
+  if (doc && !external && isPageRaster && !pdfUri) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         <Text style={{ color: tokens.muted }}>{backfilling ? 'Preparing preview…' : 'Loading…'}</Text>
@@ -252,23 +267,52 @@ export function ReaderScreen() {
     );
   }
 
-  const activePdfUri = pdfUri!;
+  if (doc && !external && !isPageRaster && !nativeUri) {
+    return (
+      <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
+        <Text style={{ color: tokens.muted }}>Loading…</Text>
+      </View>
+    );
+  }
+
+  const matchCount = isPageRaster ? searchResults.length : localMatchCount;
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
-      <PdfPageView
-        key={`${activePdfUri}:${reloadKey}`}
-        ref={pdfRef}
-        uri={activePdfUri}
-        pdfId={pdfId}
-        password={password}
-        night={night}
-        highlightRects={highlightRects}
-        onLoad={handleLoad}
-        onPageChanged={handlePageChanged}
-        onTap={handleTap}
-        onError={handlePdfError}
-      />
+      {isPageRaster ? (
+        <PdfPageView
+          key={`${pdfUri}:${reloadKey}`}
+          ref={pdfRef}
+          uri={pdfUri!}
+          pdfId={pdfId}
+          password={password}
+          night={night}
+          highlightRects={highlightRects}
+          onLoad={handleLoad}
+          onPageChanged={handlePageChanged}
+          onTap={handleTap}
+          onError={handlePdfError}
+        />
+      ) : format === 'CSV' || format === 'XLSX' || format === 'XLS' ? (
+        <SheetView
+          key={nativeUri}
+          uri={nativeUri!}
+          format={format}
+          night={night}
+          findQuery={findQuery}
+          onMatchCount={setLocalMatchCount}
+          onTap={handleTap}
+        />
+      ) : format === 'TXT' ? (
+        <TxtView
+          key={nativeUri}
+          uri={nativeUri!}
+          night={night}
+          findQuery={findQuery}
+          onMatchCount={setLocalMatchCount}
+          onTap={handleTap}
+        />
+      ) : null}
 
       {needsPassword && (
         <View style={styles.passwordOverlay} pointerEvents="box-none">
@@ -305,7 +349,7 @@ export function ReaderScreen() {
         findOpen={findOpen}
         findQuery={findQuery}
         onChangeFindQuery={setFindQuery}
-        matchCount={searchResults.length}
+        matchCount={matchCount}
       />
 
       <ReaderBottomChrome
@@ -314,6 +358,7 @@ export function ReaderScreen() {
         activeIndex={activeIndex}
         onFind={() => setFindOpen((v) => !v)}
         findOpen={findOpen}
+        showFind={!!format && canFindInDoc(format)}
         onNight={() => dispatch({ type: 'reader/TOGGLE_NIGHT' })}
         nightOn={night}
       />
@@ -321,7 +366,7 @@ export function ReaderScreen() {
       <ReaderActionBar
         visible={chromeVisible}
         onPress={handleOverflowSelect}
-        hiddenIds={isImportedOrExternal ? ['sign'] : []}
+        hiddenIds={[...(signVisible ? [] : (['sign'] as const)), ...(isPageRaster ? [] : (['export'] as const))]}
       />
 
       <OverflowSheet

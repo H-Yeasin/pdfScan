@@ -82,7 +82,7 @@ export async function initializeDatabase(): Promise<void> {
 
 export async function insertScannedDocument(doc: LibraryDocument): Promise<void> {
   const db = await getDb();
-  const filePath = doc.pdfUri ?? doc.pages[0]?.fileUri ?? '';
+  const filePath = doc.pdfUri ?? doc.pages[0]?.fileUri ?? doc.contentUri ?? '';
 
   await db.withTransactionAsync(async () => {
     await db.runAsync(

@@ -1,12 +1,12 @@
-import type { ExternalPdfDocument } from '../../types/models';
+import type { ExternalFileDocument } from '../../types/models';
 
 export type ReaderState = {
   readerId: string | null;
-  // Mutually exclusive with readerId - an externally-opened PDF not (yet) in the library.
+  // Mutually exclusive with readerId - an externally-opened file not (yet) in the library.
   // SET_READER_ID always clears this, SET_EXTERNAL always clears readerId, so every call site
-  // (LibraryScreen's handlePressRow, the "Open a PDF" entry point, OS "Open with" wiring) stays
+  // (LibraryScreen's handlePressRow, the "Open a file" entry point, OS "Open with" wiring) stays
   // regression-safe without needing to remember to clear the other field itself.
-  external: ExternalPdfDocument | null;
+  external: ExternalFileDocument | null;
   night: boolean;
 };
 
@@ -18,7 +18,7 @@ export const initialReaderState: ReaderState = {
 
 export type ReaderAction =
   | { type: 'reader/SET_READER_ID'; id: string }
-  | { type: 'reader/SET_EXTERNAL'; doc: ExternalPdfDocument | null }
+  | { type: 'reader/SET_EXTERNAL'; doc: ExternalFileDocument | null }
   | { type: 'reader/TOGGLE_NIGHT' };
 
 export function readerReducer(state: ReaderState, action: ReaderAction): ReaderState {

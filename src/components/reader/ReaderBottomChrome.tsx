@@ -9,6 +9,7 @@ type ReaderBottomChromeProps = {
   activeIndex: number;
   onFind: () => void;
   findOpen: boolean;
+  showFind?: boolean;
   onNight: () => void;
   nightOn: boolean;
 };
@@ -24,6 +25,7 @@ export function ReaderBottomChrome({
   activeIndex,
   onFind,
   findOpen,
+  showFind = true,
   onNight,
   nightOn,
 }: ReaderBottomChromeProps) {
@@ -54,10 +56,12 @@ export function ReaderBottomChrome({
       </View>
 
       <View style={styles.actions}>
-        <Pressable style={styles.actionButton} onPress={onFind}>
-          <Ionicons name="search" size={17} color={findOpen ? tokens.accent : tokens.ink} />
-          <Text style={[styles.actionLabel, { color: findOpen ? tokens.accent : tokens.ink }]}>Find</Text>
-        </Pressable>
+        {showFind && (
+          <Pressable style={styles.actionButton} onPress={onFind}>
+            <Ionicons name="search" size={17} color={findOpen ? tokens.accent : tokens.ink} />
+            <Text style={[styles.actionLabel, { color: findOpen ? tokens.accent : tokens.ink }]}>Find</Text>
+          </Pressable>
+        )}
         <Pressable style={styles.actionButton} onPress={onNight}>
           <Ionicons name="moon-outline" size={17} color={nightOn ? tokens.accent : tokens.ink} />
           <Text style={[styles.actionLabel, { color: nightOn ? tokens.accent : tokens.ink }]}>Night</Text>

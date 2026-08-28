@@ -25,6 +25,8 @@
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "^57.0.2",
+    "mammoth": "^1.12.1",
+    "papaparse": "^5.6.0",
     "pdf-lib": "^1.17.1",
     "react": "19.2.3",
     "react-native": "0.86.0",
@@ -37,10 +39,13 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
     "react-native-view-shot": "5.1.0",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.0",
-    "rn-mlkit-ocr": "^0.3.1"
+    "rn-mlkit-ocr": "^0.3.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.5.2",
     "@types/react": "~19.2.2",
     "patch-package": "^8.0.1",
     "typescript": "~6.0.3"

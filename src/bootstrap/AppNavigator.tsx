@@ -15,7 +15,7 @@ import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
-import { useExternalPdfLinking } from '../store/useExternalPdfLinking';
+import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useAppState } from '../store/AppStateContext';
 import { initializeDatabase } from '../services/persistence/dbService';
 
@@ -35,7 +35,7 @@ export function AppNavigator() {
   const libraryLoaded = useLibraryPersistence();
   useSettingsPersistence();
   useSignaturePersistence();
-  useExternalPdfLinking(libraryLoaded);
+  useExternalFileLinking(libraryLoaded);
   useEffect(() => {
     initializeDatabase().catch((e) => console.warn('DB init failed', e));
   }, []);

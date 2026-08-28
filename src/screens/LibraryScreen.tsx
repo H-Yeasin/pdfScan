@@ -25,11 +25,18 @@ import {
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { deleteScannedDocument, insertScannedDocument, searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
-import { importExternalPdf } from '../services/pdf/externalPdfService';
+import { importExternalFile } from '../services/files/externalFileService';
+import { canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument } from '../types/models';
 import { createId } from '../utils/id';
+
+// Formats reachable via the in-app picker today. Widens as DOCX/XLSX/XLS viewers land (see the
+// universal-reader plan's phasing) - deliberately narrower than docFormat.ts's full MIME_BY_FORMAT
+// map so the picker never lets someone select a format with no viewer built yet.
+const PICKABLE_MIME_TYPES = [MIME_BY_FORMAT.PDF, MIME_BY_FORMAT.TXT, MIME_BY_FORMAT.CSV];
 
 export function LibraryScreen() {
   const { tokens } = useTheme();
@@ -78,6 +85,8 @@ export function LibraryScreen() {
 
   const unfiledCount = useMemo(() => files.filter((f) => !f.folderId).length, [files]);
 
+  const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
+
   const activeFolderName = useMemo(() => {
     if (activeFolderId === UNFILED_FOLDER_ID) return 'Unfiled';
     return folders.find((f) => f.id === activeFolderId)?.name ?? 'Folder';
@@ -108,16 +117,19 @@ export function LibraryScreen() {
     [selMode, dispatch, go]
   );
 
-  const handleOpenPdf = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+  const handleOpenFile = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: PICKABLE_MIME_TYPES, copyToCacheDirectory: true });
     if (result.canceled || !result.assets[0]) return;
     try {
-      const ext = await importExternalPdf(result.assets[0].uri, { originalFileName: result.assets[0].name });
+      const ext = await importExternalFile(result.assets[0].uri, {
+        originalFileName: result.assets[0].name,
+        mimeType: result.assets[0].mimeType,
+      });
       dispatch({ type: 'reader/SET_EXTERNAL', doc: ext });
       go('reader');
     } catch (e) {
-      console.warn('LibraryScreen.handleOpenPdf failed', e);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't open that PDF" });
+      console.warn('LibraryScreen.handleOpenFile failed', e);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't open that file" });
     }
   }, [dispatch, go]);
 
@@ -131,7 +143,6 @@ export function LibraryScreen() {
 
   const handleSelectionTool = useCallback(
     async (id: SelectionToolId) => {
-      const selectedDocs = files.filter((f) => selection.includes(f.id));
       if (selectedDocs.length === 0) return;
 
       if (id === 'merge' && selectedDocs.length >= 2) {
@@ -163,7 +174,7 @@ export function LibraryScreen() {
         selectedDocs.forEach((doc) => dispatch({ type: 'library/TOGGLE_LOCKED', id: doc.id }));
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Protect only marks the file — it does not encrypt it yet' });
-      } else if (id === 'sign' && selectedDocs.length === 1) {
+      } else if (id === 'sign' && selectedDocs.length === 1 && canSign(selectedDocs[0])) {
         const [target] = selectedDocs;
         setSignTarget(target);
         if (target.format === 'PDF') {
@@ -176,7 +187,7 @@ export function LibraryScreen() {
         }
       }
     },
-    [files, selection, dispatch, state.signature.saved, state.settings.ocrScript]
+    [selectedDocs, selection, dispatch, state.signature.saved, state.settings.ocrScript]
   );
 
   const handleSignConfirm = useCallback(
@@ -236,7 +247,7 @@ export function LibraryScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: tokens.ink }]}>Library</Text>
           <View style={styles.headerIcons}>
-            <Pressable style={styles.iconButton} onPress={handleOpenPdf}>
+            <Pressable style={styles.iconButton} onPress={handleOpenFile}>
               <Ionicons name="document-outline" size={21} color={tokens.ink} />
             </Pressable>
             <Pressable
@@ -325,7 +336,7 @@ export function LibraryScreen() {
       )}
 
       {selMode ? (
-        <SelectionBar selectionCount={selection.length} onPress={handleSelectionTool} />
+        <SelectionBar selectedDocs={selectedDocs} onPress={handleSelectionTool} />
       ) : (
         <TabBar
           active="library"
