@@ -3,6 +3,7 @@ import { File } from 'expo-file-system';
 import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 import type { AppAction } from '../../store/appReducer';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
+import { analyzeImageUri } from '../enhance/filters/stats';
 import { runOcr } from '../ocr/ocrService';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
 import type { OcrScript, SessionPage } from '../../types/models';
@@ -64,6 +65,8 @@ export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, sc
       if (rawFile.exists) rawFile.delete();
 
       const ocr = await runOcr(compressed.uri, script);
+      // Measured once here so switching filters in Review never reads pixels again.
+      const stats = await analyzeImageUri(compressed.uri);
 
       processedPages.push({
         id: createId('page'),
@@ -72,6 +75,7 @@ export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, sc
         height: compressed.height,
         rotation: 0,
         enhance: 'auto',
+        stats,
         ocr,
       });
     }

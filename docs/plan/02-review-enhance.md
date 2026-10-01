@@ -57,7 +57,21 @@ setting), C1 (per-mode `defaultEnhance`; Notes switches from `document_scan` to 
 ## Steps
 
 ### E1 · Filter registry and shared filter engine *(M)*
-Status: todo
+Status: done, adapted (uncommitted). It was built before its prerequisites F1, F5 and C1, so:
+- **Tests deferred to F1.** For now, a one-off script checked that `filterMath`'s auto/color/gray
+  chains, the adjust stack and histogram clipping are identical to the pre-refactor code
+  (7,001 random and edge cases). Add the jest tests listed below once F1 lands.
+- **No `renderPage` yet (F5).** `drawFiltered` is called by `skiaEnhance.bakeEnhance(uri, page)`,
+  which Deliver, AcademicOptions and the current preview hook use. F5 swaps `bakeEnhance` for
+  `renderPage`.
+- **No `captureModes.ts` yet (C1).** C1's table in `01-capture.md` now says `bw` for Notes.
+- As built: `filters/{filterMath,stats,sauvola,registry,drawFiltered}.ts`. `FilterSpec` also has
+  `available: false` for `ink`/`board`, which are placeholders (they render as Gray and Auto) and
+  stay hidden from `EnhanceSegmented` until E4/E5 build them. `lightCorrect` is false everywhere
+  until E3. `SessionPage.stats` is measured at scan ingest (`scannerPipeline`). Gallery imports,
+  merged pages and pages whose `uri` changed (the reducer drops stale stats on `UPDATE_PAGE`) are
+  measured by ReviewScreen through `capture/SET_PAGE_STATS`. `drawFiltered` falls back to
+  measuring when stats are missing.
 
 - Split `skiaEnhance.ts` into `src/services/enhance/filters/`:
   - `filterMath.ts`: **pure** functions moved as they are (`channelStatsFromHistogram`,

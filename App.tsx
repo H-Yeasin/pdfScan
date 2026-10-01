@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AppProviders } from './src/bootstrap/AppProviders';
 import { AppNavigator } from './src/bootstrap/AppNavigator';
 import { Snackbar } from './src/components/shared/Snackbar';

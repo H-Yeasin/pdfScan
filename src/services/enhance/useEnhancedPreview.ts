@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { File } from 'expo-file-system';
-import { DEFAULT_ADJUST } from './adjust';
 import { bakeEnhance } from './skiaEnhance';
-import type { AdjustValues, EnhanceMode } from '../../types/models';
+import type { FilterPage } from './filters/drawFiltered';
 
 function deleteIfExists(uri: string) {
   const file = new File(uri);
   if (file.exists) file.delete();
 }
 
-// Live preview for the Review screen's Auto/Color/Gray/B&W/Scan control plus its brightness/
-// contrast/saturation sliders. Every mode now derives a content-adaptive matrix from the page's
-// own histogram (see skiaEnhance.ts), so none of them have a cheap non-destructive preview - this
-// runs the same `bakeEnhance` used at export time against a scratch cache file whenever mode or
-// adjust changes, keeping the preview pixel-identical to what Deliver will actually produce.
-export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, adjust: AdjustValues = DEFAULT_ADJUST) {
+// Live preview for the Review screen's filter picker plus its brightness/contrast/saturation
+// sliders. This runs the same `bakeEnhance` used at export time against a scratch cache file
+// whenever the filter, sliders or options change, keeping the preview pixel-identical to what
+// Deliver will actually produce. E2 replaces it with an SkPicture from drawFiltered (no files).
+export function useEnhancedPreview(uri: string | undefined, page: FilterPage | undefined) {
   const [previewUri, setPreviewUri] = useState<string | undefined>(uri);
   const [loading, setLoading] = useState(false);
   const bakedRef = useRef<string | null>(null);
@@ -22,7 +20,7 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, a
   useEffect(() => {
     let cancelled = false;
 
-    if (!uri) {
+    if (!uri || !page) {
       if (bakedRef.current) {
         deleteIfExists(bakedRef.current);
         bakedRef.current = null;
@@ -33,7 +31,7 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, a
     }
 
     setLoading(true);
-    bakeEnhance(uri, mode, adjust).then((baked) => {
+    bakeEnhance(uri, page).then((baked) => {
       if (cancelled) {
         deleteIfExists(baked.uri);
         return;
@@ -47,7 +45,11 @@ export function useEnhancedPreview(uri: string | undefined, mode: EnhanceMode, a
     return () => {
       cancelled = true;
     };
-  }, [uri, mode, adjust.brightness, adjust.contrast, adjust.saturation]);
+    // Keyed on the fields that change the output, not `page` identity: unrelated page updates (OCR
+    // landing, err flag) must not trigger a re-bake. `stats` is left out on purpose - it only ever
+    // goes from undefined to the values drawFiltered would measure anyway, or is dropped together
+    // with a `uri` change, so it never changes the rendered pixels on its own.
+  }, [uri, page?.enhance, page?.adjust, page?.filterOptions]);
 
   // Unmount-only cleanup of whatever the last successful bake produced.
   useEffect(() => {

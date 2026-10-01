@@ -30,7 +30,7 @@ ID cards, plus batch import from the gallery.
 - Reusable pieces: `enhance/perspective.ts` (`quadToQuadMatrix`),
   `perspectiveCrop.warpPerspectiveCrop(uri, quad)`, `review/CropOverlay` (manual quad editor),
   `compositeHalfPages` and `fitBox` (layout), the `skiaEnhance` Skia surface pattern, and the
-  `document_scan` (Sauvola black-and-white) enhance mode.
+  `bw` (Sauvola black-and-white) enhance mode (named `document_scan` before §2 E1).
 
 ### Key design decision
 **Keep Google's scanner as the main camera.** It already has the best edge detection,
@@ -71,7 +71,7 @@ Status: todo
 
   | Mode | Default filter | Page limit | Post-processing |
   |---|---|---|---|
-  | **Notes** | `document_scan` | 50 | none |
+  | **Notes** | `bw` | 50 | none |
   | **Document** | `auto` | 50 | none |
   | **Board** | `color` | 20 | none |
   | **Book** | `auto` | 50 | `splitSpread` |

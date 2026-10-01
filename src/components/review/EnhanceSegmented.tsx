@@ -1,13 +1,12 @@
 import { SegmentedControl } from '../shared/SegmentedControl';
+import { FILTERS } from '../../services/enhance/filters/registry';
 import type { EnhanceMode } from '../../types/models';
 
-const SEGMENTS: { id: EnhanceMode; label: string }[] = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'color', label: 'Color' },
-  { id: 'gray', label: 'Gray' },
-  { id: 'bw', label: 'B&W' },
-  { id: 'document_scan', label: 'Scan' },
-];
+// Driven by the filter registry; filters whose pipeline isn't built yet (available: false) are hidden.
+const SEGMENTS: { id: EnhanceMode; label: string }[] = FILTERS.filter((spec) => spec.available).map((spec) => ({
+  id: spec.id,
+  label: spec.label,
+}));
 
 type EnhanceSegmentedProps = {
   value: EnhanceMode;

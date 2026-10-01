@@ -1,4 +1,7 @@
-export type EnhanceMode = 'auto' | 'color' | 'gray' | 'bw' | 'document_scan';
+// Session-only filter IDs (the library stores baked pixels, so these can change freely). Each one
+// has exactly one FilterSpec in services/enhance/filters/registry.ts. 'bw' is the Sauvola
+// photocopy threshold (it was called 'document_scan' before E1; the old contrast-boost 'bw' is gone).
+export type EnhanceMode = 'original' | 'auto' | 'color' | 'gray' | 'ink' | 'board' | 'bw';
 export type CaptureMode = 'doc' | 'id' | 'book';
 export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' | 'TXT';
 
@@ -12,8 +15,20 @@ export type OcrBlock = { text: string; lines: OcrLine[]; bounding: OcrBounding }
 export type PageOcr = { text: string; blocks: OcrBlock[] };
 
 // Manual tone adjustments layered on top of `enhance`. Each field is -1..1, where 0 is a no-op;
-// see skiaEnhance.ts's composeAdjustFilter for how these map to actual color-matrix math.
+// see services/enhance/filters/filterMath.ts's adjustMatrices for the actual color-matrix math.
 export type AdjustValues = { brightness: number; contrast: number; saturation: number };
+
+// Histogram endpoints (0..1) of a page, measured once by services/enhance/filters/stats.ts and
+// cached on SessionPage.stats so switching filters never reads pixels again.
+export type ChannelStats = { lo: number; hi: number };
+export type ImageStats = { r: ChannelStats; g: ChannelStats; b: ChannelStats; luma: ChannelStats };
+
+// Per-page options for the Ink (E4) and Board (E5) filters. Ignored by every other filter.
+export type FilterOptions = {
+  keepInkColor?: boolean;
+  fadeLines?: boolean;
+  boardStyle?: 'auto' | 'light' | 'dark';
+};
 
 export type SessionPage = {
   id: string;
@@ -24,6 +39,10 @@ export type SessionPage = {
   cropRect?: { originX: number; originY: number; width: number; height: number };
   enhance: EnhanceMode;
   adjust?: AdjustValues;
+  filterOptions?: FilterOptions;
+  // Measured from `uri`. The capture reducer drops it whenever `uri` changes (crop, rotate, sign),
+  // and ReviewScreen measures it again for the selected page; undefined just means "measure on use".
+  stats?: ImageStats;
   err?: boolean;
   ocr?: PageOcr;
 };

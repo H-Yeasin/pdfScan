@@ -15,6 +15,8 @@ import { SignaturePlacementOverlay } from '../components/shared/SignaturePlaceme
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
+import { getFilter } from '../services/enhance/filters/registry';
+import { analyzeImageUri } from '../services/enhance/filters/stats';
 import { rotatePage } from '../services/enhance/enhanceService';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
 import type { Point } from '../services/enhance/perspective';
@@ -58,13 +60,21 @@ export function ReviewScreen() {
   const multiPage = pages.length > 1;
   const coverConfig = academicConfig?.coverPage;
   const currentAdjust = selectedPage?.adjust ?? DEFAULT_ADJUST;
-  const adjustable = selectedPage?.enhance !== 'document_scan';
+  const adjustable = selectedPage ? getFilter(selectedPage.enhance).adjustable : true;
 
-  const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(
-    selectedPage?.uri,
-    selectedPage?.enhance ?? 'auto',
-    currentAdjust
-  );
+  const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(selectedPage?.uri, selectedPage);
+
+  // Scanned pages arrive with stats measured at ingest; gallery imports, merged halves and pages
+  // whose image changed (crop, rotate, sign - the reducer drops stale stats) are measured here, once,
+  // the first time they're shown. SET_PAGE_STATS ignores the result if the uri moved on meanwhile.
+  const statsPageId = selectedPage && !selectedPage.stats ? selectedPage.id : undefined;
+  const statsPageUri = statsPageId ? selectedPage?.uri : undefined;
+  useEffect(() => {
+    if (!statsPageId || !statsPageUri) return;
+    analyzeImageUri(statsPageUri).then((stats) => {
+      if (stats) dispatch({ type: 'capture/SET_PAGE_STATS', id: statsPageId, uri: statsPageUri, stats });
+    });
+  }, [dispatch, statsPageId, statsPageUri]);
 
   // Runs border/header-footer stamping on top of the already-enhanced preview, so this mirrors
   // the real save pipeline's order (bake enhance, then stamp) - not just the raw enhance preview.

@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
-import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { buildPdfFromPages } from '../services/pdf/pdfService';
 import type { AcademicConfig, CoverPageConfig } from '../services/pdf/pdfService';
@@ -137,7 +136,7 @@ export function AcademicOptionsScreen() {
     try {
       const bakedPages = await Promise.all(
         pages.map(async (page) => {
-          const baked = await bakeEnhance(page.uri, page.enhance, page.adjust ?? DEFAULT_ADJUST);
+          const baked = await bakeEnhance(page.uri, page);
           return { ...page, ...baked };
         })
       );

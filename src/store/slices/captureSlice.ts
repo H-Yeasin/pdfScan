@@ -1,4 +1,4 @@
-import type { AdjustValues, CaptureMode, EnhanceMode, SessionPage } from '../../types/models';
+import type { AdjustValues, CaptureMode, EnhanceMode, ImageStats, SessionPage } from '../../types/models';
 
 export type ProcessingStatus = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
 
@@ -31,6 +31,8 @@ export type CaptureAction =
   | { type: 'capture/SET_PAGE_ADJUST'; id: string; adjust: AdjustValues }
   | { type: 'capture/SET_ALL_PAGES_ADJUST'; adjust: AdjustValues }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
+  // `uri` is the image the stats were measured from; they're dropped if the page moved on since.
+  | { type: 'capture/SET_PAGE_STATS'; id: string; uri: string; stats: ImageStats }
   | { type: 'capture/REPLACE_PAGES'; ids: string[]; page: SessionPage }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
@@ -73,7 +75,20 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
     case 'capture/UPDATE_PAGE':
       return {
         ...state,
-        pages: state.pages.map((p) => (p.id === action.id ? { ...p, ...action.patch } : p)),
+        pages: state.pages.map((p) => {
+          if (p.id !== action.id) return p;
+          const next = { ...p, ...action.patch };
+          // Stats describe the pixels of `uri`. A crop/rotate/sign that swaps the image without
+          // supplying fresh stats must not keep the old ones, or Auto/Color/Gray would stretch the
+          // new image with the old histogram.
+          if (next.uri !== p.uri && !('stats' in action.patch)) delete next.stats;
+          return next;
+        }),
+      };
+    case 'capture/SET_PAGE_STATS':
+      return {
+        ...state,
+        pages: state.pages.map((p) => (p.id === action.id && p.uri === action.uri ? { ...p, stats: action.stats } : p)),
       };
     case 'capture/REPLACE_PAGES': {
       // firstIndex is the position of the FIRST (in array order) matching page, so every page
