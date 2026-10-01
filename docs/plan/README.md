@@ -5,7 +5,7 @@ its own steps. A step's `Status:` line and its "As built" notes describe the cod
 The "Context" and "What the code looks like today" sections at the top of each file describe the
 code **when the section was planned**, and are kept as history.
 
-## Where things stand (2026-10-01)
+## Where things stand (2026-10-02)
 
 | Section | File | Steps | State |
 |---|---|---|---|
@@ -13,7 +13,8 @@ code **when the section was planned**, and are kept as history.
 | §1 Capture | [01-capture.md](01-capture.md) | C1–C7 | All done in code. Device checks open. C5 used the no-native-dependency detector; the OpenCV spike is still pending. |
 | §2 Review and enhance | [02-review-enhance.md](02-review-enhance.md) | E1–E7 | E1–E6 done. **E7 in progress:** the tooling is done; the benchmark needs real pages and raters. |
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | K1–K5 done. **Next: K6** (organising existing documents). |
-| §4 Submit and later | — | — | Not planned yet. Next to plan: `docs/plan/04-submit.md` (see `docs/PLAN.md` §4). |
+| §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | Planned (2026-10-02). Starts after §3 K6 (not required by it). Start with S1, then S2. |
+| §5 Study and later | — | — | Not planned yet. Next to plan: `docs/plan/05-study.md` (see `docs/PLAN.md` §5). |
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
 lines here.

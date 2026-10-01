@@ -136,18 +136,16 @@ right one with zero or one tap.
 ### §4 Submit (the killer feature)
 Goal: an assignment ready to upload, in one screen.
 
-- [ ] **Student profile** (Settings): name, roll or ID number, section, institution. Stored locally. (S)
-- [ ] **Auto naming template**, for example `{roll}_{name}_{course}_{type}{n}` gives
-      `2021331045_Rahim_CSE101_HW3.pdf`. (S)
-- [ ] **Exact size target:** "Under 1 / 2 / 5 / 10 MB / custom". Binary search over resolution
-      and JPEG quality, keeping OCR intact. (M)
-- [ ] **Cover page templates** (generic, lab report, assignment), filled from the profile and the
-      course. (M)
-- [ ] Header and footer: name, roll and page number "1 / 10" on every page (already partly built
-      in Academic mode). (S)
-- [ ] 2-up Eco layout (exists) and an A4/Letter page size choice. (S)
-- [ ] Submit history per course: what was sent, when, and at what size. Can be re-shared. (M)
-- [ ] Deadline reminders (local notifications, optional). (M)
+**Detailed steps:** [`docs/plan/04-submit.md`](plan/04-submit.md)
+
+- [ ] S1 Student profile (name, roll, section, institution; stored only on the phone)
+- [ ] S2 Naming template (`{roll}_{name}_{course}_{type}{n}`) and shared files named after the document (today they arrive as `document.pdf`)
+- [ ] S3 Exact size target (Under 1 / 2 / 5 / 10 MB / custom), OCR text kept
+- [ ] S4 Cover page templates (Simple, Assignment, Lab report) filled from profile and course
+- [ ] S5 Footer presets (page numbers, name + roll + pages) and A4 / Letter page size
+- [ ] S6 Submit button and per-course submission presets (3 taps after capture)
+- [ ] S7 Submission history per course, with "Share again"
+- [ ] S8 Deadline reminders (local notifications, optional)
 
 **Done when:** from opening the app to having the share sheet open with a correctly named,
 under-limit PDF takes 3 taps after capture.
@@ -256,4 +254,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. Next to plan: §4 Submit (`docs/plan/04-submit.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. Next to plan: §5 Study (`docs/plan/05-study.md`).
