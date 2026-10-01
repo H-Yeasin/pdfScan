@@ -340,7 +340,27 @@ As built:
 "Next", then "Submit", then the app in the share sheet: 3 taps, with the right name and size.
 
 ### S7 · Submission history *(M)*
-Status: todo
+Status: done in code (commit 9b7ec21). "Share again after the cache was cleared" needs a device.
+
+As built:
+- Migration v6 as planned plus two columns, `preset` (JSON) and `type_number`: the settings the
+  file was built with, so "Share again" can rebuild it exactly. `course_id` is
+  `ON DELETE SET NULL` (a deleted course leaves its submissions Unsorted).
+- `Submission` in `models.ts`; the file is `library/<documentId>/submissions/<fileName>`
+  (`history.submissionFile`), so only the name is stored.
+- `libraryRepo`: `insertSubmission`, `listSubmissions({ courseId?, documentId? })`, and
+  submissions in `loadAll`/`syncLibrary` (`LoadedLibrary.submissions` is optional, so the legacy
+  import and older tests are unchanged). State: `library.submissions` with
+  `SET_SUBMISSIONS`/`ADD_SUBMISSION`; `REMOVE_FILES`, `REPLACE_FILES` (merge, split) and
+  `DELETE_COURSE` keep it in step with the database.
+- `submit/history.ts`: `submissionRecord`, `submissionFile`, `ensureSubmissionFile` (the stored
+  file, or a rebuild with the stored preset and number, today's profile and course) and
+  `submittedSummary`. `store/useSubmitDocument.useShareSubmission` shares it.
+- UI: `components/submit/SubmissionList` (name, date, size, red "over 2 MB" when it didn't fit;
+  Share again, Open) in a "Submitted" section at the end of `CourseScreen`'s list;
+  `ReaderTopChrome` takes a tappable `subtitle` that opens `SubmissionsSheet`; Library has
+  `SubmittedFilterChips` (All / Submitted / Not submitted), shown once anything was submitted.
+  "Open" opens the submitted document in the Reader.
 
 - Migration v6: `submissions` (id, document_id, course_id, file_name, size_bytes,
   size_limit_bytes, page_count, created_at). Deleting a document deletes its rows (cascade)
