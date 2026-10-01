@@ -75,4 +75,33 @@ describe('useLibraryPersistence', () => {
       ['old', true],
     ]);
   });
+
+  it('courses and semesters survive a restart, including an archived semester and a reorder', async () => {
+    const first = await mountPersistence();
+    await act(async () => {
+      const { dispatch } = first.current();
+      dispatch({ type: 'library/CREATE_SEMESTER', semester: { id: 's1', name: 'Fall 2026', startsOn: '2026-09-01' } });
+      dispatch({ type: 'library/CREATE_COURSE', id: 'a', name: 'Algebra', fields: { semesterId: 's1', emoji: '➗' } });
+      dispatch({ type: 'library/CREATE_COURSE', id: 'b', name: 'Biology', fields: { semesterId: 's1' } });
+      dispatch({ type: 'library/CREATE_COURSE', id: 'c', name: 'Chemistry' });
+    });
+    await flush();
+    await act(async () => {
+      const { dispatch } = first.current();
+      dispatch({ type: 'library/REORDER_COURSES', ids: ['c', 'a', 'b'] });
+      dispatch({ type: 'library/ARCHIVE_SEMESTER', id: 's1' });
+    });
+    await flush();
+
+    // A fresh store reading the same database, as after an app restart.
+    const second = await mountPersistence();
+    const { courses, semesters } = second.current().state.library;
+    expect(semesters.map((s) => [s.id, s.name, s.startsOn, s.archived])).toEqual([['s1', 'Fall 2026', '2026-09-01', true]]);
+    expect(courses.map((c) => [c.id, c.sortOrder, c.archived, c.semesterId])).toEqual([
+      ['c', 0, false, undefined],
+      ['a', 1, true, 's1'],
+      ['b', 2, true, 's1'],
+    ]);
+    expect(courses[1]).toMatchObject({ emoji: '➗', color: first.current().state.library.courses[1].color });
+  });
 });

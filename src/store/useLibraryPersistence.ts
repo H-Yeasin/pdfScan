@@ -3,8 +3,8 @@ import { getDb } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
 import { useAppState } from './AppStateContext';
 
-// Loads the library from SQLite, then mirrors every later change to state.library.files/courses
-// back to disk as a diff (only documents/courses whose object identity changed are written).
+// Loads the library from SQLite, then mirrors every later change to state.library.files/courses/
+// semesters back to disk as a diff (only rows whose object identity changed are written).
 //
 // Data-loss guard: persistence only starts after a *successful* load. If the load fails, status
 // becomes 'failed', the Library shows an error with Retry, and nothing is written - so a read
@@ -14,15 +14,15 @@ import { useAppState } from './AppStateContext';
 // their own boot-time work after it.
 export function useLibraryPersistence(): boolean {
   const { state, dispatch } = useAppState();
-  const { files, courses, loadStatus, loadAttempt } = state.library;
+  const { files, courses, semesters, loadStatus, loadAttempt } = state.library;
   const loaded = loadStatus === 'ready';
 
   // `committed` is the last snapshot known to be on disk; `latest` is the newest in-memory one.
   // Writes run one at a time, each diffing committed -> latest, so a failed write is retried by
   // the next one instead of being silently dropped.
   const committed = useRef<LoadedLibrary | null>(null);
-  const latest = useRef<LoadedLibrary>({ documents: files, courses });
-  latest.current = { documents: files, courses };
+  const latest = useRef<LoadedLibrary>({ documents: files, courses, semesters });
+  latest.current = { documents: files, courses, semesters };
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -38,6 +38,7 @@ export function useLibraryPersistence(): boolean {
         const unsaved = latest.current.documents.filter((d) => !storedIds.has(d.id));
         dispatch({ type: 'library/SET_FILES', files: [...unsaved, ...stored.documents] });
         dispatch({ type: 'library/SET_COURSES', courses: stored.courses });
+        dispatch({ type: 'library/SET_SEMESTERS', semesters: stored.semesters });
         dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' });
       })
       .catch((error) => {
@@ -64,7 +65,7 @@ export function useLibraryPersistence(): boolean {
         console.warn('Failed to save library changes', error);
       }
     });
-  }, [loaded, files, courses]);
+  }, [loaded, files, courses, semesters]);
 
   return loaded;
 }

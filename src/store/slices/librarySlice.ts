@@ -1,4 +1,5 @@
-import type { Course, LibraryDocument } from '../../types/models';
+import type { Course, LibraryDocument, Semester } from '../../types/models';
+import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
 export type LibraryTab = 'starred' | 'recent' | 'courses';
@@ -12,7 +13,11 @@ export type LibraryState = {
   // Bumped by RETRY_LOAD; useLibraryPersistence reloads whenever it changes.
   loadAttempt: number;
   files: LibraryDocument[];
+  // Always sorted by sortOrder (the reducer keeps it that way). Includes archived courses; screens
+  // filter them out where they shouldn't appear.
   courses: Course[];
+  // Newest start date first, as loaded.
+  semesters: Semester[];
   // UI-only drill-in state for the Courses tab: null = showing the course list,
   // a course id = showing that course's contents. Not persisted, same category as `tab`.
   activeCourseId: string | null;
@@ -30,6 +35,7 @@ export const initialLibraryState: LibraryState = {
   loadAttempt: 0,
   files: [],
   courses: [],
+  semesters: [],
   activeCourseId: null,
   selection: [],
   selMode: false,
@@ -56,11 +62,34 @@ export type LibraryAction =
   | { type: 'library/TOGGLE_SEARCH_OPEN' }
   | { type: 'library/SET_SEARCH_RESULT_IDS'; ids: string[] | null }
   | { type: 'library/SET_COURSES'; courses: Course[] }
-  | { type: 'library/CREATE_COURSE'; id: string; name: string }
-  | { type: 'library/RENAME_COURSE'; id: string; name: string }
+  // `color` defaults to the next unused palette colour; the course goes to the end of the list.
+  | { type: 'library/CREATE_COURSE'; id: string; name: string; fields?: Partial<Omit<CourseFields, 'name'>> }
+  | { type: 'library/UPDATE_COURSE'; id: string; patch: Partial<CourseFields> }
+  | { type: 'library/REORDER_COURSES'; ids: string[] }
   | { type: 'library/DELETE_COURSE'; id: string }
+  | { type: 'library/SET_SEMESTERS'; semesters: Semester[] }
+  | { type: 'library/CREATE_SEMESTER'; semester: Omit<Semester, 'archived' | 'createdAt'> }
+  | { type: 'library/UPDATE_SEMESTER'; id: string; patch: Partial<Omit<Semester, 'id' | 'createdAt'>> }
+  | { type: 'library/ARCHIVE_SEMESTER'; id: string }
+  | { type: 'library/DELETE_SEMESTER'; id: string }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_ACTIVE_COURSE'; id: string | null };
+
+// The editable part of a course: everything but its identity, position (REORDER_COURSES) and
+// creation time.
+export type CourseFields = Omit<Course, 'id' | 'sortOrder' | 'createdAt'>;
+
+function bySortOrder(courses: Course[]): Course[] {
+  return [...courses].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+}
+
+// Listed ids take positions 0..n-1 in that order; any course not listed keeps its relative order
+// after them. Courses whose position didn't change keep their object, so only moved ones are saved.
+function reorder(courses: Course[], ids: string[]): Course[] {
+  const listed = ids.map((id) => courses.find((c) => c.id === id)).filter((c): c is Course => !!c);
+  const rest = courses.filter((c) => !ids.includes(c.id));
+  return [...listed, ...rest].map((c, i) => (c.sortOrder === i ? c : { ...c, sortOrder: i }));
+}
 
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
@@ -129,17 +158,27 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/SET_SEARCH_RESULT_IDS':
       return { ...state, searchResultIds: action.ids };
     case 'library/SET_COURSES':
-      return { ...state, courses: action.courses };
-    case 'library/CREATE_COURSE':
+      return { ...state, courses: bySortOrder(action.courses) };
+    case 'library/CREATE_COURSE': {
+      const fields = action.fields ?? {};
+      const course: Course = {
+        ...fields,
+        id: action.id,
+        name: action.name,
+        color: fields.color ?? nextCourseColor(state.courses),
+        archived: fields.archived ?? false,
+        sortOrder: state.courses.reduce((max, c) => Math.max(max, c.sortOrder + 1), 0),
+        createdAt: Date.now(),
+      };
+      return { ...state, courses: [...state.courses, course] };
+    }
+    case 'library/UPDATE_COURSE':
       return {
         ...state,
-        courses: [...state.courses, { id: action.id, name: action.name, archived: false, createdAt: Date.now() }],
+        courses: state.courses.map((c) => (c.id === action.id ? { ...c, ...action.patch } : c)),
       };
-    case 'library/RENAME_COURSE':
-      return {
-        ...state,
-        courses: state.courses.map((c) => (c.id === action.id ? { ...c, name: action.name } : c)),
-      };
+    case 'library/REORDER_COURSES':
+      return { ...state, courses: reorder(state.courses, action.ids) };
     case 'library/DELETE_COURSE':
       // Documents in the course move to Unsorted; their files stay where they are.
       return {
@@ -154,6 +193,34 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         files: state.files.map((f) =>
           action.ids.includes(f.id) ? { ...f, courseId: action.courseId ?? undefined } : f
         ),
+      };
+    case 'library/SET_SEMESTERS':
+      return { ...state, semesters: action.semesters };
+    case 'library/CREATE_SEMESTER':
+      return {
+        ...state,
+        semesters: [{ ...action.semester, archived: false, createdAt: Date.now() }, ...state.semesters],
+      };
+    case 'library/UPDATE_SEMESTER':
+      return {
+        ...state,
+        semesters: state.semesters.map((s) => (s.id === action.id ? { ...s, ...action.patch } : s)),
+      };
+    case 'library/ARCHIVE_SEMESTER':
+      // The semester and its courses together; synced to disk in one transaction (syncLibrary).
+      // Their documents are untouched. Un-archiving is per course/semester (UPDATE_*), since a
+      // student may want only some courses back.
+      return {
+        ...state,
+        semesters: state.semesters.map((s) => (s.id === action.id ? { ...s, archived: true } : s)),
+        courses: state.courses.map((c) => (c.semesterId === action.id && !c.archived ? { ...c, archived: true } : c)),
+      };
+    case 'library/DELETE_SEMESTER':
+      // Its courses stay, with no semester (mirrors ON DELETE SET NULL).
+      return {
+        ...state,
+        semesters: state.semesters.filter((s) => s.id !== action.id),
+        courses: state.courses.map((c) => (c.semesterId === action.id ? { ...c, semesterId: undefined } : c)),
       };
     case 'library/SET_ACTIVE_COURSE':
       return { ...state, activeCourseId: action.id };

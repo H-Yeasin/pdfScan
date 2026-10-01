@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, Paths } from 'expo-file-system';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { COURSE_COLORS, nextCourseColor } from '../courses/palette';
 import type { Course, LibraryDocument, LibraryPage } from '../../types/models';
 import { sanitizeFolderSegment } from '../../utils/sanitize';
 import { buildSearchHaystack } from '../search/searchService';
@@ -52,10 +53,13 @@ function courseIdForCourseFolder(segment: string): string {
 //    those always shared one directory on disk);
 //  - a document is filed under its folder if it had one, otherwise under its courseFolder's course.
 export function convertLegacyIndex(index: LegacyIndexV2): { courses: Course[]; documents: LegacyDocument[]; courseIdByDoc: Map<string, string> } {
+  // Colour and sortOrder are placeholders here, assigned in list order at the end.
   const courses: Course[] = index.folders.map((f) => ({
     id: f.id,
     name: f.name,
+    color: COURSE_COLORS[0],
     archived: false,
+    sortOrder: 0,
     createdAt: f.createdAt,
   }));
   const byLowerName = new Map(courses.map((c) => [c.name.trim().toLowerCase(), c.id]));
@@ -75,13 +79,24 @@ export function convertLegacyIndex(index: LegacyIndexV2): { courses: Course[]; d
     let courseId = byLowerName.get(name.toLowerCase()) ?? bySegment.get(segment);
     if (!courseId) {
       courseId = courseIdForCourseFolder(segment);
-      courses.push({ id: courseId, name, archived: false, createdAt: doc.createdAt ?? Date.now() });
+      courses.push({
+        id: courseId,
+        name,
+        color: COURSE_COLORS[0],
+        archived: false,
+        sortOrder: 0,
+        createdAt: doc.createdAt ?? Date.now(),
+      });
       byLowerName.set(name.toLowerCase(), courseId);
     }
     bySegment.set(segment, courseId);
     courseIdByDoc.set(doc.id, courseId);
   }
-  return { courses, documents: index.documents, courseIdByDoc };
+  // Folders first, then course folders in the order documents first used them - the order they
+  // were listed in before - each with the colour a new course would get.
+  const ordered: Course[] = [];
+  for (const course of courses) ordered.push({ ...course, color: nextCourseColor(ordered), sortOrder: ordered.length });
+  return { courses: ordered, documents: index.documents, courseIdByDoc };
 }
 
 function rebase(uri: string | undefined, fromPrefix: string, toPrefix: string): string | undefined {
@@ -136,7 +151,7 @@ export async function importLegacyLibraryIfPresent(db: SQLiteDatabase): Promise<
 
   const index = migrateLibraryIndex(JSON.parse(raw));
   const converted = convertLegacyIndex(index);
-  const library: LoadedLibrary = { courses: converted.courses, documents: toLibraryDocuments(converted) };
+  const library: LoadedLibrary = { courses: converted.courses, documents: toLibraryDocuments(converted), semesters: [] };
   await insertIfMissing(db, library);
 
   // Only once the rows are committed: keep the blob as a backup, then retire the live key so the

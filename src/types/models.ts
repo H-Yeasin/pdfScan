@@ -135,6 +135,8 @@ export type LibraryDocument = {
   // between courses never touches the filesystem. Unrelated to AcademicConfig.coverPage.courseCode
   // (which only prints on the PDF cover page).
   courseId?: string;
+  // Undefined means 'other' (and every document saved before K1).
+  docType?: DocType;
   // Mirrors the AcademicConfig.coverPage.mode this document's page 0 was built with, if any.
   // undefined means "no cover page" OR "saved before this field existed" - both are treated
   // identically (fitToMarginBox=true) by applySignatureToDocument, since a missing cover is far
@@ -168,13 +170,48 @@ export type ExternalFileDocument = {
 };
 
 // One organizing unit for the library (replaces both the old logical folders and the free-text
-// "courseFolder" routing). code/color/semester are optional until the full Course UI lands (§3).
+// "courseFolder" routing).
 export type Course = {
   id: string;
   name: string;
   code?: string;
-  color?: string;
-  semester?: string;
+  // A palette id (services/courses/palette.ts), resolved to a light/dark colour by the theme.
+  color: CourseColor;
+  emoji?: string;
+  teacher?: string;
+  // Undefined: not in any semester.
+  semesterId?: string;
+  archived: boolean;
+  // Position in course lists; 0 first. Rewritten as a whole by library/REORDER_COURSES.
+  sortOrder: number;
+  createdAt: number;
+};
+
+export type CourseColor =
+  | 'teal'
+  | 'blue'
+  | 'indigo'
+  | 'purple'
+  | 'pink'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'green'
+  | 'slate';
+
+// A term that courses belong to. Its own entity (not a string on the course) so a whole semester
+// archives in one step and the current one can be found by date. Dates are local calendar days,
+// 'YYYY-MM-DD'.
+export type Semester = {
+  id: string;
+  name: string;
+  startsOn: string;
+  // Undefined: open-ended (the student didn't say when it ends).
+  endsOn?: string;
   archived: boolean;
   createdAt: number;
 };
+
+// What kind of document it is, for filtering and §4's `{type}` naming field. A document without
+// one is treated as 'other'.
+export type DocType = 'assignment' | 'notes' | 'handout' | 'exam' | 'lab' | 'other';

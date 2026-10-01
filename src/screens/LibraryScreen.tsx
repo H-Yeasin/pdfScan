@@ -97,7 +97,7 @@ export function LibraryScreen() {
     [dispatch]
   );
   const handleRenameCourse = useCallback(
-    (id: string, name: string) => dispatch({ type: 'library/RENAME_COURSE', id, name }),
+    (id: string, name: string) => dispatch({ type: 'library/UPDATE_COURSE', id, patch: { name } }),
     [dispatch]
   );
   const handleDeleteCourse = useCallback(

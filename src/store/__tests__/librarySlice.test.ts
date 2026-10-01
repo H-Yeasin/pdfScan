@@ -1,0 +1,114 @@
+import { initialLibraryState, libraryReducer } from '../slices/librarySlice';
+import type { LibraryAction, LibraryState } from '../slices/librarySlice';
+import { COURSE_COLORS } from '../../services/courses/palette';
+
+function run(...actions: LibraryAction[]): LibraryState {
+  return actions.reduce(libraryReducer, initialLibraryState);
+}
+
+const createCourse = (id: string, fields?: Extract<LibraryAction, { type: 'library/CREATE_COURSE' }>['fields']): LibraryAction => ({
+  type: 'library/CREATE_COURSE',
+  id,
+  name: id.toUpperCase(),
+  fields,
+});
+
+describe('librarySlice courses', () => {
+  it('gives new courses the next colour and the next position', () => {
+    const state = run(createCourse('a'), createCourse('b'), createCourse('c', { color: 'slate', code: 'C1' }));
+    expect(state.courses.map((c) => [c.id, c.color, c.sortOrder])).toEqual([
+      ['a', COURSE_COLORS[0], 0],
+      ['b', COURSE_COLORS[1], 1],
+      ['c', 'slate', 2],
+    ]);
+    expect(state.courses[2]).toMatchObject({ code: 'C1', archived: false });
+  });
+
+  it('updates a course in place', () => {
+    const state = run(createCourse('a'), {
+      type: 'library/UPDATE_COURSE',
+      id: 'a',
+      patch: { name: 'Algebra', emoji: '➗', teacher: 'Ms. Ada' },
+    });
+    expect(state.courses[0]).toMatchObject({ id: 'a', name: 'Algebra', emoji: '➗', teacher: 'Ms. Ada', sortOrder: 0 });
+  });
+
+  it('reorders, keeping unmoved courses as the same objects', () => {
+    const before = run(createCourse('a'), createCourse('b'), createCourse('c'), createCourse('d'));
+    const after = libraryReducer(before, { type: 'library/REORDER_COURSES', ids: ['b', 'a'] });
+    expect(after.courses.map((c) => [c.id, c.sortOrder])).toEqual([
+      ['b', 0],
+      ['a', 1],
+      ['c', 2],
+      ['d', 3],
+    ]);
+    // Only the moved courses are new objects, so persistence writes only those.
+    expect(after.courses[2]).toBe(before.courses[2]);
+    expect(after.courses[3]).toBe(before.courses[3]);
+  });
+
+  it('SET_COURSES sorts by sortOrder', () => {
+    const [a, b] = run(createCourse('a'), createCourse('b')).courses;
+    const state = run({ type: 'library/SET_COURSES', courses: [{ ...a, sortOrder: 5 }, b] });
+    expect(state.courses.map((c) => c.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('librarySlice semesters', () => {
+  const fall = { id: 's_fall', name: 'Fall 2026', startsOn: '2026-09-01', endsOn: '2026-12-20' };
+  const spring = { id: 's_spring', name: 'Spring 2027', startsOn: '2027-01-10' };
+
+  function withTwoSemesters(): LibraryState {
+    return run(
+      { type: 'library/CREATE_SEMESTER', semester: fall },
+      { type: 'library/CREATE_SEMESTER', semester: spring },
+      createCourse('a', { semesterId: 's_fall' }),
+      createCourse('b', { semesterId: 's_fall' }),
+      createCourse('c', { semesterId: 's_spring' }),
+      createCourse('d')
+    );
+  }
+
+  it('creates and edits semesters', () => {
+    let state = withTwoSemesters();
+    expect(state.semesters.map((s) => s.id)).toEqual(['s_spring', 's_fall']);
+    expect(state.semesters[1]).toMatchObject({ ...fall, archived: false });
+    state = libraryReducer(state, { type: 'library/UPDATE_SEMESTER', id: 's_spring', patch: { endsOn: '2027-05-30' } });
+    expect(state.semesters[0].endsOn).toBe('2027-05-30');
+  });
+
+  it('archiving a semester archives exactly its courses', () => {
+    const before = withTwoSemesters();
+    const after = libraryReducer(before, { type: 'library/ARCHIVE_SEMESTER', id: 's_fall' });
+    expect(after.semesters.find((s) => s.id === 's_fall')?.archived).toBe(true);
+    expect(after.semesters.find((s) => s.id === 's_spring')?.archived).toBe(false);
+    expect(after.courses.map((c) => [c.id, c.archived])).toEqual([
+      ['a', true],
+      ['b', true],
+      ['c', false],
+      ['d', false],
+    ]);
+    expect(after.courses[2]).toBe(before.courses[2]);
+  });
+
+  it('a new course after archiving starts the palette again', () => {
+    const state = run(
+      { type: 'library/CREATE_SEMESTER', semester: fall },
+      createCourse('a', { semesterId: 's_fall' }),
+      { type: 'library/ARCHIVE_SEMESTER', id: 's_fall' },
+      createCourse('next')
+    );
+    expect(state.courses.find((c) => c.id === 'next')?.color).toBe(COURSE_COLORS[0]);
+  });
+
+  it('deleting a semester keeps its courses, unassigned', () => {
+    const state = libraryReducer(withTwoSemesters(), { type: 'library/DELETE_SEMESTER', id: 's_fall' });
+    expect(state.semesters.map((s) => s.id)).toEqual(['s_spring']);
+    expect(state.courses.map((c) => [c.id, c.semesterId])).toEqual([
+      ['a', undefined],
+      ['b', undefined],
+      ['c', 's_spring'],
+      ['d', undefined],
+    ]);
+  });
+});

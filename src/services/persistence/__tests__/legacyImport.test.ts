@@ -62,7 +62,7 @@ describe('legacy AsyncStorage import', () => {
 
     const { documents, courses } = await loadAll(await getDb());
 
-    expect(courses).toEqual([{ id: 'folder_1', name: 'Biology', archived: false, createdAt: 5 }]);
+    expect(courses).toEqual([{ id: 'folder_1', name: 'Biology', color: 'teal', archived: false, sortOrder: 0, createdAt: 5 }]);
     expect(documents.find((d) => d.id === 'd1')?.courseId).toBe('folder_1');
     expect(documents.find((d) => d.id === 'd2')?.courseId).toBeUndefined();
   });
@@ -123,6 +123,8 @@ describe('migrateLibraryIndex + convertLegacyIndex', () => {
     const { courses, courseIdByDoc } = convertLegacyIndex(index);
 
     expect(courses.map((c) => c.name)).toEqual(['Math', 'CS 101']);
+    // Each in list order, with its own palette colour.
+    expect(courses.map((c) => [c.sortOrder, c.color])).toEqual([[0, 'teal'], [1, 'blue']]);
     expect(courseIdByDoc.get('a')).toBe('f_math');
     expect(courseIdByDoc.get('b')).toBe(courseIdByDoc.get('c'));
     expect(courseIdByDoc.get('d')).toBe('f_math');

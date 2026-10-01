@@ -29,7 +29,7 @@ export function ManageFoldersScreen() {
     [dispatch]
   );
   const handleRename = useCallback(
-    (id: string, name: string) => dispatch({ type: 'library/RENAME_COURSE', id, name }),
+    (id: string, name: string) => dispatch({ type: 'library/UPDATE_COURSE', id, patch: { name } }),
     [dispatch]
   );
   const handleDelete = useCallback((id: string) => dispatch({ type: 'library/DELETE_COURSE', id }), [dispatch]);

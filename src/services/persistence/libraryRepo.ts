@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { Course, DocFormat, CaptureMode, LibraryDocument, LibraryPage, PageOcr } from '../../types/models';
+import type { Course, DocFormat, DocType, CaptureMode, LibraryDocument, LibraryPage, PageOcr, Semester } from '../../types/models';
+import { COURSE_COLORS, isCourseColor } from '../courses/palette';
 import { buildSearchHaystack } from '../search/searchService';
 import { fromStoredPath, toStoredPath } from './libraryFiles';
 
@@ -21,6 +22,7 @@ type DocumentRow = {
   cover_kind: string | null;
   source_kind: string | null;
   course_id: string | null;
+  doc_type: string | null;
 };
 
 type PageRow = {
@@ -43,12 +45,30 @@ type CourseRow = {
   name: string;
   code: string | null;
   color: string | null;
-  semester: string | null;
+  emoji: string | null;
+  teacher: string | null;
+  semester_id: string | null;
+  archived: number;
+  sort_order: number;
+  created_at: number;
+};
+
+type SemesterRow = {
+  id: string;
+  name: string;
+  starts_on: string;
+  ends_on: string | null;
   archived: number;
   created_at: number;
 };
 
-export type LoadedLibrary = { documents: LibraryDocument[]; courses: Course[] };
+export type LoadedLibrary = { documents: LibraryDocument[]; courses: Course[]; semesters: Semester[] };
+
+const DOC_TYPES: readonly DocType[] = ['assignment', 'notes', 'handout', 'exam', 'lab', 'other'];
+
+function toDocType(value: string | null): DocType | undefined {
+  return DOC_TYPES.includes(value as DocType) ? (value as DocType) : undefined;
+}
 
 function parseOcr(text: string | null, json: string | null): PageOcr | undefined {
   if (json) {
@@ -80,8 +100,24 @@ function rowToCourse(row: CourseRow): Course {
     id: row.id,
     name: row.name,
     code: row.code ?? undefined,
-    color: row.color ?? undefined,
-    semester: row.semester ?? undefined,
+    // Migration v3 and every write give a course a palette id; this only guards a hand-edited or
+    // future-palette value from crashing the theme lookup.
+    color: isCourseColor(row.color) ? row.color : COURSE_COLORS[row.sort_order % COURSE_COLORS.length],
+    emoji: row.emoji ?? undefined,
+    teacher: row.teacher ?? undefined,
+    semesterId: row.semester_id ?? undefined,
+    archived: !!row.archived,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+  };
+}
+
+function rowToSemester(row: SemesterRow): Semester {
+  return {
+    id: row.id,
+    name: row.name,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on ?? undefined,
     archived: !!row.archived,
     createdAt: row.created_at,
   };
@@ -91,7 +127,8 @@ function rowToCourse(row: CourseRow): Course {
 export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
   const docRows = await db.getAllAsync<DocumentRow>('SELECT * FROM documents ORDER BY created_at DESC, id');
   const pageRows = await db.getAllAsync<PageRow>('SELECT * FROM pages ORDER BY document_id, idx');
-  const courseRows = await db.getAllAsync<CourseRow>('SELECT * FROM courses ORDER BY created_at, id');
+  const courseRows = await db.getAllAsync<CourseRow>('SELECT * FROM courses ORDER BY sort_order, created_at, id');
+  const semesterRows = await db.getAllAsync<SemesterRow>('SELECT * FROM semesters ORDER BY starts_on DESC, created_at DESC, id');
 
   const pagesByDoc = new Map<string, LibraryPage[]>();
   for (const row of pageRows) {
@@ -117,12 +154,13 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       locked: !!row.locked,
       searchHaystack: buildSearchHaystack(row.name, pages),
       courseId: row.course_id ?? undefined,
+      docType: toDocType(row.doc_type),
       coverKind: (row.cover_kind ?? undefined) as LibraryDocument['coverKind'],
       sourceKind: (row.source_kind ?? undefined) as LibraryDocument['sourceKind'],
     };
   });
 
-  return { documents, courses: courseRows.map(rowToCourse) };
+  return { documents, courses: courseRows.map(rowToCourse), semesters: semesterRows.map(rowToSemester) };
 }
 
 // Writes one document and replaces its pages. Pages are deleted and re-inserted (rather than
@@ -145,10 +183,11 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
     doc.coverKind ?? null,
     doc.sourceKind ?? null,
     doc.courseId ?? null,
+    doc.docType ?? null,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
-       updated_at, star, tag, locked, cover_kind, source_kind, course_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -158,7 +197,7 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
          mode = excluded.mode, pdf_path = excluded.pdf_path, content_path = excluded.content_path,
          size_bytes = excluded.size_bytes, updated_at = excluded.updated_at, star = excluded.star,
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
-         source_kind = excluded.source_kind, course_id = excluded.course_id`,
+         source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type`,
       params
     );
     await db.runAsync('DELETE FROM pages WHERE document_id = ?', [doc.id]);
@@ -193,25 +232,39 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
 }
 
 async function writeCourse(db: SQLiteDatabase, course: Course, conflict: 'upsert' | 'ignore'): Promise<void> {
-  const insert = `INSERT INTO courses (id, name, code, color, semester, archived, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  const insert = `INSERT INTO courses (id, name, code, color, emoji, teacher, semester_id, archived, sort_order,
+       created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const onConflict =
     conflict === 'ignore'
       ? 'ON CONFLICT (id) DO NOTHING'
       : `ON CONFLICT (id) DO UPDATE SET name = excluded.name, code = excluded.code, color = excluded.color,
-           semester = excluded.semester, archived = excluded.archived`;
+           emoji = excluded.emoji, teacher = excluded.teacher, semester_id = excluded.semester_id,
+           archived = excluded.archived, sort_order = excluded.sort_order`;
   await db.runAsync(`${insert} ${onConflict}`, [
     course.id,
     course.name,
     course.code ?? null,
-    course.color ?? null,
-    course.semester ?? null,
+    course.color,
+    course.emoji ?? null,
+    course.teacher ?? null,
+    course.semesterId ?? null,
     course.archived ? 1 : 0,
+    course.sortOrder,
     course.createdAt,
   ]);
 }
 
-async function deleteRows(db: SQLiteDatabase, table: 'documents' | 'courses', ids: string[]): Promise<void> {
+async function writeSemester(db: SQLiteDatabase, semester: Semester): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO semesters (id, name, starts_on, ends_on, archived, created_at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET name = excluded.name, starts_on = excluded.starts_on,
+       ends_on = excluded.ends_on, archived = excluded.archived`,
+    [semester.id, semester.name, semester.startsOn, semester.endsOn ?? null, semester.archived ? 1 : 0, semester.createdAt]
+  );
+}
+
+async function deleteRows(db: SQLiteDatabase, table: 'documents' | 'courses' | 'semesters', ids: string[]): Promise<void> {
   for (const id of ids) await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [id]);
 }
 
@@ -245,6 +298,33 @@ export async function deleteCourses(db: SQLiteDatabase, ids: string[]): Promise<
   await db.withTransactionAsync(() => deleteRows(db, 'courses', ids));
 }
 
+// Sets every listed course's sort_order to its position in `ids`. Courses not listed keep theirs.
+export async function reorderCourses(db: SQLiteDatabase, ids: string[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < ids.length; i++) await db.runAsync('UPDATE courses SET sort_order = ? WHERE id = ?', [i, ids[i]]);
+  });
+}
+
+export async function upsertSemesters(db: SQLiteDatabase, semesters: Semester[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (const semester of semesters) await writeSemester(db, semester);
+  });
+}
+
+// Courses in a deleted semester stay, with no semester (ON DELETE SET NULL).
+export async function deleteSemesters(db: SQLiteDatabase, ids: string[]): Promise<void> {
+  await db.withTransactionAsync(() => deleteRows(db, 'semesters', ids));
+}
+
+// End of term: the semester and all its courses are archived together, or not at all. Their
+// documents are untouched (still searchable, still in the library).
+export async function archiveSemester(db: SQLiteDatabase, id: string): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('UPDATE semesters SET archived = 1 WHERE id = ?', [id]);
+    await db.runAsync('UPDATE courses SET archived = 1 WHERE semester_id = ?', [id]);
+  });
+}
+
 export type Diff<T> = { changed: T[]; removedIds: string[] };
 
 // The reducer is immutable, so a document/course whose object reference is unchanged is unchanged.
@@ -258,21 +338,21 @@ export function diffById<T extends { id: string }>(prev: readonly T[], next: rea
   };
 }
 
-// Applies the difference between two in-memory snapshots in one transaction. Courses are written
-// before documents (a new document may reference a new course) and deleted after them.
+// Applies the difference between two in-memory snapshots in one transaction (so the reducer's
+// ARCHIVE_SEMESTER lands all-or-nothing, like archiveSemester above). Parents are written before
+// children (semester -> course -> document, since each may reference a new one) and deleted after.
 export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next: LoadedLibrary): Promise<void> {
+  const semesters = diffById(prev.semesters, next.semesters);
   const courses = diffById(prev.courses, next.courses);
   const documents = diffById(prev.documents, next.documents);
-  if (
-    courses.changed.length + courses.removedIds.length + documents.changed.length + documents.removedIds.length ===
-    0
-  ) {
-    return;
-  }
+  const diffs = [semesters, courses, documents];
+  if (diffs.every((d) => d.changed.length + d.removedIds.length === 0)) return;
   await db.withTransactionAsync(async () => {
+    for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
     for (const doc of documents.changed) await writeDocument(db, doc, 'upsert');
     await deleteRows(db, 'documents', documents.removedIds);
     await deleteRows(db, 'courses', courses.removedIds);
+    await deleteRows(db, 'semesters', semesters.removedIds);
   });
 }
