@@ -110,7 +110,22 @@ Status: todo
 **Done when:** a user with 4 courses sees them on Home, opens one, and scans directly into it.
 
 ### K3 · Course setup and editing *(S)*
-Status: todo
+Status: done (commit 1e925cf). As built:
+- Home doesn't exist until K2, so both sheets live in `components/courses/CourseList.tsx`
+  (it replaces `FolderList`), which the Courses tab and Manage courses show now. K2's Home should
+  reuse `CourseList` (or open the two sheets directly). Its empty state is the "Add your courses"
+  card. "Show archived" is a switch at the bottom of that list.
+- Logic in `services/courses/courseSetup.ts`: `defaultSemester(date)` (Jan–May Spring,
+  Jun–Jul Summer, Aug–Dec Fall, with the term's start and end dates), `validateCourseDraft`,
+  `validateQuickSetup`, `quickSetupActions` (reuses an active semester with the same name).
+  Codes are compared loosely (`cse 101` = `CSE101`) among active courses of the same semester.
+- The editor's semester chips include "+ <today's term>" when that semester doesn't exist yet;
+  it is created on save.
+- Archived courses: Deliver's picker (`FolderPickerModal`) hides them. There is no "archive
+  semester" button yet (`ARCHIVE_SEMESTER` exists from K1); add it where K2 groups courses by
+  semester.
+- Tests: `courseSetup.test.ts` and `components/courses/__tests__/CourseList.test.tsx` (adds 4
+  courses from the empty state; Show archived).
 
 - `components/courses/CourseEditorSheet.tsx`: name (required), code, emoji picker (a short
   list of about 24 subject emojis, no extra package), colour swatches, teacher, semester.
@@ -198,8 +213,7 @@ K5, then K6.
 - `src/components/shared/TabBar.tsx`, `src/types/navigation.ts`, `src/bootstrap/AppNavigator.tsx`
 - `src/store/slices/{librarySlice,deliverSlice}.ts`
 
-Existing code to reuse: `FolderList`'s create, rename and delete flow (it becomes
-`CourseList`), `FolderPickerModal` (it becomes the course picker in F4), `FileRow`,
+Existing code to reuse: `CourseList` (was `FolderList`; since K3 it has the editor and quick setup), `FolderPickerModal` (it becomes the course picker in F4), `FileRow`,
 `SelectionBar`, `TextPromptModal`, `EmptyState`, `SegmentedControl`, the `Pill` chip,
 `createId`, theme tokens.
 
