@@ -28,8 +28,9 @@ export function TabBar({ active, background, activeColor, inactiveColor, accent 
 
   const open = (tab: Tab) => {
     if (tab === active) return;
-    // Scan from the tab bar files into no particular course (Deliver's picker still decides).
-    if (tab === 'capture') startScan(state, dispatch, null);
+    // The Scan tab only shows Capture; the camera opens when the student taps the shutter. It files
+    // into no particular course (the automatic suggestion decides).
+    if (tab === 'capture') startScan(state, dispatch, null, { launch: false });
     const index = (t: Tab) => TABS.findIndex((x) => x.id === t);
     go(tab, index(tab) < index(active) ? 'back' : 'fwd');
   };

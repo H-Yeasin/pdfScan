@@ -47,7 +47,7 @@ export function CourseScreen() {
   };
 
   const handleScan = () => {
-    startScan(state, dispatch, course?.id ?? null);
+    startScan(state, dispatch, course?.id ?? null, { launch: true });
     go('capture');
   };
 

@@ -82,6 +82,8 @@ describe('Home course hub', () => {
     press(root, 'Scan into this course');
     expect(ctx().router.screen).toBe('capture');
     expect(ctx().app.state.deliver.courseId).toBe('physics');
+    // A "scan now" button: Capture opens the scanner on arrival (the Scan tab doesn't).
+    expect(ctx().app.state.capture.scannerRequested).toBe(true);
   });
 
   it('offers quick setup when there are no courses yet', () => {

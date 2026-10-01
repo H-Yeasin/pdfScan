@@ -250,6 +250,7 @@ export function ReviewScreen() {
   const handleRetake = useCallback(() => {
     if (!selectedPage) return;
     dispatch({ type: 'capture/SET_RETAKE_TARGET', id: selectedPage.id });
+    dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
     go('capture', 'back');
   }, [dispatch, selectedPage, go]);
 
@@ -463,6 +464,7 @@ export function ReviewScreen() {
               style={[styles.startButton, { backgroundColor: tokens.accent }]}
               onPress={() => {
                 dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+                dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
                 go('capture');
               }}
             >
@@ -550,6 +552,7 @@ export function ReviewScreen() {
         onReorder={handleReorder}
         onAddMore={() => {
           dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+          dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
           go('capture');
         }}
         onDelete={handleDeletePage}

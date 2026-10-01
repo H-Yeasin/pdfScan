@@ -158,7 +158,7 @@ export function LibraryScreen() {
           title="Your scans will appear here."
           actionLabel="Scan now"
           onAction={() => {
-            startScan(state, dispatch, null);
+            startScan(state, dispatch, null, { launch: true });
             go('capture');
           }}
         />

@@ -91,6 +91,10 @@ Status: done (commit 2249a8a). Device check pending: scan in Notes → B&W in Re
 - Change the auto-launch on mount (`hasAutoLaunched`) so it only happens after the user has
   picked a mode once (`settings.firstRun`). Otherwise the mode picker would never be seen
   before the scanner covers the screen.
+  *Changed in §3 (after K5): there is no auto-launch on mount any more. Capture opens the scanner
+  only when a "scan now" button asks for it (`capture.scannerRequested`: Home's Scan, a course's
+  Scan, Library's "Scan now", Review's Retake / Add more / Start Capture). The Scan tab and app
+  start just show the Capture screen. The first-run rule above still applies.*
 - Tests: the registry is complete (every `CaptureMode` has a spec); the reducer's `SET_MODE`;
   the default filter is applied on ingest.
 

@@ -55,7 +55,7 @@ export function HomeScreen() {
   };
 
   const handleScan = () => {
-    startScan(state, dispatch, null);
+    startScan(state, dispatch, null, { launch: true });
     go('capture');
   };
 

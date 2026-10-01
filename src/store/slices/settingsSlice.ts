@@ -4,7 +4,7 @@ import type { CaptureMode, EnhanceMode, OcrScript } from '../../types/models';
 
 export type SettingsState = {
   // False until persisted settings have been read, so first-run-dependent behaviour (like the
-  // Capture screen's auto-launch) doesn't act on defaults.
+  // Capture screen's requested scanner launch) doesn't act on defaults.
   loaded: boolean;
   // True until the user has picked a capture mode or started a scan once.
   firstRun: boolean;

@@ -18,6 +18,10 @@ export type CaptureState = {
   // When this session's first pages arrived: the time course suggestions use (K5), so a scan made
   // at the end of class still matches its timetable slot however long Review takes.
   startedAt: number | null;
+  // One-shot "open the scanner when Capture appears", set by buttons that mean "scan now" (Home's
+  // Scan, a course's Scan, Retake, Add more...). The Scan tab and app start don't set it, so just
+  // arriving on Capture never launches the camera; CaptureScreen consumes it.
+  scannerRequested: boolean;
 };
 
 export const initialCaptureState: CaptureState = {
@@ -27,10 +31,12 @@ export const initialCaptureState: CaptureState = {
   progress: null,
   retakeTargetId: null,
   startedAt: null,
+  scannerRequested: false,
 };
 
 export type CaptureAction =
   | { type: 'capture/SET_MODE'; mode: CaptureMode }
+  | { type: 'capture/REQUEST_SCANNER'; requested: boolean }
   | { type: 'capture/REMOVE_PAGE'; id: string }
   | { type: 'capture/SET_RETAKE_TARGET'; id: string | null }
   | { type: 'capture/REORDER_PAGES'; fromIndex: number; toIndex: number }
@@ -166,6 +172,8 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       pages.splice(firstIndex, 0, joined);
       return { ...state, pages };
     }
+    case 'capture/REQUEST_SCANNER':
+      return state.scannerRequested === action.requested ? state : { ...state, scannerRequested: action.requested };
     case 'capture/CLEAR_PAGES':
       return { ...state, pages: [], startedAt: null };
     case 'capture/BULK_ADD_PAGES': {

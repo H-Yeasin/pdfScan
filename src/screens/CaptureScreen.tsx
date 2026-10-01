@@ -23,11 +23,10 @@ export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { pages, processingStatus, mode } = state.capture;
+  const { pages, processingStatus, mode, scannerRequested } = state.capture;
   const { ocrScript, loaded: settingsLoaded, firstRun, lastCaptureMode, scannerUnavailable } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
   const spec = useMemo(() => captureSpecFor(state.settings, mode), [state.settings, mode]);
-  const hasAutoLaunched = useRef(false);
   // "Saving to" chip (K5): where this scan will be filed, so it can be changed before scanning.
   const { courseId: filingCourseId } = useFilingCourse();
   const filingCourse = state.library.courses.find((c) => c.id === filingCourseId);
@@ -44,7 +43,7 @@ export function CaptureScreen() {
   }, [settingsLoaded, lastCaptureMode, mode, pages.length, dispatch]);
 
   // Picking a mode (or starting a scan) counts as having seen the picker, which is what turns
-  // the auto-launch on for later visits - see the effect below.
+  // a requested scanner launch possible on later visits - see the effect below.
   const markPickerSeen = useCallback(() => {
     if (firstRun) dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: false });
   }, [dispatch, firstRun]);
@@ -93,20 +92,22 @@ export function CaptureScreen() {
     runNativeScannerPipeline(dispatch, ocrScript, spec, { scannerUnavailable });
   }, [busyScanning, dispatch, ocrScript, spec, markPickerSeen, scannerUnavailable]);
 
-  // Opens the scanner straight away on entering this tab - but only once the user has picked a
-  // mode at least once (firstRun false). On a first visit the picker must stay visible instead
-  // of being covered by the full-screen scanner. Waits for settings so a returning user's
-  // stored firstRun/lastCaptureMode are known; uses the restored mode explicitly because the
-  // SET_MODE dispatched by the restore effect hasn't re-rendered yet in this pass.
+  // Opens the scanner on arrival only when asked to (capture.scannerRequested: a "scan now" button
+  // like Home's Scan, a course's Scan, Retake or Add more). Arriving any other way - the Scan tab,
+  // app start, Back from Review - just shows this screen, and the camera opens from the shutter.
+  // Never on a first visit either: the mode picker must stay visible instead of being covered by
+  // the full-screen scanner. Waits for settings so a returning user's stored firstRun/
+  // lastCaptureMode are known; uses the restored mode explicitly because the SET_MODE dispatched
+  // by the restore effect hasn't re-rendered yet in this pass.
   useEffect(() => {
-    if (!settingsLoaded || hasAutoLaunched.current) return;
-    hasAutoLaunched.current = true;
+    if (!settingsLoaded || !scannerRequested) return;
+    dispatch({ type: 'capture/REQUEST_SCANNER', requested: false });
     if (firstRun || busyScanning) return;
     const launchMode = pages.length === 0 ? lastCaptureMode : mode;
     runNativeScannerPipeline(dispatch, ocrScript, captureSpecFor(state.settings, launchMode), { scannerUnavailable });
-    // Once per mount (i.e. once per visit to this tab).
+    // Runs when a request is pending; the request is consumed first, so it launches once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settingsLoaded]);
+  }, [settingsLoaded, scannerRequested]);
 
   return (
     <View style={[styles.container, { backgroundColor: chrome.base }]}>

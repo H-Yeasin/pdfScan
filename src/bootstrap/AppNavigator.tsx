@@ -60,8 +60,8 @@ export function AppNavigator() {
   const prevProcessingStatus = useRef(processingStatus);
 
   // Start screen: Home once the student has at least one course, otherwise Capture as before.
-  // Nothing renders until the library and settings are in, because Capture opens the scanner as
-  // soon as it mounts - it mustn't flash up (or launch) on the way to Home. A failed library load
+  // Nothing renders until the library and settings are in, so Capture doesn't flash up on the way
+  // to Home. A failed library load
   // falls through to Capture; anything that already navigated (e.g. "Open with") wins.
   const [booting, setBooting] = useState(true);
   const libraryStatus = state.library.loadStatus;
