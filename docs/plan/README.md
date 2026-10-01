@@ -16,7 +16,8 @@ code **when the section was planned**, and are kept as history.
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | Planned (2026-10-02). T1 first; T7 (flashcards) is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | Planned (2026-10-02). L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
-| §7 Reader tools and later | — | — | Not planned yet. Next to plan: `docs/plan/07-reader-tools.md` (see `docs/PLAN.md` §7). |
+| §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | Planned (2026-10-02). R5 (SheetJS security fix) can go first; R6 waits for Pro. |
+| §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
 lines here.

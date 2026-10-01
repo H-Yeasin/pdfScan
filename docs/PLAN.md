@@ -181,9 +181,19 @@ Goal: adding a new script or UI language is a configuration change, not a refact
 **Done when:** a branch that adds a fake script touches only the registry plus one engine or model file.
 
 ### §7 Reader and PDF tools *(already strong: maintain, don't expand)*
-- [ ] Keep merge, split, compress, sign and the universal reader.
-- [ ] Real PDF password encryption via a native module, or keep it hidden. (L)
-- [ ] Office formats stay read-only and are not promoted.
+Goal: fix the gaps and risks in the existing tools; no new tool families.
+
+**Detailed steps:** [`docs/plan/07-reader-tools.md`](plan/07-reader-tools.md)
+
+- [ ] R1 Imported PDFs become first-class: thumbnails, text extraction or OCR, search (small native module)
+- [ ] R2 Page-level tools for imported PDFs (merge, split, sign, submit) without losing vector text
+- [ ] R3 Edit pages after saving (reorder, lossless rotate, delete, extract, add pages)
+- [ ] R4 Reader conveniences (resume at last page, page jump, thumbnail scrubber)
+- [ ] R5 Office formats read-only, safe and honest (fixed SheetJS, DOCX preview, drop .doc)
+- [ ] R6 *(Later, with Pro)* Real PDF passwords
+
+**Done when:** a teacher's PDF can be searched, merged with a scanned answer, signed and
+submitted, and every format the app accepts opens.
 
 ### §8 Backup and portability
 Goal: students never lose a semester of notes.
@@ -257,4 +267,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. Next to plan: §7 Reader and PDF tools (`docs/plan/07-reader-tools.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. Next to plan: §8 Backup and portability (`docs/plan/08-backup.md`).
