@@ -141,7 +141,7 @@ Status: done (commit 15d95c9). Pure maths in `enhance/gutter.ts`, Skia in `enhan
 lands on the gutter in at least 9 of the 10.
 
 ### C4 · ID card mode: front and back on one page *(M)*
-Status: todo
+Status: done (commit ee5a8aa). Needed a new `layout: 'fullPage'` page property (DB migration v2): the normal 24 pt margin would print the card at ~92 %. Session parts are `SessionPage.idCard` (not `parts`). Device check pending: print at 100 % and measure.
 
 - New `src/services/enhance/composeIdCard.ts`: `composeIdCard(front, back?) → page`.
   - Draw an A4 canvas at 200 dpi (1654×2339 px), white.
