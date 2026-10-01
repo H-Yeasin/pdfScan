@@ -3,11 +3,16 @@ import type { SkColorFilter, SkImage, SkShader } from '@shopify/react-native-ski
 import type { Ionicons } from '@expo/vector-icons';
 import { autoMatrices, COLOR_MIN_SPAN, COLOR_SATURATION_BOOST, colorMatrices, grayMatrices, LUMA_MIN_SPAN } from './filterMath';
 import type { ColorMatrix } from './filterMath';
+import { LIGHT_RADIUS, LIGHT_SIGMA, PAPER_WHITE } from './lightCorrect';
+import type { LightCorrectParams } from './lightCorrect';
 import { makeSauvolaShader, SAMPLE_RADIUS_RATIO, SAUVOLA_K, SAUVOLA_R } from './sauvola';
 import type { AdjustValues, EnhanceMode, FilterOptions, ImageStats } from '../../../types/models';
 
 export type FilterContext = {
   image: SkImage;
+  // What the filter draws from, in image space: the light-corrected page when the spec has
+  // lightCorrect: true, otherwise the raw image. Colour-filter specs get it implicitly.
+  source: SkShader;
   stats: ImageStats;
   width: number;
   height: number;
@@ -32,8 +37,9 @@ export type FilterSpec = {
   icon: keyof typeof Ionicons.glyphMap;
   // Whether the brightness/contrast/saturation sliders apply (drawFiltered composes them on top).
   adjustable: boolean;
-  // Whether the shared flat-field light correction runs before this filter. Nothing reads it yet:
-  // E3 adds the correction pass, so every spec is false for now to keep output unchanged.
+  // Whether the shared flat-field light correction (lightCorrect.ts) runs before this filter, so
+  // shadows and lamp tints are divided out before levels. Its stats are measured on the corrected
+  // page too (stats.ts), so this is only meaningful for filters built on `source` or a colour filter.
   lightCorrect: boolean;
   // False hides the filter from the Review picker. Ink (E4) and Board (E5) have registry entries
   // so every EnhanceMode has a spec, but their real pipelines don't exist yet.
@@ -44,6 +50,22 @@ export type FilterSpec = {
 
 const COLOR_MIN_SPAN_PARAM: FilterParam = { key: 'minSpan', label: 'Min span', min: 0.05, max: 0.6, default: COLOR_MIN_SPAN };
 const LUMA_MIN_SPAN_PARAM: FilterParam = { key: 'minSpan', label: 'Min span', min: 0.05, max: 0.6, default: LUMA_MIN_SPAN };
+
+// Light-correction constants, tunable per filter in the Filter Lab. Lab overrides change the drawn
+// correction only; the cached stats (and so the levels) stay measured with the defaults.
+const LIGHT_PARAMS: FilterParam[] = [
+  { key: 'lcRadius', label: 'Light: ink removal radius', min: 1, max: 8, default: LIGHT_RADIUS },
+  { key: 'lcSigma', label: 'Light: smoothing', min: 1, max: 16, default: LIGHT_SIGMA },
+  { key: 'lcPaperWhite', label: 'Light: paper white', min: 0.7, max: 1, default: PAPER_WHITE },
+];
+
+export function lightParamsFrom(params: Record<string, number>): LightCorrectParams {
+  return {
+    radius: params.lcRadius ?? LIGHT_RADIUS,
+    sigma: params.lcSigma ?? LIGHT_SIGMA,
+    paperWhite: params.lcPaperWhite ?? PAPER_WHITE,
+  };
+}
 
 // Folds an ordered matrix chain (first applied first) into one Skia colour filter, or null for an
 // empty chain. MakeCompose(outer, inner) is outer(inner(x)), so each later matrix wraps the result.
@@ -72,9 +94,9 @@ export const FILTERS: FilterSpec[] = [
     label: 'Auto',
     icon: 'sparkles-outline',
     adjustable: true,
-    lightCorrect: false,
+    lightCorrect: true,
     available: true,
-    params: [COLOR_MIN_SPAN_PARAM],
+    params: [COLOR_MIN_SPAN_PARAM, ...LIGHT_PARAMS],
     build: ({ stats, params }) => ({ colorFilter: matrixChainFilter(autoMatrices(stats, params.minSpan)) }),
   },
   {
@@ -82,11 +104,12 @@ export const FILTERS: FilterSpec[] = [
     label: 'Color',
     icon: 'color-palette-outline',
     adjustable: true,
-    lightCorrect: false,
+    lightCorrect: true,
     available: true,
     params: [
       COLOR_MIN_SPAN_PARAM,
       { key: 'saturationBoost', label: 'Saturation boost', min: 0, max: 1, default: COLOR_SATURATION_BOOST },
+      ...LIGHT_PARAMS,
     ],
     build: ({ stats, params }) => ({
       colorFilter: matrixChainFilter(colorMatrices(stats, params.minSpan, params.saturationBoost)),
@@ -97,9 +120,9 @@ export const FILTERS: FilterSpec[] = [
     label: 'Gray',
     icon: 'contrast-outline',
     adjustable: true,
-    lightCorrect: false,
+    lightCorrect: true,
     available: true,
-    params: [LUMA_MIN_SPAN_PARAM],
+    params: [LUMA_MIN_SPAN_PARAM, ...LIGHT_PARAMS],
     build: ({ stats, params }) => ({ colorFilter: matrixChainFilter(grayMatrices(stats, params.minSpan)) }),
   },
   {
@@ -108,9 +131,9 @@ export const FILTERS: FilterSpec[] = [
     label: 'Ink',
     icon: 'create-outline',
     adjustable: true,
-    lightCorrect: false,
+    lightCorrect: true,
     available: false,
-    params: [],
+    params: LIGHT_PARAMS,
     build: ({ stats }) => ({ colorFilter: matrixChainFilter(grayMatrices(stats)) }),
   },
   {
@@ -119,9 +142,9 @@ export const FILTERS: FilterSpec[] = [
     label: 'Board',
     icon: 'easel-outline',
     adjustable: true,
-    lightCorrect: false,
+    lightCorrect: true,
     available: false,
-    params: [],
+    params: LIGHT_PARAMS,
     build: ({ stats }) => ({ colorFilter: matrixChainFilter(autoMatrices(stats)) }),
   },
   {

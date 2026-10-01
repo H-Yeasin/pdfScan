@@ -21,7 +21,15 @@ export type AdjustValues = { brightness: number; contrast: number; saturation: n
 // Histogram endpoints (0..1) of a page, measured once by services/enhance/filters/stats.ts and
 // cached on SessionPage.stats so switching filters never reads pixels again.
 export type ChannelStats = { lo: number; hi: number };
-export type ImageStats = { r: ChannelStats; g: ChannelStats; b: ChannelStats; luma: ChannelStats };
+// r/g/b/luma are measured AFTER light correction (see stats.ts); `light` is what the correction
+// itself needs (whether the page is dark, the background's mean colour).
+export type ImageStats = {
+  r: ChannelStats;
+  g: ChannelStats;
+  b: ChannelStats;
+  luma: ChannelStats;
+  light?: { dark: boolean; bgMean: [number, number, number] };
+};
 
 // Per-page options for the Ink (E4) and Board (E5) filters. Ignored by every other filter.
 export type FilterOptions = {

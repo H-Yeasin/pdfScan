@@ -1,8 +1,9 @@
-import { Skia } from '@shopify/react-native-skia';
-import type { SkCanvas, SkImage, SkRect } from '@shopify/react-native-skia';
+import { FilterMode, MipmapMode, Skia, TileMode } from '@shopify/react-native-skia';
+import type { SkCanvas, SkImage, SkPaint, SkRect } from '@shopify/react-native-skia';
 import { DEFAULT_ADJUST } from '../adjust';
 import { adjustMatrices } from './filterMath';
-import { getFilter, matrixChainFilter, resolveFilterParams } from './registry';
+import { makeLightCorrectedShader } from './lightCorrect';
+import { getFilter, lightParamsFrom, matrixChainFilter, resolveFilterParams } from './registry';
 import type { FilterParamOverrides } from './registry';
 import { analyzeImage } from './stats';
 import type { SessionPage } from '../../../types/models';
@@ -28,16 +29,22 @@ export function drawFiltered(
   const width = image.width();
   const height = image.height();
   const adjust = page.adjust ?? DEFAULT_ADJUST;
+  const params = resolveFilterParams(spec, paramOverrides);
+  // Pages normally arrive with stats measured at ingest; this fallback covers pages whose uri
+  // changed (crop, rotate) and haven't been re-measured yet. It's two small read-backs, so cheap.
+  const stats = page.stats ?? analyzeImage(image);
+  const source = spec.lightCorrect
+    ? makeLightCorrectedShader(image, width, height, stats.light, lightParamsFrom(params))
+    : image.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.Linear);
   const output = spec.build({
     image,
-    // Pages normally arrive with stats measured at ingest; this fallback covers pages whose uri
-    // changed (crop, rotate) and haven't been re-measured yet. It's a 48x48 read-back, so cheap.
-    stats: page.stats ?? analyzeImage(image),
+    source,
+    stats,
     width,
     height,
     adjust,
     options: page.filterOptions ?? {},
-    params: resolveFilterParams(spec, paramOverrides),
+    params,
   });
   const adjustFilter = spec.adjustable ? matrixChainFilter(adjustMatrices(adjust)) : null;
   const paint = Skia.Paint();
@@ -45,12 +52,7 @@ export function drawFiltered(
   if ('shader' in output) {
     paint.setShader(output.shader);
     if (adjustFilter) paint.setColorFilter(adjustFilter);
-    // Shaders are built in the image's own pixel space, so map that space onto targetRect.
-    canvas.save();
-    canvas.translate(targetRect.x, targetRect.y);
-    canvas.scale(targetRect.width / width, targetRect.height / height);
-    canvas.drawRect(Skia.XYWHRect(0, 0, width, height), paint);
-    canvas.restore();
+    drawInImageSpace(canvas, paint, width, height, targetRect);
     return;
   }
 
@@ -58,5 +60,21 @@ export function drawFiltered(
   const combined =
     colorFilter && adjustFilter ? Skia.ColorFilter.MakeCompose(adjustFilter, colorFilter) : colorFilter ?? adjustFilter;
   if (combined) paint.setColorFilter(combined);
-  canvas.drawImageRect(image, Skia.XYWHRect(0, 0, width, height), targetRect, paint);
+  if (!spec.lightCorrect) {
+    canvas.drawImageRect(image, Skia.XYWHRect(0, 0, width, height), targetRect, paint);
+    return;
+  }
+  // Light-corrected: the colour filter applies to the corrected shader's output, so the levels
+  // stretch sees even paper.
+  paint.setShader(source);
+  drawInImageSpace(canvas, paint, width, height, targetRect);
+}
+
+// Shaders are built in the image's own pixel space, so map that space onto targetRect.
+function drawInImageSpace(canvas: SkCanvas, paint: SkPaint, width: number, height: number, targetRect: SkRect) {
+  canvas.save();
+  canvas.translate(targetRect.x, targetRect.y);
+  canvas.scale(targetRect.width / width, targetRect.height / height);
+  canvas.drawRect(Skia.XYWHRect(0, 0, width, height), paint);
+  canvas.restore();
 }

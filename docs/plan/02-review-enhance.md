@@ -138,7 +138,25 @@ Status: done (see git log), adapted. Built before F5, so "the master" is `Sessio
 (checked by listing the cache), and the preview matches the exported page.
 
 ### E3 · Shadow and lighting correction *(M)*
-Status: todo
+Status: done (see git log); needs the Filter Lab check on a device. As built:
+- `filters/lightCorrect.ts` does the work. `makeBackgroundImage(image, dark, radius, sigma)`
+  always works at a 160 px long side instead of 1/8 scale, so the radius and sigma are fractions
+  of the page, and the 1400 px preview gets the same background as the full-size export. The
+  morphology reads a clamp-tiled shader (`ImageFilter.MakeShader`), so the page edges don't erode
+  into a dark frame. Results are cached per decoded `SkImage` (WeakMap), so slider drags don't redo
+  the morphology. `makeLightCorrectedShader` runs `LIGHT_CORRECT_SKSL`.
+- `FilterContext.source` is the corrected shader for `lightCorrect` specs (Auto, Color, Gray, and
+  the Ink and Board placeholders), and their colour filter is applied on top of it.
+- `ImageStats` gained `light: { dark, bgMean }`. `analyzeImage` reads the page and its background
+  at 48×48, divides in JS with the same formula, and measures levels on the corrected page.
+  Dark pages (raw median luma < 0.35) erode, and they normalize to their own mean background
+  instead of to white, so a blackboard stays dark.
+- `lightCorrectMath.ts` holds the pure formula plus `estimateBackground1D`, the 1-D reference.
+  A scratch run of the planned test case (a 0.35→0.9 ramp with ink dips) gave a paper spread of
+  0.55 → 0.04 with the ink dips preserved, and a dark board that stays even and dark. Turn this
+  into a jest test in F1.
+- Filter Lab: Auto, Color, Gray, Ink and Board have "Light:" sliders for radius, smoothing and
+  paper white. The overrides affect the drawn correction; the stats keep the defaults.
 
 - `filters/lightCorrect.ts`: `makeBackgroundShader(image) → SkShader`:
   1. Draw the image into a surface at 1/8 scale.
