@@ -89,7 +89,26 @@ As built:
 **Done when:** the profile survives a restart and is used by no other code yet.
 
 ### S2 · Naming template and correctly named shared files *(S)*
-Status: todo
+Status: done (commit 5f81a98)
+
+As built:
+- `naming.ts` also has `suggestName(template, ctx)`: it uses the fallback template only when
+  the template is the default and the profile has no name or roll; a custom template is always
+  used as typed. `NAME_TOKENS` lists the tokens for the chips.
+- An empty token takes the separator **after** it if there is one, otherwise the one before.
+  Leading and trailing `_`/`-` are trimmed. `{date}` is the local date, not UTC.
+- File names are cleaned by a new `utils/sanitize.sanitizeFileName` (keeps the case, `/` and
+  `\` become `-`, at most 80). `sanitizeFolderSegment` lowercases and caps at 60, so it didn't fit.
+- `shareAs(uri, fileName, mimeType)` takes the file name **with** its extension;
+  `shareFileName(name, ext, suffix)` builds it (`document` if nothing is left). It empties
+  `cache/share/` before each share. `shareDocument` uses it for every format (DOCX etc. too),
+  and so does the Reader's "Export PDF" for library documents. External files are shared as
+  before, since they already have their own name.
+- Deliver: `deliver/SET_AUTO_NAME` (ignored once `nameEdited`) next to `deliver/SET_NAME` (sets
+  it). An empty result falls back to `Scan_<date>`.
+- Settings: `NameTemplateSection` below the profile ("File names"). Chips insert at the cursor
+  (`NameField` gained `onSelectionChange`); the example uses the first active course or a sample
+  one, an Assignment numbered 3. A stored template that is blank loads as the default.
 
 - `src/services/submit/naming.ts`:
   - `renderTemplate(template, ctx) → string`, a pure function. Tokens: `{name}` (full name with

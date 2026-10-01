@@ -13,7 +13,7 @@ code **when the section was planned**, and are kept as history.
 | §1 Capture | [01-capture.md](01-capture.md) | C1–C7 | All done in code. Device checks open. C5 used the no-native-dependency detector; the OpenCV spike is still pending. |
 | §2 Review and enhance | [02-review-enhance.md](02-review-enhance.md) | E1–E7 | E1–E6 done. **E7 in progress:** the tooling is done; the benchmark needs real pages and raters. |
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | K1–K5 done. **Next: K6** (organising existing documents). |
-| §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | S1 done. **Next: S2** (naming template, correctly named shared files). §3 K6 is still open too. |
+| §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | S1–S2 done. **Next: S3** (exact size target). §3 K6 is still open too. |
 | §5 Study and later | — | — | Not planned yet. Next to plan: `docs/plan/05-study.md` (see `docs/PLAN.md` §5). |
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
@@ -50,6 +50,7 @@ lines here.
 | K4 Document types | 080c5b7 | |
 | K5 Course suggestions, class times | 10286d8 | migration v4 |
 | S1 Student profile | c4f8f75 | `settings.profile`, `submit/profile.ts`, `pdf/winAnsi.ts` |
+| S2 Naming template, named shares | 5f81a98 | `submit/naming.ts`, `shareService.shareAs`, `sanitizeFileName` |
 
 ## How the branches came together
 
