@@ -12,6 +12,9 @@ export type PersistedSettings = {
   androidExportFolderLabel?: string | null;
   // Optional: settings saved before E6 don't have it.
   defaultEnhanceByMode?: Partial<Record<CaptureMode, EnhanceMode>>;
+  crashReportsEnabled?: boolean;
+  lastCaptureMode?: CaptureMode;
+  scannerUnavailable?: boolean;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

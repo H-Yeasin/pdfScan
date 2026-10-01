@@ -32,9 +32,14 @@ type CropOverlayProps = {
   // feature. Omitted by the single-crop call site, so its layout is unaffected.
   stepLabel?: string;
   // Natural-pixel-space corners, topLeft/topRight/bottomRight/bottomLeft order — the caller runs
-  // the actual perspective warp (mirrors how rotatePage/cropPage are invoked from ReviewScreen).
+  // the actual perspective warp (ReviewScreen runs warpPerspectiveCrop on confirm).
   onConfirm: (points: [Point, Point, Point, Point]) => void;
   onCancel: () => void;
+  // Natural-pixel corners to start from (e.g. a detected page outline) instead of the full image.
+  // Read once on mount - give the overlay a `key` per page when stepping through several.
+  initialQuad?: [Point, Point, Point, Point];
+  // Defaults to "Cancel"; the crop-check flow uses "Keep as is".
+  cancelLabel?: string;
 };
 
 type Corner = { x: SharedValue<number>; y: SharedValue<number>; startX: SharedValue<number>; startY: SharedValue<number> };
@@ -51,7 +56,16 @@ function useCornerPoint(initX: number, initY: number): Corner {
 // Four independently draggable corners (not constrained to a rectangle) so the user can trace
 // a document's actual edges even when the photo was taken at an angle; onConfirm hands the raw
 // quad back to the caller, which runs a perspective warp to straighten it into a rectangle.
-export function CropOverlay({ uri, naturalWidth, naturalHeight, stepLabel, onConfirm, onCancel }: CropOverlayProps) {
+export function CropOverlay({
+  uri,
+  naturalWidth,
+  naturalHeight,
+  stepLabel,
+  onConfirm,
+  onCancel,
+  initialQuad,
+  cancelLabel = 'Cancel',
+}: CropOverlayProps) {
   const { tokens } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
@@ -68,10 +82,16 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, stepLabel, onCon
     return { displayWidth: w, displayHeight: h };
   }, [screenWidth, screenHeight, naturalWidth, naturalHeight]);
 
-  const topLeft = useCornerPoint(0, 0);
-  const topRight = useCornerPoint(displayWidth, 0);
-  const bottomRight = useCornerPoint(displayWidth, displayHeight);
-  const bottomLeft = useCornerPoint(0, displayHeight);
+  // Natural -> display coordinates for initialQuad, clamped to the image.
+  const toDisplay = (p: Point | undefined, fallbackX: number, fallbackY: number): [number, number] => {
+    if (!p) return [fallbackX, fallbackY];
+    const scale = displayWidth / naturalWidth;
+    return [clamp(p.x * scale, 0, displayWidth), clamp(p.y * scale, 0, displayHeight)];
+  };
+  const topLeft = useCornerPoint(...toDisplay(initialQuad?.[0], 0, 0));
+  const topRight = useCornerPoint(...toDisplay(initialQuad?.[1], displayWidth, 0));
+  const bottomRight = useCornerPoint(...toDisplay(initialQuad?.[2], displayWidth, displayHeight));
+  const bottomLeft = useCornerPoint(...toDisplay(initialQuad?.[3], 0, displayHeight));
 
   // The dragged corner's position, mirrored for the loupe (only one corner moves at a time).
   const loupeVisible = useSharedValue(0);
@@ -209,7 +229,7 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, stepLabel, onCon
 
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
-            <Text style={styles.ghostLabel}>Cancel</Text>
+            <Text style={styles.ghostLabel}>{cancelLabel}</Text>
           </Pressable>
           <Pressable style={styles.ghostButton} onPress={handleReset}>
             <Text style={styles.ghostLabel}>Reset</Text>

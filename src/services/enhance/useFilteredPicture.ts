@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Skia } from '@shopify/react-native-skia';
 import type { SkCanvas, SkImage, SkPicture } from '@shopify/react-native-skia';
-import { drawFiltered } from './filters/drawFiltered';
+import { drawFiltered, drawRotated, rotatedSize } from './filters/drawFiltered';
 import type { FilterPage } from './filters/drawFiltered';
 import { loadPreviewImage, prefetchPreviewImage } from './previewImageCache';
-import type { AdjustValues } from '../../types/models';
+import type { AdjustValues, SessionPage } from '../../types/models';
 
 // Draws extra content (e.g. the academic border/header/footer) on top of the filtered page, in the
-// preview image's own pixel space. Must be memoized by the caller: a new function re-records.
+// preview's own (already rotated) pixel space. Must be memoized by the caller: a new function re-records.
 export type PictureOverlay = (canvas: SkCanvas, width: number, height: number) => void;
 
 type FilteredPictureOptions = {
@@ -38,7 +38,7 @@ function recordPicture(width: number, height: number, draw: (canvas: SkCanvas) =
 // draw commands; the GPU does the pixel work when the <Canvas> renders it). The preview differs
 // from the export only in resolution.
 export function useFilteredPicture(
-  page: (FilterPage & { uri: string }) | undefined,
+  page: (FilterPage & { uri: string; rotation?: SessionPage['rotation'] }) | undefined,
   previewMaxDim: number,
   { adjust, prefetchUris, overlay }: FilteredPictureOptions = {}
 ) {
@@ -76,26 +76,31 @@ export function useFilteredPicture(
   const effectiveAdjust = adjust ?? page?.adjust;
   const stats = page?.stats;
   const filterOptions = page?.filterOptions;
+  const rotation = page?.rotation ?? 0;
 
   // Recorded once per decoded image; slider drags re-record only the filtered picture below.
   const originalPicture = useMemo(() => {
     if (!image) return null;
-    const rect = Skia.XYWHRect(0, 0, image.width(), image.height());
-    return recordPicture(rect.width, rect.height, (canvas) => canvas.drawImageRect(image, rect, rect, Skia.Paint()));
-  }, [image]);
+    const out = { ...rotatedSize(image.width(), image.height(), rotation), scale: 1 };
+    return recordPicture(out.width, out.height, (canvas) =>
+      drawRotated(canvas, image.width(), image.height(), rotation, out, (rect) =>
+        canvas.drawImageRect(image, rect, rect, Skia.Paint())
+      )
+    );
+  }, [image, rotation]);
 
   const result = useMemo<FilteredPicture | null>(() => {
     if (!image || !enhance || !originalPicture) return null;
-    const width = image.width();
-    const height = image.height();
-    const rect = Skia.XYWHRect(0, 0, width, height);
+    const out = { ...rotatedSize(image.width(), image.height(), rotation), scale: 1 };
     const filterPage: FilterPage = { enhance, adjust: effectiveAdjust, stats, filterOptions };
-    const picture = recordPicture(width, height, (canvas) => {
-      drawFiltered(canvas, image, filterPage, rect);
-      overlay?.(canvas, width, height);
+    const picture = recordPicture(out.width, out.height, (canvas) => {
+      drawRotated(canvas, image.width(), image.height(), rotation, out, (rect) =>
+        drawFiltered(canvas, image, filterPage, rect)
+      );
+      overlay?.(canvas, out.width, out.height);
     });
-    return { picture, originalPicture, width, height };
-  }, [image, originalPicture, enhance, effectiveAdjust, stats, filterOptions, overlay]);
+    return { picture, originalPicture, width: out.width, height: out.height };
+  }, [image, originalPicture, rotation, enhance, effectiveAdjust, stats, filterOptions, overlay]);
 
   return {
     preview: result,

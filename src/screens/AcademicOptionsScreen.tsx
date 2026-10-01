@@ -7,7 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
-import { bakeEnhance } from '../services/enhance/skiaEnhance';
+import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { renderPage } from '../services/enhance/skiaEnhance';
+import { exportPreset } from '../services/capture/imageSpec';
 import { buildPdfFromPages } from '../services/pdf/pdfService';
 import type { AcademicConfig, CoverPageConfig } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -134,34 +136,37 @@ export function AcademicOptionsScreen() {
     }
     const previewId = createId('preview');
     try {
-      const bakedPages = await Promise.all(
-        pages.map(async (page) => {
-          const baked = await bakeEnhance(page.uri, page);
-          return { ...page, ...baked };
-        })
-      );
+      // Same single-pass render Deliver uses, one page at a time, straight to the export preset.
+      const preset = exportPreset(state.deliver.quality);
+      const bakedPages: { uri: string; width: number; height: number }[] = [];
+      for (const page of pages) {
+        const edits = {
+          rotation: page.rotation,
+          enhance: page.enhance,
+          adjust: page.adjust ?? DEFAULT_ADJUST,
+          stats: page.stats,
+          filterOptions: page.filterOptions,
+        };
+        bakedPages.push(await renderPage(page.uri, edits, preset));
+      }
 
       const result = await buildPdfFromPages(
         previewId,
         bakedPages,
-        state.deliver.quality,
-        cfg ?? undefined,
-        state.settings.ocrScript
+        'as-is',
+        cfg ?? undefined
       );
       await Print.printAsync({ uri: result.uri });
       lastPreviewIdRef.current = previewId;
 
-      const staleCacheUris = bakedPages
-        .filter((page, i) => page.uri !== pages[i].uri)
-        .map((page) => page.uri);
-      cleanTemporaryCache(staleCacheUris);
+      cleanTemporaryCache(bakedPages.map((page) => page.uri));
     } catch (error) {
       console.warn('AcademicOptionsScreen: preview failed', error);
       deleteDocumentFiles(previewId);
     } finally {
       setPreviewing(false);
     }
-  }, [pages, previewing, state.deliver.quality, state.settings.ocrScript, cfg]);
+  }, [pages, previewing, state.deliver.quality, cfg]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>

@@ -2,7 +2,9 @@
 // has exactly one FilterSpec in services/enhance/filters/registry.ts. 'bw' is the Sauvola
 // photocopy threshold (it was called 'document_scan' before E1; the old contrast-boost 'bw' is gone).
 export type EnhanceMode = 'original' | 'auto' | 'color' | 'gray' | 'ink' | 'board' | 'bw';
-export type CaptureMode = 'doc' | 'id' | 'book';
+// See services/capture/captureModes.ts for what each mode does. Documents saved before Notes and
+// Board existed only ever have 'doc' / 'id' / 'book', which are still valid.
+export type CaptureMode = 'notes' | 'doc' | 'board' | 'book' | 'id';
 export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' | 'TXT';
 
 // Mirrors rn-mlkit-ocr's OcrResult shape (block -> line), kept close to the native
@@ -45,9 +47,13 @@ export type FilterOptions = {
 
 export type SessionPage = {
   id: string;
+  // The page's master image. Rotation is NOT baked into it - see `rotation`.
   uri: string;
+  // Small preview of `uri` for strips and grids; undefined falls back to `uri`.
+  thumbUri?: string;
   width: number;
   height: number;
+  // Clockwise rotation applied at render time (preview and export), so rotating never re-encodes.
   rotation: 0 | 90 | 180 | 270;
   cropRect?: { originX: number; originY: number; width: number; height: number };
   enhance: EnhanceMode;
@@ -58,14 +64,48 @@ export type SessionPage = {
   stats?: ImageStats;
   err?: boolean;
   ocr?: PageOcr;
+  // Set on both halves of a Book-mode spread split (C3): the original spread's master, so Review
+  // can "Undo split" without re-encoding anything. Halves of one spread share `groupId`.
+  splitFrom?: { groupId: string; uri: string; thumbUri?: string; width: number; height: number };
+  // ID card mode (C4): the scanned card images this page was composed from, kept so Review can
+  // swap front/back or retake the back and recompose from the originals.
+  idCard?: { front: SourceImage; back?: SourceImage };
+  // See PageLayout.
+  layout?: PageLayout;
+  // Gallery import (C5) couldn't crop this page confidently; Review's "Check crops" goes through
+  // these. cropSuggestion is a doubtful detected outline to start the crop from, in this page's
+  // natural pixels (topLeft, topRight, bottomRight, bottomLeft).
+  needsCropReview?: boolean;
+  cropSuggestion?: [CropPoint, CropPoint, CropPoint, CropPoint];
 };
+
+export type CropPoint = { x: number; y: number };
+
+export type SourceImage = { uri: string; width: number; height: number };
+
+// How a page image goes onto its PDF page. undefined = fit inside the standard margin (every
+// normal page). 'fullPage' = edge to edge on A4 at 100 % - for images that are already a
+// true-size A4 canvas (ID card mode), so they print at real size.
+export type PageLayout = 'fullPage';
 
 export type LibraryPage = {
   id: string;
+  // The clean master image: rotation/enhance already applied, never academic-stamped, never
+  // recompressed by Compress. Every rebuild (merge, split, compress, sign) starts from this.
   fileUri: string;
+  // Optional stamped copy (academic border/header/footer) shown in the in-app viewer instead of
+  // the master. Undefined means "show the master".
+  displayUri?: string;
+  // Small preview for lists/strips, so they don't decode full-resolution masters.
+  thumbUri?: string;
   width: number;
   height: number;
   ocr?: PageOcr;
+  // See PageLayout; must survive rebuilds (merge, split, compress) or an ID card would shrink.
+  layout?: PageLayout;
+  // True when OCR ran at save time and failed (as opposed to finding no text), so the reader can
+  // offer "Retry OCR" later.
+  ocrFailed?: boolean;
 };
 
 export type LibraryDocument = {
@@ -87,16 +127,14 @@ export type LibraryDocument = {
   // UI-only signal: no real PDF encryption is implemented. Every surface that shows
   // this badge must also show the "not actually protected" disclosure.
   locked: boolean;
+  // Derived from name + OCR text when the library loads (and when a document is created); never
+  // persisted.
   searchHaystack: string;
-  // Undefined means "unfiled" — every document saved before folders shipped has no
-  // key here at all, so undefined and null must be treated identically everywhere.
-  folderId?: string;
-  // Additive "Courses" physical routing - separate from folderId's logical library-folder system,
-  // and unrelated to AcademicConfig.coverPage.courseCode (which only prints on the PDF cover page).
-  // Raw display name (e.g. "CS 101"); undefined/"" both mean "no course, flat layout." See
-  // sanitizeFolderSegment (utils/sanitize.ts) for how this becomes a physical directory segment,
-  // and libraryFiles.ts's getDocumentDir for where that segment is actually used.
-  courseFolder?: string;
+  // The Course this document is filed under. Undefined means "Unsorted". Purely logical: a
+  // document's files always live in library/<id>/ regardless of course, so moving a document
+  // between courses never touches the filesystem. Unrelated to AcademicConfig.coverPage.courseCode
+  // (which only prints on the PDF cover page).
+  courseId?: string;
   // Mirrors the AcademicConfig.coverPage.mode this document's page 0 was built with, if any.
   // undefined means "no cover page" OR "saved before this field existed" - both are treated
   // identically (fitToMarginBox=true) by applySignatureToDocument, since a missing cover is far
@@ -129,21 +167,14 @@ export type ExternalFileDocument = {
   pageCount?: number;
 };
 
-export type LibraryFolder = {
+// One organizing unit for the library (replaces both the old logical folders and the free-text
+// "courseFolder" routing). code/color/semester are optional until the full Course UI lands (§3).
+export type Course = {
   id: string;
   name: string;
+  code?: string;
+  color?: string;
+  semester?: string;
+  archived: boolean;
   createdAt: number;
 };
-
-export type LibraryIndexV1 = {
-  version: 1;
-  documents: LibraryDocument[];
-};
-
-export type LibraryIndexV2 = {
-  version: 2;
-  documents: LibraryDocument[];
-  folders: LibraryFolder[];
-};
-
-export type LibraryIndex = LibraryIndexV1 | LibraryIndexV2;

@@ -13,16 +13,19 @@ import { useRouter } from '../navigation/router';
 import { summarizeAcademicConfig } from './AcademicOptionsScreen';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
-import { bakeEnhance } from '../services/enhance/skiaEnhance';
+import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { renderPage } from '../services/enhance/skiaEnhance';
+import { MASTER_PRESET } from '../services/capture/imageSpec';
+import { runOcr } from '../services/ocr/ocrService';
+import { buildSearchHaystack } from '../services/search/searchService';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
-import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
+import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { insertScannedDocument } from '../services/persistence/dbService';
 import { shareDocument } from '../services/sharing/shareService';
 import { historyUris } from '../store/pageHistory';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
-import type { LibraryDocument, LibraryPage, PageOcr } from '../types/models';
+import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { formatBytes } from '../utils/format';
 import { createId } from '../utils/id';
 
@@ -38,30 +41,41 @@ function firstOcrLine(text?: string): string | undefined {
   return line;
 }
 
-// The normalized shape fed into saveImagesToLibrary + the final LibraryPage[] build - lighter
-// than SessionPage since a rasterized cover page has no rotation/cropRect/enhance of its own.
-type LibraryInputPage = { id: string; uri: string; width: number; height: number; ocr?: PageOcr };
+// One page on its way into the library: its rendered master (+ optional stamped display copy).
+// Lighter than SessionPage since a rasterized cover page has no rotation/enhance of its own.
+type LibraryInputPage = {
+  id: string;
+  masterUri: string;
+  displayUri?: string;
+  keepSource?: boolean;
+  width: number;
+  height: number;
+  ocr?: PageOcr;
+  ocrFailed?: boolean;
+  layout?: PageLayout;
+};
 
 export function DeliverScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, pw, folderId, courseFolder, exportCopy, academicConfig, layoutMode } = state.deliver;
-  const { folders } = state.library;
+  const { name, format, quality, more, courseId, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { courses } = state.library;
   const { androidExportFolderUri, androidExportFolderLabel, ocrScript } = state.settings;
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
 
-  const folderName = useMemo(
-    () => folders.find((f) => f.id === folderId)?.name ?? 'My Scans',
-    [folders, folderId]
+  const courseName = useMemo(
+    () => courses.find((c) => c.id === courseId)?.name ?? 'Unsorted',
+    [courses, courseId]
   );
 
-  const handleCreateFolder = useCallback(
-    (folderName: string) => {
-      const id = createId('folder');
-      dispatch({ type: 'library/CREATE_FOLDER', id, name: folderName });
+  const handleCreateCourse = useCallback(
+    (name: string) => {
+      const id = createId('course');
+      dispatch({ type: 'library/CREATE_COURSE', id, name });
       return id;
     },
     [dispatch]
@@ -81,93 +95,122 @@ export function DeliverScreen() {
       setSaving(true);
       try {
         const documentId = createId('doc');
-        const trimmedCourseFolder = courseFolder.trim() || undefined;
+        const encoding = encodingForQuality(quality);
+        const total = pages.length;
+        const transientUris = new Set<string>();
 
-        // Every page gets a real pixel bake (Skia) into a fresh file before export, so the
-        // effect survives into the saved PDF/JPG rather than staying a UI-only selection.
-        const bakedPages = await Promise.all(
-          pages.map(async (page) => {
-            const baked = await bakeEnhance(page.uri, page);
-            return { ...page, ...baked };
-          })
-        );
+        // One page at a time (never Promise.all): each page is rendered from its session master in
+        // a single Skia pass (rotation + filter + resize + one JPEG encode) - once at master spec
+        // for the library, and once more at the export preset only if that differs. OCR then runs
+        // on the final master pixels, so the PDF's text layer always lines up with what was saved,
+        // whatever was rotated or cropped in Review.
+        const contentPages: (LibraryInputPage & { exportUri: string })[] = [];
+        for (let i = 0; i < total; i++) {
+          const page = pages[i];
+          setProgress(`Preparing page ${i + 1} of ${total}…`);
+          const edits = {
+            rotation: page.rotation,
+            enhance: page.enhance,
+            adjust: page.adjust ?? DEFAULT_ADJUST,
+            stats: page.stats,
+            filterOptions: page.filterOptions,
+          };
+          const master = await renderPage(page.uri, edits, MASTER_PRESET);
+          const exported = encoding === 'as-is' ? master : await renderPage(page.uri, edits, encoding);
+          if (exported !== master) transientUris.add(exported.uri);
+          const ocr = await runOcr(master.uri, ocrScript);
+          contentPages.push({
+            id: page.id,
+            masterUri: master.uri,
+            exportUri: exported.uri,
+            width: master.width,
+            height: master.height,
+            ocr,
+            ocrFailed: ocr === undefined,
+            layout: page.layout,
+          });
+        }
 
-        // ReaderScreen (the in-app page-by-page viewer, both right after saving and whenever this
-        // document is reopened from the Library later) renders each LibraryPage's own raw image -
-        // it never renders the compiled PDF. So an academic cover/border/header-footer needs to
-        // also exist as real pixels in a SEPARATE set of images used only for the library, baked
-        // via academicRasterService (Skia). bakedPages itself is left untouched and still goes
-        // into buildPdfFromPages below unchanged, so the actual PDF keeps its crisp vector version.
-        let contentPagesForLibrary: LibraryInputPage[] = bakedPages.map((page) => ({
-          id: page.id,
-          uri: page.uri,
-          width: page.width,
-          height: page.height,
-          ocr: page.ocr,
-        }));
-        let coverPageForLibrary: LibraryInputPage | null = null;
-
+        // ReaderScreen shows each LibraryPage's own image, not the compiled PDF, so an academic
+        // border/header-footer also needs to exist as pixels - on a separate display copy, so the
+        // master stays clean for later rebuilds. The PDF itself gets the crisp vector version.
+        let coverPage: LibraryInputPage | null = null;
         if (format === 'PDF' && academicConfig) {
           if (academicConfig.enableBorder || academicConfig.headerText || academicConfig.footerText) {
-            const total = bakedPages.length;
-            contentPagesForLibrary = await Promise.all(
-              bakedPages.map(async (page, i) => {
-                const stamped = await stampContentPageImage(page.uri, academicConfig, i + 1, total);
-                return { id: page.id, uri: stamped.uri, width: stamped.width, height: stamped.height, ocr: page.ocr };
-              })
-            );
+            for (let i = 0; i < contentPages.length; i++) {
+              setProgress(`Stamping page ${i + 1} of ${total}…`);
+              const stamped = await stampContentPageImage(contentPages[i].masterUri, academicConfig, i + 1, total);
+              contentPages[i].displayUri = stamped.uri;
+            }
           }
           if (academicConfig.coverPage) {
             const rendered = await renderCoverPageImage(academicConfig.coverPage);
-            if (rendered) coverPageForLibrary = { id: createId('page'), uri: rendered.uri, width: rendered.width, height: rendered.height };
+            if (rendered) {
+              coverPage = {
+                id: createId('page'),
+                masterUri: rendered.uri,
+                width: rendered.width,
+                height: rendered.height,
+                // An imported cover is the user's own picked file - copy it, don't move it.
+                keepSource: rendered.uri === academicConfig.coverPage.importedUri,
+              };
+            }
           }
         }
 
-        const libraryInputPages: LibraryInputPage[] = coverPageForLibrary
-          ? [coverPageForLibrary, ...contentPagesForLibrary]
-          : contentPagesForLibrary;
-
-        const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality, trimmedCourseFolder);
-
-        // Always build a document.pdf now, regardless of the chosen export `format` - the unified
-        // reader (ReaderScreen) renders every library doc through the real PDF engine, so a
-        // JPG-format doc needs a real PDF behind it too, not just its export copy. `sizeBytes`
-        // still reflects the format the user actually picked (unchanged JPG display size).
+        // Always build a document.pdf, regardless of the chosen export `format` - the unified
+        // reader renders every library doc through the real PDF engine, so a JPG-format doc needs
+        // a real PDF behind it too. Pages are already encoded for export, so they go in as-is.
+        setProgress('Building PDF…');
         const pdfResult = await buildPdfFromPages(
           documentId,
-          bakedPages,
-          quality,
+          contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
+          'as-is',
           academicConfig ?? undefined,
-          ocrScript,
-          trimmedCourseFolder,
           layoutMode
         );
         const pdfUri: string = pdfResult.uri;
+
+        const libraryInputPages: LibraryInputPage[] = coverPage ? [coverPage, ...contentPages] : contentPages;
+        const savedImages = await saveImagesToLibrary(
+          documentId,
+          libraryInputPages.map((p) => ({ masterUri: p.masterUri, displayUri: p.displayUri, keepSource: p.keepSource }))
+        );
         const sizeBytes = format === 'PDF' ? pdfResult.sizeBytes : savedImages.sizeBytes;
 
-        // `saveImagesToLibrary` (and, for gray/bw pages, `bakeEnhance` / academicRasterService
-        // before it) each wrote a fresh compressed copy rather than reusing the session's cache
-        // files, so the originals are now orphaned in the cache dir once the library copies above
-        // exist. Sweep them here rather than leaving them for the OS to eventually reap.
-        const staleCacheUris = new Set<string>();
-        pages.forEach((page) => staleCacheUris.add(page.uri));
-        bakedPages.forEach((page) => staleCacheUris.add(page.uri));
-        libraryInputPages.forEach((page) => staleCacheUris.add(page.uri));
-        // Images only Review's undo history still points at (pre-crop/rotate/sign versions, merged
+        // The session's own masters/thumbnails and any export-only renders are now superseded by
+        // the library copies.
+        pages.forEach((page) => {
+          transientUris.add(page.uri);
+          if (page.thumbUri) transientUris.add(page.thumbUri);
+          // A Book-mode half keeps its original spread around for "Undo split".
+          // An ID card page keeps its scanned card images for swap/retake.
+          if (page.idCard) {
+            transientUris.add(page.idCard.front.uri);
+            if (page.idCard.back) transientUris.add(page.idCard.back.uri);
+          }
+          if (page.splitFrom) {
+            transientUris.add(page.splitFrom.uri);
+            if (page.splitFrom.thumbUri) transientUris.add(page.splitFrom.thumbUri);
+          }
+        });
+        // Images only Review's undo history still points at (pre-crop/sign versions, merged
         // halves) were kept alive for undo; the session ends here, so they go too.
-        historyUris(state.review.history).forEach((uri) => staleCacheUris.add(uri));
-        cleanTemporaryCache(Array.from(staleCacheUris));
+        historyUris(state.review.history).forEach((uri) => transientUris.add(uri));
+        cleanTemporaryCache(Array.from(transientUris));
 
         const libraryPages: LibraryPage[] = libraryInputPages.map((page, i) => ({
           id: page.id,
-          fileUri: savedImages.uris[i],
+          ...savedImages.pages[i],
           width: page.width,
           height: page.height,
           ocr: page.ocr,
+          ocrFailed: page.ocrFailed || undefined,
+          layout: page.layout,
         }));
 
         const finalName = name.trim() || defaultName();
-        const haystack = [finalName, ...libraryPages.map((p) => p.ocr?.text ?? '')].join(' ').toLowerCase();
+        const haystack = buildSearchHaystack(finalName, libraryPages);
 
         const doc: LibraryDocument = {
           id: documentId,
@@ -180,16 +223,14 @@ export function DeliverScreen() {
           createdAt: Date.now(),
           star: false,
           tag: finalName.slice(0, 4).toUpperCase(),
-          locked: pw,
+          locked: false,
           searchHaystack: haystack,
-          folderId: folderId ?? undefined,
-          courseFolder: trimmedCourseFolder,
+          courseId: courseId ?? undefined,
           // Only set when a cover page actually made it into libraryPages[0] - mirrors
-          // coverPageForLibrary's own condition, not just whether academicConfig exists.
-          coverKind: coverPageForLibrary ? academicConfig?.coverPage?.mode : undefined,
+          // coverPage's own condition, not just whether academicConfig exists.
+          coverKind: coverPage ? academicConfig?.coverPage?.mode : undefined,
         };
 
-        insertScannedDocument(doc).catch((e) => console.warn('dbService.insertScannedDocument failed', e));
         dispatch({ type: 'library/ADD_FILE', file: doc });
         dispatch({ type: 'capture/CLEAR_PAGES' });
         dispatch({ type: 'review/RESET' });
@@ -198,13 +239,13 @@ export function DeliverScreen() {
 
         // The device-folder copy runs after the in-app save has already succeeded and never
         // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.
-        let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${folderName}`;
+        let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${courseName}`;
         if (!shareAfter && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
           const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
           snackMsg =
             result.failed === 0
-              ? `Saved · ${folderName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
-              : `Saved · ${folderName} · copy to device folder failed`;
+              ? `Saved · ${courseName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
+              : `Saved · ${courseName} · copy to device folder failed`;
         }
 
         dispatch({
@@ -213,13 +254,17 @@ export function DeliverScreen() {
           action: 'Undo',
           onAction: () => {
             dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
-            deleteDocumentFiles(documentId, doc.courseFolder);
+            deleteDocumentFiles(documentId);
           },
         });
 
         if (shareAfter) await shareDocument(doc);
+      } catch (error) {
+        console.warn('DeliverScreen: save failed', error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't save. Your pages are still here." });
       } finally {
         setSaving(false);
+        setProgress(null);
       }
     },
     [
@@ -228,10 +273,8 @@ export function DeliverScreen() {
       quality,
       format,
       name,
-      pw,
-      folderId,
-      folderName,
-      courseFolder,
+      courseId,
+      courseName,
       ocrScript,
       exportCopy,
       academicConfig,
@@ -290,8 +333,6 @@ export function DeliverScreen() {
         <MoreOptionsPanel
           open={more}
           onToggleOpen={() => dispatch({ type: 'deliver/TOGGLE_MORE' })}
-          passwordEnabled={pw}
-          onTogglePassword={() => dispatch({ type: 'deliver/TOGGLE_PW' })}
           exportCopy={
             Platform.OS === 'android'
               ? {
@@ -308,17 +349,9 @@ export function DeliverScreen() {
           style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
           onPress={() => setFolderPickerOpen(true)}
         >
-          <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
-          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{folderName}</Text>
+          <Text style={{ color: tokens.ink, fontSize: 15 }}>Course</Text>
+          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
         </Pressable>
-
-        <NameField
-          label="Courses folder (optional)"
-          value={courseFolder}
-          onChange={(value) => dispatch({ type: 'deliver/SET_COURSE_FOLDER', courseFolder: value })}
-          placeholder="e.g. CS 101"
-          helperText="Routes this file into Library ▸ Courses ▸ <name> on disk — separate from the 'Course code' printed on the Academic export cover page."
-        />
 
         <Pressable
           style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
@@ -333,16 +366,17 @@ export function DeliverScreen() {
 
       <StickyActions
         saving={saving}
+        progress={progress}
         onSave={() => handleSaveInternal(false)}
         onSaveShare={() => handleSaveInternal(true)}
       />
 
       <FolderPickerModal
         visible={folderPickerOpen}
-        folders={folders}
-        selectedFolderId={folderId}
-        onSelect={(id) => dispatch({ type: 'deliver/SET_FOLDER', folderId: id })}
-        onCreate={handleCreateFolder}
+        courses={courses}
+        selectedCourseId={courseId}
+        onSelect={(id) => dispatch({ type: 'deliver/SET_COURSE', courseId: id })}
+        onCreate={handleCreateCourse}
         onClose={() => setFolderPickerOpen(false)}
       />
     </SafeAreaView>

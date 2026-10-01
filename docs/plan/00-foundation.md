@@ -47,7 +47,7 @@ Decisions already made: app ID **`com.yeasin.pdfscan`**; crash reporting **Sentr
 ## Steps (in order; each one is a separate commit)
 
 ### F1 · Test harness and CI *(first, so every later step ships with tests)*
-Status: todo
+Status: done (commit bb99d51). Device checks: see Verification.
 
 - Add dev dependencies: `jest-expo@~57.0.5` (matches SDK 57), `jest`, `@types/jest`, and
   `pdfjs-dist` (used in tests only, to extract text from generated PDFs).
@@ -64,7 +64,7 @@ Status: todo
 **Done when:** CI is green on the branch and the test count is above 0.
 
 ### F2 · Store hygiene *(small)*
-Status: todo
+Status: done (commit 009cccb). Device checks: see Verification.
 
 - `app.json`:
   - `ios.bundleIdentifier` and `android.package` set to `com.yeasin.pdfscan`.
@@ -90,7 +90,7 @@ Status: todo
 `RECORD_AUDIO`, and the app launches with no spike or Pro or Protect UI.
 
 ### F3 · Library storage moves to SQLite as the single source of truth *(critical)*
-Status: todo
+Status: done (commit 3a39203) (with F4). Device checks: see Verification.
 
 - **Data-loss guard first** (a one-line fix that ships even before the rest):
   - In `useLibraryPersistence`, set `loaded` only on a *successful* load.
@@ -127,7 +127,7 @@ Android phone, toggling a star writes one row, and killing the app mid-save neve
 documents.
 
 ### F4 · Folders + `courseFolder` become one **Course** model
-Status: todo
+Status: done (commit 3a39203) (with F3). Device checks: see Verification.
 
 - `courses` table: id, name, code, color, semester (nullable), archived, created_at.
   `documents.course_id` is nullable (null means "Unsorted").
@@ -153,7 +153,7 @@ Status: todo
 pre-existing document still opens.
 
 ### F5 · Image pipeline: high-resolution master, edits that don't re-save, one encode per export
-Status: todo
+Status: done (commit 4345a55). Device checks: see Verification.
 
 - `src/services/capture/imageSpec.ts` with these constants:
   - `MASTER_MAX_DIM = 2400`, `MASTER_JPEG_Q = 0.92`, `THUMB_MAX_DIM = 400`.
@@ -195,7 +195,7 @@ rotate-and-enhance cycle encodes the JPEG once at export; library page files kee
 after Compress.
 
 ### F6 · OCR text layer for every script: a "glyphless font"
-Status: todo
+Status: done (commit f84a669, 97ee2a6). Device checks: see Verification.
 
 Use the same technique as Tesseract's PDF output, instead of embedding one font per script
 (CJK fonts are 10+ MB each).
@@ -230,7 +230,7 @@ Use the same technique as Tesseract's PDF output, instead of embedding one font 
 in Google Drive's PDF viewer is searchable.
 
 ### F7 · Small correctness fixes
-Status: todo
+Status: done (commit c1a1d66) (LIKE escaping landed in F3, ocrFailed in F5). Device checks: see Verification.
 
 - `searchDocumentsByText`: escape `%`, `_` and `\` in the LIKE parameter and add `ESCAPE '\'`.
   Add a test.
@@ -241,7 +241,7 @@ Status: todo
   otherwise remount).
 
 ### F8 · Opt-in crash reporting (Sentry)
-Status: todo
+Status: done (commit e502f9b). Device checks: see Verification.
 
 - Install `@sentry/react-native` in the version whose Expo plugin supports SDK 57 (check its
   compatibility table when implementing; docs.expo.dev is blocked from this environment, so

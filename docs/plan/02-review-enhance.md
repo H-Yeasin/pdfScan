@@ -64,6 +64,9 @@ Status: done (commit a993721), adapted. It was built before its prerequisites F1
 - **No `renderPage` yet (F5).** `drawFiltered` is called by `skiaEnhance.bakeEnhance(uri, page)`,
   which Deliver, AcademicOptions and the current preview hook use. F5 swaps `bakeEnhance` for
   `renderPage`.
+  *Done when §0/§1 were merged in: `bakeEnhance` is gone; `renderPage` draws through
+  `drawFiltered`, rotation is a setting applied by `drawRotated` in both export and preview,
+  ingest measures stats, and Notes/Board default to `ink`/`board` in `captureModes.ts`.*
 - **No `captureModes.ts` yet (C1).** C1's table in `01-capture.md` now says `bw` for Notes.
 - As built: `filters/{filterMath,stats,sauvola,registry,drawFiltered}.ts`. `FilterSpec` also has
   `available: false` for `ink`/`board`, which are placeholders (they render as Gray and Auto) and

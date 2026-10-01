@@ -7,6 +7,9 @@ export type CaptureState = {
   pages: SessionPage[];
   processingStatus: ProcessingStatus;
   errorMessage?: string;
+  // Per-page progress of the batch being processed (scan or gallery import); null when idle.
+  // A separate small field, so updating it once per page is cheap.
+  progress: { done: number; total: number } | null;
   // Set by ReviewScreen's "Retake" action right before navigating to Capture. The next
   // BULK_ADD_PAGES splices its pages in at this page's position (replacing it) instead of
   // appending, then clears the flag. Every other entry point into Capture must clear it too, so a
@@ -18,6 +21,7 @@ export const initialCaptureState: CaptureState = {
   mode: 'doc',
   pages: [],
   processingStatus: 'idle',
+  progress: null,
   retakeTargetId: null,
 };
 
@@ -34,13 +38,16 @@ export type CaptureAction =
   | { type: 'capture/APPLY_LOOK_TO_ALL'; enhance: EnhanceMode; adjust: AdjustValues | undefined; filterOptions: FilterOptions | undefined }
   // Merged into each page's existing filterOptions; id null means every page (apply to all).
   | { type: 'capture/SET_FILTER_OPTIONS'; id: string | null; options: FilterOptions }
+  | { type: 'capture/ROTATE_PAGE'; id: string }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
   // `uri` is the image the stats were measured from; they're dropped if the page moved on since.
   | { type: 'capture/SET_PAGE_STATS'; id: string; uri: string; stats: ImageStats }
   | { type: 'capture/REPLACE_PAGES'; ids: string[]; page: SessionPage }
+  | { type: 'capture/UNSPLIT'; groupId: string; id: string }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
-  | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string };
+  | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string }
+  | { type: 'capture/SET_PROGRESS'; progress: { done: number; total: number } | null };
 
 export function captureReducer(state: CaptureState, action: CaptureAction): CaptureState {
   switch (action.type) {
@@ -88,16 +95,33 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
           action.id === null || p.id === action.id ? { ...p, filterOptions: { ...p.filterOptions, ...action.options } } : p
         ),
       };
+    case 'capture/ROTATE_PAGE':
+      // A setting only: the master isn't re-encoded, the rotation is applied when rendering. Stats
+      // describe the unrotated master, so they stay valid.
+      return {
+        ...state,
+        pages: state.pages.map((p) =>
+          p.id === action.id ? { ...p, rotation: ((p.rotation + 90) % 360) as SessionPage['rotation'] } : p
+        ),
+      };
     case 'capture/UPDATE_PAGE':
       return {
         ...state,
         pages: state.pages.map((p) => {
           if (p.id !== action.id) return p;
-          const next = { ...p, ...action.patch };
-          // Stats describe the pixels of `uri`. A crop/rotate/sign that swaps the image without
-          // supplying fresh stats must not keep the old ones, or Auto/Color/Gray would stretch the
-          // new image with the old histogram.
-          if (next.uri !== p.uri && !('stats' in action.patch)) delete next.stats;
+          // A new master (crop, signature) makes the old thumbnail stale unless one is supplied,
+          // and settles any pending crop check (its suggested outline was for the old image).
+          const newMaster = action.patch.uri !== undefined && action.patch.uri !== p.uri;
+          const next: SessionPage = {
+            ...p,
+            ...(newMaster ? { needsCropReview: undefined, cropSuggestion: undefined } : null),
+            ...action.patch,
+            ...(newMaster && action.patch.thumbUri === undefined ? { thumbUri: undefined } : null),
+          };
+          // Stats describe the pixels of `uri`. A crop/sign that swaps the image without supplying
+          // fresh stats must not keep the old ones, or Auto/Color/Gray would stretch the new image
+          // with the old histogram.
+          if (newMaster && !('stats' in action.patch)) delete next.stats;
           return next;
         }),
       };
@@ -117,6 +141,27 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       pages.splice(firstIndex, 0, action.page);
       return { ...state, pages };
     }
+    case 'capture/UNSPLIT': {
+      // Puts a split spread back together: both halves become the original spread page again, at
+      // the first half's position, keeping the first half's filter settings.
+      const halves = state.pages.filter((p) => p.splitFrom?.groupId === action.groupId);
+      const source = halves[0]?.splitFrom;
+      if (!source) return state;
+      const firstIndex = state.pages.indexOf(halves[0]);
+      const joined: SessionPage = {
+        id: action.id,
+        uri: source.uri,
+        thumbUri: source.thumbUri,
+        width: source.width,
+        height: source.height,
+        rotation: 0,
+        enhance: halves[0].enhance,
+        adjust: halves[0].adjust,
+      };
+      const pages = state.pages.filter((p) => p.splitFrom?.groupId !== action.groupId);
+      pages.splice(firstIndex, 0, joined);
+      return { ...state, pages };
+    }
     case 'capture/CLEAR_PAGES':
       return { ...state, pages: [] };
     case 'capture/BULK_ADD_PAGES': {
@@ -131,6 +176,14 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
     }
     case 'capture/SET_PROCESSING_STATUS':
       return { ...state, processingStatus: action.status, errorMessage: action.errorMessage };
+    case 'capture/SET_PROGRESS': {
+      const next = action.progress;
+      if (next === null) return state.progress === null ? state : { ...state, progress: null };
+      // Clamp, so a stray value can never render "page 11 of 10".
+      const total = Math.max(0, next.total);
+      const done = Math.min(total, Math.max(0, next.done));
+      return { ...state, progress: { done, total } };
+    }
     default:
       return state;
   }

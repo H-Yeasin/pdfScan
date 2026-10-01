@@ -14,7 +14,8 @@ import { drawFiltered } from '../services/enhance/filters/drawFiltered';
 import { FILTERS, resolveFilterParams } from '../services/enhance/filters/registry';
 import type { FilterParam, FilterParamOverrides, FilterSpec } from '../services/enhance/filters/registry';
 import { analyzeImage, analyzeImageUri } from '../services/enhance/filters/stats';
-import { bakeEnhance } from '../services/enhance/skiaEnhance';
+import { renderPage } from '../services/enhance/skiaEnhance';
+import { MASTER_PRESET } from '../services/capture/imageSpec';
 import { loadPreviewImage } from '../services/enhance/previewImageCache';
 import { shareFileUri } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
@@ -35,11 +36,11 @@ const SHEET_GAP = 16;
 type LabImage = { uri: string; image: SkImage; stats: ImageStats; width: number; height: number };
 type Timing = { label: string; ms: number };
 
-// F5's master size. The §2 budget is under 400 ms per exported page at this size, on a
+// F5's master size (MASTER_MAX_DIM). The §2 budget is under 400 ms per exported page at this size, on a
 // mid-range phone, in a release-like build (dev builds run JS much slower).
 const TIMING_MASTER_SIZE = 2400;
 
-// Times the real export path (bakeEnhance: decode, drawFiltered at full size, JPEG encode, write)
+// Times the real export path (renderPage: decode, drawFiltered at master size, JPEG encode, write)
 // once per filter on a 2400 px copy of the picked image, plus the one-off page analysis that
 // ingest does. Every file it writes is deleted again.
 async function timeExports(uri: string, filterOptions: FilterOptions): Promise<Timing[]> {
@@ -53,7 +54,7 @@ async function timeExports(uri: string, filterOptions: FilterOptions): Promise<T
     timings.push({ label: 'Analysis (once per page, at ingest)', ms: performance.now() - t0 });
     for (const spec of FILTERS) {
       t0 = performance.now();
-      const baked = await bakeEnhance(masterFile.uri, { enhance: spec.id, stats, filterOptions });
+      const baked = await renderPage(masterFile.uri, { enhance: spec.id, stats, filterOptions }, MASTER_PRESET);
       timings.push({ label: `Export · ${spec.label}`, ms: performance.now() - t0 });
       const out = new File(baked.uri);
       if (out.exists) out.delete();

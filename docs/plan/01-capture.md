@@ -55,7 +55,7 @@ a setting) and F4 (Course model, for document type and naming).
 ## Steps
 
 ### C1 · Capture mode registry and mode picker *(M)*
-Status: todo
+Status: done (commit 2249a8a). Device check pending: scan in Notes → B&W in Review; mode kept after restart.
 
 - New `src/services/capture/captureModes.ts`, which becomes the single source of truth:
   ```ts
@@ -98,7 +98,7 @@ Status: todo
 black-and-white filter, and the chosen mode is still selected after restarting the app.
 
 ### C2 · Scanner plugin options patch *(S)*
-Status: todo
+Status: done (commit ab4d8be). Patch applies on `npm ci`; device check pending (Android build, gallery button, ID card stops at 2).
 
 - `patch-package` patch for `react-native-document-scanner-plugin`:
   - In the spec (`src/NativeDocumentScanner.ts`), add the optional fields
@@ -117,7 +117,7 @@ Status: todo
 from gallery" button, and ID card mode stops after 2 pages.
 
 ### C3 · Book mode: split two-page spreads *(M)*
-Status: todo
+Status: done (commit 15d95c9). Pure maths in `enhance/gutter.ts`, Skia in `enhance/splitSpread.ts`, pipeline hook `ingestBatch.ingestOne`; Undo split keeps the spread on both halves (`SessionPage.splitFrom`). Progress counts captures (spreads), not output pages. Device check pending: 5 spreads → 10 pages, gutter hit ≥ 9/10.
 
 - New `src/services/enhance/splitSpread.ts`: `splitSpread(uri) → [left, right]`.
   - Find the gutter with Skia: draw the page into a small offscreen surface about 256 px wide,
@@ -141,7 +141,7 @@ Status: todo
 lands on the gutter in at least 9 of the 10.
 
 ### C4 · ID card mode: front and back on one page *(M)*
-Status: todo
+Status: done (commit ee5a8aa). Needed a new `layout: 'fullPage'` page property (DB migration v2): the normal 24 pt margin would print the card at ~92 %. Session parts are `SessionPage.idCard` (not `parts`). Device check pending: print at 100 % and measure.
 
 - New `src/services/enhance/composeIdCard.ts`: `composeIdCard(front, back?) → page`.
   - Draw an A4 canvas at 200 dpi (1654×2339 px), white.
@@ -162,7 +162,21 @@ Status: todo
 85.6×54 mm.
 
 ### C5 · Batch gallery import with automatic cropping *(L — starts with a spike)*
-Status: todo
+Status: done with the no-native-dependency detector (commit da8e429); **OpenCV spike still to do on a device.**
+
+Spike results / decision (so far):
+- The spike needs an Android dev build (APK size per ABI) and real photos, neither available in
+  the cloud session that implemented this. Not done yet.
+- Shipped instead: a pure-JS detector (`capture/quadDetect.ts`: Otsu, largest bright component,
+  convex hull, largest quad on the hull) on a ~400 px copy read through Skia. It produces real
+  perspective quads (not just a bounding box) with no APK cost. Confidence comes from how solidly
+  the component fills its quad: 'high' crops automatically, 'low' is a suggestion to check, and
+  no detection keeps the photo; both of the latter go to Review's "Check crops".
+- Its weak case is a light page on a light background (sheet on a white bed): no contrast, so it
+  falls back to manual cropping rather than guessing.
+- To finish the spike: on a device, run the 30-photo set through `detectDocumentQuad` and count
+  correct crops. If below the 17/20 target, add `react-native-fast-opencv` (measure APK size
+  first, budget 8 MB) behind the same `detectDocumentQuad` interface.
 
 Google's scanner gallery import (C2) covers Android when the user starts from the scanner. C5
 covers our own Gallery button: multi-select 20 or more photos, crop each automatically, with
@@ -200,7 +214,7 @@ iOS support too.
 with no manual work, and memory stays flat during the batch (Android Studio profiler).
 
 ### C6 · Feedback, progress and the capture loop *(S)*
-Status: todo
+Status: done (commit 53aba95). `ingestGalleryBatch` exists now (in `capture/ingestBatch.ts`, on top of `processSequentially`); C5 adds auto-crop to it. Device check pending: 10 handwritten pages, Scan → Review ready in under 60 s.
 
 - Add `expo-haptics@~57.0.3`: a light impact when the scanner returns pages, success when
   processing finishes, a warning on error.
@@ -221,7 +235,7 @@ handwritten pages, from tapping Scan to Review being ready, takes under 60 s on 
 phone (the §1 "done when").
 
 ### C7 · Fallback when Google's scanner is unavailable *(M)*
-Status: todo
+Status: done (commit fbfe02b). Also added: a Settings row to retry Google's scanner after a Play services update. Device check pending: emulator image without Play services. The P3 custom-camera plan (`docs/plan/xx-custom-camera.md`) is not written yet.
 
 Some phones have no Google Play services, or an outdated version (Huawei, some Chinese ROMs,
 emulators).

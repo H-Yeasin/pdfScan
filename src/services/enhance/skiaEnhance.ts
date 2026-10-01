@@ -1,37 +1,54 @@
 import { File, Paths } from 'expo-file-system';
 import { ImageFormat, Skia } from '@shopify/react-native-skia';
+import { fitWithin } from '../capture/imageSpec';
 import { createId } from '../../utils/id';
-import { drawFiltered } from './filters/drawFiltered';
+import { drawFiltered, drawRotated, rotatedSize } from './filters/drawFiltered';
 import type { FilterPage } from './filters/drawFiltered';
+import type { SessionPage } from '../../types/models';
 
 // All filter logic lives in ./filters (registry.ts lists them; drawFiltered.ts applies them).
-// This file is only the export-side wrapper: decode, draw through drawFiltered into a full-size
-// offscreen surface, encode. F5 replaces it with `renderPage`.
+// This file is only the export-side wrapper: decode, rotate + fit + draw through drawFiltered into
+// an offscreen surface, encode once.
 
-// Real pixel-level bake using Skia: runs the page through an offscreen GPU surface. Always writes
-// a new JPEG file; never touches the source page's original image.
-export async function bakeEnhance(
-  uri: string,
-  page: FilterPage
-): Promise<{ uri: string; width: number; height: number }> {
+export type PageEdits = Partial<FilterPage> & {
+  rotation?: SessionPage['rotation'];
+};
+
+export type RenderTarget = { maxDim: number; q: number };
+
+export type RenderedPage = { uri: string; width: number; height: number };
+
+// Renders a page in ONE Skia pass - rotate, filter, downscale - and encodes it exactly once, to a
+// new JPEG in the cache dir. This is the only place page pixels are re-encoded on the way to the
+// library or an export, so quality never compounds across steps. Never touches the source file.
+// No `enhance` means no filter ('original'): a plain resize/re-encode, e.g. exporting a master.
+export async function renderPage(uri: string, edits: PageEdits, target: RenderTarget): Promise<RenderedPage> {
   const data = await Skia.Data.fromURI(uri);
   const image = Skia.Image.MakeImageFromEncoded(data);
   if (!image) throw new Error(`Skia failed to decode image at ${uri}`);
 
-  const width = image.width();
-  const height = image.height();
+  const srcWidth = image.width();
+  const srcHeight = image.height();
+  const rotation = edits.rotation ?? 0;
+  const rotated = rotatedSize(srcWidth, srcHeight, rotation);
+  const out = fitWithin(rotated.width, rotated.height, target.maxDim);
 
-  const surface = Skia.Surface.MakeOffscreen(width, height);
+  const surface = Skia.Surface.MakeOffscreen(out.width, out.height);
   if (!surface) throw new Error('Skia failed to create an offscreen surface');
+  const canvas = surface.getCanvas();
 
-  drawFiltered(surface.getCanvas(), image, page, Skia.XYWHRect(0, 0, width, height));
+  // Drawn in source coordinates, so shader-based filters keep their sample radii in source pixels.
+  const page: FilterPage = {
+    enhance: edits.enhance ?? 'original',
+    adjust: edits.adjust,
+    stats: edits.stats,
+    filterOptions: edits.filterOptions,
+  };
+  drawRotated(canvas, srcWidth, srcHeight, rotation, out, (srcRect) => drawFiltered(canvas, image, page, srcRect));
   surface.flush();
 
-  const snapshot = surface.makeImageSnapshot();
-  const bytes = snapshot.encodeToBytes(ImageFormat.JPEG, 92);
-
-  const dest = new File(Paths.cache, `${createId('enhanced')}.jpg`);
+  const bytes = surface.makeImageSnapshot().encodeToBytes(ImageFormat.JPEG, Math.round(target.q * 100));
+  const dest = new File(Paths.cache, `${createId('render')}.jpg`);
   dest.write(bytes);
-
-  return { uri: dest.uri, width, height };
+  return { uri: dest.uri, width: out.width, height: out.height };
 }

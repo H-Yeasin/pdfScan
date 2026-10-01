@@ -71,16 +71,17 @@ M = a few days, L = a week or more.
 ### §0 Foundation and quality fixes *(must happen first)*
 Goal: the existing app is trustworthy and store-ready before new features go in.
 
-**Detailed steps:** [`docs/plan/00-foundation.md`](plan/00-foundation.md)
+**Detailed steps:** [`docs/plan/00-foundation.md`](plan/00-foundation.md). Done in code; the device
+checks in that plan's Verification section are still to do.
 
-- [ ] F1 Test harness and CI
-- [ ] F2 Store hygiene (app ID `com.yeasin.pdfscan`, no RECORD_AUDIO, remove spikes, hide Protect/Pro)
-- [ ] F3 Library storage moves to SQLite as the single source of truth (fixes the data-loss risk)
-- [ ] F4 Folders + course folders become one Course model
-- [ ] F5 Image pipeline: high-resolution master, edits that don't re-save, one encode per export
-- [ ] F6 OCR text layer for every script (glyphless font)
-- [ ] F7 Small correctness fixes (LIKE escaping, OCR-failed flag, error boundary)
-- [ ] F8 Opt-in crash reporting (Sentry)
+- [x] F1 Test harness and CI
+- [x] F2 Store hygiene (app ID `com.yeasin.pdfscan`, no RECORD_AUDIO, remove spikes, hide Protect/Pro)
+- [x] F3 Library storage moves to SQLite as the single source of truth (fixes the data-loss risk)
+- [x] F4 Folders + course folders become one Course model
+- [x] F5 Image pipeline: high-resolution master, edits that don't re-save, one encode per export
+- [x] F6 OCR text layer for every script (glyphless font)
+- [x] F7 Small correctness fixes (LIKE escaping, OCR-failed flag, error boundary)
+- [x] F8 Opt-in crash reporting (Sentry)
 
 **Done when:** tests pass in CI, a 10-page scan exports sharp enough to read 8 pt print, and OCR
 text in every supported script is searchable in an external PDF viewer.
@@ -90,13 +91,13 @@ Goal: the best camera experience for school material.
 
 **Detailed steps:** [`docs/plan/01-capture.md`](plan/01-capture.md)
 
-- [ ] C1 Capture modes (Notes, Document, Board, Book, ID card) and mode picker
-- [ ] C2 Scanner plugin options patch (page limit per mode, gallery import in Google's scanner)
-- [ ] C3 Book mode: split two-page spreads at the gutter
-- [ ] C4 ID card mode: front and back at true size on one A4 page
-- [ ] C5 Batch gallery import with automatic cropping (OpenCV spike first)
-- [ ] C6 Haptics, per-page progress, "Scan more" loop, cancel
-- [ ] C7 Fallback when Google's scanner is unavailable (custom live camera stays in P3)
+- [x] C1 Capture modes (Notes, Document, Board, Book, ID card) and mode picker
+- [x] C2 Scanner plugin options patch (page limit per mode, gallery import in Google's scanner)
+- [x] C3 Book mode: split two-page spreads at the gutter
+- [x] C4 ID card mode: front and back at true size on one A4 page
+- [x] C5 Batch gallery import with automatic cropping (OpenCV spike first)
+- [x] C6 Haptics, per-page progress, "Scan more" loop, cancel
+- [x] C7 Fallback when Google's scanner is unavailable (custom live camera stays in P3)
 
 **Done when:** a student can capture a 10-page handwritten assignment in under 60 seconds with no
 manual cropping on most pages.

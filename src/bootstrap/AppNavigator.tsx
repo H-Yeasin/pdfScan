@@ -18,7 +18,8 @@ import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useAppState } from '../store/AppStateContext';
-import { initializeDatabase } from '../services/persistence/dbService';
+import { FEATURES } from '../config/features';
+import { initCrashReporting } from '../services/telemetry/crash';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
   capture: CaptureScreen,
@@ -27,7 +28,8 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   library: LibraryScreen,
   reader: ReaderScreen,
   settings: SettingsScreen,
-  pro: ProScreen,
+  // Falls back to the Library while Pro is disabled, so a stray go('pro') can't reach a dead end.
+  pro: FEATURES.pro ? ProScreen : LibraryScreen,
   manageFolders: ManageFoldersScreen,
   academicOptions: AcademicOptionsScreen,
   filterLab: FilterLabScreen,
@@ -38,9 +40,6 @@ export function AppNavigator() {
   useSettingsPersistence();
   useSignaturePersistence();
   useExternalFileLinking(libraryLoaded);
-  useEffect(() => {
-    initializeDatabase().catch((e) => console.warn('DB init failed', e));
-  }, []);
   const { screen, navDir, navTick, go } = useRouter();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(1)).current;
@@ -49,6 +48,8 @@ export function AppNavigator() {
   const prevScreen = useRef<ScreenName>(screen);
 
   const { state, dispatch } = useAppState();
+  const { crashReportsEnabled } = state.settings;
+  useEffect(() => initCrashReporting(crashReportsEnabled), [crashReportsEnabled]);
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 
@@ -65,7 +66,7 @@ export function AppNavigator() {
     if (processingStatus === 'processing' && prev === 'scanning') {
       go('review');
     } else if (processingStatus === 'success') {
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Scan complete' });
+      // The "Added N pages · Scan more" snack comes from the pipeline itself (ingestBatch.ts).
       dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
     } else if (processingStatus === 'error') {
       dispatch({ type: 'ui/SHOW_SNACK', msg: errorMessage ?? 'Scan failed' });

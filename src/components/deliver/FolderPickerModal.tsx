@@ -3,21 +3,21 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TextPromptModal } from '../shared/TextPromptModal';
 import { radii, spacing, useTheme } from '../../theme';
-import type { LibraryFolder } from '../../types/models';
+import type { Course } from '../../types/models';
 
 type FolderPickerModalProps = {
   visible: boolean;
-  folders: LibraryFolder[];
-  selectedFolderId: string | null;
-  onSelect: (folderId: string | null) => void;
+  courses: Course[];
+  selectedCourseId: string | null;
+  onSelect: (courseId: string | null) => void;
   onCreate: (name: string) => string;
   onClose: () => void;
 };
 
 export function FolderPickerModal({
   visible,
-  folders,
-  selectedFolderId,
+  courses,
+  selectedCourseId,
   onSelect,
   onCreate,
   onClose,
@@ -29,7 +29,7 @@ export function FolderPickerModal({
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={[styles.title, { color: tokens.ink }]}>Save to</Text>
+          <Text style={[styles.title, { color: tokens.ink }]}>Course</Text>
           <ScrollView style={styles.list} contentContainerStyle={{ gap: spacing.xs }}>
             <Pressable
               style={styles.row}
@@ -38,29 +38,29 @@ export function FolderPickerModal({
                 onClose();
               }}
             >
-              <Text style={[styles.rowLabel, { color: tokens.ink }]}>My Scans</Text>
-              {selectedFolderId === null && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
+              <Text style={[styles.rowLabel, { color: tokens.ink }]}>Unsorted</Text>
+              {selectedCourseId === null && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
             </Pressable>
-            {folders.map((folder) => (
+            {courses.map((course) => (
               <Pressable
-                key={folder.id}
+                key={course.id}
                 style={styles.row}
                 onPress={() => {
-                  onSelect(folder.id);
+                  onSelect(course.id);
                   onClose();
                 }}
               >
                 <Text style={[styles.rowLabel, { color: tokens.ink }]} numberOfLines={1}>
-                  {folder.name}
+                  {course.name}
                 </Text>
-                {selectedFolderId === folder.id && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
+                {selectedCourseId === course.id && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
               </Pressable>
             ))}
           </ScrollView>
 
           <Pressable style={styles.newRow} onPress={() => setCreating(true)}>
             <Ionicons name="add" size={18} color={tokens.accentInk} />
-            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>New folder</Text>
+            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>New course</Text>
           </Pressable>
 
           <Pressable style={styles.cancelRow} onPress={onClose}>
@@ -71,8 +71,8 @@ export function FolderPickerModal({
 
       <TextPromptModal
         visible={creating}
-        title="New folder"
-        placeholder="Folder name"
+        title="New course"
+        placeholder="Course name, e.g. CSE 101"
         submitLabel="Create"
         onCancel={() => setCreating(false)}
         onSubmit={(value) => {

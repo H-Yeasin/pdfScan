@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
-import { FolderList, UNFILED_FOLDER_ID } from '../components/library/FolderList';
+import { FolderList, UNSORTED_COURSE_ID } from '../components/library/FolderList';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar, type SelectionToolId } from '../components/library/SelectionBar';
@@ -23,7 +23,7 @@ import {
   splitDocument,
 } from '../services/persistence/libraryOperations';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { deleteScannedDocument, insertScannedDocument, searchDocumentsByText } from '../services/persistence/dbService';
+import { searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
 import { importExternalFile } from '../services/files/externalFileService';
 import { canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
@@ -42,7 +42,7 @@ export function LibraryScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { files, folders, activeFolderId, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
+  const { loadStatus, files, courses, activeCourseId, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
@@ -64,44 +64,44 @@ export function LibraryScreen() {
   const visibleFiles = useMemo(() => {
     let tabbed = files;
     if (tab === 'starred') tabbed = files.filter((f) => f.star);
-    else if (tab === 'folders') {
-      if (activeFolderId === UNFILED_FOLDER_ID) tabbed = files.filter((f) => !f.folderId);
-      else if (activeFolderId) tabbed = files.filter((f) => f.folderId === activeFolderId);
+    else if (tab === 'courses') {
+      if (activeCourseId === UNSORTED_COURSE_ID) tabbed = files.filter((f) => !f.courseId);
+      else if (activeCourseId) tabbed = files.filter((f) => f.courseId === activeCourseId);
       else tabbed = [];
     }
     if (!search.trim()) return tabbed;
     if (searchResultIds === null) return searchDocuments(tabbed, search);
     const idSet = new Set(searchResultIds);
     return tabbed.filter((f) => idSet.has(f.id));
-  }, [files, tab, activeFolderId, search, searchResultIds]);
+  }, [files, tab, activeCourseId, search, searchResultIds]);
 
-  const folderCounts = useMemo(() => {
+  const courseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     files.forEach((f) => {
-      if (f.folderId) counts[f.folderId] = (counts[f.folderId] ?? 0) + 1;
+      if (f.courseId) counts[f.courseId] = (counts[f.courseId] ?? 0) + 1;
     });
     return counts;
   }, [files]);
 
-  const unfiledCount = useMemo(() => files.filter((f) => !f.folderId).length, [files]);
+  const unsortedCount = useMemo(() => files.filter((f) => !f.courseId).length, [files]);
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
 
-  const activeFolderName = useMemo(() => {
-    if (activeFolderId === UNFILED_FOLDER_ID) return 'Unfiled';
-    return folders.find((f) => f.id === activeFolderId)?.name ?? 'Folder';
-  }, [activeFolderId, folders]);
+  const activeCourseName = useMemo(() => {
+    if (activeCourseId === UNSORTED_COURSE_ID) return 'Unsorted';
+    return courses.find((c) => c.id === activeCourseId)?.name ?? 'Course';
+  }, [activeCourseId, courses]);
 
-  const handleCreateFolder = useCallback(
-    (name: string) => dispatch({ type: 'library/CREATE_FOLDER', id: createId('folder'), name }),
+  const handleCreateCourse = useCallback(
+    (name: string) => dispatch({ type: 'library/CREATE_COURSE', id: createId('course'), name }),
     [dispatch]
   );
-  const handleRenameFolder = useCallback(
-    (id: string, name: string) => dispatch({ type: 'library/RENAME_FOLDER', id, name }),
+  const handleRenameCourse = useCallback(
+    (id: string, name: string) => dispatch({ type: 'library/RENAME_COURSE', id, name }),
     [dispatch]
   );
-  const handleDeleteFolder = useCallback(
-    (id: string) => dispatch({ type: 'library/DELETE_FOLDER', id }),
+  const handleDeleteCourse = useCallback(
+    (id: string) => dispatch({ type: 'library/DELETE_COURSE', id }),
     [dispatch]
   );
 
@@ -146,34 +146,25 @@ export function LibraryScreen() {
       if (selectedDocs.length === 0) return;
 
       if (id === 'merge' && selectedDocs.length >= 2) {
-        const merged = await mergeDocuments(selectedDocs, state.settings.ocrScript);
-        selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id, doc.courseFolder));
+        const merged = await mergeDocuments(selectedDocs);
+        selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
         dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `${selectedDocs.length} files merged` });
-        selectedDocs.forEach((doc) => deleteScannedDocument(doc.id).catch((e) => console.warn('db delete failed', e)));
-        insertScannedDocument(merged).catch((e) => console.warn('db insert failed', e));
       } else if (id === 'split' && selectedDocs.length === 1) {
         const [doc] = selectedDocs;
-        const split = await splitDocument(doc, state.settings.ocrScript);
-        deleteDocumentFiles(doc.id, doc.courseFolder);
+        const split = await splitDocument(doc);
+        deleteDocumentFiles(doc.id);
         dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `Split into ${split.length} files` });
-        deleteScannedDocument(doc.id).catch((e) => console.warn('db delete failed', e));
-        split.forEach((d) => insertScannedDocument(d).catch((e) => console.warn('db insert failed', e)));
       } else if (id === 'compress') {
         for (const doc of selectedDocs) {
-          const compressed = await compressDocument(doc, state.settings.ocrScript);
+          const compressed = await compressDocument(doc);
           dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
-          insertScannedDocument(compressed).catch((e) => console.warn('db insert failed', e));
         }
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Compressed · done' });
-      } else if (id === 'protect') {
-        selectedDocs.forEach((doc) => dispatch({ type: 'library/TOGGLE_LOCKED', id: doc.id }));
-        dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Protect only marks the file — it does not encrypt it yet' });
       } else if (id === 'sign' && selectedDocs.length === 1 && canSign(selectedDocs[0])) {
         const [target] = selectedDocs;
         setSignTarget(target);
@@ -187,20 +178,19 @@ export function LibraryScreen() {
         }
       }
     },
-    [selectedDocs, selection, dispatch, state.signature.saved, state.settings.ocrScript]
+    [selectedDocs, selection, dispatch, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!signTarget) return;
-      const updated = await applySignedPage(signTarget, 0, flattenedUri, state.settings.ocrScript);
+      const updated = await applySignedPage(signTarget, 0, flattenedUri);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
-      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
-    [signTarget, dispatch, state.settings.ocrScript]
+    [signTarget, dispatch]
   );
 
   const handleSignatureCaptured = useCallback(
@@ -233,7 +223,6 @@ export function LibraryScreen() {
       setCapturedSignature(null);
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signature added — visible in exported PDF' });
-      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
     [signTarget, capturedSignature, dispatch]
   );
@@ -279,16 +268,23 @@ export function LibraryScreen() {
 
       <LibraryTabs value={tab} onChange={(value) => dispatch({ type: 'library/SET_TAB', tab: value })} />
 
-      {tab === 'folders' && activeFolderId === null ? (
+      {loadStatus === 'failed' ? (
+        <EmptyState
+          title="Couldn't load library"
+          body="Your documents are still on this phone. Nothing has been changed."
+          actionLabel="Try again"
+          onAction={() => dispatch({ type: 'library/RETRY_LOAD' })}
+        />
+      ) : tab === 'courses' && activeCourseId === null ? (
         <ScrollView>
           <FolderList
-            folders={folders}
-            counts={folderCounts}
-            unfiledCount={unfiledCount}
-            onOpenFolder={(id) => dispatch({ type: 'library/SET_ACTIVE_FOLDER', id })}
-            onCreate={handleCreateFolder}
-            onRename={handleRenameFolder}
-            onDelete={handleDeleteFolder}
+            courses={courses}
+            counts={courseCounts}
+            unsortedCount={unsortedCount}
+            onOpenCourse={(id) => dispatch({ type: 'library/SET_ACTIVE_COURSE', id })}
+            onCreate={handleCreateCourse}
+            onRename={handleRenameCourse}
+            onDelete={handleDeleteCourse}
           />
         </ScrollView>
       ) : isEmptyLibrary ? (
@@ -307,13 +303,13 @@ export function LibraryScreen() {
         />
       ) : (
         <>
-          {tab === 'folders' && (
+          {tab === 'courses' && (
             <Pressable
               style={styles.folderBack}
-              onPress={() => dispatch({ type: 'library/SET_ACTIVE_FOLDER', id: null })}
+              onPress={() => dispatch({ type: 'library/SET_ACTIVE_COURSE', id: null })}
             >
               <Ionicons name="chevron-back" size={18} color={tokens.ink} />
-              <Text style={[styles.folderBackLabel, { color: tokens.ink }]}>{activeFolderName}</Text>
+              <Text style={[styles.folderBackLabel, { color: tokens.ink }]}>{activeCourseName}</Text>
             </Pressable>
           )}
           <FlatList

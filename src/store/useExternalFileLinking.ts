@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
 import { importExternalFile, pruneExternalOpens } from '../services/files/externalFileService';
 import { promoteExternalToLibrary } from '../services/persistence/libraryOperations';
-import { insertScannedDocument } from '../services/persistence/dbService';
 import { useAppState } from './AppStateContext';
 import { useRouter } from '../navigation/router';
 
@@ -30,7 +29,6 @@ export function useExternalFileLinking(libraryLoaded: boolean): void {
         // findable afterwards without an extra "Add to Library" tap: it lands in Library's
         // default Recent tab like any other document, same as pressing "Add to Library" manually.
         const promoted = await promoteExternalToLibrary(ext);
-        insertScannedDocument(promoted).catch((e) => console.warn('db insert failed', e));
         dispatch({ type: 'library/ADD_FILE', file: promoted });
         dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
         go('reader');

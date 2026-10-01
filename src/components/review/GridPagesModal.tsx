@@ -4,6 +4,7 @@ import { FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { radii, spacing, fontFamily, typeScale, useTheme } from '../../theme';
 import type { SessionPage } from '../../types/models';
+import { rotationStyle } from '../../utils/rotation';
 
 const COLUMNS = 3;
 const GAP = spacing.sm;
@@ -102,7 +103,11 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
                 onLongPress={() => handleTileLongPress(item)}
                 delayLongPress={LONG_PRESS_MS}
               >
-                <Image source={{ uri: item.uri }} style={styles.tileImage} resizeMode="cover" />
+                <Image
+                  source={{ uri: item.thumbUri ?? item.uri }}
+                  style={[styles.tileImage, rotationStyle(item.rotation)]}
+                  resizeMode="cover"
+                />
                 <View style={styles.indexBadge}>
                   <Text style={styles.indexBadgeText}>{index + 1}</Text>
                 </View>

@@ -25,3 +25,9 @@ export function getMatchSnippet(doc: LibraryDocument, query: string): string | u
   }
   return undefined;
 }
+
+// The lowercased text the in-memory search filter matches against: the name plus every page's
+// OCR text. Derived, never persisted - rebuilt on load and whenever a document is created.
+export function buildSearchHaystack(name: string, pages: { ocr?: { text: string } }[]): string {
+  return [name, ...pages.map((p) => p.ocr?.text ?? '')].join(' ').toLowerCase();
+}

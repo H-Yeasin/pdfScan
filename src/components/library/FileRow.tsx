@@ -37,7 +37,7 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, onPress, o
     >
       <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
         {cover?.fileUri ? (
-          <Image source={{ uri: cover.fileUri }} style={styles.coverImage} resizeMode="cover" />
+          <Image source={{ uri: cover.thumbUri ?? cover.fileUri }} style={styles.coverImage} resizeMode="cover" />
         ) : (
           <FileTypeIcon format={doc.format} size={18} />
         )}

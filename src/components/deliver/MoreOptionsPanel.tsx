@@ -12,8 +12,6 @@ type ExportCopyProps = {
 type MoreOptionsPanelProps = {
   open: boolean;
   onToggleOpen: () => void;
-  passwordEnabled: boolean;
-  onTogglePassword: () => void;
   // Android-only: omitted entirely on iOS, which has no SAF equivalent.
   exportCopy?: ExportCopyProps;
 };
@@ -21,8 +19,6 @@ type MoreOptionsPanelProps = {
 export function MoreOptionsPanel({
   open,
   onToggleOpen,
-  passwordEnabled,
-  onTogglePassword,
   exportCopy,
 }: MoreOptionsPanelProps) {
   const { tokens } = useTheme();
@@ -41,19 +37,6 @@ export function MoreOptionsPanel({
 
       {open && (
         <View style={styles.body}>
-          <View style={styles.row}>
-            <View style={styles.rowTextWrap}>
-              <Text style={[styles.rowLabel, { color: tokens.ink }]}>Password protect</Text>
-              <Text style={[styles.disclosure, { color: tokens.muted }]}>
-                Marks the file as protected in your library — this build does not encrypt the PDF itself.
-              </Text>
-            </View>
-            <Switch
-              value={passwordEnabled}
-              onValueChange={onTogglePassword}
-              trackColor={{ true: tokens.accent, false: tokens.surface2 }}
-            />
-          </View>
           <View style={styles.row}>
             <Text style={[styles.rowLabel, { color: tokens.ink }]}>Page size</Text>
             <Text style={{ color: tokens.muted }}>A4 · fit to content</Text>

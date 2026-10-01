@@ -13,7 +13,6 @@ import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { insertScannedDocument } from '../services/persistence/dbService';
 import {
   applySignedPage,
   applySignatureToDocument,
@@ -81,16 +80,15 @@ export function ReaderScreen() {
     if (!doc || external || doc.pdfUri || !isPageRaster) return;
     let cancelled = false;
     setBackfilling(true);
-    ensureDocumentPdf(doc, state.settings.ocrScript).then((updated) => {
+    ensureDocumentPdf(doc).then((updated) => {
       if (cancelled) return;
       dispatch({ type: 'library/UPDATE_FILE', id: updated.id, patch: updated });
-      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
       setBackfilling(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [doc, external, isPageRaster, state.settings.ocrScript, dispatch]);
+  }, [doc, external, isPageRaster, dispatch]);
 
   // Resets all per-document viewer state when a different document/external file is opened.
   useEffect(() => {
@@ -180,7 +178,6 @@ export function ReaderScreen() {
       } else if (id === 'addToLibrary') {
         if (!external) return;
         const promoted = await promoteExternalToLibrary(external);
-        insertScannedDocument(promoted).catch((e) => console.warn('db insert failed', e));
         dispatch({ type: 'library/ADD_FILE', file: promoted });
         dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Added to Library' });
@@ -196,7 +193,7 @@ export function ReaderScreen() {
               style: 'destructive',
               onPress: () => {
                 dispatch({ type: 'library/REMOVE_FILES', ids: [doc.id] });
-                deleteDocumentFiles(doc.id, doc.courseFolder);
+                deleteDocumentFiles(doc.id);
                 go('library', 'back');
               },
             },
@@ -210,13 +207,12 @@ export function ReaderScreen() {
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!doc) return;
-      const updated = await applySignedPage(doc, activeIndex, flattenedUri, state.settings.ocrScript);
+      const updated = await applySignedPage(doc, activeIndex, flattenedUri);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
-      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
-    [doc, activeIndex, dispatch, state.settings.ocrScript]
+    [doc, activeIndex, dispatch]
   );
 
   const handleSignatureCaptured = useCallback(
@@ -246,7 +242,6 @@ export function ReaderScreen() {
       setSignStep(null);
       setCapturedSignature(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signature added — visible in exported PDF' });
-      insertScannedDocument(updated).catch((e) => console.warn('db insert failed', e));
     },
     [doc, activeIndex, capturedSignature, dispatch]
   );

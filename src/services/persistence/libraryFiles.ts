@@ -1,35 +1,52 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { sanitizeFolderSegment } from '../../utils/sanitize';
 
-const COURSES_SEGMENT = 'Courses';
+const LIBRARY_SEGMENT = 'library';
 
-// Shared by getDocumentDir/deleteDocumentFiles so both always agree on where a document's files
-// live. A blank/unset courseFolder (or one that sanitizes to '') resolves to the original flat
-// `library/<documentId>` layout — every document saved before Courses routing shipped, and every
-// document saved without a course, keeps landing exactly where it always has.
-function resolveLibrarySegments(documentId: string, courseFolder?: string): string[] {
-  const sanitized = courseFolder ? sanitizeFolderSegment(courseFolder) : '';
-  return sanitized ? [COURSES_SEGMENT, sanitized, documentId] : [documentId];
-}
-
-export function getDocumentDir(documentId: string, courseFolder?: string): Directory {
-  const dir = new Directory(Paths.document, 'library', ...resolveLibrarySegments(documentId, courseFolder));
+// Every library document's files live in library/<documentId>/, whatever course it's filed under,
+// so moving a document between courses never touches the filesystem.
+export function getDocumentDir(documentId: string): Directory {
+  const dir = new Directory(Paths.document, LIBRARY_SEGMENT, documentId);
   if (!dir.exists) dir.create({ intermediates: true });
   return dir;
 }
 
-// Callers operating on an already-saved document must pass that document's own `courseFolder`
-// (e.g. `doc.courseFolder`), never a live/current UI value — otherwise this resolves to the wrong
-// directory and leaves the document's real files behind undeleted.
-export function deleteDocumentFiles(documentId: string, courseFolder?: string): void {
-  const dir = new Directory(Paths.document, 'library', ...resolveLibrarySegments(documentId, courseFolder));
+export function deleteDocumentFiles(documentId: string): void {
+  const dir = new Directory(Paths.document, LIBRARY_SEGMENT, documentId);
   if (dir.exists) dir.delete();
+}
+
+// Where a document filed under the old free-text "courseFolder" lived before every document moved
+// to the flat layout. Only the one-time legacy import (legacyLibrary.ts) uses this; returns null
+// when the name sanitizes to nothing, which always meant the flat layout.
+export function legacyCourseDocumentDir(documentId: string, courseFolder: string): Directory | null {
+  const segment = sanitizeFolderSegment(courseFolder);
+  return segment ? new Directory(Paths.document, LIBRARY_SEGMENT, 'Courses', segment, documentId) : null;
+}
+
+// Paths are persisted relative to the app's document directory: on iOS the absolute container
+// path can change across app updates, which would orphan every absolute URI on disk. Anything
+// outside the document directory (or already relative) is stored unchanged.
+function documentBaseUri(): string {
+  const base = Paths.document.uri;
+  return base.endsWith('/') ? base : `${base}/`;
+}
+
+export function toStoredPath(uri: string | undefined): string | null {
+  if (!uri) return null;
+  const base = documentBaseUri();
+  return uri.startsWith(base) ? uri.slice(base.length) : uri;
+}
+
+export function fromStoredPath(stored: string | null): string | undefined {
+  if (!stored) return undefined;
+  return /^[a-z][a-z0-9+.-]*:/i.test(stored) ? stored : `${documentBaseUri()}${stored}`;
 }
 
 // Deletes cache-resident files by explicit URI (session discarded, or superseded by copies
 // written elsewhere, e.g. into a permanent library document dir). Takes explicit URIs rather
-// than sweeping Paths.cache wholesale — other features (skiaEnhance's bakeEnhance, etc.) also
-// write there, and a blind sweep could delete files still in use.
+// than sweeping Paths.cache wholesale — other features (skiaEnhance, etc.) also write there, and
+// a blind sweep could delete files still in use.
 export function cleanTemporaryCache(uris: string[]): void {
   uris.forEach((uri) => {
     const file = new File(uri);

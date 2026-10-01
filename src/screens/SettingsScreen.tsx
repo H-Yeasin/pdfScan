@@ -10,7 +10,7 @@ import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
-import type { OcrScript } from '../types/models';
+import { READY_SCRIPTS } from '../services/scripts/registry';
 
 const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'system', label: 'System' },
@@ -18,19 +18,13 @@ const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
-const AVAILABLE_SCRIPTS: { id: OcrScript; label: string }[] = [
-  { id: 'latin', label: 'English / Western (Latin)' },
-  { id: 'devanagari', label: 'Hindi · Marathi · Nepali (Devanagari)' },
-  { id: 'chinese', label: 'Chinese' },
-  { id: 'japanese', label: 'Japanese' },
-  { id: 'korean', label: 'Korean' },
-];
 
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { ocrScript, androidExportFolderUri, androidExportFolderLabel } = state.settings;
+  const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
+    state.settings;
 
   const handlePickExportFolder = useCallback(async () => {
     const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -63,7 +57,7 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>OCR script</Text>
           <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-            {AVAILABLE_SCRIPTS.map((script) => (
+            {READY_SCRIPTS.map((script) => (
               <LanguageRow
                 key={script.id}
                 name={script.label}
@@ -81,8 +75,8 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Organization</Text>
           <SettingRow
-            title="Manage folders"
-            subtitle="Create, rename, and organize save locations"
+            title="Manage courses"
+            subtitle="Create, rename, and organize your courses"
             chevron
             onPress={() => go('manageFolders')}
           />
@@ -105,6 +99,20 @@ export function SettingsScreen() {
           </View>
         )}
 
+        {scannerUnavailable && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Scanner</Text>
+            <SettingRow
+              title="Basic camera mode"
+              subtitle="Google's scanner wasn't available on this phone. Tap to try it again (e.g. after updating Google Play services)."
+              onPress={() => {
+                dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: false });
+                dispatch({ type: 'ui/SHOW_SNACK', msg: "The next scan will try Google's scanner" });
+              }}
+            />
+          </View>
+        )}
+
         {__DEV__ && (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Developer</Text>
@@ -116,6 +124,18 @@ export function SettingsScreen() {
             />
           </View>
         )}
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Privacy</Text>
+          <SettingRow
+            title="Send anonymous crash reports"
+            subtitle="Never includes your documents, names or scanned text."
+            toggle={{
+              value: crashReportsEnabled,
+              onChange: (enabled) => dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled }),
+            }}
+          />
+        </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>About</Text>

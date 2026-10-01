@@ -1,31 +1,35 @@
 import type { Dispatch } from 'react';
-import { File } from 'expo-file-system';
 import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 import type { AppAction } from '../../store/appReducer';
-import { downscaleAndCompressPage } from '../enhance/enhanceService';
-import { analyzeImageUri } from '../enhance/filters/stats';
-import { runOcr } from '../ocr/ocrService';
-import { cleanTemporaryCache } from '../persistence/libraryFiles';
-import type { EnhanceMode, OcrScript, SessionPage } from '../../types/models';
-import { createId } from '../../utils/id';
-
-const MAX_PAGES = 50;
-const MAX_DIMENSION = 1200;
-const JPEG_QUALITY = 0.8;
+import type { CaptureModeSpec } from './captureModes';
+import { ingestBatch } from './ingestBatch';
+import { SCANNER_UNAVAILABLE_MESSAGE, isScannerUnavailableError, runCameraFallback } from './scannerFallback';
+import { hapticPagesReceived, hapticWarning } from '../feedback/haptics';
+import type { OcrScript } from '../../types/models';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Orchestrates the whole scan session outside the reducer, committing state only at clean
-// transition points (scanning -> processing -> one bulk commit -> success/error) instead of
-// once per page, so the Context doesn't re-render mid-scan.
+// Orchestrates a scan session outside the reducer: scanning -> processing (per-page progress,
+// cancellable, see ingestBatch.ts) -> one bulk commit -> success/error.
 export async function runNativeScannerPipeline(
   dispatch: Dispatch<AppAction>,
   script: OcrScript,
-  defaultEnhance: EnhanceMode
+  spec: CaptureModeSpec,
+  // settings.scannerUnavailable: skip straight to the basic camera (scannerFallback.ts).
+  options: { scannerUnavailable?: boolean } = {}
 ): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'scanning' });
+  // "Scan more" relaunches in the same mode; BULK_ADD_PAGES appends.
+  const scanMore = () => {
+    void runNativeScannerPipeline(dispatch, script, spec, options);
+  };
+
+  if (options.scannerUnavailable) {
+    await runCameraFallback(dispatch, script, spec, scanMore);
+    return;
+  }
 
   dispatch({
     type: 'ui/SHOW_SNACK',
@@ -36,10 +40,15 @@ export async function runNativeScannerPipeline(
   try {
     // Edge detection, auto-capture on a steady quadrilateral, and perspective-correction
     // cropping all happen inside Google's closed-source on-device Document Scanner
-    // (Play Services GmsDocumentScanner, hardcoded to SCANNER_MODE_FULL by this plugin's
-    // native module) — this app has no code path into or visibility over that internal logic.
+    // (Play Services GmsDocumentScanner) — this app has no code path into or visibility over
+    // that internal logic. Our patch (patches/react-native-document-scanner-plugin+*.patch)
+    // exposes the scanner's own options: the mode's page limit, and gallery import so students
+    // can pull e.g. WhatsApp photos through the same edge detection. Android only; iOS's
+    // VisionKit scanner ignores both.
     const result = await DocumentScanner.scanDocument({
-      maxNumDocuments: MAX_PAGES,
+      maxNumDocuments: spec.pageLimit,
+      galleryImportAllowed: true,
+      scannerMode: 'full',
       responseType: ResponseType.ImageFilePath,
     });
 
@@ -49,47 +58,23 @@ export async function runNativeScannerPipeline(
     }
     scannedImages = result.scannedImages;
   } catch (error) {
+    if (isScannerUnavailableError(error)) {
+      // Remembered (persisted), so later scans skip the doomed attempt; the explanation shows
+      // only this once.
+      dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: true });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: SCANNER_UNAVAILABLE_MESSAGE });
+      await runCameraFallback(dispatch, script, spec, () => {
+        void runNativeScannerPipeline(dispatch, script, spec, { scannerUnavailable: true });
+      });
+      return;
+    }
+    hapticWarning();
     dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'error', errorMessage: errorMessage(error) });
     return;
   }
 
+  hapticPagesReceived();
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
 
-  const processedPages: SessionPage[] = [];
-
-  try {
-    // Sequential on purpose: each raw scan can be 4K+/12MB+. Running these concurrently
-    // (Promise.all) risks OOM-killing the app on mid-range Android devices.
-    for (const rawUri of scannedImages) {
-      const compressed = await downscaleAndCompressPage(rawUri, MAX_DIMENSION, JPEG_QUALITY);
-
-      // The raw pre-compression scan is now fully superseded by `compressed` — delete it
-      // immediately rather than waiting for session end, so peak disk/cache usage stays bounded.
-      const rawFile = new File(rawUri);
-      if (rawFile.exists) rawFile.delete();
-
-      const ocr = await runOcr(compressed.uri, script);
-      // Measured once here so switching filters in Review never reads pixels again.
-      const stats = await analyzeImageUri(compressed.uri);
-
-      processedPages.push({
-        id: createId('page'),
-        uri: compressed.uri,
-        width: compressed.width,
-        height: compressed.height,
-        rotation: 0,
-        enhance: defaultEnhance,
-        stats,
-        ocr,
-      });
-    }
-  } catch (error) {
-    // Pages compressed before the failure were never committed to state — don't orphan them.
-    cleanTemporaryCache(processedPages.map((p) => p.uri));
-    dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'error', errorMessage: errorMessage(error) });
-    return;
-  }
-
-  dispatch({ type: 'capture/BULK_ADD_PAGES', pages: processedPages });
-  dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'success' });
+  await ingestBatch(dispatch, scannedImages, { script, spec, ownsInputs: true, onScanMore: scanMore });
 }

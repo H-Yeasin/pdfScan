@@ -11,15 +11,17 @@ import { FilterOptionsPanel } from '../components/review/FilterOptionsPanel';
 import { GridPagesModal } from '../components/review/GridPagesModal';
 import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
+import { ProcessingProgress } from '../components/review/ProcessingProgress';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../services/enhance/adjust';
+import { recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
+import { cancelProcessing } from '../services/capture/processingSession';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
 import { getFilter } from '../services/enhance/filters/registry';
 import { analyzeImageUri } from '../services/enhance/filters/stats';
-import { rotatePage } from '../services/enhance/enhanceService';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
 import type { Point } from '../services/enhance/perspective';
 import { useFilteredPicture } from '../services/enhance/useFilteredPicture';
@@ -32,7 +34,7 @@ import { saveSignatureForReuse } from '../services/signature/savedSignatureStora
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
-import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage } from '../types/models';
+import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage, SourceImage } from '../types/models';
 
 const OCR_SPARSE_THRESHOLD = 6;
 
@@ -46,7 +48,7 @@ export function ReviewScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { pages, processingStatus } = state.capture;
+  const { pages, processingStatus, progress } = state.capture;
   const { sel, ocrRunning, history } = state.review;
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
@@ -120,9 +122,9 @@ export function ReviewScreen() {
     (selectedPage.enhance !== 'original' || !isDefaultAdjust(liveAdjust ?? currentAdjust) || stampActive);
   const shownPicture = preview && (comparing ? preview.originalPicture : preview.picture);
 
-  // Also animates while new pages are still being scanned/processed in the background (e.g. the
-  // "Add more" flow), so there's a visible signal even though this screen already has pages to show.
-  const showRibbon = ocrRunning || scanProcessing;
+  // Indeterminate ribbon for OCR and the moment before per-page progress is known; once a batch
+  // reports progress, ProcessingProgress (determinate, with Cancel) takes over.
+  const showRibbon = ocrRunning || (scanProcessing && !progress);
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!showRibbon) return;
@@ -216,10 +218,9 @@ export function ReviewScreen() {
     if (sel < pages.length - 1) dispatch({ type: 'review/SELECT_PAGE', index: sel + 1 });
   }, [dispatch, sel, pages.length]);
 
-  const handleRotate = useCallback(async () => {
+  const handleRotate = useCallback(() => {
     if (!selectedPage) return;
-    const rotated = await rotatePage(selectedPage.uri, 90);
-    dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: rotated });
+    dispatch({ type: 'capture/ROTATE_PAGE', id: selectedPage.id });
   }, [dispatch, selectedPage]);
 
   const handleOcr = useCallback(async () => {
@@ -272,6 +273,35 @@ export function ReviewScreen() {
     },
     [dispatch, selectedPage]
   );
+
+  // "Check crops": steps through every page gallery import couldn't crop confidently, starting each
+  // from the suggested outline when there is one. Confirming warps the page (which clears its
+  // flag); "Keep as is" accepts the photo uncropped. Either way it moves on to the next page.
+  const [checkingCrops, setCheckingCrops] = useState(false);
+  const cropCheckPages = pages.filter((p) => p.needsCropReview);
+  const cropCheckPage = checkingCrops ? cropCheckPages[0] : undefined;
+  useEffect(() => {
+    if (checkingCrops && cropCheckPages.length === 0) setCheckingCrops(false);
+  }, [checkingCrops, cropCheckPages.length]);
+
+  const handleCropCheckConfirm = useCallback(
+    async (points: [Point, Point, Point, Point]) => {
+      if (!cropCheckPage) return;
+      const cropped = await warpPerspectiveCrop(cropCheckPage.uri, points);
+      cleanTemporaryCache(cropCheckPage.thumbUri ? [cropCheckPage.uri, cropCheckPage.thumbUri] : [cropCheckPage.uri]);
+      dispatch({ type: 'capture/UPDATE_PAGE', id: cropCheckPage.id, patch: cropped });
+    },
+    [dispatch, cropCheckPage]
+  );
+
+  const handleCropCheckKeep = useCallback(() => {
+    if (!cropCheckPage) return;
+    dispatch({
+      type: 'capture/UPDATE_PAGE',
+      id: cropCheckPage.id,
+      patch: { needsCropReview: undefined, cropSuggestion: undefined },
+    });
+  }, [dispatch, cropCheckPage]);
 
   const handleMergeRequest = useCallback((ids: [string, string]) => {
     setMergeCrop({ ids, stage: 'first' });
@@ -361,13 +391,70 @@ export function ReviewScreen() {
 
   const showErrHint = !!selectedPage?.err && selectedPage.enhance !== 'bw';
 
+  // ID card mode: recompose the true-size page from its kept card images.
+  const [idCardBusy, setIdCardBusy] = useState(false);
+  const updateIdCard = useCallback(
+    async (getNext: () => Promise<{ front: SourceImage; back?: SourceImage } | null>, doneMsg: string) => {
+      if (!selectedPage?.idCard || idCardBusy) return;
+      setIdCardBusy(true);
+      try {
+        const next = await getNext();
+        if (!next) return;
+        const patch = await recomposeIdCard(selectedPage, next, state.settings.ocrScript);
+        dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: doneMsg });
+      } catch (error) {
+        console.warn('ReviewScreen: ID card update failed', error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't update the ID card" });
+      } finally {
+        setIdCardBusy(false);
+      }
+    },
+    [dispatch, idCardBusy, selectedPage, state.settings.ocrScript]
+  );
+
+  const handleSwapIdSides = useCallback(() => {
+    const card = selectedPage?.idCard;
+    if (!card?.back) return;
+    void updateIdCard(async () => ({ front: card.back!, back: card.front }), 'Front and back swapped');
+  }, [selectedPage, updateIdCard]);
+
+  const handleRetakeIdBack = useCallback(() => {
+    const card = selectedPage?.idCard;
+    if (!card) return;
+    void updateIdCard(async () => {
+      const back = await scanIdCardSide(state.settings.ocrScript);
+      return back ? { front: card.front, back } : null;
+    }, card.back ? 'Back replaced' : 'Back added');
+  }, [selectedPage, updateIdCard, state.settings.ocrScript]);
+
+  // Book mode split this page out of a two-page spread; put the pair back together. The halves'
+  // own files are no longer referenced afterwards, so they're deleted.
+  const handleUndoSplit = useCallback(() => {
+    const groupId = selectedPage?.splitFrom?.groupId;
+    if (!groupId) return;
+    const halves = pages.filter((p) => p.splitFrom?.groupId === groupId);
+    const firstIndex = pages.indexOf(halves[0]);
+    dispatch({ type: 'capture/UNSPLIT', groupId, id: createId('page') });
+    dispatch({ type: 'review/SELECT_PAGE', index: Math.max(0, firstIndex) });
+    cleanTemporaryCache(halves.flatMap((p) => (p.thumbUri ? [p.uri, p.thumbUri] : [p.uri])));
+    dispatch({ type: 'ui/SHOW_SNACK', msg: 'Spread restored as one page' });
+  }, [dispatch, pages, selectedPage]);
+
   if (!selectedPage) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         {scanProcessing ? (
           <>
             <ActivityIndicator color={tokens.accent} size="large" />
-            <Text style={{ color: tokens.muted, marginTop: spacing.md }}>Processing pages…</Text>
+            <Text style={{ color: tokens.muted, marginTop: spacing.md }}>
+              {progress ? `Processing page ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…` : 'Processing pages…'}
+            </Text>
+            {progress ? (
+              <Pressable onPress={cancelProcessing} hitSlop={8} style={{ marginTop: spacing.md }} accessibilityRole="button">
+                <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+            ) : null}
           </>
         ) : (
           <>
@@ -436,6 +523,10 @@ export function ReviewScreen() {
         </View>
       </View>
 
+      {progress ? (
+        <ProcessingProgress done={progress.done} total={progress.total} onCancel={cancelProcessing} />
+      ) : null}
+
       <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: showRibbon ? 1 : 0 }]}>
         <Animated.View
           style={[
@@ -493,6 +584,46 @@ export function ReviewScreen() {
         />
       </View>
 
+      {cropCheckPages.length > 0 && !scanProcessing && (
+        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
+            {cropCheckPages.length === 1 ? "1 page couldn't be cropped automatically" : `${cropCheckPages.length} pages couldn't be cropped automatically`}
+          </Text>
+          <Pressable onPress={() => setCheckingCrops(true)} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
+              Check crops ({cropCheckPages.length})
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {selectedPage.idCard && (
+        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
+            {idCardBusy ? 'Updating ID card…' : 'ID card · prints at real size'}
+          </Text>
+          {selectedPage.idCard.back && (
+            <Pressable onPress={handleSwapIdSides} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
+              <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Swap sides</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={handleRetakeIdBack} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
+              {selectedPage.idCard.back ? 'Retake back' : 'Add back'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {selectedPage.splitFrom && (
+        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>Split from a book spread</Text>
+          <Pressable onPress={handleUndoSplit} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Undo split</Text>
+          </Pressable>
+        </View>
+      )}
+
       {showErrHint && (
         <View style={[styles.errHint, { backgroundColor: `${tokens.danger}1A` }]}>
           <Text style={{ color: tokens.danger, fontSize: 13, fontWeight: '500' }}>
@@ -544,6 +675,20 @@ export function ReviewScreen() {
           naturalHeight={selectedPage.height}
           onConfirm={handleCropConfirm}
           onCancel={() => setCropTarget(null)}
+        />
+      )}
+
+      {cropCheckPage && (
+        <CropOverlay
+          key={cropCheckPage.id}
+          uri={cropCheckPage.uri}
+          naturalWidth={cropCheckPage.width}
+          naturalHeight={cropCheckPage.height}
+          initialQuad={cropCheckPage.cropSuggestion}
+          stepLabel={`Check crop · ${cropCheckPages.length} left`}
+          cancelLabel="Keep as is"
+          onConfirm={handleCropCheckConfirm}
+          onCancel={handleCropCheckKeep}
         />
       )}
 
@@ -686,6 +831,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splitChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   errHint: {
     marginHorizontal: spacing.lg,

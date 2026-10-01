@@ -1,0 +1,76 @@
+diff --git a/node_modules/react-native-document-scanner-plugin/android/src/main/java/com/documentscanner/DocumentScannerModule.kt b/node_modules/react-native-document-scanner-plugin/android/src/main/java/com/documentscanner/DocumentScannerModule.kt
+index fbb6836..26eb22a 100644
+--- a/node_modules/react-native-document-scanner-plugin/android/src/main/java/com/documentscanner/DocumentScannerModule.kt
++++ b/node_modules/react-native-document-scanner-plugin/android/src/main/java/com/documentscanner/DocumentScannerModule.kt
+@@ -49,9 +49,21 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
+     val currentActivity = reactApplicationContext.getCurrentActivity()
+     val response: WritableMap = WritableNativeMap()
+ 
++    val scannerMode = when (if (options.hasKey("scannerMode")) options.getString("scannerMode") else null) {
++      "base" -> GmsDocumentScannerOptions.SCANNER_MODE_BASE
++      "baseWithFilter" -> GmsDocumentScannerOptions.SCANNER_MODE_BASE_WITH_FILTER
++      else -> GmsDocumentScannerOptions.SCANNER_MODE_FULL
++    }
++
+     val documentScannerOptionsBuilder = GmsDocumentScannerOptions.Builder()
+       .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+-      .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
++      .setScannerMode(scannerMode)
++
++    if (options.hasKey("galleryImportAllowed")) {
++      documentScannerOptionsBuilder.setGalleryImportAllowed(
++        options.getBoolean("galleryImportAllowed")
++      )
++    }
+ 
+     if (options.hasKey("maxNumDocuments")) {
+       documentScannerOptionsBuilder.setPageLimit(
+diff --git a/node_modules/react-native-document-scanner-plugin/lib/typescript/src/NativeDocumentScanner.d.ts b/node_modules/react-native-document-scanner-plugin/lib/typescript/src/NativeDocumentScanner.d.ts
+index 6a7fd2e..03a6ba7 100644
+--- a/node_modules/react-native-document-scanner-plugin/lib/typescript/src/NativeDocumentScanner.d.ts
++++ b/node_modules/react-native-document-scanner-plugin/lib/typescript/src/NativeDocumentScanner.d.ts
+@@ -19,6 +19,19 @@ export interface ScanDocumentOptions {
+      * @default: ResponseType.ImageFilePath
+      */
+     responseType?: ResponseType;
++    /**
++     * Android only: lets the user pull photos from the gallery into the scanner (they get the same
++     * edge detection and cleanup as camera captures).
++     * @default: false
++     */
++    galleryImportAllowed?: boolean;
++
++    /**
++     * Android only: which ML Kit scanner UI to show. 'base' = capture + crop only,
++     * 'baseWithFilter' = adds filters, 'full' = adds ML cleanup (remove stains, fingers, shadows).
++     * @default: 'full'
++     */
++    scannerMode?: 'base' | 'baseWithFilter' | 'full';
+ }
+ export declare enum ResponseType {
+     /**
+diff --git a/node_modules/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts b/node_modules/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts
+index 449eeb0..5a18bf8 100644
+--- a/node_modules/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts
++++ b/node_modules/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts
+@@ -23,6 +23,20 @@ export interface ScanDocumentOptions {
+    * @default: ResponseType.ImageFilePath
+    */
+   responseType?: ResponseType;
++
++  /**
++   * Android only: lets the user pull photos from the gallery into the scanner (they get the same
++   * edge detection and cleanup as camera captures).
++   * @default: false
++   */
++  galleryImportAllowed?: boolean;
++
++  /**
++   * Android only: which ML Kit scanner UI to show. 'base' = capture + crop only,
++   * 'baseWithFilter' = adds filters, 'full' = adds ML cleanup (remove stains, fingers, shadows).
++   * @default: 'full'
++   */
++  scannerMode?: 'base' | 'baseWithFilter' | 'full';
+ }
+ 
+ export enum ResponseType {

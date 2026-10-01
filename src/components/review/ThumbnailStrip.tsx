@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
 import type { SessionPage } from '../../types/models';
+import { rotationStyle } from '../../utils/rotation';
 
 const THUMB_WIDTH = 60;
 const THUMB_HEIGHT = (THUMB_WIDTH * 4) / 3;
@@ -143,7 +144,11 @@ function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt, 
           animatedStyle,
         ]}
       >
-        <Image source={{ uri: page.uri }} style={styles.thumbImage} resizeMode="cover" />
+        <Image
+          source={{ uri: page.thumbUri ?? page.uri }}
+          style={[styles.thumbImage, rotationStyle(page.rotation)]}
+          resizeMode="cover"
+        />
         <View style={styles.indexBadge}>
           <Text style={styles.indexBadgeText}>{index + 1}</Text>
         </View>

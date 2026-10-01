@@ -10,13 +10,13 @@ import type { SessionPage } from '../types/models';
 //    or pages added after the edit survive the undo.
 //  - 'pages': the whole page list, for the actions that change it (merge, delete). Undo restores
 //    the list as it was.
-// Crop, rotate and sign write new image files and only change `uri`, so undoing them just points
-// back at the previous file. Those files stay in the cache until the session ends
+// Rotate only changes the `rotation` setting (F5). Crop and sign write new image files and change
+// `uri` (and drop `thumbUri`), so undoing them just points back at the previous files. Those files stay in the cache until the session ends
 // (historyUris + Deliver's cache sweep), because redo or undo may still need them.
 
 export const HISTORY_LIMIT = 20;
 
-const EDITED_FIELDS = ['enhance', 'adjust', 'filterOptions', 'rotation', 'uri', 'width', 'height', 'cropRect'] as const;
+const EDITED_FIELDS = ['enhance', 'adjust', 'filterOptions', 'rotation', 'uri', 'thumbUri', 'width', 'height', 'cropRect'] as const;
 type EditedField = (typeof EDITED_FIELDS)[number];
 export type PageSnapshot = { id: string } & Pick<SessionPage, EditedField>;
 
@@ -42,6 +42,7 @@ export function historyEntryFor(pages: SessionPage[], action: AppAction): Histor
   switch (action.type) {
     case 'capture/SET_PAGE_ENHANCE':
     case 'capture/SET_PAGE_ADJUST':
+    case 'capture/ROTATE_PAGE':
       return fieldsEntry(pages, [action.id]);
     case 'capture/SET_ALL_PAGES_ENHANCE':
     case 'capture/SET_ALL_PAGES_ADJUST':
@@ -113,6 +114,11 @@ export function redo(pages: SessionPage[], history: PageHistory): { pages: Sessi
 // them, so the end-of-session cache sweep (DeliverScreen) deletes them instead.
 export function historyUris(history: PageHistory): string[] {
   const uris = new Set<string>();
-  for (const entry of [...history.past, ...history.future]) for (const page of entry.pages) uris.add(page.uri);
+  for (const entry of [...history.past, ...history.future]) {
+    for (const page of entry.pages) {
+      uris.add(page.uri);
+      if (page.thumbUri) uris.add(page.thumbUri);
+    }
+  }
   return Array.from(uris);
 }

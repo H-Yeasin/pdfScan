@@ -6,11 +6,8 @@ export type DeliverState = {
   format: DocFormat;
   quality: number; // 1-5
   more: boolean;
-  pw: boolean;
-  folderId: string | null;
-  // Free-text "Courses" physical routing (see LibraryDocument.courseFolder) - '' means none,
-  // same convention as `name`, unlike folderId's null-means-none ID-from-a-list convention.
-  courseFolder: string;
+  // Course the saved document is filed under; null means Unsorted.
+  courseId: string | null;
   // Android-only: also write a copy to the user's chosen device folder via SAF.
   exportCopy: boolean;
   // Premium academic PDF export options (cover page, border, header/footer). No UI sets this yet;
@@ -26,9 +23,7 @@ export const initialDeliverState: DeliverState = {
   format: 'PDF',
   quality: 3,
   more: false,
-  pw: false,
-  folderId: null,
-  courseFolder: '',
+  courseId: null,
   exportCopy: false,
   academicConfig: null,
   layoutMode: 'standard',
@@ -39,9 +34,7 @@ export type DeliverAction =
   | { type: 'deliver/SET_FORMAT'; format: DocFormat }
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/TOGGLE_MORE' }
-  | { type: 'deliver/TOGGLE_PW' }
-  | { type: 'deliver/SET_FOLDER'; folderId: string | null }
-  | { type: 'deliver/SET_COURSE_FOLDER'; courseFolder: string }
+  | { type: 'deliver/SET_COURSE'; courseId: string | null }
   | { type: 'deliver/TOGGLE_EXPORT_COPY' }
   | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/SET_LAYOUT_MODE'; layoutMode: LayoutMode }
@@ -57,12 +50,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, quality: action.quality };
     case 'deliver/TOGGLE_MORE':
       return { ...state, more: !state.more };
-    case 'deliver/TOGGLE_PW':
-      return { ...state, pw: !state.pw };
-    case 'deliver/SET_FOLDER':
-      return { ...state, folderId: action.folderId };
-    case 'deliver/SET_COURSE_FOLDER':
-      return { ...state, courseFolder: action.courseFolder };
+    case 'deliver/SET_COURSE':
+      return { ...state, courseId: action.courseId };
     case 'deliver/TOGGLE_EXPORT_COPY':
       return { ...state, exportCopy: !state.exportCopy };
     case 'deliver/SET_ACADEMIC_CONFIG':

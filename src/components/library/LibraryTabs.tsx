@@ -5,7 +5,7 @@ import type { LibraryTab } from '../../store/slices/librarySlice';
 const TABS: { id: LibraryTab; label: string }[] = [
   { id: 'starred', label: '★ Starred' },
   { id: 'recent', label: 'Recent' },
-  { id: 'folders', label: 'Folders' },
+  { id: 'courses', label: 'Courses' },
 ];
 
 type LibraryTabsProps = {
