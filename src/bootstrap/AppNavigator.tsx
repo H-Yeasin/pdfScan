@@ -18,6 +18,7 @@ import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useAppState } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
+import { initCrashReporting } from '../services/telemetry/crash';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
   capture: CaptureScreen,
@@ -45,6 +46,8 @@ export function AppNavigator() {
   const prevScreen = useRef<ScreenName>(screen);
 
   const { state, dispatch } = useAppState();
+  const { crashReportsEnabled } = state.settings;
+  useEffect(() => initCrashReporting(crashReportsEnabled), [crashReportsEnabled]);
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 

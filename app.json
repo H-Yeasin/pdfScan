@@ -86,7 +86,8 @@
         }
       ],
       "expo-asset",
-      "react-native-pdf-jsi"
+      "react-native-pdf-jsi",
+      "@sentry/react-native"
     ],
     "extra": {
       "eas": {

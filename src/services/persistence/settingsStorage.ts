@@ -10,6 +10,7 @@ export type PersistedSettings = {
   ocrScript: OcrScript;
   androidExportFolderUri?: string | null;
   androidExportFolderLabel?: string | null;
+  crashReportsEnabled?: boolean;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

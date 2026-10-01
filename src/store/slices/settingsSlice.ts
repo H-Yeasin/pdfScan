@@ -6,6 +6,8 @@ export type SettingsState = {
   // Android-only: persisted SAF tree URI for "also save a copy to device" exports.
   androidExportFolderUri: string | null;
   androidExportFolderLabel: string | null;
+  // Opt-in, off by default: see services/telemetry/crash.ts.
+  crashReportsEnabled: boolean;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -13,12 +15,14 @@ export const initialSettingsState: SettingsState = {
   ocrScript: 'latin',
   androidExportFolderUri: null,
   androidExportFolderLabel: null,
+  crashReportsEnabled: false,
 };
 
 export type SettingsAction =
   | { type: 'settings/SET_FIRST_RUN'; firstRun: boolean }
   | { type: 'settings/SET_OCR_SCRIPT'; script: OcrScript }
-  | { type: 'settings/SET_ANDROID_EXPORT_FOLDER'; uri: string | null; label: string | null };
+  | { type: 'settings/SET_ANDROID_EXPORT_FOLDER'; uri: string | null; label: string | null }
+  | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -28,6 +32,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, ocrScript: action.script };
     case 'settings/SET_ANDROID_EXPORT_FOLDER':
       return { ...state, androidExportFolderUri: action.uri, androidExportFolderLabel: action.label };
+    case 'settings/SET_CRASH_REPORTS':
+      return { ...state, crashReportsEnabled: action.enabled };
     default:
       return state;
   }

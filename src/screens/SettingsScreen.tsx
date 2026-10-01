@@ -23,7 +23,7 @@ export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { ocrScript, androidExportFolderUri, androidExportFolderLabel } = state.settings;
+  const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled } = state.settings;
 
   const handlePickExportFolder = useCallback(async () => {
     const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -97,6 +97,18 @@ export function SettingsScreen() {
             ) : null}
           </View>
         )}
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Privacy</Text>
+          <SettingRow
+            title="Send anonymous crash reports"
+            subtitle="Never includes your documents, names or scanned text."
+            toggle={{
+              value: crashReportsEnabled,
+              onChange: (enabled) => dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled }),
+            }}
+          />
+        </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>About</Text>

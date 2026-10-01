@@ -19,6 +19,7 @@ export function useSettingsPersistence() {
           uri: settings.androidExportFolderUri ?? null,
           label: settings.androidExportFolderLabel ?? null,
         });
+        dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled: settings.crashReportsEnabled === true });
       }
       loaded.current = true;
     });
@@ -32,6 +33,7 @@ export function useSettingsPersistence() {
       ocrScript: state.settings.ocrScript,
       androidExportFolderUri: state.settings.androidExportFolderUri,
       androidExportFolderLabel: state.settings.androidExportFolderLabel,
+      crashReportsEnabled: state.settings.crashReportsEnabled,
     });
   }, [
     themePref,
@@ -39,5 +41,6 @@ export function useSettingsPersistence() {
     state.settings.ocrScript,
     state.settings.androidExportFolderUri,
     state.settings.androidExportFolderLabel,
+    state.settings.crashReportsEnabled,
   ]);
 }
