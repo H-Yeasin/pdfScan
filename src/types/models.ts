@@ -17,9 +17,13 @@ export type AdjustValues = { brightness: number; contrast: number; saturation: n
 
 export type SessionPage = {
   id: string;
+  // The page's master image. Rotation is NOT baked into it - see `rotation`.
   uri: string;
+  // Small preview of `uri` for strips and grids; undefined falls back to `uri`.
+  thumbUri?: string;
   width: number;
   height: number;
+  // Clockwise rotation applied at render time (preview and export), so rotating never re-encodes.
   rotation: 0 | 90 | 180 | 270;
   cropRect?: { originX: number; originY: number; width: number; height: number };
   enhance: EnhanceMode;

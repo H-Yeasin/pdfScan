@@ -1,6 +1,7 @@
-import { File } from 'expo-file-system';
-import { applySignatureToPdf, buildPdfFromPages } from '../pdf/pdfService';
-import { compressPage } from '../enhance/enhanceService';
+import { Directory, File } from 'expo-file-system';
+import { applySignatureToPdf, buildPdfFromPages, encodingForQuality } from '../pdf/pdfService';
+import { downscaleAndCompressPage } from '../enhance/enhanceService';
+import { THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { getDocumentDir } from './libraryFiles';
 import { buildSearchHaystack } from '../search/searchService';
 import { readTextWithEncodingFallback } from '../documents/txtService';
@@ -10,6 +11,27 @@ import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
 
 const buildHaystack = buildSearchHaystack;
 
+function copyIfPresent(uri: string | undefined, dest: File): string | undefined {
+  if (!uri) return undefined;
+  const source = new File(uri);
+  if (!source.exists) return undefined;
+  if (dest.exists) dest.delete();
+  source.copySync(dest);
+  return dest.uri;
+}
+
+// Copies one page's master (+ display copy and thumbnail, when present) into another document's
+// directory as page N - byte-for-byte, so merging/splitting never costs image quality.
+function copyPageInto(page: LibraryPage, dir: Directory, pageNumber: number): LibraryPage {
+  return {
+    ...page,
+    id: createId('page'),
+    fileUri: copyIfPresent(page.fileUri, new File(dir, `page_${pageNumber}.jpg`)) ?? '',
+    displayUri: copyIfPresent(page.displayUri, new File(dir, `display_${pageNumber}.jpg`)),
+    thumbUri: copyIfPresent(page.thumbUri, new File(dir, `thumb_${pageNumber}.jpg`)),
+  };
+}
+
 // Merged output lands in the source docs' course only when they all share one; a merge combining
 // docs from different courses has no single obviously-correct destination, so it goes to Unsorted.
 export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScript): Promise<LibraryDocument> {
@@ -17,20 +39,14 @@ export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScri
   const dir = getDocumentDir(documentId);
 
   const mergedPages: LibraryPage[] = [];
-  let pageIndex = 0;
   for (const doc of docs) {
-    for (const page of doc.pages) {
-      pageIndex += 1;
-      const dest = new File(dir, `page_${pageIndex}.jpg`);
-      new File(page.fileUri).copySync(dest);
-      mergedPages.push({ id: createId('page'), fileUri: dest.uri, width: page.width, height: page.height, ocr: page.ocr });
-    }
+    for (const page of doc.pages) mergedPages.push(copyPageInto(page, dir, mergedPages.length + 1));
   }
 
   const pdfResult = await buildPdfFromPages(
     documentId,
     mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-    5,
+    'as-is',
     undefined,
     ocrScript
   );
@@ -61,23 +77,20 @@ export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript):
     const source = doc.pages[i];
     const documentId = createId('doc');
     const dir = getDocumentDir(documentId);
-    const dest = new File(dir, 'page_1.jpg');
-    new File(source.fileUri).copySync(dest);
-
-    const page: LibraryPage = { id: createId('page'), fileUri: dest.uri, width: source.width, height: source.height, ocr: source.ocr };
+    const page = copyPageInto(source, dir, 1);
     const name = `${doc.name}_p${i + 1}`;
 
     // Always rebuilds a document.pdf, regardless of doc.format - the unified reader needs a real
     // PDF for every library document (see DeliverScreen.tsx's matching change).
     const pdfResult = await buildPdfFromPages(
       documentId,
-      [{ uri: dest.uri, width: source.width, height: source.height, ocr: source.ocr }],
-      5,
+      [{ uri: page.fileUri, width: page.width, height: page.height, ocr: page.ocr }],
+      'as-is',
       undefined,
       ocrScript
     );
     const pdfUri: string = pdfResult.uri;
-    const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : dest.size ?? 0;
+    const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : new File(page.fileUri).size ?? 0;
 
     results.push({
       id: documentId,
@@ -99,38 +112,26 @@ export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript):
   return results;
 }
 
+// Rebuilds only document.pdf, from the untouched library masters, at the requested export
+// quality. Page images are never overwritten, so compressing is reversible: compress again at a
+// higher quality and the detail is still there.
 export async function compressDocument(doc: LibraryDocument, ocrScript: OcrScript, quality = 2): Promise<LibraryDocument> {
-  const dir = getDocumentDir(doc.id);
-  const compressQuality = 0.2 + (quality - 1) * 0.2;
-
-  const pages: LibraryPage[] = [];
-  let sizeBytes = 0;
-  for (let i = 0; i < doc.pages.length; i++) {
-    const compressed = await compressPage(doc.pages[i].fileUri, compressQuality);
-    const dest = new File(dir, `page_${i + 1}.jpg`);
-    if (dest.exists) dest.delete();
-    new File(compressed.uri).moveSync(dest);
-    sizeBytes += dest.size ?? 0;
-    pages.push({ ...doc.pages[i], fileUri: dest.uri });
-  }
-
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
-    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-    quality,
+    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    encodingForQuality(quality),
     undefined,
     ocrScript
   );
-  const pdfUri: string = pdfResult.uri;
-  if (doc.format === 'PDF') sizeBytes = pdfResult.sizeBytes;
+  const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
   // Rebuilds by feeding doc.pages (including any former cover raster at index 0) straight through
   // buildPdfFromPages with academicConfig: undefined - a cover page is never re-emitted via
   // buildCoverPage here, so page 0 becomes a plain fit-to-margin-box content page same as every
   // other page. coverKind must be cleared to match, or applySignatureToDocument would wrongly
   // treat a rebuilt PDF's page 0 as an unfit, full-page template cover.
-  return { ...doc, pages, pdfUri, sizeBytes, coverKind: undefined };
+  return { ...doc, pdfUri: pdfResult.uri, sizeBytes, coverKind: undefined };
 }
 
 // Replaces one page's image with a signed (flattened) version, in place, and rebuilds the
@@ -146,13 +147,24 @@ export async function applySignedPage(
   if (dest.exists) dest.delete();
   new File(flattenedUri).moveSync(dest);
 
-  const pages = doc.pages.map((page, i) => (i === pageIndex ? { ...page, fileUri: dest.uri } : page));
+  // The old display copy and thumbnail show the unsigned page - regenerate the thumbnail and drop
+  // the display copy (the viewer falls back to the signed master).
+  const thumbSource = await downscaleAndCompressPage(dest.uri, THUMB_MAX_DIM, THUMB_JPEG_Q);
+  const thumb = new File(dir, `thumb_${pageIndex + 1}.jpg`);
+  if (thumb.exists) thumb.delete();
+  new File(thumbSource.uri).moveSync(thumb);
+  const staleDisplay = new File(dir, `display_${pageIndex + 1}.jpg`);
+  if (staleDisplay.exists) staleDisplay.delete();
+
+  const pages = doc.pages.map((page, i) =>
+    i === pageIndex ? { ...page, fileUri: dest.uri, thumbUri: thumb.uri, displayUri: undefined } : page
+  );
 
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
     pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-    5,
+    'as-is',
     undefined,
     ocrScript
   );

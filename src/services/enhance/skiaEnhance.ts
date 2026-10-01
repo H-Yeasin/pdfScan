@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import { AlphaType, ColorType, FilterMode, ImageFormat, MipmapMode, Skia, TileMode } from '@shopify/react-native-skia';
-import type { SkImage } from '@shopify/react-native-skia';
+import type { SkImage, SkPaint } from '@shopify/react-native-skia';
+import { fitWithin } from '../capture/imageSpec';
 import { createId } from '../../utils/id';
 import { DEFAULT_ADJUST, isDefaultAdjust } from './adjust';
 import type { AdjustValues, EnhanceMode } from '../../types/models';
@@ -287,56 +288,82 @@ function getDocumentScanEffect() {
   return documentScanEffect;
 }
 
-// Real pixel-level bake using Skia — runs the page through an offscreen GPU surface. auto/color/
-// gray/bw derive a content-adaptive matrix from a real histogram analysis of the page (see
-// analyzeImage/baseModeFilter above), so every mode now produces a genuinely distinct result
-// instead of some being no-ops; document_scan runs the Sauvola threshold shader instead, since a
-// binarized scan has no continuous tone for a color matrix to act on. Manual brightness/contrast/
-// saturation adjustments are composed on TOP of the mode filter (not before it) - the mode
-// filter's stats are computed from the original pixels, so it must see the original distribution;
-// the user's adjustment then applies as a relative nudge on top of that already-corrected result.
-// Always writes a new JPEG file; never touches the source page's original image.
-export async function bakeEnhance(
-  uri: string,
-  mode: EnhanceMode,
-  adjust: AdjustValues = DEFAULT_ADJUST
-): Promise<{ uri: string; width: number; height: number }> {
-  const data = await Skia.Data.fromURI(uri);
-  const image = Skia.Image.MakeImageFromEncoded(data);
-  if (!image) throw new Error(`Skia failed to decode image at ${uri}`);
+export type PageEdits = {
+  rotation?: 0 | 90 | 180 | 270;
+  // undefined means "no filter" (a plain resize/re-encode, e.g. exporting a library master).
+  enhance?: EnhanceMode;
+  adjust?: AdjustValues;
+};
 
+export type RenderTarget = { maxDim: number; q: number };
+
+export type RenderedPage = { uri: string; width: number; height: number };
+
+// Sets up `paint` for the page's filter. auto/color/gray/bw derive a content-adaptive matrix from a
+// real histogram analysis of the page (see analyzeImage/baseModeFilter above), so every mode
+// produces a genuinely distinct result; document_scan runs the Sauvola threshold shader instead,
+// since a binarized scan has no continuous tone for a color matrix to act on. Manual brightness/
+// contrast/saturation adjustments are composed on TOP of the mode filter (not before it) - the
+// mode filter's stats are computed from the original pixels, so it must see the original
+// distribution; the user's adjustment then applies as a relative nudge on top of that result.
+// Returns whether the page must be drawn as a shaded rect (document_scan) rather than an image.
+function configurePaint(image: SkImage, paint: SkPaint, edits: PageEdits): boolean {
   const width = image.width();
   const height = image.height();
-
-  const surface = Skia.Surface.MakeOffscreen(width, height);
-  if (!surface) throw new Error('Skia failed to create an offscreen surface');
-
-  const paint = Skia.Paint();
-  const canvas = surface.getCanvas();
-
-  if (mode === 'document_scan') {
+  if (edits.enhance === 'document_scan') {
     const imageShader = image.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.None);
     const shader = getDocumentScanEffect().makeShaderWithChildren(
       [SAUVOLA_K, SAUVOLA_R, SAMPLE_RADIUS_RATIO * Math.max(width, height)],
       [imageShader]
     );
     paint.setShader(shader);
-    canvas.drawRect(Skia.XYWHRect(0, 0, width, height), paint);
-  } else {
-    const stats = analyzeImage(image);
-    const modeFilter = baseModeFilter(mode, stats);
-    const adjustFilter = composeAdjustFilter(adjust);
-    const colorFilter = adjustFilter ? Skia.ColorFilter.MakeCompose(adjustFilter, modeFilter) : modeFilter;
-    paint.setColorFilter(colorFilter);
-    canvas.drawImage(image, 0, 0, paint);
+    return true;
   }
+  const adjustFilter = composeAdjustFilter(edits.adjust ?? DEFAULT_ADJUST);
+  const modeFilter = edits.enhance ? baseModeFilter(edits.enhance, analyzeImage(image)) : null;
+  const colorFilter =
+    modeFilter && adjustFilter ? Skia.ColorFilter.MakeCompose(adjustFilter, modeFilter) : (modeFilter ?? adjustFilter);
+  if (colorFilter) paint.setColorFilter(colorFilter);
+  return false;
+}
+
+// Renders a page in ONE Skia pass - rotate, filter, downscale - and encodes it exactly once, to a
+// new JPEG in the cache dir. This is the only place page pixels are re-encoded on the way to the
+// library or an export, so quality never compounds across steps. Never touches the source file.
+export async function renderPage(uri: string, edits: PageEdits, target: RenderTarget): Promise<RenderedPage> {
+  const data = await Skia.Data.fromURI(uri);
+  const image = Skia.Image.MakeImageFromEncoded(data);
+  if (!image) throw new Error(`Skia failed to decode image at ${uri}`);
+
+  const srcWidth = image.width();
+  const srcHeight = image.height();
+  const rotation = edits.rotation ?? 0;
+  const quarterTurn = rotation === 90 || rotation === 270;
+  const out = fitWithin(quarterTurn ? srcHeight : srcWidth, quarterTurn ? srcWidth : srcHeight, target.maxDim);
+
+  const surface = Skia.Surface.MakeOffscreen(out.width, out.height);
+  if (!surface) throw new Error('Skia failed to create an offscreen surface');
+  const canvas = surface.getCanvas();
+
+  const paint = Skia.Paint();
+  paint.setAntiAlias(true);
+  const asShadedRect = configurePaint(image, paint, edits);
+
+  // Map the source image into the output: center, rotate, scale, then draw in source coordinates
+  // (so the document_scan shader's sample radius stays in source pixels).
+  canvas.save();
+  canvas.translate(out.width / 2, out.height / 2);
+  if (rotation !== 0) canvas.rotate(rotation, 0, 0);
+  canvas.scale(out.scale, out.scale);
+  canvas.translate(-srcWidth / 2, -srcHeight / 2);
+  const srcRect = Skia.XYWHRect(0, 0, srcWidth, srcHeight);
+  if (asShadedRect) canvas.drawRect(srcRect, paint);
+  else canvas.drawImageRectOptions(image, srcRect, srcRect, FilterMode.Linear, MipmapMode.Linear, paint);
+  canvas.restore();
   surface.flush();
 
-  const snapshot = surface.makeImageSnapshot();
-  const bytes = snapshot.encodeToBytes(ImageFormat.JPEG, 92);
-
-  const dest = new File(Paths.cache, `${createId('enhanced')}.jpg`);
+  const bytes = surface.makeImageSnapshot().encodeToBytes(ImageFormat.JPEG, Math.round(target.q * 100));
+  const dest = new File(Paths.cache, `${createId('render')}.jpg`);
   dest.write(bytes);
-
-  return { uri: dest.uri, width, height };
+  return { uri: dest.uri, width: out.width, height: out.height };
 }

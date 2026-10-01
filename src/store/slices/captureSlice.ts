@@ -30,6 +30,7 @@ export type CaptureAction =
   | { type: 'capture/SET_ALL_PAGES_ENHANCE'; enhance: EnhanceMode }
   | { type: 'capture/SET_PAGE_ADJUST'; id: string; adjust: AdjustValues }
   | { type: 'capture/SET_ALL_PAGES_ADJUST'; adjust: AdjustValues }
+  | { type: 'capture/ROTATE_PAGE'; id: string }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
   | { type: 'capture/REPLACE_PAGES'; ids: string[]; page: SessionPage }
   | { type: 'capture/CLEAR_PAGES' }
@@ -70,10 +71,23 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
         ...state,
         pages: state.pages.map((p) => ({ ...p, adjust: action.adjust })),
       };
+    case 'capture/ROTATE_PAGE':
+      // A setting only: the master isn't re-encoded, the rotation is applied when rendering.
+      return {
+        ...state,
+        pages: state.pages.map((p) =>
+          p.id === action.id ? { ...p, rotation: ((p.rotation + 90) % 360) as SessionPage['rotation'] } : p
+        ),
+      };
     case 'capture/UPDATE_PAGE':
       return {
         ...state,
-        pages: state.pages.map((p) => (p.id === action.id ? { ...p, ...action.patch } : p)),
+        pages: state.pages.map((p) => {
+          if (p.id !== action.id) return p;
+          // A new master (crop, signature) makes the old thumbnail stale unless one is supplied.
+          const staleThumb = action.patch.uri !== undefined && action.patch.thumbUri === undefined;
+          return { ...p, ...action.patch, ...(staleThumb ? { thumbUri: undefined } : null) };
+        }),
       };
     case 'capture/REPLACE_PAGES': {
       // firstIndex is the position of the FIRST (in array order) matching page, so every page

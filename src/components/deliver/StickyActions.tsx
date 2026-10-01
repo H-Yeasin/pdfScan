@@ -3,11 +3,13 @@ import { radii, spacing, useTheme } from '../../theme';
 
 type StickyActionsProps = {
   saving: boolean;
+  // Shown under the Save button while saving (e.g. "Preparing page 3 of 10…").
+  progress?: string | null;
   onSave: () => void;
   onSaveShare: () => void;
 };
 
-export function StickyActions({ saving, onSave, onSaveShare }: StickyActionsProps) {
+export function StickyActions({ saving, progress, onSave, onSaveShare }: StickyActionsProps) {
   const { tokens } = useTheme();
 
   return (
@@ -19,6 +21,11 @@ export function StickyActions({ saving, onSave, onSaveShare }: StickyActionsProp
       >
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryLabel}>Save</Text>}
       </Pressable>
+      {saving && progress ? (
+        <Text style={[styles.progress, { color: tokens.muted }]} accessibilityLiveRegion="polite">
+          {progress}
+        </Text>
+      ) : null}
       <Pressable style={styles.ghost} onPress={onSaveShare} disabled={saving}>
         <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>Save & Share</Text>
       </Pressable>
@@ -48,6 +55,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  progress: {
+    textAlign: 'center',
+    fontSize: 13,
+    marginTop: spacing.sm,
   },
   ghost: {
     height: 46,

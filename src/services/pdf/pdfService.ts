@@ -3,7 +3,8 @@ import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { compressPage } from '../enhance/enhanceService';
+import { renderPage } from '../enhance/skiaEnhance';
+import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { fitBox } from '../../utils/fitBox';
 import type { LibraryDocument, OcrLine, OcrScript, PageOcr } from '../../types/models';
@@ -156,17 +157,34 @@ function drawOcrLayer(pdfPage: PDFPage, ocr: PageOcr, scale: number, placement: 
   }
 }
 
-// Recompresses the page's JPEG at the requested quality, embeds the resulting bytes, and deletes
-// the transient recompressed file - no page holds more than one raw image buffer at a time
-// before pdf-lib takes ownership of the bytes, and nothing is ever base64-inflated.
-async function embedPageImage(pdfDoc: PDFDocument, uri: string, compressQuality: number) {
-  const compressed = await compressPage(uri, compressQuality);
+// How page images get into the PDF. 'as-is' embeds the file's bytes untouched - for pages that
+// are already final (library masters at quality 5, or pages Deliver rendered at the export preset).
+// An ExportPreset renders each page from its master once, at that preset, then embeds the result.
+export type PageImageEncoding = 'as-is' | ExportPreset;
+
+// Exporting at master quality needs no re-encode at all, so it's the same as 'as-is'.
+export function encodingForQuality(quality: number): PageImageEncoding {
+  return isMasterQuality(quality) ? 'as-is' : exportPreset(quality);
+}
+
+// Embeds one page image. Never decodes/re-encodes an 'as-is' page; an ExportPreset page is
+// rendered exactly once and the transient file deleted right after - no page holds more than one
+// raw image buffer at a time before pdf-lib takes ownership of the bytes.
+async function embedPageImage(pdfDoc: PDFDocument, uri: string, encoding: PageImageEncoding) {
+  let sourceUri = uri;
+  let tempUri: string | null = null;
+  if (encoding !== 'as-is') {
+    tempUri = (await renderPage(uri, {}, encoding)).uri;
+    sourceUri = tempUri;
+  }
   try {
-    const bytes = await new File(compressed.uri).bytes();
-    return await pdfDoc.embedJpg(bytes);
+    const bytes = await new File(sourceUri).bytes();
+    return sniffImageKind(bytes) === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
   } finally {
-    const tempFile = new File(compressed.uri);
-    if (tempFile.exists) tempFile.delete();
+    if (tempUri) {
+      const tempFile = new File(tempUri);
+      if (tempFile.exists) tempFile.delete();
+    }
   }
 }
 
@@ -298,7 +316,7 @@ function stampAcademicPage(
 async function buildStandardContentPages(
   pdfDoc: PDFDocument,
   pages: PdfSourcePage[],
-  compressQuality: number,
+  encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
   ocrFont: PDFFont
@@ -309,7 +327,7 @@ async function buildStandardContentPages(
   const totalContentPages = pages.length;
   for (const page of pages) {
     contentPageNumber += 1;
-    const jpgImage = await embedPageImage(pdfDoc, page.uri, compressQuality);
+    const jpgImage = await embedPageImage(pdfDoc, page.uri, encoding);
 
     const placement = fitBox(page.width, page.height, CONTENT_MARGIN_PT, CONTENT_MARGIN_PT, boxWidthPt, boxHeightPt);
 
@@ -341,14 +359,14 @@ async function drawTwoUpColumn(
   pdfDoc: PDFDocument,
   pdfPage: PDFPage,
   page: PdfSourcePage,
-  compressQuality: number,
+  encoding: PageImageEncoding,
   columnX: number,
   ocrFont: PDFFont
 ): Promise<void> {
   const columnWidthPt = (LAYOUT_2IN1_WIDTH_PT - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
   const columnHeightPt = LAYOUT_2IN1_HEIGHT_PT - LAYOUT_2IN1_MARGIN_PT * 2;
 
-  const image = await embedPageImage(pdfDoc, page.uri, compressQuality);
+  const image = await embedPageImage(pdfDoc, page.uri, encoding);
   const placement = fitBox(page.width, page.height, columnX, LAYOUT_2IN1_MARGIN_PT, columnWidthPt, columnHeightPt);
 
   pdfPage.drawImage(image, {
@@ -371,7 +389,7 @@ async function drawTwoUpColumn(
 async function buildTwoUpContentPages(
   pdfDoc: PDFDocument,
   pages: PdfSourcePage[],
-  compressQuality: number,
+  encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
   ocrFont: PDFFont
@@ -387,11 +405,11 @@ async function buildTwoUpContentPages(
     sheetNumber += 1;
     const pdfPage = pdfDoc.addPage([LAYOUT_2IN1_WIDTH_PT, LAYOUT_2IN1_HEIGHT_PT]);
 
-    await drawTwoUpColumn(pdfDoc, pdfPage, pages[i], compressQuality, leftColumnX, ocrFont);
+    await drawTwoUpColumn(pdfDoc, pdfPage, pages[i], encoding, leftColumnX, ocrFont);
 
     const pageB = pages[i + 1];
     if (pageB) {
-      await drawTwoUpColumn(pdfDoc, pdfPage, pageB, compressQuality, rightColumnX, ocrFont);
+      await drawTwoUpColumn(pdfDoc, pdfPage, pageB, encoding, rightColumnX, ocrFont);
     }
 
     if (academicConfig) {
@@ -403,12 +421,11 @@ async function buildTwoUpContentPages(
 export async function buildPdfFromPages(
   documentId: string,
   pages: PdfSourcePage[],
-  quality: number,
+  encoding: PageImageEncoding,
   academicConfig?: AcademicConfig,
   ocrScript?: OcrScript,
   layoutMode: LayoutMode = 'standard'
 ): Promise<{ uri: string; sizeBytes: number }> {
-  const compressQuality = 0.2 + (quality - 1) * 0.2; // quality 1-5 -> 0.2-1.0, same convention as enhanceService/imageExportService
 
   const pdfDoc = await PDFDocument.create();
   // stampFont is for header/footer only and always stays on the asset-free standard font, per
@@ -440,9 +457,9 @@ export async function buildPdfFromPages(
   }
 
   if (layoutMode === '2_in_1') {
-    await buildTwoUpContentPages(pdfDoc, pages, compressQuality, academicConfig, stampFont, ocrFont);
+    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont);
   } else {
-    await buildStandardContentPages(pdfDoc, pages, compressQuality, academicConfig, stampFont, ocrFont);
+    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont);
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -539,15 +556,16 @@ export async function ensureDocumentPdf(doc: LibraryDocument, ocrScript: OcrScri
   const result = await buildPdfFromPages(
     doc.id,
     doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-    5,
+    'as-is',
     undefined,
     ocrScript
   );
   return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes };
 }
 
+// Deliver's "≈ size" hint. Session pages are master-spec files, so their size scaled by the
+// preset's size factor is a fair guess at the exported page images (which dominate a scan PDF).
 export function estimateSizeBytes(pages: PdfSourcePage[], quality: number): number {
-  const rawBytes = pages.reduce((sum, page) => sum + (new File(page.uri).size ?? 0), 0);
-  const qualityMultiplier = 0.2 + (quality - 1) * 0.2; // quality 1-5 -> 0.2-1.0
-  return Math.round(rawBytes * qualityMultiplier);
+  const masterBytes = pages.reduce((sum, page) => sum + (new File(page.uri).size ?? 0), 0);
+  return estimateExportBytes(masterBytes, quality);
 }

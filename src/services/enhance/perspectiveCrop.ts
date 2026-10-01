@@ -2,8 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { ImageFormat, Skia } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
 import { quadToQuadMatrix, type Point } from './perspective';
-
-const JPEG_QUALITY = 92;
+import { CROP_JPEG_Q } from '../capture/imageSpec';
 
 function edgeLength(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
@@ -52,7 +51,7 @@ export async function warpPerspectiveCrop(
   surface.flush();
 
   const snapshot = surface.makeImageSnapshot();
-  const bytes = snapshot.encodeToBytes(ImageFormat.JPEG, JPEG_QUALITY);
+  const bytes = snapshot.encodeToBytes(ImageFormat.JPEG, Math.round(CROP_JPEG_Q * 100));
 
   const dest = new File(Paths.cache, `${createId('cropped')}.jpg`);
   dest.write(bytes);

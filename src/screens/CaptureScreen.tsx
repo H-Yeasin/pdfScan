@@ -7,12 +7,12 @@ import { StatusBar } from 'expo-status-bar';
 import { CaptureControls } from '../components/capture/CaptureControls';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
+import { ingestPage } from '../services/capture/ingest';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { useAppState } from '../store/AppStateContext';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
 import type { SessionPage } from '../types/models';
-import { createId } from '../utils/id';
 
 export function CaptureScreen() {
   const chrome = useCaptureChrome();
@@ -28,19 +28,26 @@ export function CaptureScreen() {
   // images (status flips to 'processing'), so it can no longer be the one reacting to the
   // eventual 'success'/'error' that lands after the slow downscale/OCR loop finishes.
 
+  // Gallery photos go through the same ingest as scans (master downscale, thumbnail, OCR), one at
+  // a time - full-size phone photos are large enough that doing them concurrently risks OOM.
   const addPagesFromAssets = useCallback(
-    (assets: { uri: string; width: number; height: number }[]) => {
-      const newPages: SessionPage[] = assets.map((asset) => ({
-        id: createId('page'),
-        uri: asset.uri,
-        width: asset.width,
-        height: asset.height,
-        rotation: 0,
-        enhance: 'auto',
-      }));
-      dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
+    async (assets: { uri: string }[]) => {
+      dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
+      const newPages: SessionPage[] = [];
+      try {
+        for (const asset of assets) newPages.push(await ingestPage(asset.uri, ocrScript));
+        dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
+        dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
+      } catch (error) {
+        if (newPages.length > 0) dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
+        dispatch({
+          type: 'capture/SET_PROCESSING_STATUS',
+          status: 'error',
+          errorMessage: `Couldn't import ${assets.length - newPages.length} photo(s)`,
+        });
+      }
     },
-    [dispatch]
+    [dispatch, ocrScript]
   );
 
   const handleImport = useCallback(async () => {
@@ -50,12 +57,13 @@ export function CaptureScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      quality: 0.9,
+      // Full quality: ingestPage does the one encode to the master spec.
+      quality: 1,
     });
     if (result.canceled || result.assets.length === 0) return;
 
-    addPagesFromAssets(result.assets);
     go('review');
+    addPagesFromAssets(result.assets);
   }, [addPagesFromAssets, go]);
 
   const handleScan = useCallback(() => {

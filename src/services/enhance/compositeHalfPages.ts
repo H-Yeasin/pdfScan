@@ -2,14 +2,13 @@ import { File, Paths } from 'expo-file-system';
 import { ImageFormat, Skia } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
 import { fitBox } from '../../utils/fitBox';
+import { MASTER_JPEG_Q, MASTER_MAX_DIM } from '../capture/imageSpec';
 
-// A4-ratio pixel canvas for a merged (two-pages-stacked) page. Larger than scannerPipeline.ts's
-// MAX_DIMENSION=1200 (a normal single scanned page's long-side cap) since this canvas holds two
-// source pages' worth of content stacked vertically - ~1.33x keeps each half's effective
-// resolution budget close to what a normal single-page scan gets.
-const MERGE_CANVAS_WIDTH_PX = 1131;
-const MERGE_CANVAS_HEIGHT_PX = 1600;
-const JPEG_QUALITY = 92;
+// A4-ratio pixel canvas for a merged (two-pages-stacked) page, at the same long-side budget as
+// any other master (about 1697x2400), so a merged page is as sharp as a normal one.
+const MERGE_CANVAS_HEIGHT_PX = MASTER_MAX_DIM;
+const MERGE_CANVAS_WIDTH_PX = Math.round(MASTER_MAX_DIM / Math.SQRT2);
+const JPEG_QUALITY = Math.round(MASTER_JPEG_Q * 100);
 
 type CroppedImage = { uri: string; width: number; height: number };
 

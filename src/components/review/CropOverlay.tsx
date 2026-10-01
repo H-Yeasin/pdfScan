@@ -25,7 +25,7 @@ type CropOverlayProps = {
   // feature. Omitted by the single-crop call site, so its layout is unaffected.
   stepLabel?: string;
   // Natural-pixel-space corners, topLeft/topRight/bottomRight/bottomLeft order — the caller runs
-  // the actual perspective warp (mirrors how rotatePage/cropPage are invoked from ReviewScreen).
+  // the actual perspective warp (ReviewScreen runs warpPerspectiveCrop on confirm).
   onConfirm: (points: [Point, Point, Point, Point]) => void;
   onCancel: () => void;
 };

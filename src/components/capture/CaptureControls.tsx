@@ -4,6 +4,7 @@ import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, View } from 
 import { radii, spacing } from '../../theme';
 import { useCaptureChrome } from '../../theme/captureChrome';
 import type { SessionPage } from '../../types/models';
+import { rotationStyle } from '../../utils/rotation';
 
 const SIDE_BUTTON_SIZE = 48;
 const SCAN_BUTTON_SIZE = 76;
@@ -79,7 +80,11 @@ export function CaptureControls({
         hitSlop={8}
       >
         {lastPage ? (
-          <Image source={{ uri: lastPage.uri }} style={styles.thumbnailImage} resizeMode="cover" />
+          <Image
+            source={{ uri: lastPage.thumbUri ?? lastPage.uri }}
+            style={[styles.thumbnailImage, rotationStyle(lastPage.rotation)]}
+            resizeMode="cover"
+          />
         ) : (
           <Ionicons name="document-outline" size={20} color={chrome.textDim} />
         )}

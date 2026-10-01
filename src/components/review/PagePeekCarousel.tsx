@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useZoomableImageGesture } from '../shared/useZoomableImageGesture';
 import type { SessionPage } from '../../types/models';
+import { rotationStyle } from '../../utils/rotation';
 
 const SWIPE_DISTANCE_THRESHOLD = 50;
 const SWIPE_VELOCITY_THRESHOLD = 300;
@@ -18,6 +19,8 @@ type PagePeekCarouselProps = {
   pages: SessionPage[];
   sel: number;
   displayUri: string | undefined;
+  // Rotation still to apply to `displayUri` (0 when the preview is already rendered rotated).
+  displayRotation?: SessionPage['rotation'];
   onCommitPrev: () => void;
   onCommitNext: () => void;
 };
@@ -28,7 +31,7 @@ type PagePeekCarouselProps = {
 // hinting that the page is swipeable before the user touches it.
 // Only the "current" panel gets the expensive enhanced/stamped `displayUri` - the peek panels use
 // the page's raw (already-captured) uri, same cheap source ThumbnailStrip renders for thumbnails.
-export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommitNext }: PagePeekCarouselProps) {
+export function PagePeekCarousel({ pages, sel, displayUri, displayRotation = 0, onCommitPrev, onCommitNext }: PagePeekCarouselProps) {
   const [width, setWidth] = useState(0);
   const dragX = useSharedValue(0);
   const isAnimating = useSharedValue(false);
@@ -110,17 +113,21 @@ export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommi
             style={[styles.track, { width: mainWidth * 3 + PANEL_GAP * 2, left: baseLeft }, trackStyle]}
           >
             <View style={[styles.panel, { width: mainWidth, marginRight: PANEL_GAP }]}>
-              {prevPage && <Image source={{ uri: prevPage.uri }} style={styles.image} resizeMode="contain" />}
+              {prevPage && (
+                <Image source={{ uri: prevPage.uri }} style={[styles.image, rotationStyle(prevPage.rotation)]} resizeMode="contain" />
+              )}
             </View>
             <View style={[styles.panel, { width: mainWidth, marginRight: PANEL_GAP }]}>
               <Animated.Image
                 source={{ uri: displayUri ?? currentPage.uri }}
-                style={[styles.image, zoomStyle]}
+                style={[styles.image, rotationStyle(displayRotation), zoomStyle]}
                 resizeMode="contain"
               />
             </View>
             <View style={[styles.panel, { width: mainWidth }]}>
-              {nextPage && <Image source={{ uri: nextPage.uri }} style={styles.image} resizeMode="contain" />}
+              {nextPage && (
+                <Image source={{ uri: nextPage.uri }} style={[styles.image, rotationStyle(nextPage.rotation)]} resizeMode="contain" />
+              )}
             </View>
           </Animated.View>
         </GestureDetector>

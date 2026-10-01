@@ -15,7 +15,6 @@ import { SignaturePlacementOverlay } from '../components/shared/SignaturePlaceme
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
-import { rotatePage } from '../services/enhance/enhanceService';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
 import type { Point } from '../services/enhance/perspective';
 import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
@@ -63,7 +62,8 @@ export function ReviewScreen() {
   const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(
     selectedPage?.uri,
     selectedPage?.enhance ?? 'auto',
-    currentAdjust
+    currentAdjust,
+    selectedPage?.rotation ?? 0
   );
 
   // Runs border/header-footer stamping on top of the already-enhanced preview, so this mirrors
@@ -141,10 +141,9 @@ export function ReviewScreen() {
     if (sel < pages.length - 1) dispatch({ type: 'review/SELECT_PAGE', index: sel + 1 });
   }, [dispatch, sel, pages.length]);
 
-  const handleRotate = useCallback(async () => {
+  const handleRotate = useCallback(() => {
     if (!selectedPage) return;
-    const rotated = await rotatePage(selectedPage.uri, 90);
-    dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: rotated });
+    dispatch({ type: 'capture/ROTATE_PAGE', id: selectedPage.id });
   }, [dispatch, selectedPage]);
 
   const handleOcr = useCallback(async () => {
@@ -374,6 +373,9 @@ export function ReviewScreen() {
           pages={pages}
           sel={sel}
           displayUri={displayUri}
+          // The rendered preview already has the rotation baked in; the raw master shown while
+          // comparing doesn't.
+          displayRotation={comparing ? selectedPage.rotation : 0}
           onCommitPrev={goPrevPage}
           onCommitNext={goNextPage}
         />
