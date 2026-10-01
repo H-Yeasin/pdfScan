@@ -8,12 +8,12 @@ import { CaptureControls } from '../components/capture/CaptureControls';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
-import { ingestPage } from '../services/capture/ingest';
+import { ingestGalleryBatch } from '../services/capture/ingestBatch';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { useAppState } from '../store/AppStateContext';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
-import type { CaptureMode, SessionPage } from '../types/models';
+import type { CaptureMode } from '../types/models';
 
 export function CaptureScreen() {
   const chrome = useCaptureChrome();
@@ -54,30 +54,6 @@ export function CaptureScreen() {
   // images (status flips to 'processing'), so it can no longer be the one reacting to the
   // eventual 'success'/'error' that lands after the slow downscale/OCR loop finishes.
 
-  // Gallery photos go through the same ingest as scans (master downscale, thumbnail, OCR), one at
-  // a time - full-size phone photos are large enough that doing them concurrently risks OOM.
-  const addPagesFromAssets = useCallback(
-    async (assets: { uri: string }[]) => {
-      dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
-      const newPages: SessionPage[] = [];
-      try {
-        for (const asset of assets) {
-          newPages.push(await ingestPage(asset.uri, ocrScript, { enhance: spec.defaultEnhance }));
-        }
-        dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
-        dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
-      } catch (error) {
-        if (newPages.length > 0) dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
-        dispatch({
-          type: 'capture/SET_PROCESSING_STATUS',
-          status: 'error',
-          errorMessage: `Couldn't import ${assets.length - newPages.length} photo(s)`,
-        });
-      }
-    },
-    [dispatch, ocrScript, spec.defaultEnhance]
-  );
-
   const handleImport = useCallback(async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) return;
@@ -90,9 +66,17 @@ export function CaptureScreen() {
     });
     if (result.canceled || result.assets.length === 0) return;
 
+    markPickerSeen();
     go('review');
-    addPagesFromAssets(result.assets);
-  }, [addPagesFromAssets, go]);
+    // Same ingest as scans (master, thumbnail, OCR, the mode's filter), one photo at a time with
+    // per-page progress in Review.
+    void ingestGalleryBatch(
+      dispatch,
+      result.assets.map((asset) => asset.uri),
+      ocrScript,
+      spec
+    );
+  }, [dispatch, go, markPickerSeen, ocrScript, spec]);
 
   const handleScan = useCallback(() => {
     if (busyScanning) return;

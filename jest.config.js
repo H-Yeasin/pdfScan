@@ -11,6 +11,7 @@ module.exports = {
     '^expo-asset$': '<rootDir>/src/test/mocks/expoAsset.ts',
     '^expo-sqlite$': '<rootDir>/src/test/mocks/expoSqlite.ts',
     '^rn-mlkit-ocr$': '<rootDir>/src/test/mocks/rnMlkitOcr.ts',
+    '^expo-haptics$': '<rootDir>/src/test/mocks/expoHaptics.ts',
     '^@react-native-async-storage/async-storage$':
       '@react-native-async-storage/async-storage/jest/async-storage-mock',
   },

@@ -7,6 +7,9 @@ export type CaptureState = {
   pages: SessionPage[];
   processingStatus: ProcessingStatus;
   errorMessage?: string;
+  // Per-page progress of the batch being processed (scan or gallery import); null when idle.
+  // A separate small field, so updating it once per page is cheap.
+  progress: { done: number; total: number } | null;
   // Set by ReviewScreen's "Retake" action right before navigating to Capture. The next
   // BULK_ADD_PAGES splices its pages in at this page's position (replacing it) instead of
   // appending, then clears the flag. Every other entry point into Capture must clear it too, so a
@@ -18,6 +21,7 @@ export const initialCaptureState: CaptureState = {
   mode: 'doc',
   pages: [],
   processingStatus: 'idle',
+  progress: null,
   retakeTargetId: null,
 };
 
@@ -35,7 +39,8 @@ export type CaptureAction =
   | { type: 'capture/REPLACE_PAGES'; ids: string[]; page: SessionPage }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
-  | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string };
+  | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string }
+  | { type: 'capture/SET_PROGRESS'; progress: { done: number; total: number } | null };
 
 export function captureReducer(state: CaptureState, action: CaptureAction): CaptureState {
   switch (action.type) {
@@ -114,6 +119,14 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
     }
     case 'capture/SET_PROCESSING_STATUS':
       return { ...state, processingStatus: action.status, errorMessage: action.errorMessage };
+    case 'capture/SET_PROGRESS': {
+      const next = action.progress;
+      if (next === null) return state.progress === null ? state : { ...state, progress: null };
+      // Clamp, so a stray value can never render "page 11 of 10".
+      const total = Math.max(0, next.total);
+      const done = Math.min(total, Math.max(0, next.done));
+      return { ...state, progress: { done, total } };
+    }
     default:
       return state;
   }

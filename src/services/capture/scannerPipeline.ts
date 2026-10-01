@@ -2,18 +2,16 @@ import type { Dispatch } from 'react';
 import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 import type { AppAction } from '../../store/appReducer';
 import type { CaptureModeSpec } from './captureModes';
-import { ingestPage } from './ingest';
-import { cleanTemporaryCache } from '../persistence/libraryFiles';
-import type { OcrScript, SessionPage } from '../../types/models';
-
+import { ingestBatch } from './ingestBatch';
+import { hapticPagesReceived, hapticWarning } from '../feedback/haptics';
+import type { OcrScript } from '../../types/models';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Orchestrates the whole scan session outside the reducer, committing state only at clean
-// transition points (scanning -> processing -> one bulk commit -> success/error) instead of
-// once per page, so the Context doesn't re-render mid-scan.
+// Orchestrates a scan session outside the reducer: scanning -> processing (per-page progress,
+// cancellable, see ingestBatch.ts) -> one bulk commit -> success/error.
 export async function runNativeScannerPipeline(
   dispatch: Dispatch<AppAction>,
   script: OcrScript,
@@ -48,27 +46,21 @@ export async function runNativeScannerPipeline(
     }
     scannedImages = result.scannedImages;
   } catch (error) {
+    hapticWarning();
     dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'error', errorMessage: errorMessage(error) });
     return;
   }
 
+  hapticPagesReceived();
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
 
-  const processedPages: SessionPage[] = [];
-
-  try {
-    // Sequential on purpose: each raw scan can be 4K+/12MB+. Running these concurrently
-    // (Promise.all) risks OOM-killing the app on mid-range Android devices.
-    for (const rawUri of scannedImages) {
-      processedPages.push(await ingestPage(rawUri, script, { deleteSource: true, enhance: spec.defaultEnhance }));
-    }
-  } catch (error) {
-    // Pages compressed before the failure were never committed to state — don't orphan them.
-    cleanTemporaryCache(processedPages.flatMap((p) => (p.thumbUri ? [p.uri, p.thumbUri] : [p.uri])));
-    dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'error', errorMessage: errorMessage(error) });
-    return;
-  }
-
-  dispatch({ type: 'capture/BULK_ADD_PAGES', pages: processedPages });
-  dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'success' });
+  // "Scan more" relaunches the scanner in the same mode; BULK_ADD_PAGES appends.
+  await ingestBatch(dispatch, scannedImages, {
+    script,
+    spec,
+    ownsInputs: true,
+    onScanMore: () => {
+      void runNativeScannerPipeline(dispatch, script, spec);
+    },
+  });
 }

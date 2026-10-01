@@ -9,11 +9,13 @@ import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
 import { GridPagesModal } from '../components/review/GridPagesModal';
 import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
+import { ProcessingProgress } from '../components/review/ProcessingProgress';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { cancelProcessing } from '../services/capture/processingSession';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
 import type { Point } from '../services/enhance/perspective';
@@ -40,7 +42,7 @@ export function ReviewScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { pages, processingStatus } = state.capture;
+  const { pages, processingStatus, progress } = state.capture;
   const { sel, ocrRunning } = state.review;
   const scanProcessing = processingStatus === 'scanning' || processingStatus === 'processing';
   const { academicConfig } = state.deliver;
@@ -80,9 +82,9 @@ export function ReviewScreen() {
   const showCompare = !!selectedPage && mainPreviewUri !== selectedPage.uri;
   const displayUri = comparing && selectedPage ? selectedPage.uri : mainPreviewUri ?? selectedPage?.uri;
 
-  // Also animates while new pages are still being scanned/processed in the background (e.g. the
-  // "Add more" flow), so there's a visible signal even though this screen already has pages to show.
-  const showRibbon = ocrRunning || scanProcessing;
+  // Indeterminate ribbon for OCR and the moment before per-page progress is known; once a batch
+  // reports progress, ProcessingProgress (determinate, with Cancel) takes over.
+  const showRibbon = ocrRunning || (scanProcessing && !progress);
   const ribbon = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!showRibbon) return;
@@ -287,7 +289,14 @@ export function ReviewScreen() {
         {scanProcessing ? (
           <>
             <ActivityIndicator color={tokens.accent} size="large" />
-            <Text style={{ color: tokens.muted, marginTop: spacing.md }}>Processing pages…</Text>
+            <Text style={{ color: tokens.muted, marginTop: spacing.md }}>
+              {progress ? `Processing page ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…` : 'Processing pages…'}
+            </Text>
+            {progress ? (
+              <Pressable onPress={cancelProcessing} hitSlop={8} style={{ marginTop: spacing.md }} accessibilityRole="button">
+                <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+            ) : null}
           </>
         ) : (
           <>
@@ -337,6 +346,10 @@ export function ReviewScreen() {
           </Pressable>
         </View>
       </View>
+
+      {progress ? (
+        <ProcessingProgress done={progress.done} total={progress.total} onCancel={cancelProcessing} />
+      ) : null}
 
       <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: showRibbon ? 1 : 0 }]}>
         <Animated.View

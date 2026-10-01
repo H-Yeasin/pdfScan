@@ -64,7 +64,7 @@ export function AppNavigator() {
     if (processingStatus === 'processing' && prev === 'scanning') {
       go('review');
     } else if (processingStatus === 'success') {
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Scan complete' });
+      // The "Added N pages · Scan more" snack comes from the pipeline itself (ingestBatch.ts).
       dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
     } else if (processingStatus === 'error') {
       dispatch({ type: 'ui/SHOW_SNACK', msg: errorMessage ?? 'Scan failed' });
