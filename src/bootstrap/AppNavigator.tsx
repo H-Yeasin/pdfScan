@@ -12,6 +12,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { ProScreen } from '../screens/ProScreen';
 import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
 import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
+import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
@@ -29,6 +30,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   pro: ProScreen,
   manageFolders: ManageFoldersScreen,
   academicOptions: AcademicOptionsScreen,
+  filterLab: FilterLabScreen,
 };
 
 export function AppNavigator() {

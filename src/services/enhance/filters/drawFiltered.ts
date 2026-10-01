@@ -2,7 +2,8 @@ import { Skia } from '@shopify/react-native-skia';
 import type { SkCanvas, SkImage, SkRect } from '@shopify/react-native-skia';
 import { DEFAULT_ADJUST } from '../adjust';
 import { adjustMatrices } from './filterMath';
-import { getFilter, matrixChainFilter } from './registry';
+import { getFilter, matrixChainFilter, resolveFilterParams } from './registry';
+import type { FilterParamOverrides } from './registry';
 import { analyzeImage } from './stats';
 import type { SessionPage } from '../../../types/models';
 
@@ -15,7 +16,14 @@ export type FilterPage = Pick<SessionPage, 'enhance' | 'adjust' | 'stats' | 'fil
 // Manual brightness/contrast/saturation adjustments are composed on TOP of the filter (not before
 // it): the filter's stats are measured from the original pixels, so it must see the original
 // distribution, and the user's adjustment then applies as a relative nudge on the corrected result.
-export function drawFiltered(canvas: SkCanvas, image: SkImage, page: FilterPage, targetRect: SkRect) {
+// `paramOverrides` is for the dev Filter Lab only; the app always renders with the defaults.
+export function drawFiltered(
+  canvas: SkCanvas,
+  image: SkImage,
+  page: FilterPage,
+  targetRect: SkRect,
+  paramOverrides?: FilterParamOverrides
+) {
   const spec = getFilter(page.enhance);
   const width = image.width();
   const height = image.height();
@@ -29,6 +37,7 @@ export function drawFiltered(canvas: SkCanvas, image: SkImage, page: FilterPage,
     height,
     adjust,
     options: page.filterOptions ?? {},
+    params: resolveFilterParams(spec, paramOverrides),
   });
   const adjustFilter = spec.adjustable ? matrixChainFilter(adjustMatrices(adjust)) : null;
   const paint = Skia.Paint();

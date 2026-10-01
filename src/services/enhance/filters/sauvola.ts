@@ -45,9 +45,12 @@ vec4 main(vec2 fragCoord) {
 }
 `;
 
-const SAUVOLA_K = 0.2; // matches scikit-image's threshold_sauvola default
-const SAUVOLA_R = 0.5; // half the normalized 0..1 dynamic range, per Sauvola's standard parameterization
-const SAMPLE_RADIUS_RATIO = 0.006; // tap spacing as a fraction of the longer image dimension
+export const SAUVOLA_K = 0.2; // matches scikit-image's threshold_sauvola default
+export const SAUVOLA_R = 0.5; // half the normalized 0..1 dynamic range, per Sauvola's standard parameterization
+export const SAMPLE_RADIUS_RATIO = 0.006; // tap spacing as a fraction of the longer image dimension
+
+export type SauvolaParams = { k: number; r: number; radiusRatio: number };
+const DEFAULT_SAUVOLA: SauvolaParams = { k: SAUVOLA_K, r: SAUVOLA_R, radiusRatio: SAMPLE_RADIUS_RATIO };
 
 // Compiled once and cached at module scope so the shader isn't recompiled on every page.
 let sauvolaEffect: ReturnType<typeof Skia.RuntimeEffect.Make> | null = null;
@@ -61,10 +64,15 @@ function getSauvolaEffect() {
 
 // The shader works in the image's own pixel space (0..width, 0..height); drawFiltered maps that
 // space onto the target rect, so the tap spacing stays relative to the source resolution.
-export function makeSauvolaShader(image: SkImage, width: number, height: number): SkShader {
+export function makeSauvolaShader(
+  image: SkImage,
+  width: number,
+  height: number,
+  { k, r, radiusRatio }: SauvolaParams = DEFAULT_SAUVOLA
+): SkShader {
   const imageShader = image.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.None);
   return getSauvolaEffect().makeShaderWithChildren(
-    [SAUVOLA_K, SAUVOLA_R, SAMPLE_RADIUS_RATIO * Math.max(width, height)],
+    [k, r, radiusRatio * Math.max(width, height)],
     [imageShader]
   );
 }

@@ -1,5 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 import { FontStyle, ImageFormat, PaintStyle, Skia } from '@shopify/react-native-skia';
+import type { SkCanvas } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
 import type { AcademicConfig, CoverPageConfig } from './pdfService';
 
@@ -109,28 +110,22 @@ export async function renderCoverPageImage(
   }
 }
 
-// Bakes the border/header/footer onto a COPY of one content page's image (never the source uri -
-// same never-mutate-the-original convention as bakeEnhance). pageNumber/totalPages are 1-based and
-// exclude the cover page, matching the "Page X of Y" convention pdfService.ts's vector stamping
-// already uses.
-export async function stampContentPageImage(
-  uri: string,
+export function hasContentPageStamp(config: AcademicConfig | null | undefined): config is AcademicConfig {
+  return !!config && (config.enableBorder || !!config.headerText || !!config.footerText);
+}
+
+// Draws the border/header/footer over a content page of width x height pixels already drawn on
+// `canvas`. Shared by the saved copy below and the Review screen's live SkPicture preview, so the
+// two can't drift. Every size is a ratio of the long side, so it renders the same at any resolution.
+export function drawAcademicStamp(
+  canvas: SkCanvas,
+  width: number,
+  height: number,
   config: AcademicConfig,
   pageNumber: number,
   totalPages: number
-): Promise<{ uri: string; width: number; height: number }> {
-  const data = await Skia.Data.fromURI(uri);
-  const image = Skia.Image.MakeImageFromEncoded(data);
-  if (!image) throw new Error(`academicRasterService: failed to decode image at ${uri}`);
-
-  const width = image.width();
-  const height = image.height();
+) {
   const longSide = Math.max(width, height);
-
-  const surface = Skia.Surface.MakeOffscreen(width, height);
-  if (!surface) throw new Error('academicRasterService: Skia failed to create an offscreen surface');
-  const canvas = surface.getCanvas();
-  canvas.drawImage(image, 0, 0);
 
   if (config.enableBorder) {
     const inset = STAMP_INSET_RATIO * longSide;
@@ -158,6 +153,30 @@ export async function stampContentPageImage(
       canvas.drawText(text, (width - textWidth) / 2, height - FOOTER_Y_RATIO * longSide, textPaint, font);
     }
   }
+}
+
+// Bakes the border/header/footer onto a COPY of one content page's image (never the source uri -
+// same never-mutate-the-original convention as bakeEnhance). pageNumber/totalPages are 1-based and
+// exclude the cover page, matching the "Page X of Y" convention pdfService.ts's vector stamping
+// already uses.
+export async function stampContentPageImage(
+  uri: string,
+  config: AcademicConfig,
+  pageNumber: number,
+  totalPages: number
+): Promise<{ uri: string; width: number; height: number }> {
+  const data = await Skia.Data.fromURI(uri);
+  const image = Skia.Image.MakeImageFromEncoded(data);
+  if (!image) throw new Error(`academicRasterService: failed to decode image at ${uri}`);
+
+  const width = image.width();
+  const height = image.height();
+
+  const surface = Skia.Surface.MakeOffscreen(width, height);
+  if (!surface) throw new Error('academicRasterService: Skia failed to create an offscreen surface');
+  const canvas = surface.getCanvas();
+  canvas.drawImage(image, 0, 0);
+  drawAcademicStamp(canvas, width, height, config, pageNumber, totalPages);
 
   const stampedUri = await writeJpeg(surface, 'stamped');
   return { uri: stampedUri, width, height };

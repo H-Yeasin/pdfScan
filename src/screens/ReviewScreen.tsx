@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, PixelRatio, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdjustPanel } from '../components/review/AdjustPanel';
 import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
+import { FilteredPreview } from '../components/review/FilteredPreview';
 import { GridPagesModal } from '../components/review/GridPagesModal';
 import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
@@ -13,17 +14,18 @@ import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
-import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { DEFAULT_ADJUST, isDefaultAdjust } from '../services/enhance/adjust';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
 import { getFilter } from '../services/enhance/filters/registry';
 import { analyzeImageUri } from '../services/enhance/filters/stats';
 import { rotatePage } from '../services/enhance/enhanceService';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
 import type { Point } from '../services/enhance/perspective';
-import { useEnhancedPreview } from '../services/enhance/useEnhancedPreview';
+import { useFilteredPicture } from '../services/enhance/useFilteredPicture';
+import type { PictureOverlay } from '../services/enhance/useFilteredPicture';
 import { runOcr } from '../services/ocr/ocrService';
 import { cleanTemporaryCache } from '../services/persistence/libraryFiles';
-import { useAcademicStampPreview } from '../services/pdf/useAcademicPreview';
+import { drawAcademicStamp, hasContentPageStamp } from '../services/pdf/academicRasterService';
 import { applySignatureToPage } from '../services/signature/signatureCompositeService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
@@ -62,7 +64,10 @@ export function ReviewScreen() {
   const currentAdjust = selectedPage?.adjust ?? DEFAULT_ADJUST;
   const adjustable = selectedPage ? getFilter(selectedPage.enhance).adjustable : true;
 
-  const { previewUri, loading: enhancePreviewLoading } = useEnhancedPreview(selectedPage?.uri, selectedPage);
+  // Slider values while a drag is in progress. Only the preview sees them; the store gets the
+  // final values from handleAdjustCommit, which clears this.
+  const [liveAdjust, setLiveAdjust] = useState<AdjustValues | null>(null);
+  useEffect(() => setLiveAdjust(null), [selectedPage?.id]);
 
   // Scanned pages arrive with stats measured at ingest; gallery imports, merged halves and pages
   // whose image changed (crop, rotate, sign - the reducer drops stale stats) are measured here, once,
@@ -76,19 +81,36 @@ export function ReviewScreen() {
     });
   }, [dispatch, statsPageId, statsPageUri]);
 
-  // Runs border/header-footer stamping on top of the already-enhanced preview, so this mirrors
-  // the real save pipeline's order (bake enhance, then stamp) - not just the raw enhance preview.
-  const { previewUri: stampedUri, loading: stampLoading } = useAcademicStampPreview(
-    previewUri ?? selectedPage?.uri,
-    academicConfig,
-    sel + 1,
-    pages.length
+  // Border/header-footer drawn on top of the filtered picture, mirroring the save pipeline's order
+  // (filter, then stamp) with the same drawAcademicStamp the saved copies use.
+  const stampActive = hasContentPageStamp(academicConfig);
+  const stampBorder = academicConfig?.enableBorder;
+  const stampHeader = academicConfig?.headerText;
+  const stampFooter = academicConfig?.footerText;
+  const pageNumber = sel + 1;
+  const totalPages = pages.length;
+  const stampOverlay = useCallback<PictureOverlay>(
+    (canvas, width, height) => {
+      const config = { enableBorder: !!stampBorder, headerText: stampHeader, footerText: stampFooter };
+      drawAcademicStamp(canvas, width, height, config, pageNumber, totalPages);
+    },
+    [stampBorder, stampHeader, stampFooter, pageNumber, totalPages]
   );
 
-  const mainPreviewUri = stampedUri ?? selectedPage?.uri;
-  const mainPreviewLoading = enhancePreviewLoading || stampLoading;
-  const showCompare = !!selectedPage && mainPreviewUri !== selectedPage.uri;
-  const displayUri = comparing && selectedPage ? selectedPage.uri : mainPreviewUri ?? selectedPage?.uri;
+  // Decoded at roughly screen resolution: enough for a sharp full-screen page, and a fraction of
+  // the master's memory.
+  const windowSize = useWindowDimensions();
+  const previewMaxDim = Math.min(1400, Math.round(Math.max(windowSize.width, windowSize.height) * PixelRatio.get()));
+  const { preview, loading: mainPreviewLoading } = useFilteredPicture(selectedPage, previewMaxDim, {
+    adjust: liveAdjust ?? undefined,
+    prefetchUris: [pages[sel - 1]?.uri, pages[sel + 1]?.uri],
+    overlay: stampActive ? stampOverlay : undefined,
+  });
+  const showCompare =
+    !!preview &&
+    !!selectedPage &&
+    (selectedPage.enhance !== 'original' || !isDefaultAdjust(liveAdjust ?? currentAdjust) || stampActive);
+  const shownPicture = preview && (comparing ? preview.originalPicture : preview.picture);
 
   // Also animates while new pages are still being scanned/processed in the background (e.g. the
   // "Add more" flow), so there's a visible signal even though this screen already has pages to show.
@@ -139,6 +161,7 @@ export function ReviewScreen() {
       if (!selectedPage) return;
       if (applyToAll) dispatch({ type: 'capture/SET_ALL_PAGES_ADJUST', adjust });
       else dispatch({ type: 'capture/SET_PAGE_ADJUST', id: selectedPage.id, adjust });
+      setLiveAdjust(null);
     },
     [dispatch, selectedPage, applyToAll]
   );
@@ -383,7 +406,11 @@ export function ReviewScreen() {
         <PagePeekCarousel
           pages={pages}
           sel={sel}
-          displayUri={displayUri}
+          currentContent={
+            preview && shownPicture ? (
+              <FilteredPreview picture={shownPicture} contentWidth={preview.width} contentHeight={preview.height} />
+            ) : undefined
+          }
           onCommitPrev={goPrevPage}
           onCommitNext={goNextPage}
         />
@@ -433,7 +460,9 @@ export function ReviewScreen() {
             )}
           </View>
         )}
-        {adjustOpen && adjustable && <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} />}
+        {adjustOpen && adjustable && (
+          <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} onLive={setLiveAdjust} />
+        )}
         <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
       </View>
 

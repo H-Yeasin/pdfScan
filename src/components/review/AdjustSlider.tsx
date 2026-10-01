@@ -11,9 +11,9 @@ const MAX = 1;
 type AdjustSliderProps = {
   label: string;
   value: number; // -1..1, 0 is the centered/no-op position
-  // Fires continuously while dragging, for a live numeric label — cheap, no bake triggered.
+  // Fires continuously while dragging, for the live label and preview — must stay cheap.
   onChange: (value: number) => void;
-  // Fires once on release/tap — this is what should actually trigger the (expensive) Skia bake.
+  // Fires once on release/tap — this is what should actually reach the store.
   onCommit: (value: number) => void;
 };
 

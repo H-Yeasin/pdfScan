@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Image, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
@@ -17,7 +18,8 @@ const PANEL_GAP = 10;
 type PagePeekCarouselProps = {
   pages: SessionPage[];
   sel: number;
-  displayUri: string | undefined;
+  // The current page's filtered preview (a Skia <Canvas>); the raw image is shown until it's ready.
+  currentContent: ReactNode | undefined;
   onCommitPrev: () => void;
   onCommitNext: () => void;
 };
@@ -26,9 +28,9 @@ type PagePeekCarouselProps = {
 // image slides with the finger while a raw peek of the neighboring page slides in from that edge.
 // Even at rest, the prev/next panels are sized to leave a PEEK_WIDTH sliver visible at each edge,
 // hinting that the page is swipeable before the user touches it.
-// Only the "current" panel gets the expensive enhanced/stamped `displayUri` - the peek panels use
-// the page's raw (already-captured) uri, same cheap source ThumbnailStrip renders for thumbnails.
-export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommitNext }: PagePeekCarouselProps) {
+// Only the "current" panel gets the filtered/stamped `currentContent` - the peek panels use the
+// page's raw (already-captured) uri, same cheap source ThumbnailStrip renders for thumbnails.
+export function PagePeekCarousel({ pages, sel, currentContent, onCommitPrev, onCommitNext }: PagePeekCarouselProps) {
   const [width, setWidth] = useState(0);
   const dragX = useSharedValue(0);
   const isAnimating = useSharedValue(false);
@@ -113,11 +115,11 @@ export function PagePeekCarousel({ pages, sel, displayUri, onCommitPrev, onCommi
               {prevPage && <Image source={{ uri: prevPage.uri }} style={styles.image} resizeMode="contain" />}
             </View>
             <View style={[styles.panel, { width: mainWidth, marginRight: PANEL_GAP }]}>
-              <Animated.Image
-                source={{ uri: displayUri ?? currentPage.uri }}
-                style={[styles.image, zoomStyle]}
-                resizeMode="contain"
-              />
+              {currentContent ? (
+                <Animated.View style={[styles.image, zoomStyle]}>{currentContent}</Animated.View>
+              ) : (
+                <Animated.Image source={{ uri: currentPage.uri }} style={[styles.image, zoomStyle]} resizeMode="contain" />
+              )}
             </View>
             <View style={[styles.panel, { width: mainWidth }]}>
               {nextPage && <Image source={{ uri: nextPage.uri }} style={styles.image} resizeMode="contain" />}

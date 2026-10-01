@@ -107,7 +107,7 @@ Goal: handwriting and boards look like clean photocopies.
 **Detailed steps:** [`docs/plan/02-review-enhance.md`](plan/02-review-enhance.md)
 
 - [x] E1 Filter registry and shared filter engine (adds Original, Ink, Board)
-- [ ] E2 Live preview without temporary files, plus a dev Filter Lab
+- [x] E2 Live preview without temporary files, plus a dev Filter Lab
 - [ ] E3 Shadow and lighting correction for every filter
 - [ ] E4 Ink filter for handwritten notes (soft curve, fade ruled lines, keep pen colour)
 - [ ] E5 Board filter for whiteboards, blackboards and slides

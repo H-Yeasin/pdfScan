@@ -143,10 +143,10 @@ export function levelsScale(lo: number, hi: number, minSpan: number): { scale: n
 // Per-channel black/white-point stretch - each of R/G/B is independently pulled to its own
 // measured range, which is what makes this double as white-balance correction (paper trends
 // toward neutral white, not just higher contrast) rather than a plain contrast boost.
-export function levelsMatrix(stats: ImageStats): ColorMatrix {
-  const r = levelsScale(stats.r.lo, stats.r.hi, COLOR_MIN_SPAN);
-  const g = levelsScale(stats.g.lo, stats.g.hi, COLOR_MIN_SPAN);
-  const b = levelsScale(stats.b.lo, stats.b.hi, COLOR_MIN_SPAN);
+export function levelsMatrix(stats: ImageStats, minSpan = COLOR_MIN_SPAN): ColorMatrix {
+  const r = levelsScale(stats.r.lo, stats.r.hi, minSpan);
+  const g = levelsScale(stats.g.lo, stats.g.hi, minSpan);
+  const b = levelsScale(stats.b.lo, stats.b.hi, minSpan);
   return [
     r.scale, 0, 0, 0, r.translate,
     0, g.scale, 0, 0, g.translate,
@@ -158,8 +158,8 @@ export function levelsMatrix(stats: ImageStats): ColorMatrix {
 // Luminance-only stretch applied identically to R/G/B - preserves color ratios (irrelevant here
 // since this feeds straight into a grayscale conversion) while normalizing exposure/contrast
 // using the page's own measured tonal range instead of a fixed matrix.
-export function lumaLevelsMatrix(stats: ImageStats): ColorMatrix {
-  const { scale, translate } = levelsScale(stats.luma.lo, stats.luma.hi, LUMA_MIN_SPAN);
+export function lumaLevelsMatrix(stats: ImageStats, minSpan = LUMA_MIN_SPAN): ColorMatrix {
+  const { scale, translate } = levelsScale(stats.luma.lo, stats.luma.hi, minSpan);
   return [
     scale, 0, 0, 0, translate,
     0, scale, 0, 0, translate,
@@ -170,16 +170,17 @@ export function lumaLevelsMatrix(stats: ImageStats): ColorMatrix {
 
 // Per-filter matrix chains (applied first to last). These are exactly the chains the pre-E1
 // `baseModeFilter` composed, kept as data so the "export output for auto/color/gray is unchanged"
-// check can compare arrays instead of rendered pixels.
-export function autoMatrices(stats: ImageStats): ColorMatrix[] {
-  return [levelsMatrix(stats)];
+// check can compare arrays instead of rendered pixels. The optional arguments exist for the Filter
+// Lab's sliders; their defaults are the shipped constants.
+export function autoMatrices(stats: ImageStats, minSpan = COLOR_MIN_SPAN): ColorMatrix[] {
+  return [levelsMatrix(stats, minSpan)];
 }
 
 // Correct the colour cast first, then boost vividness.
-export function colorMatrices(stats: ImageStats): ColorMatrix[] {
-  return [levelsMatrix(stats), saturationMatrix(COLOR_SATURATION_BOOST)];
+export function colorMatrices(stats: ImageStats, minSpan = COLOR_MIN_SPAN, saturationBoost = COLOR_SATURATION_BOOST): ColorMatrix[] {
+  return [levelsMatrix(stats, minSpan), saturationMatrix(saturationBoost)];
 }
 
-export function grayMatrices(stats: ImageStats): ColorMatrix[] {
-  return [lumaLevelsMatrix(stats), GRAYSCALE_MATRIX];
+export function grayMatrices(stats: ImageStats, minSpan = LUMA_MIN_SPAN): ColorMatrix[] {
+  return [lumaLevelsMatrix(stats, minSpan), GRAYSCALE_MATRIX];
 }

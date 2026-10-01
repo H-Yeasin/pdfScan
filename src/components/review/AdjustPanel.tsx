@@ -9,19 +9,23 @@ import { AdjustSlider } from './AdjustSlider';
 type AdjustPanelProps = {
   value: AdjustValues;
   onCommit: (next: AdjustValues) => void;
+  // Every drag tick, for the live preview (it only re-records an SkPicture, so it's cheap).
+  onLive?: (next: AdjustValues) => void;
 };
 
-// Draft state mirrors `value` but updates on every drag tick (for a responsive label/thumb),
-// while `onCommit` — the call that actually triggers a Skia re-bake — only fires on release/tap
-// (AdjustSlider's contract) or Reset. Re-synced from `value` when the page changes underneath it.
-export function AdjustPanel({ value, onCommit }: AdjustPanelProps) {
+// Draft state mirrors `value` but updates on every drag tick (for a responsive label/thumb and the
+// live preview through `onLive`), while `onCommit` - the only call that reaches the store - fires
+// on release/tap (AdjustSlider's contract) or Reset. Re-synced from `value` when the page changes.
+export function AdjustPanel({ value, onCommit, onLive }: AdjustPanelProps) {
   const { tokens } = useTheme();
   const [draft, setDraft] = useState(value);
 
   useEffect(() => setDraft(value), [value]);
 
   const liveField = (field: keyof AdjustValues, v: number) => {
-    setDraft((d) => ({ ...d, [field]: v }));
+    const next = { ...draft, [field]: v };
+    setDraft(next);
+    onLive?.(next);
   };
 
   const commitField = (field: keyof AdjustValues, v: number) => {

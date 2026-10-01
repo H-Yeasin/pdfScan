@@ -105,6 +105,18 @@ export function SettingsScreen() {
           </View>
         )}
 
+        {__DEV__ && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Developer</Text>
+            <SettingRow
+              title="Filter Lab"
+              subtitle="Compare every filter and tune its constants"
+              chevron
+              onPress={() => go('filterLab')}
+            />
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>About</Text>
           <Text style={[styles.aboutText, { color: tokens.muted }]}>

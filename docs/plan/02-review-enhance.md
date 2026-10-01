@@ -57,7 +57,7 @@ setting), C1 (per-mode `defaultEnhance`; Notes switches from `document_scan` to 
 ## Steps
 
 ### E1 · Filter registry and shared filter engine *(M)*
-Status: done, adapted (uncommitted). It was built before its prerequisites F1, F5 and C1, so:
+Status: done (commit a993721), adapted. It was built before its prerequisites F1, F5 and C1, so:
 - **Tests deferred to F1.** For now, a one-off script checked that `filterMath`'s auto/color/gray
   chains, the adjust stack and histogram clipping are identical to the pre-refactor code
   (7,001 random and edge cases). Add the jest tests listed below once F1 lands.
@@ -96,7 +96,24 @@ Status: done, adapted (uncommitted). It was built before its prerequisites F1, F
 `renderPage` plus thin wrappers.
 
 ### E2 · Live preview without temporary files, plus the Filter Lab *(M)*
-Status: todo
+Status: done (see git log), adapted. Built before F5, so "the master" is `SessionPage.uri`. As built:
+- `useFilteredPicture(page, previewMaxDim, { adjust, prefetchUris, overlay })` in
+  `services/enhance/`. Decoding and the LRU of 3 live in `previewImageCache.ts`. It returns
+  `{ picture, originalPicture, width, height }`, and `components/review/FilteredPreview.tsx` draws
+  it aspect-fit in a `<Canvas>`. `PagePeekCarousel` now takes `currentContent` instead of
+  `displayUri`. Its zoom scales the canvas view, which is fine at today's 1200 px scans.
+- Academic stamp: `academicRasterService.drawAcademicStamp(canvas, …)` was split out of
+  `stampContentPageImage`, and the preview draws it as the picture's overlay, so no bake was
+  needed. `useEnhancedPreview` and `useAcademicStampPreview` were deleted.
+- The Filter Lab needed tunable constants, so `FilterSpec` gained `params: FilterParam[]` and
+  `ctx.params`, and `drawFiltered` takes optional `paramOverrides` (the Lab is the only caller that
+  passes them). The defaults are the shipped constants, and a re-run of the E1 matrix check is
+  still identical. The Lab is in Settings → Developer (`__DEV__` only). Its contact sheets go to
+  `Paths.document/filter-lab/` and the share sheet.
+- Not measured yet: the 100 ms / 30 fps budget on a mid-range phone, and listing the cache
+  folder. Review no longer calls any file-writing code when a filter or slider changes. The B&W
+  preview runs Sauvola on the 1400 px preview image, so thin strokes can differ slightly from
+  the full-resolution export.
 
 - Replace `useEnhancedPreview` with `useFilteredPicture(page, previewSize)`:
   - decode the master **once per selected page** into an `SkImage` downscaled to the preview
