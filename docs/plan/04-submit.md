@@ -189,7 +189,28 @@ As built:
 most 2 builds, and text in it is still searchable.
 
 ### S4 · Cover page templates *(M)*
-Status: todo
+Status: done in code (commit 2097822). "The library preview matches the PDF" needs a device look.
+
+As built:
+- `coverTemplates.ts` has the registry, `layoutCover(templateId, values, pageSize, measure?)`,
+  `coverDefaults(ctx)`, `withCoverDefaults(cover, defaults)` and `normalizeCoverConfig(raw)` (old
+  `{ title, studentName, courseCode }` → Simple). `CoverPageConfig` now lives there and is
+  re-exported from `pdfService`.
+- Line breaks use Helvetica's metrics (pdf-lib's `StandardFontEmbedder`, synchronous) for both
+  outputs; each renderer centres text with its own font, so Skia's system font stays centred.
+  Text is reduced to WinAnsi (`?`) in the layout, so the library copy shows what the PDF shows.
+  The template cover now uses Helvetica / Helvetica-Bold (was Times bold for the title).
+- `CoverItem` is `text | line | box`, top-left origin, text `y` = baseline.
+- Field set: institution, title, docLabel ("Assignment 3"), course code and name, teacher, name,
+  roll, section, date ("2 October 2026"), experiment no. and name. The title has no default; a
+  lab's experiment no. defaults to its number. Simple uses the title, or the type and number when
+  there is none, as its heading. A row with no value, and an empty "Submitted by/to" box, are
+  left out.
+- In `deliver.academicConfig` a template's `values` are only the edits; `useCoverDefaults()`
+  (store) gives the defaults for the current course and type, and Deliver and Academic options
+  fill them in with `withCoverDefaults` before drawing. A cleared field stays empty.
+- Thumbnails (`components/deliver/CoverThumbnail`) draw the same items with plain Views, not
+  Skia. Template edits survive switching the cover to Photo and back while the screen is open.
 
 - `src/services/pdf/coverTemplates.ts`: a registry `{ id, label, fields, layout }` for
   **Simple**, **Assignment** and **Lab report**.
