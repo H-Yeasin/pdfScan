@@ -55,7 +55,7 @@ a setting) and F4 (Course model, for document type and naming).
 ## Steps
 
 ### C1 · Capture mode registry and mode picker *(M)*
-Status: todo
+Status: done (commit 2249a8a). Device check pending: scan in Notes → B&W in Review; mode kept after restart.
 
 - New `src/services/capture/captureModes.ts`, which becomes the single source of truth:
   ```ts

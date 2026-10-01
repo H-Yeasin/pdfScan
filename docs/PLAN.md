@@ -99,7 +99,7 @@ Goal: the best camera experience for school material.
 
 **Detailed steps:** [`docs/plan/01-capture.md`](plan/01-capture.md)
 
-- [ ] C1 Capture modes (Notes, Document, Board, Book, ID card) and mode picker
+- [x] C1 Capture modes (Notes, Document, Board, Book, ID card) and mode picker
 - [ ] C2 Scanner plugin options patch (page limit per mode, gallery import in Google's scanner)
 - [ ] C3 Book mode: split two-page spreads at the gutter
 - [ ] C4 ID card mode: front and back at true size on one A4 page
