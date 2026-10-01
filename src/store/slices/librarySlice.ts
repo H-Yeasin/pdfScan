@@ -34,7 +34,6 @@ export type LibraryAction =
   | { type: 'library/ADD_FILE'; file: LibraryDocument }
   | { type: 'library/REMOVE_FILES'; ids: string[] }
   | { type: 'library/TOGGLE_STAR'; id: string }
-  | { type: 'library/TOGGLE_LOCKED'; id: string }
   | { type: 'library/UPDATE_FILE'; id: string; patch: Partial<LibraryDocument> }
   | { type: 'library/REPLACE_FILES'; ids: string[]; files: LibraryDocument[] }
   | { type: 'library/TOGGLE_SELECTION'; id: string }
@@ -67,11 +66,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return {
         ...state,
         files: state.files.map((f) => (f.id === action.id ? { ...f, star: !f.star } : f)),
-      };
-    case 'library/TOGGLE_LOCKED':
-      return {
-        ...state,
-        files: state.files.map((f) => (f.id === action.id ? { ...f, locked: !f.locked } : f)),
       };
     case 'library/UPDATE_FILE':
       return {

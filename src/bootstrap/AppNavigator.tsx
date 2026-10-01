@@ -18,6 +18,7 @@ import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useAppState } from '../store/AppStateContext';
 import { initializeDatabase } from '../services/persistence/dbService';
+import { FEATURES } from '../config/features';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
   capture: CaptureScreen,
@@ -26,7 +27,8 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   library: LibraryScreen,
   reader: ReaderScreen,
   settings: SettingsScreen,
-  pro: ProScreen,
+  // Falls back to the Library while Pro is disabled, so a stray go('pro') can't reach a dead end.
+  pro: FEATURES.pro ? ProScreen : LibraryScreen,
   manageFolders: ManageFoldersScreen,
   academicOptions: AcademicOptionsScreen,
 };

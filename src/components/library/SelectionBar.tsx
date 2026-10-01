@@ -4,7 +4,7 @@ import { spacing, useTheme } from '../../theme';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import type { LibraryDocument } from '../../types/models';
 
-export type SelectionToolId = 'merge' | 'split' | 'compress' | 'protect' | 'sign';
+export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign';
 
 type Tool = { id: SelectionToolId; label: string; icon: keyof typeof Ionicons.glyphMap };
 
@@ -12,13 +12,11 @@ const TOOLS: Tool[] = [
   { id: 'merge', label: 'Merge', icon: 'git-merge-outline' },
   { id: 'split', label: 'Split', icon: 'git-branch-outline' },
   { id: 'compress', label: 'Compress', icon: 'contract-outline' },
-  { id: 'protect', label: 'Protect', icon: 'shield-outline' },
   { id: 'sign', label: 'Sign', icon: 'create-outline' },
 ];
 
 // Merge/Split/Compress/Sign all rebuild a PDF from doc.pages' raster images - meaningless (and, for
-// Compress/Sign, actively corrupting) for a format with no real page images. Protect is a UI-only
-// flag toggle and stays available for every format.
+// Compress/Sign, actively corrupting) for a format with no real page images.
 const RASTER_ONLY_TOOLS: SelectionToolId[] = ['merge', 'split', 'compress', 'sign'];
 
 type SelectionBarProps = {

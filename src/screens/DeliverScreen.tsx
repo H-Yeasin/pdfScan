@@ -47,7 +47,7 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, pw, folderId, courseFolder, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { name, format, quality, more, folderId, courseFolder, exportCopy, academicConfig, layoutMode } = state.deliver;
   const { folders } = state.library;
   const { androidExportFolderUri, androidExportFolderLabel, ocrScript } = state.settings;
   const [saving, setSaving] = useState(false);
@@ -177,7 +177,7 @@ export function DeliverScreen() {
           createdAt: Date.now(),
           star: false,
           tag: finalName.slice(0, 4).toUpperCase(),
-          locked: pw,
+          locked: false,
           searchHaystack: haystack,
           folderId: folderId ?? undefined,
           courseFolder: trimmedCourseFolder,
@@ -225,7 +225,6 @@ export function DeliverScreen() {
       quality,
       format,
       name,
-      pw,
       folderId,
       folderName,
       courseFolder,
@@ -287,8 +286,6 @@ export function DeliverScreen() {
         <MoreOptionsPanel
           open={more}
           onToggleOpen={() => dispatch({ type: 'deliver/TOGGLE_MORE' })}
-          passwordEnabled={pw}
-          onTogglePassword={() => dispatch({ type: 'deliver/TOGGLE_PW' })}
           exportCopy={
             Platform.OS === 'android'
               ? {

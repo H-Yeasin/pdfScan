@@ -6,7 +6,6 @@ export type DeliverState = {
   format: DocFormat;
   quality: number; // 1-5
   more: boolean;
-  pw: boolean;
   folderId: string | null;
   // Free-text "Courses" physical routing (see LibraryDocument.courseFolder) - '' means none,
   // same convention as `name`, unlike folderId's null-means-none ID-from-a-list convention.
@@ -26,7 +25,6 @@ export const initialDeliverState: DeliverState = {
   format: 'PDF',
   quality: 3,
   more: false,
-  pw: false,
   folderId: null,
   courseFolder: '',
   exportCopy: false,
@@ -39,7 +37,6 @@ export type DeliverAction =
   | { type: 'deliver/SET_FORMAT'; format: DocFormat }
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/TOGGLE_MORE' }
-  | { type: 'deliver/TOGGLE_PW' }
   | { type: 'deliver/SET_FOLDER'; folderId: string | null }
   | { type: 'deliver/SET_COURSE_FOLDER'; courseFolder: string }
   | { type: 'deliver/TOGGLE_EXPORT_COPY' }
@@ -57,8 +54,6 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, quality: action.quality };
     case 'deliver/TOGGLE_MORE':
       return { ...state, more: !state.more };
-    case 'deliver/TOGGLE_PW':
-      return { ...state, pw: !state.pw };
     case 'deliver/SET_FOLDER':
       return { ...state, folderId: action.folderId };
     case 'deliver/SET_COURSE_FOLDER':

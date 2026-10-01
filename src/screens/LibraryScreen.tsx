@@ -170,10 +170,6 @@ export function LibraryScreen() {
         }
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Compressed · done' });
-      } else if (id === 'protect') {
-        selectedDocs.forEach((doc) => dispatch({ type: 'library/TOGGLE_LOCKED', id: doc.id }));
-        dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Protect only marks the file — it does not encrypt it yet' });
       } else if (id === 'sign' && selectedDocs.length === 1 && canSign(selectedDocs[0])) {
         const [target] = selectedDocs;
         setSignTarget(target);

@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "pdfScan",
+    "name": "PDF Scan",
     "slug": "yeasin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "pdfscan",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.pdfScan",
+      "bundleIdentifier": "com.yeasin.pdfscan",
       "infoPlist": {
         "LSSupportsOpeningDocumentsInPlace": true,
         "CFBundleDocumentTypes": [
@@ -30,11 +30,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.pdfScan",
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
-      ],
+      "package": "com.yeasin.pdfscan",
+      "permissions": ["android.permission.CAMERA"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -60,7 +58,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan documents."
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan documents.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
         }
       ],
       "expo-font",
