@@ -280,7 +280,26 @@ As built:
 Bookmarked section.
 
 ### T6 · Exam pack: one revision PDF from many pages *(M)*
-Status: todo
+Status: done in code (commit 5c14baa).
+
+As built:
+- `store/slices/packSlice.ts` (root key `pack`): items in order, `courseId` (set by the first
+  add, or by opening the pack from a course page), title, and the three options. Session only.
+- Sources: `CourseScreen` Bookmarked section "Add all to exam pack"; Library `PageResults` "Add
+  these n pages to an exam pack" (course: the course filter, else the first hit's); the pack's own
+  "+ Add pages" (`components/study/PagePickerModal`: the course's unarchived scanned documents,
+  page thumbnails, multi-select). A layers button with a count on the course page opens the pack.
+- `screens/ExamPackScreen.tsx` (`'examPack'`): reorder with up/down buttons (not drag), remove,
+  title (placeholder `defaultPackTitle`, e.g. "CSE101 exam pack – 2 October 2026"), options
+  Contents page / Include annotations / Page numbers (all on), Build → opens the new document.
+- `study/buildExamPack.ts`: pages copied with `libraryOperations.copyPageInto` (now exported)
+  through `processSequentially`; annotations copied as new rows on the copies (when included);
+  type `notes` (no new `revision` type); page numbers as the standard footer. The contents page
+  is `coverTemplates.layoutContents` (runs of pages from one document per entry, `pageList`
+  collapses "p. 2, 4–6"), drawn by `academicRasterService.renderLayoutImage` (the template-cover
+  drawing, now shared) and given OCR from the same items (`itemsAsOcr`), so it is searchable.
+  The contents page is an ordinary first page (it is counted in "Page X of Y").
+- Tests: `study/__tests__/buildExamPack.test.ts`.
 
 - **Pick pages**, from three places, into a pack tray (a session state slice `pack`, like the
   capture tray): the course's bookmarks ("Add all bookmarked"), page search results ("Add

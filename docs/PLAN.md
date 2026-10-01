@@ -160,7 +160,7 @@ Goal: scans become study material, not dead files.
 - [x] T3 Copy page text, extract to .txt, select text on a page
 - [x] T4 Annotations (highlighter snapped to words, pen, notes) kept through every PDF rebuild
 - [x] T5 Bookmarks
-- [ ] T6 Exam pack: one revision PDF from pages across documents
+- [x] T6 Exam pack: one revision PDF from pages across documents
 - [ ] T7 *(Later, P4)* Flashcards from highlights
 
 **Done when:** a student can search a word and land on the exact highlighted page within 2 seconds
