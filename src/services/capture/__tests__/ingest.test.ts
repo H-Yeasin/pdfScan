@@ -30,6 +30,11 @@ describe('ingestPage', () => {
     });
   });
 
+  it("starts the page with the capture mode's default filter", async () => {
+    const page = await ingestPage('file:///scan/1.jpg', 'latin', { enhance: 'document_scan' });
+    expect(page.enhance).toBe('document_scan');
+  });
+
   it('deletes the raw capture only when asked to', async () => {
     const raw = new File(Paths.cache, 'raw_scan.jpg');
     raw.write('raw');

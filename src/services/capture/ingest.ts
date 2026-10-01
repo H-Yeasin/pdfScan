@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { runOcr } from '../ocr/ocrService';
-import type { OcrScript, SessionPage } from '../../types/models';
+import type { EnhanceMode, OcrScript, SessionPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { MASTER_JPEG_Q, MASTER_MAX_DIM, THUMB_JPEG_Q, THUMB_MAX_DIM } from './imageSpec';
 
@@ -13,7 +13,11 @@ import { MASTER_JPEG_Q, MASTER_MAX_DIM, THUMB_JPEG_Q, THUMB_MAX_DIM } from './im
 export async function ingestPage(
   rawUri: string,
   script: OcrScript,
-  options: { deleteSource?: boolean } = {}
+  options: {
+    deleteSource?: boolean;
+    // The capture mode's default filter (see captureModes.ts).
+    enhance?: EnhanceMode;
+  } = {}
 ): Promise<SessionPage> {
   const master = await downscaleAndCompressPage(rawUri, MASTER_MAX_DIM, MASTER_JPEG_Q);
   if (options.deleteSource) {
@@ -32,7 +36,7 @@ export async function ingestPage(
     width: master.width,
     height: master.height,
     rotation: 0,
-    enhance: 'auto',
+    enhance: options.enhance ?? 'auto',
     ocr,
   };
 }

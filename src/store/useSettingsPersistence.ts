@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings } from '../services/persistence/settingsStorage';
 import { useAppState } from './AppStateContext';
 import { useTheme } from '../theme';
@@ -6,7 +7,7 @@ import { useTheme } from '../theme';
 export function useSettingsPersistence() {
   const { state, dispatch } = useAppState();
   const { themePref, setThemePref } = useTheme();
-  const loaded = useRef(false);
+  const { loaded } = state.settings;
 
   useEffect(() => {
     loadSettings().then((settings) => {
@@ -20,13 +21,18 @@ export function useSettingsPersistence() {
           label: settings.androidExportFolderLabel ?? null,
         });
         dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled: settings.crashReportsEnabled === true });
+        if (isCaptureMode(settings.lastCaptureMode)) {
+          dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
+        }
       }
-      loaded.current = true;
+      // Only after the stored values are in state, so the save effect below never writes the
+      // defaults over them.
+      dispatch({ type: 'settings/SET_LOADED' });
     });
   }, [dispatch, setThemePref]);
 
   useEffect(() => {
-    if (!loaded.current) return;
+    if (!loaded) return;
     persistSettings({
       themePref,
       firstRun: state.settings.firstRun,
@@ -34,13 +40,16 @@ export function useSettingsPersistence() {
       androidExportFolderUri: state.settings.androidExportFolderUri,
       androidExportFolderLabel: state.settings.androidExportFolderLabel,
       crashReportsEnabled: state.settings.crashReportsEnabled,
+      lastCaptureMode: state.settings.lastCaptureMode,
     });
   }, [
+    loaded,
     themePref,
     state.settings.firstRun,
     state.settings.ocrScript,
     state.settings.androidExportFolderUri,
     state.settings.androidExportFolderLabel,
     state.settings.crashReportsEnabled,
+    state.settings.lastCaptureMode,
   ]);
 }

@@ -1,11 +1,11 @@
 import type { Dispatch } from 'react';
 import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 import type { AppAction } from '../../store/appReducer';
+import type { CaptureModeSpec } from './captureModes';
 import { ingestPage } from './ingest';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
 import type { OcrScript, SessionPage } from '../../types/models';
 
-const MAX_PAGES = 50;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -14,7 +14,11 @@ function errorMessage(error: unknown): string {
 // Orchestrates the whole scan session outside the reducer, committing state only at clean
 // transition points (scanning -> processing -> one bulk commit -> success/error) instead of
 // once per page, so the Context doesn't re-render mid-scan.
-export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, script: OcrScript): Promise<void> {
+export async function runNativeScannerPipeline(
+  dispatch: Dispatch<AppAction>,
+  script: OcrScript,
+  spec: CaptureModeSpec
+): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'scanning' });
 
   dispatch({
@@ -29,7 +33,7 @@ export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, sc
     // (Play Services GmsDocumentScanner, hardcoded to SCANNER_MODE_FULL by this plugin's
     // native module) — this app has no code path into or visibility over that internal logic.
     const result = await DocumentScanner.scanDocument({
-      maxNumDocuments: MAX_PAGES,
+      maxNumDocuments: spec.pageLimit,
       responseType: ResponseType.ImageFilePath,
     });
 
@@ -51,7 +55,7 @@ export async function runNativeScannerPipeline(dispatch: Dispatch<AppAction>, sc
     // Sequential on purpose: each raw scan can be 4K+/12MB+. Running these concurrently
     // (Promise.all) risks OOM-killing the app on mid-range Android devices.
     for (const rawUri of scannedImages) {
-      processedPages.push(await ingestPage(rawUri, script, { deleteSource: true }));
+      processedPages.push(await ingestPage(rawUri, script, { deleteSource: true, enhance: spec.defaultEnhance }));
     }
   } catch (error) {
     // Pages compressed before the failure were never committed to state — don't orphan them.

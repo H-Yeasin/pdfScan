@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { OcrScript } from '../../types/models';
+import type { CaptureMode, OcrScript } from '../../types/models';
 import type { ThemePref } from '../../theme';
 
 const SETTINGS_KEY = 'app:settings';
@@ -11,6 +11,7 @@ export type PersistedSettings = {
   androidExportFolderUri?: string | null;
   androidExportFolderLabel?: string | null;
   crashReportsEnabled?: boolean;
+  lastCaptureMode?: CaptureMode;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

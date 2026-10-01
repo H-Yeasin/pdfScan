@@ -7,21 +7,47 @@ import { StatusBar } from 'expo-status-bar';
 import { CaptureControls } from '../components/capture/CaptureControls';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
+import { getCaptureModeSpec } from '../services/capture/captureModes';
 import { ingestPage } from '../services/capture/ingest';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { useAppState } from '../store/AppStateContext';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
-import type { SessionPage } from '../types/models';
+import type { CaptureMode, SessionPage } from '../types/models';
 
 export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { pages, processingStatus } = state.capture;
-  const { ocrScript } = state.settings;
+  const { pages, processingStatus, mode } = state.capture;
+  const { ocrScript, loaded: settingsLoaded, firstRun, lastCaptureMode } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
+  const spec = getCaptureModeSpec(mode);
   const hasAutoLaunched = useRef(false);
+  const restoredMode = useRef(false);
+
+  // Restore the last-used mode once settings are in. Only on the first visit with an empty
+  // session: mid-session (e.g. "Add more") the mode the user is already scanning in wins.
+  useEffect(() => {
+    if (!settingsLoaded || restoredMode.current) return;
+    restoredMode.current = true;
+    if (pages.length === 0 && mode !== lastCaptureMode) dispatch({ type: 'capture/SET_MODE', mode: lastCaptureMode });
+  }, [settingsLoaded, lastCaptureMode, mode, pages.length, dispatch]);
+
+  // Picking a mode (or starting a scan) counts as having seen the picker, which is what turns
+  // the auto-launch on for later visits - see the effect below.
+  const markPickerSeen = useCallback(() => {
+    if (firstRun) dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: false });
+  }, [dispatch, firstRun]);
+
+  const handleModeChange = useCallback(
+    (next: CaptureMode) => {
+      dispatch({ type: 'capture/SET_MODE', mode: next });
+      dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: next });
+      markPickerSeen();
+    },
+    [dispatch, markPickerSeen]
+  );
 
   // Success/error handling and the post-scan navigation to Review now live in AppNavigator
   // (always mounted), not here - this screen unmounts as soon as the native scan hands off raw
@@ -35,7 +61,9 @@ export function CaptureScreen() {
       dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
       const newPages: SessionPage[] = [];
       try {
-        for (const asset of assets) newPages.push(await ingestPage(asset.uri, ocrScript));
+        for (const asset of assets) {
+          newPages.push(await ingestPage(asset.uri, ocrScript, { enhance: spec.defaultEnhance }));
+        }
         dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
         dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
       } catch (error) {
@@ -47,7 +75,7 @@ export function CaptureScreen() {
         });
       }
     },
-    [dispatch, ocrScript]
+    [dispatch, ocrScript, spec.defaultEnhance]
   );
 
   const handleImport = useCallback(async () => {
@@ -68,17 +96,24 @@ export function CaptureScreen() {
 
   const handleScan = useCallback(() => {
     if (busyScanning) return;
-    runNativeScannerPipeline(dispatch, ocrScript);
-  }, [busyScanning, dispatch, ocrScript]);
+    markPickerSeen();
+    runNativeScannerPipeline(dispatch, ocrScript, spec);
+  }, [busyScanning, dispatch, ocrScript, spec, markPickerSeen]);
 
+  // Opens the scanner straight away on entering this tab - but only once the user has picked a
+  // mode at least once (firstRun false). On a first visit the picker must stay visible instead
+  // of being covered by the full-screen scanner. Waits for settings so a returning user's
+  // stored firstRun/lastCaptureMode are known; uses the restored mode explicitly because the
+  // SET_MODE dispatched by the restore effect hasn't re-rendered yet in this pass.
   useEffect(() => {
-    if (hasAutoLaunched.current) return;
+    if (!settingsLoaded || hasAutoLaunched.current) return;
     hasAutoLaunched.current = true;
-    handleScan();
-    // Auto-launch only once per mount (i.e. once per visit to this tab) — handleScan itself
-    // guards against being triggered again while a scan is already in flight.
+    if (firstRun || busyScanning) return;
+    const launchMode = pages.length === 0 ? lastCaptureMode : mode;
+    runNativeScannerPipeline(dispatch, ocrScript, getCaptureModeSpec(launchMode));
+    // Once per mount (i.e. once per visit to this tab).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [settingsLoaded]);
 
   return (
     <View style={[styles.container, { backgroundColor: chrome.base }]}>
@@ -96,11 +131,9 @@ export function CaptureScreen() {
         </View>
 
         <View style={styles.centerArea}>
-          <Ionicons name="scan-outline" size={56} color={chrome.textDim} />
-          <Text style={[styles.title, { color: chrome.text }]}>Ready to scan</Text>
-          <Text style={[styles.subtitle, { color: chrome.textDim }]}>
-            Tap the scan button to capture a document.
-          </Text>
+          <Ionicons name={spec.icon} size={56} color={chrome.textDim} />
+          <Text style={[styles.title, { color: chrome.text }]}>{spec.label}</Text>
+          <Text style={[styles.subtitle, { color: chrome.textDim }]}>{spec.hint}</Text>
         </View>
 
         <View style={styles.controlsArea}>
@@ -111,6 +144,8 @@ export function CaptureScreen() {
             busy={busyScanning}
             pageCount={pages.length}
             lastPage={pages[pages.length - 1]}
+            mode={mode}
+            onModeChange={handleModeChange}
           />
         </View>
       </SafeAreaView>

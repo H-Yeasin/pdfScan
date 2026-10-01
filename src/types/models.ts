@@ -1,5 +1,7 @@
 export type EnhanceMode = 'auto' | 'color' | 'gray' | 'bw' | 'document_scan';
-export type CaptureMode = 'doc' | 'id' | 'book';
+// See services/capture/captureModes.ts for what each mode does. Documents saved before Notes and
+// Board existed only ever have 'doc' / 'id' / 'book', which are still valid.
+export type CaptureMode = 'notes' | 'doc' | 'board' | 'book' | 'id';
 export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' | 'TXT';
 
 // Mirrors rn-mlkit-ocr's OcrResult shape (block -> line), kept close to the native
