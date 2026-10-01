@@ -12,8 +12,8 @@ describe('startScan', () => {
     expect(actions(2, 'c1')).toContainEqual({ type: 'deliver/SET_COURSE', courseId: 'c1' });
   });
 
-  it('clears a leftover course for a general scan, but not mid-session', () => {
-    expect(actions(0, null)).toContainEqual({ type: 'deliver/SET_COURSE', courseId: null });
+  it('goes back to the automatic course for a general scan, but not mid-session', () => {
+    expect(actions(0, null)).toContainEqual({ type: 'deliver/AUTO_COURSE' });
     expect(actions(2, null).map((a) => a.type)).toEqual(['capture/SET_RETAKE_TARGET']);
   });
 });

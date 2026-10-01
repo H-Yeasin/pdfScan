@@ -1,5 +1,15 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { Course, DocFormat, DocType, CaptureMode, LibraryDocument, LibraryPage, PageOcr, Semester } from '../../types/models';
+import type {
+  Course,
+  DocFormat,
+  DocType,
+  CaptureMode,
+  LibraryDocument,
+  LibraryPage,
+  PageOcr,
+  Semester,
+  TimetableSlot,
+} from '../../types/models';
 import { COURSE_COLORS, isCourseColor } from '../courses/palette';
 import { buildSearchHaystack } from '../search/searchService';
 import { fromStoredPath, toStoredPath } from './libraryFiles';
@@ -62,7 +72,14 @@ type SemesterRow = {
   created_at: number;
 };
 
-export type LoadedLibrary = { documents: LibraryDocument[]; courses: Course[]; semesters: Semester[] };
+type SlotRow = { id: string; course_id: string; weekday: number; start_min: number; end_min: number };
+
+export type LoadedLibrary = {
+  documents: LibraryDocument[];
+  courses: Course[];
+  semesters: Semester[];
+  timetable: TimetableSlot[];
+};
 
 const DOC_TYPES: readonly DocType[] = ['assignment', 'notes', 'handout', 'exam', 'lab', 'other'];
 
@@ -129,6 +146,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
   const pageRows = await db.getAllAsync<PageRow>('SELECT * FROM pages ORDER BY document_id, idx');
   const courseRows = await db.getAllAsync<CourseRow>('SELECT * FROM courses ORDER BY sort_order, created_at, id');
   const semesterRows = await db.getAllAsync<SemesterRow>('SELECT * FROM semesters ORDER BY starts_on DESC, created_at DESC, id');
+  const slotRows = await db.getAllAsync<SlotRow>('SELECT * FROM timetable_slots ORDER BY weekday, start_min, id');
 
   const pagesByDoc = new Map<string, LibraryPage[]>();
   for (const row of pageRows) {
@@ -160,7 +178,18 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
     };
   });
 
-  return { documents, courses: courseRows.map(rowToCourse), semesters: semesterRows.map(rowToSemester) };
+  return {
+    documents,
+    courses: courseRows.map(rowToCourse),
+    semesters: semesterRows.map(rowToSemester),
+    timetable: slotRows.map((row) => ({
+      id: row.id,
+      courseId: row.course_id,
+      weekday: row.weekday,
+      startMin: row.start_min,
+      endMin: row.end_min,
+    })),
+  };
 }
 
 // Writes one document and replaces its pages. Pages are deleted and re-inserted (rather than
@@ -264,7 +293,20 @@ async function writeSemester(db: SQLiteDatabase, semester: Semester): Promise<vo
   );
 }
 
-async function deleteRows(db: SQLiteDatabase, table: 'documents' | 'courses' | 'semesters', ids: string[]): Promise<void> {
+async function writeSlot(db: SQLiteDatabase, slot: TimetableSlot): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO timetable_slots (id, course_id, weekday, start_min, end_min) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET course_id = excluded.course_id, weekday = excluded.weekday,
+       start_min = excluded.start_min, end_min = excluded.end_min`,
+    [slot.id, slot.courseId, slot.weekday, slot.startMin, slot.endMin]
+  );
+}
+
+async function deleteRows(
+  db: SQLiteDatabase,
+  table: 'documents' | 'courses' | 'semesters' | 'timetable_slots',
+  ids: string[]
+): Promise<void> {
   for (const id of ids) await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [id]);
 }
 
@@ -352,17 +394,20 @@ export function diffById<T extends { id: string }>(prev: readonly T[], next: rea
 
 // Applies the difference between two in-memory snapshots in one transaction (so the reducer's
 // ARCHIVE_SEMESTER lands all-or-nothing, like archiveSemester above). Parents are written before
-// children (semester -> course -> document, since each may reference a new one) and deleted after.
+// children (semester -> course -> document/slot, since each may reference a new one) and deleted after.
 export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next: LoadedLibrary): Promise<void> {
   const semesters = diffById(prev.semesters, next.semesters);
   const courses = diffById(prev.courses, next.courses);
   const documents = diffById(prev.documents, next.documents);
-  const diffs = [semesters, courses, documents];
+  const slots = diffById(prev.timetable, next.timetable);
+  const diffs = [semesters, courses, documents, slots];
   if (diffs.every((d) => d.changed.length + d.removedIds.length === 0)) return;
   await db.withTransactionAsync(async () => {
     for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
     for (const doc of documents.changed) await writeDocument(db, doc, 'upsert');
+    for (const slot of slots.changed) await writeSlot(db, slot);
+    await deleteRows(db, 'timetable_slots', slots.removedIds);
     await deleteRows(db, 'documents', documents.removedIds);
     await deleteRows(db, 'courses', courses.removedIds);
     await deleteRows(db, 'semesters', semesters.removedIds);

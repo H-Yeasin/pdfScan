@@ -57,7 +57,7 @@ describe('nextTypeNumber', () => {
 
     it('matches the in-memory rule, and deleted documents free their number', async () => {
       const db = await getDb();
-      const empty = { documents: [], courses: [], semesters: [] };
+      const empty = { documents: [], courses: [], semesters: [], timetable: [] };
       const courses = ['math', 'bio'].map((id, i) => ({ id, name: id, color: 'teal' as const, archived: false, sortOrder: i, createdAt: 0 }));
       const stored = { ...empty, courses, documents: docs };
       await syncLibrary(db, empty, stored);

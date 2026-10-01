@@ -14,15 +14,15 @@ import { useAppState } from './AppStateContext';
 // their own boot-time work after it.
 export function useLibraryPersistence(): boolean {
   const { state, dispatch } = useAppState();
-  const { files, courses, semesters, loadStatus, loadAttempt } = state.library;
+  const { files, courses, semesters, timetable, loadStatus, loadAttempt } = state.library;
   const loaded = loadStatus === 'ready';
 
   // `committed` is the last snapshot known to be on disk; `latest` is the newest in-memory one.
   // Writes run one at a time, each diffing committed -> latest, so a failed write is retried by
   // the next one instead of being silently dropped.
   const committed = useRef<LoadedLibrary | null>(null);
-  const latest = useRef<LoadedLibrary>({ documents: files, courses, semesters });
-  latest.current = { documents: files, courses, semesters };
+  const latest = useRef<LoadedLibrary>({ documents: files, courses, semesters, timetable });
+  latest.current = { documents: files, courses, semesters, timetable };
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -39,6 +39,7 @@ export function useLibraryPersistence(): boolean {
         dispatch({ type: 'library/SET_FILES', files: [...unsaved, ...stored.documents] });
         dispatch({ type: 'library/SET_COURSES', courses: stored.courses });
         dispatch({ type: 'library/SET_SEMESTERS', semesters: stored.semesters });
+        dispatch({ type: 'library/SET_TIMETABLE', timetable: stored.timetable });
         dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' });
       })
       .catch((error) => {
@@ -65,7 +66,7 @@ export function useLibraryPersistence(): boolean {
         console.warn('Failed to save library changes', error);
       }
     });
-  }, [loaded, files, courses, semesters]);
+  }, [loaded, files, courses, semesters, timetable]);
 
   return loaded;
 }

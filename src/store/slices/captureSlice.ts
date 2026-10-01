@@ -15,6 +15,9 @@ export type CaptureState = {
   // appending, then clears the flag. Every other entry point into Capture must clear it too, so a
   // cancelled retake can't leak into an unrelated later scan and silently replace the wrong page.
   retakeTargetId: string | null;
+  // When this session's first pages arrived: the time course suggestions use (K5), so a scan made
+  // at the end of class still matches its timetable slot however long Review takes.
+  startedAt: number | null;
 };
 
 export const initialCaptureState: CaptureState = {
@@ -23,6 +26,7 @@ export const initialCaptureState: CaptureState = {
   processingStatus: 'idle',
   progress: null,
   retakeTargetId: null,
+  startedAt: null,
 };
 
 export type CaptureAction =
@@ -163,7 +167,7 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       return { ...state, pages };
     }
     case 'capture/CLEAR_PAGES':
-      return { ...state, pages: [] };
+      return { ...state, pages: [], startedAt: null };
     case 'capture/BULK_ADD_PAGES': {
       const targetId = state.retakeTargetId;
       const targetIndex = targetId ? state.pages.findIndex((p) => p.id === targetId) : -1;
@@ -172,7 +176,12 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
         pages.splice(targetIndex, 1, ...action.pages);
         return { ...state, pages, retakeTargetId: null };
       }
-      return { ...state, pages: [...state.pages, ...action.pages], retakeTargetId: null };
+      return {
+        ...state,
+        pages: [...state.pages, ...action.pages],
+        retakeTargetId: null,
+        startedAt: state.pages.length === 0 && action.pages.length > 0 ? Date.now() : state.startedAt,
+      };
     }
     case 'capture/SET_PROCESSING_STATUS':
       return { ...state, processingStatus: action.status, errorMessage: action.errorMessage };

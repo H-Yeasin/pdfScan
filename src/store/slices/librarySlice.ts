@@ -1,4 +1,4 @@
-import type { Course, DocType, LibraryDocument, Semester } from '../../types/models';
+import type { Course, DocType, LibraryDocument, Semester, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
@@ -18,6 +18,8 @@ export type LibraryState = {
   courses: Course[];
   // Newest start date first, as loaded.
   semesters: Semester[];
+  // The optional weekly timetable (§3 K5), by weekday then start time.
+  timetable: TimetableSlot[];
   // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
   homeSemesterId: string | null;
   // UI-only drill-in state for the Courses tab: null = showing the course list,
@@ -38,6 +40,7 @@ export const initialLibraryState: LibraryState = {
   files: [],
   courses: [],
   semesters: [],
+  timetable: [],
   homeSemesterId: null,
   activeCourseId: null,
   selection: [],
@@ -76,6 +79,10 @@ export type LibraryAction =
   | { type: 'library/ARCHIVE_SEMESTER'; id: string }
   | { type: 'library/DELETE_SEMESTER'; id: string }
   | { type: 'library/SET_HOME_SEMESTER'; id: string | null }
+  | { type: 'library/SET_TIMETABLE'; timetable: TimetableSlot[] }
+  | { type: 'library/ADD_SLOT'; slot: TimetableSlot }
+  | { type: 'library/UPDATE_SLOT'; id: string; patch: Partial<Omit<TimetableSlot, 'id'>> }
+  | { type: 'library/REMOVE_SLOT'; id: string }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_DOC_TYPE'; ids: string[]; docType: DocType }
   | { type: 'library/SET_ACTIVE_COURSE'; id: string | null };
@@ -83,6 +90,10 @@ export type LibraryAction =
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
 // creation time.
 export type CourseFields = Omit<Course, 'id' | 'sortOrder' | 'createdAt'>;
+
+function sortSlots(slots: TimetableSlot[]): TimetableSlot[] {
+  return [...slots].sort((a, b) => a.weekday - b.weekday || a.startMin - b.startMin || a.id.localeCompare(b.id));
+}
 
 function bySortOrder(courses: Course[]): Course[] {
   return [...courses].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
@@ -189,6 +200,8 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return {
         ...state,
         courses: state.courses.filter((c) => c.id !== action.id),
+        // Its class times go with it (ON DELETE CASCADE on disk).
+        timetable: state.timetable.filter((s) => s.courseId !== action.id),
         files: state.files.map((f) => (f.courseId === action.id ? { ...f, courseId: undefined } : f)),
         activeCourseId: state.activeCourseId === action.id ? null : state.activeCourseId,
       };
@@ -227,6 +240,17 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         semesters: state.semesters.filter((s) => s.id !== action.id),
         courses: state.courses.map((c) => (c.semesterId === action.id ? { ...c, semesterId: undefined } : c)),
       };
+    case 'library/SET_TIMETABLE':
+      return { ...state, timetable: sortSlots(action.timetable) };
+    case 'library/ADD_SLOT':
+      return { ...state, timetable: sortSlots([...state.timetable, action.slot]) };
+    case 'library/UPDATE_SLOT':
+      return {
+        ...state,
+        timetable: sortSlots(state.timetable.map((s) => (s.id === action.id ? { ...s, ...action.patch } : s))),
+      };
+    case 'library/REMOVE_SLOT':
+      return { ...state, timetable: state.timetable.filter((s) => s.id !== action.id) };
     case 'library/SET_HOME_SEMESTER':
       return { ...state, homeSemesterId: action.id };
     case 'library/SET_DOC_TYPE':

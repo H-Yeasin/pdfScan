@@ -151,7 +151,7 @@ export async function importLegacyLibraryIfPresent(db: SQLiteDatabase): Promise<
 
   const index = migrateLibraryIndex(JSON.parse(raw));
   const converted = convertLegacyIndex(index);
-  const library: LoadedLibrary = { courses: converted.courses, documents: toLibraryDocuments(converted), semesters: [] };
+  const library: LoadedLibrary = { courses: converted.courses, documents: toLibraryDocuments(converted), semesters: [], timetable: [] };
   await insertIfMissing(db, library);
 
   // Only once the rows are committed: keep the blob as a backup, then retire the live key so the

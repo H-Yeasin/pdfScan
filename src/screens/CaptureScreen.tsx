@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CaptureControls } from '../components/capture/CaptureControls';
+import { CourseBadge } from '../components/courses/CourseBadge';
+import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
 import { ingestGalleryBatch } from '../services/capture/ingestBatch';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { useAppState } from '../store/AppStateContext';
 import { captureSpecFor } from '../store/slices/settingsSlice';
+import { useFilingCourse } from '../store/useFilingCourse';
+import { createId } from '../utils/id';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
 import type { CaptureMode } from '../types/models';
@@ -24,6 +28,11 @@ export function CaptureScreen() {
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
   const spec = useMemo(() => captureSpecFor(state.settings, mode), [state.settings, mode]);
   const hasAutoLaunched = useRef(false);
+  // "Saving to" chip (K5): where this scan will be filed, so it can be changed before scanning.
+  const { courseId: filingCourseId } = useFilingCourse();
+  const filingCourse = state.library.courses.find((c) => c.id === filingCourseId);
+  const hasCourses = state.library.courses.some((c) => !c.archived);
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const restoredMode = useRef(false);
 
   // Restore the last-used mode once settings are in. Only on the first visit with an empty
@@ -105,6 +114,24 @@ export function CaptureScreen() {
 
       <SafeAreaView style={styles.overlay} edges={['top']}>
         <View style={styles.topRow}>
+          {hasCourses ? (
+            <Pressable
+              onPress={() => setCoursePickerOpen(true)}
+              hitSlop={8}
+              style={[styles.savingTo, { backgroundColor: chrome.pillBg, borderColor: chrome.pillBorder }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Saving to ${filingCourse?.name ?? 'Unsorted'}. Change`}
+            >
+              {filingCourse ? <CourseBadge course={filingCourse} size={22} /> : null}
+              <Text style={[styles.savingToLabel, { color: chrome.textDim }]}>Saving to</Text>
+              <Text style={[styles.savingToCourse, { color: chrome.text }]} numberOfLines={1}>
+                {filingCourse ? filingCourse.code || filingCourse.name : 'Unsorted'}
+              </Text>
+              <Ionicons name="chevron-down" size={14} color={chrome.textDim} />
+            </Pressable>
+          ) : (
+            <View />
+          )}
           <Pressable
             onPress={() => go('settings')}
             hitSlop={8}
@@ -142,6 +169,19 @@ export function CaptureScreen() {
         accent={chrome.accent}
       />
 
+      <FolderPickerModal
+        visible={coursePickerOpen}
+        courses={state.library.courses}
+        selectedCourseId={filingCourseId}
+        onSelect={(id) => dispatch({ type: 'deliver/SET_COURSE', courseId: id })}
+        onCreate={(name) => {
+          const id = createId('course');
+          dispatch({ type: 'library/CREATE_COURSE', id, name });
+          return id;
+        }}
+        onClose={() => setCoursePickerOpen(false)}
+      />
+
       {busyScanning && (
         <View style={[StyleSheet.absoluteFill, styles.scanOverlay]}>
           <ActivityIndicator color="#fff" size="large" />
@@ -163,8 +203,29 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
+  },
+  savingTo: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 40,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.md,
+    borderRadius: radii.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  savingToLabel: {
+    fontSize: 13,
+  },
+  savingToCourse: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
   settingsButton: {
     width: 40,

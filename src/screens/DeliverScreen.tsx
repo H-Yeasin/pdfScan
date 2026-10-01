@@ -23,10 +23,12 @@ import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../ser
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { shareDocument } from '../services/sharing/shareService';
 import { historyUris } from '../store/pageHistory';
+import { CourseChips } from '../components/courses/CourseChips';
 import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
 import { defaultDocTypeFor } from '../services/courses/docTypes';
 import { useAppState } from '../store/AppStateContext';
+import { useFilingCourse } from '../store/useFilingCourse';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { formatBytes } from '../utils/format';
@@ -63,7 +65,9 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, courseId, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { name, format, quality, more, exportCopy, academicConfig, layoutMode } = state.deliver;
+  // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
+  const { courseId, suggestions, automatic } = useFilingCourse();
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
@@ -358,13 +362,31 @@ export function DeliverScreen() {
           }
         />
 
-        <Pressable
-          style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
-          onPress={() => setFolderPickerOpen(true)}
-        >
-          <Text style={{ color: tokens.ink, fontSize: 15 }}>Course</Text>
-          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
-        </Pressable>
+        <View style={styles.typeSection}>
+          <View style={styles.qualityHeader}>
+            <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Course</Text>
+            <Text style={{ color: tokens.muted, fontSize: 13 }}>
+              {courseId === null ? 'Unsorted' : automatic ? 'Suggested' : ''}
+            </Text>
+          </View>
+          {suggestions.length > 0 ? (
+            <CourseChips
+              courses={courses}
+              suggestions={suggestions}
+              selectedId={courseId}
+              onSelect={(id) => dispatch({ type: 'deliver/SET_COURSE', courseId: id })}
+              onMore={() => setFolderPickerOpen(true)}
+            />
+          ) : (
+            <Pressable
+              style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
+              onPress={() => setFolderPickerOpen(true)}
+            >
+              <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
+              <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
+            </Pressable>
+          )}
+        </View>
 
         <View style={styles.typeSection}>
           <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Type</Text>

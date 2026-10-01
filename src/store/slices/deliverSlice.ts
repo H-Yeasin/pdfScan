@@ -6,8 +6,12 @@ export type DeliverState = {
   format: DocFormat;
   quality: number; // 1-5
   more: boolean;
-  // Course the saved document is filed under; null means Unsorted.
+  // Course the saved document is filed under; null means Unsorted. Only used once the student has
+  // chosen (coursePicked): until then the course is automatic, the top suggestion
+  // (store/useFilingCourse).
   courseId: string | null;
+  // True after a pick in Deliver or Capture's "Saving to" chip, or a scan started from a course page.
+  coursePicked: boolean;
   // The type the saved document gets. null = the capture mode's default (docTypes.defaultDocTypeFor),
   // so switching mode mid-session still changes it until the student picks one.
   docType: DocType | null;
@@ -27,6 +31,7 @@ export const initialDeliverState: DeliverState = {
   quality: 3,
   more: false,
   courseId: null,
+  coursePicked: false,
   docType: null,
   exportCopy: false,
   academicConfig: null,
@@ -39,6 +44,8 @@ export type DeliverAction =
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/TOGGLE_MORE' }
   | { type: 'deliver/SET_COURSE'; courseId: string | null }
+  // Back to the automatic (suggested) course.
+  | { type: 'deliver/AUTO_COURSE' }
   | { type: 'deliver/SET_DOC_TYPE'; docType: DocType | null }
   | { type: 'deliver/TOGGLE_EXPORT_COPY' }
   | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
@@ -56,7 +63,9 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
     case 'deliver/TOGGLE_MORE':
       return { ...state, more: !state.more };
     case 'deliver/SET_COURSE':
-      return { ...state, courseId: action.courseId };
+      return { ...state, courseId: action.courseId, coursePicked: true };
+    case 'deliver/AUTO_COURSE':
+      return { ...state, courseId: null, coursePicked: false };
     case 'deliver/SET_DOC_TYPE':
       return { ...state, docType: action.docType };
     case 'deliver/TOGGLE_EXPORT_COPY':

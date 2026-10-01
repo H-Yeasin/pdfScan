@@ -119,6 +119,23 @@ export const MIGRATIONS: Migration[] = [
       await db.execAsync('ALTER TABLE courses DROP COLUMN semester;');
     },
   },
+  {
+    // v4 (§3 K5): the optional weekly timetable that drives course suggestions. A slot belongs to
+    // one course and goes with it.
+    version: 4,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE timetable_slots (
+          id TEXT PRIMARY KEY NOT NULL,
+          course_id TEXT NOT NULL REFERENCES courses (id) ON DELETE CASCADE,
+          weekday INTEGER NOT NULL,
+          start_min INTEGER NOT NULL,
+          end_min INTEGER NOT NULL
+        );
+        CREATE INDEX idx_timetable_slots_course_id ON timetable_slots (course_id);
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

@@ -126,3 +126,19 @@ describe('librarySlice doc types', () => {
     expect(after.files[2]).toBe(before.files[2]);
   });
 });
+
+describe('librarySlice timetable', () => {
+  it('keeps slots sorted and drops a deleted course\'s slots', () => {
+    const state = run(
+      createCourse('a'),
+      createCourse('b'),
+      { type: 'library/ADD_SLOT', slot: { id: 's1', courseId: 'a', weekday: 3, startMin: 600, endMin: 660 } },
+      { type: 'library/ADD_SLOT', slot: { id: 's2', courseId: 'b', weekday: 1, startMin: 540, endMin: 600 } },
+      { type: 'library/ADD_SLOT', slot: { id: 's3', courseId: 'a', weekday: 1, startMin: 480, endMin: 530 } },
+      { type: 'library/UPDATE_SLOT', id: 's3', patch: { startMin: 700, endMin: 760 } }
+    );
+    expect(state.timetable.map((s) => s.id)).toEqual(['s2', 's3', 's1']);
+    const after = libraryReducer(state, { type: 'library/DELETE_COURSE', id: 'a' });
+    expect(after.timetable.map((s) => s.id)).toEqual(['s2']);
+  });
+});

@@ -9,6 +9,8 @@ import type { Course, CourseColor } from '../../types/models';
 import { createId } from '../../utils/id';
 import { CourseBadge } from './CourseBadge';
 import { CourseSheet, SheetField, sheetInputStyle } from './CourseSheet';
+import { TimetableEditor } from './TimetableEditor';
+import { formatSlot } from '../../services/courses/timetable';
 
 type CourseEditorSheetProps = {
   visible: boolean;
@@ -35,6 +37,8 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
   const [semester, setSemester] = useState<SemesterChoice>({ kind: 'none' });
   const [archived, setArchived] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const [classTimesOpen, setClassTimesOpen] = useState(false);
+  const classTimes = course ? state.library.timetable.filter((s) => s.courseId === course.id) : [];
 
   const todayTerm = useMemo(() => defaultSemester(new Date()), []);
   const todaySemester = findSemesterByName(semesters, todayTerm.name);
@@ -217,6 +221,22 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
       </SheetField>
 
       {course ? (
+        <SheetField label="Class times">
+          <Pressable
+            style={[styles.classTimes, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
+            onPress={() => setClassTimesOpen(true)}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.classTimesText, { color: classTimes.length ? tokens.ink : tokens.muted }]} numberOfLines={2}>
+              {classTimes.length ? classTimes.map(formatSlot).join(', ') : 'Not set — scans in class get filed here'}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={tokens.muted} />
+          </Pressable>
+          <TimetableEditor visible={classTimesOpen} courseId={course.id} onClose={() => setClassTimesOpen(false)} />
+        </SheetField>
+      ) : null}
+
+      {course ? (
         <View style={styles.switchRow}>
           <View style={styles.flex}>
             <Text style={[styles.chipLabel, { color: tokens.ink }]}>Archived</Text>
@@ -278,6 +298,18 @@ const styles = StyleSheet.create({
   chipLabel: {
     fontSize: 14.5,
     fontWeight: '600',
+  },
+  classTimes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.card,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  classTimesText: {
+    flex: 1,
+    fontSize: 14.5,
   },
   switchRow: {
     flexDirection: 'row',

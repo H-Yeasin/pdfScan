@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TimetableEditor } from '../components/courses/TimetableEditor';
 import { LanguageRow } from '../components/settings/LanguageRow';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
@@ -21,8 +22,13 @@ const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
 
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
+  const [timetableOpen, setTimetableOpen] = useState(false);
   const { go, hub } = useRouter();
   const { state, dispatch } = useAppState();
+  // Class times of active courses only: an archived course's classes are over.
+  const classCount = state.library.timetable.filter((slot) =>
+    state.library.courses.some((c) => c.id === slot.courseId && !c.archived)
+  ).length;
   const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
     state.settings;
 
@@ -79,6 +85,12 @@ export function SettingsScreen() {
             subtitle="Create, rename, and organize your courses"
             chevron
             onPress={() => go('manageFolders')}
+          />
+          <SettingRow
+            title="Class times"
+            subtitle="Scans during a class are saved to that course"
+            trailing={classCount === 0 ? 'Not set' : `${classCount} ${classCount === 1 ? 'class' : 'classes'}`}
+            onPress={() => setTimetableOpen(true)}
           />
         </View>
 
@@ -144,6 +156,7 @@ export function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+      <TimetableEditor visible={timetableOpen} onClose={() => setTimetableOpen(false)} />
     </SafeAreaView>
   );
 }

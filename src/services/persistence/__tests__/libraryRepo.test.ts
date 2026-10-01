@@ -9,7 +9,7 @@ beforeEach(resetStorage);
 const course: Course = { id: 'c1', name: 'Chemistry', color: 'teal', archived: false, sortOrder: 0, createdAt: 1 };
 
 async function seed(library: LoadedLibrary): Promise<LoadedLibrary> {
-  await syncLibrary(await getDb(), { documents: [], courses: [], semesters: [] }, library);
+  await syncLibrary(await getDb(), { documents: [], courses: [], semesters: [], timetable: [] }, library);
   return library;
 }
 
@@ -33,7 +33,7 @@ describe('libraryRepo', () => {
       coverKind: 'template',
       pages: [makePage({ ocr: { text: 'hello', blocks: [] }, ocrFailed: true }), makePage({ displayUri: 'file:///x/display.jpg' })],
     });
-    await seed({ documents: [doc], courses: [course], semesters: [] });
+    await seed({ documents: [doc], courses: [course], semesters: [], timetable: [] });
 
     const loaded = await loadAll(await getDb());
     expect(loaded.courses).toEqual([course]);
@@ -42,21 +42,21 @@ describe('libraryRepo', () => {
 
   it("keeps a page's full-page layout (ID cards) through a save and reload", async () => {
     const doc = makeDoc({ pages: [makePage({ layout: 'fullPage' }), makePage()] });
-    await seed({ documents: [doc], courses: [], semesters: [] });
+    await seed({ documents: [doc], courses: [], semesters: [], timetable: [] });
     const loaded = await loadAll(await getDb());
     expect(loaded.documents[0].pages.map((p) => p.layout)).toEqual(['fullPage', undefined]);
   });
 
   it('stores paths relative to the document directory', async () => {
     const doc = makeDoc();
-    await seed({ documents: [doc], courses: [], semesters: [] });
+    await seed({ documents: [doc], courses: [], semesters: [], timetable: [] });
     const row = await (await getDb()).getFirstAsync<{ pdf_path: string }>('SELECT pdf_path FROM documents');
     expect(row?.pdf_path).toBe(`library/${doc.id}/document.pdf`);
   });
 
   it('writes only the changed document when one is starred', async () => {
     const docs = [makeDoc({ id: 'a' }), makeDoc({ id: 'b' }), makeDoc({ id: 'c' })];
-    const prev = await seed({ documents: docs, courses: [], semesters: [] });
+    const prev = await seed({ documents: docs, courses: [], semesters: [], timetable: [] });
     const db = await getDb();
     const spy = jest.spyOn(db, 'runAsync');
 
@@ -71,8 +71,8 @@ describe('libraryRepo', () => {
   });
 
   it('applies renames and deletions', async () => {
-    const prev = await seed({ documents: [makeDoc({ id: 'a' }), makeDoc({ id: 'b' })], courses: [], semesters: [] });
-    const next = { courses: [], semesters: [], documents: [{ ...prev.documents[0], name: 'Renamed' }] };
+    const prev = await seed({ documents: [makeDoc({ id: 'a' }), makeDoc({ id: 'b' })], courses: [], semesters: [], timetable: [] });
+    const next = { courses: [], semesters: [], timetable: [], documents: [{ ...prev.documents[0], name: 'Renamed' }] };
     await syncLibrary(await getDb(), prev, next);
 
     const loaded = await loadAll(await getDb());
@@ -82,9 +82,9 @@ describe('libraryRepo', () => {
   });
 
   it('moves documents to Unsorted when their course is deleted', async () => {
-    const prev = await seed({ documents: [makeDoc({ id: 'a', courseId: 'c1' })], courses: [course], semesters: [] });
+    const prev = await seed({ documents: [makeDoc({ id: 'a', courseId: 'c1' })], courses: [course], semesters: [], timetable: [] });
     // Even without the reducer clearing courseId, the foreign key falls back to Unsorted.
-    await syncLibrary(await getDb(), prev, { documents: prev.documents, courses: [], semesters: [] });
+    await syncLibrary(await getDb(), prev, { documents: prev.documents, courses: [], semesters: [], timetable: [] });
     const loaded = await loadAll(await getDb());
     expect(loaded.courses).toEqual([]);
     expect(loaded.documents[0].courseId).toBeUndefined();
@@ -93,12 +93,12 @@ describe('libraryRepo', () => {
   it('keeps the full-text index in step with page rewrites', async () => {
     const prev = await seed({
       documents: [makeDoc({ id: 'a', pages: [makePage({ ocr: { text: 'mitochondria', blocks: [] } })] })],
-      courses: [], semesters: [],
+      courses: [], semesters: [], timetable: [],
     });
     expect(await searchDocumentsByText('mito')).toEqual(['a']);
 
     const next = {
-      courses: [], semesters: [],
+      courses: [], semesters: [], timetable: [],
       documents: [{ ...prev.documents[0], pages: [makePage({ ocr: { text: 'ribosome', blocks: [] } })] }],
     };
     await syncLibrary(await getDb(), prev, next);
@@ -107,7 +107,7 @@ describe('libraryRepo', () => {
   });
 
   it('treats LIKE wildcards in the query literally', async () => {
-    await seed({ documents: [makeDoc({ id: 'a', name: '100% done' }), makeDoc({ id: 'b', name: '1000 done' })], courses: [], semesters: [] });
+    await seed({ documents: [makeDoc({ id: 'a', name: '100% done' }), makeDoc({ id: 'b', name: '1000 done' })], courses: [], semesters: [], timetable: [] });
     expect(await searchDocumentsByText('100%')).toEqual(['a']);
     expect(await searchDocumentsByText('_')).toEqual([]);
   });
@@ -129,7 +129,7 @@ describe('courses and semesters', () => {
   it('round-trips semesters, every course field and docType', async () => {
     const full: Course = { ...courseIn('math', 0, 's_fall'), code: 'MA101', emoji: '📐', teacher: 'Dr. Noether', color: 'purple' };
     const doc = makeDoc({ courseId: 'math', docType: 'exam' });
-    await seed({ semesters: [fall, spring], courses: [full], documents: [doc, makeDoc({ id: 'untyped' })] });
+    await seed({ semesters: [fall, spring], timetable: [], courses: [full], documents: [doc, makeDoc({ id: 'untyped' })] });
 
     const loaded = await loadAll(await getDb());
     expect(loaded.semesters).toEqual([spring, fall]); // newest start first
@@ -140,7 +140,7 @@ describe('courses and semesters', () => {
 
   it('archiveSemester archives the semester and only its courses', async () => {
     await seed({
-      semesters: [fall, spring],
+      semesters: [fall, spring], timetable: [],
       courses: [courseIn('a', 0, 's_fall'), courseIn('b', 1, 's_fall'), courseIn('c', 2, 's_spring'), courseIn('d', 3)],
       documents: [makeDoc({ id: 'doc_a', courseId: 'a' })],
     });
@@ -163,7 +163,7 @@ describe('courses and semesters', () => {
   });
 
   it('reorderCourses rewrites sort_order and loadAll follows it', async () => {
-    await seed({ semesters: [], courses: [courseIn('a', 0), courseIn('b', 1), courseIn('c', 2)], documents: [] });
+    await seed({ semesters: [], timetable: [], courses: [courseIn('a', 0), courseIn('b', 1), courseIn('c', 2)], documents: [] });
     await reorderCourses(await getDb(), ['c', 'a', 'b']);
     expect((await loadAll(await getDb())).courses.map((c) => [c.id, c.sortOrder])).toEqual([
       ['c', 0],
@@ -173,7 +173,7 @@ describe('courses and semesters', () => {
   });
 
   it('deleting a semester keeps its courses, with no semester', async () => {
-    await seed({ semesters: [fall], courses: [courseIn('a', 0, 's_fall')], documents: [] });
+    await seed({ semesters: [fall], timetable: [], courses: [courseIn('a', 0, 's_fall')], documents: [] });
     await deleteSemesters(await getDb(), ['s_fall']);
     const loaded = await loadAll(await getDb());
     expect(loaded.semesters).toEqual([]);
@@ -181,8 +181,29 @@ describe('courses and semesters', () => {
   });
 
   it('syncLibrary writes a new semester before the course that references it', async () => {
-    const prev = await seed({ semesters: [], courses: [], documents: [] });
-    await syncLibrary(await getDb(), prev, { semesters: [fall], courses: [courseIn('a', 0, 's_fall')], documents: [] });
+    const prev = await seed({ semesters: [], timetable: [], courses: [], documents: [] });
+    await syncLibrary(await getDb(), prev, { semesters: [fall], timetable: [], courses: [courseIn('a', 0, 's_fall')], documents: [] });
     expect((await loadAll(await getDb())).courses[0].semesterId).toBe('s_fall');
+  });
+});
+
+describe('timetable', () => {
+  const math: Course = { id: 'math', name: 'Math', color: 'teal', archived: false, sortOrder: 0, createdAt: 0 };
+  const monday = { id: 'slot1', courseId: 'math', weekday: 1, startMin: 540, endMin: 630 };
+  const friday = { id: 'slot2', courseId: 'math', weekday: 5, startMin: 600, endMin: 660 };
+
+  it('round-trips slots in weekday order and applies edits and removals', async () => {
+    const prev = await seed({ documents: [], courses: [math], semesters: [], timetable: [friday, monday] });
+    expect((await loadAll(await getDb())).timetable).toEqual([monday, friday]);
+
+    const moved = { ...friday, startMin: 615 };
+    await syncLibrary(await getDb(), prev, { ...prev, timetable: [moved] });
+    expect((await loadAll(await getDb())).timetable).toEqual([moved]);
+  });
+
+  it("a course's class times are deleted with it", async () => {
+    const prev = await seed({ documents: [], courses: [math], semesters: [], timetable: [monday] });
+    await syncLibrary(await getDb(), prev, { ...prev, courses: [], timetable: [monday] });
+    expect((await loadAll(await getDb())).timetable).toEqual([]);
   });
 });

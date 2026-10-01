@@ -212,6 +212,16 @@ export type Semester = {
   createdAt: number;
 };
 
+// One weekly class time of a course (the optional timetable, §3 K5). Minutes since local midnight;
+// weekday 0 = Sunday, as Date.getDay().
+export type TimetableSlot = {
+  id: string;
+  courseId: string;
+  weekday: number;
+  startMin: number;
+  endMin: number;
+};
+
 // What kind of document it is, for filtering and §4's `{type}` naming field. A document without
 // one is treated as 'other'.
 export type DocType = 'assignment' | 'notes' | 'handout' | 'exam' | 'lab' | 'other';
