@@ -104,13 +104,15 @@ manual cropping on most pages.
 ### §2 Review and enhance
 Goal: handwriting and boards look like clean photocopies.
 
-- [ ] **Ink filter** for pen or pencil on lined or grid paper: adaptive threshold, boosted ink,
-      faded ruling lines (Skia shader). (L)
-- [ ] **Board filter**: glare and colour-cast removal, background flattened to white or black. (M)
-- [ ] Shadow removal (illumination normalization) for every mode. (M)
-- [ ] Apply-to-all-pages for filter and adjustments. (S)
-- [ ] Keep the existing crop, rotate, reorder, retake and half-page split; polish the gestures. (S)
-- [ ] Before/after toggle (press and hold). (S)
+**Detailed steps:** [`docs/plan/02-review-enhance.md`](plan/02-review-enhance.md)
+
+- [ ] E1 Filter registry and shared filter engine (adds Original, Ink, Board)
+- [ ] E2 Live preview without temporary files, plus a dev Filter Lab
+- [ ] E3 Shadow and lighting correction for every filter
+- [ ] E4 Ink filter for handwritten notes (soft curve, fade ruled lines, keep pen colour)
+- [ ] E5 Board filter for whiteboards, blackboards and slides
+- [ ] E6 Review UX: thumbnail filter strip, undo/redo, apply-to-all with undo, crop loupe
+- [ ] E7 Blind benchmark against CamScanner and parameter tuning
 
 **Done when:** in side-by-side tests on 20 real student pages, our output is preferred over
 CamScanner's free output on most of them.
@@ -252,4 +254,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. Next to plan: §2 Review and enhance (`docs/plan/02-review-enhance.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. Next to plan: §3 Courses and organization (`docs/plan/03-courses.md`).
