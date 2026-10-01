@@ -145,7 +145,7 @@ Goal: an assignment ready to upload, in one screen.
 - [x] S5 Footer presets (page numbers, name + roll + pages) and A4 / Letter page size
 - [x] S6 Submit button and per-course submission presets (3 taps after capture)
 - [x] S7 Submission history per course, with "Share again"
-- [ ] S8 Deadline reminders (local notifications, optional)
+- [x] S8 Deadline reminders (local notifications, optional)
 
 **Done when:** from opening the app to having the share sheet open with a correctly named,
 under-limit PDF takes 3 taps after capture.

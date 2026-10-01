@@ -380,7 +380,33 @@ As built:
 sizes, and "Share again" works even after the cache was cleared.
 
 ### S8 · Deadline reminders *(M)*
-Status: todo
+Status: done in code (commit 31c0083). Needs a new dev build (native module); the reminder and
+tap-to-open checks need a device.
+
+As built:
+- `expo-notifications@~57.0.21` (with `expo-application`, `badgin`). Plugin in `app.json`:
+  `icon` = `assets/android-icon-monochrome.png`, `color` = accent. `POST_NOTIFICATIONS` comes from
+  the library's own manifest. No `SCHEDULE_EXACT_ALARM`: on Android 12+ reminders use inexact
+  alarms (`setAndAllowWhileIdle`) and may come a few minutes late. Jest mock:
+  `src/test/mocks/expoNotifications.ts`.
+- Migration v7 as planned (`course_id` cascades). `Deadline` in `models.ts`; deadlines load and
+  sync with the library like submissions (`LoadedLibrary.deadlines`, optional). State:
+  `library.deadlines` (by due date), `highlightDeadlineId` (UI-only).
+- `submit/deadlines.ts`: `reminderTimes`, `scheduleReminders` (cancels the old ids first; a done
+  deadline gets none), `cancelReminders`, `cancelStaleReminders` (cancels scheduled reminders
+  whose deadline is gone or done), `ensureNotificationPermission`, `matchDeadline` (soonest if
+  several), `dueSoon`, `formatDue`, and editor helpers (`parseTime`, `dueAtFrom`, `upcomingDays`).
+- `store/useDeadlines.ts`: `useDeadlineReminders` (in AppNavigator: foreground banners, the
+  reconcile pass on every deadline change, which also covers a deleted course, and
+  `useLastNotificationResponse` → course page with the deadline highlighted) and
+  `useDeadlineActions` (save/remove/markDone; permission is asked on the first save).
+- UI: `DeadlineEditorSheet` with no new date-picker dependency (day chips for two weeks, time
+  presets 09:00 / 12:00 / 17:00 / 23:59 plus an HH:MM field, type chips, title prefilled as
+  e.g. "HW3"). The type is always set from the chips (the model still allows none).
+  `DeadlineList` on the course page (above the documents, "+ Add deadline", tap to edit, the
+  highlighted one has "Scan now") and Home's "Due soon" strip above the course grid.
+- After a Submit (Deliver or an earlier document) that matches an open deadline, the snack is
+  "… · Mark 'HW3' as done?" with Done, in place of Deliver's Undo.
 
 - Add `expo-notifications@~57.0.21`. Local notifications only: no push token, no network.
   Check the config plugin options in the package source (see AGENTS.md); Android 13+ needs
