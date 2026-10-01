@@ -71,20 +71,25 @@ M = a few days, L = a week or more.
 ### §0 Foundation and quality fixes *(must happen first)*
 Goal: the existing app is trustworthy and store-ready before new features go in.
 
-- [ ] Keep a high-resolution master per page (about 2400 px long side); previews use a small copy. (M)
-- [ ] Make every export from the master. Stop re-encoding JPEGs one generation after another. (M)
-- [ ] Per-script font registry for the invisible OCR layer (Latin Extended, CJK, Devanagari) and
-      fix the silently dropped lines. (M)
-- [ ] Remove the `RECORD_AUDIO` permission, set the real bundle ID and package name, fix the slug,
-      allow dark mode in `app.json`. (S)
-- [ ] Hide "Protect" and the dead "Unlock Pro" button until they work. (S)
-- [ ] Escape FTS5 search input. (S)
-- [ ] Unify the two folder systems (`folderId` and `courseFolder`) into one **Course** model (§3). (M)
-- [ ] Test setup (Jest + React Native preset) with unit tests for `pdfService`,
-      `libraryOperations`, DB migrations and search. (M)
-- [ ] CI: typecheck and tests on every push (GitHub Actions). (S)
-- [ ] Exclude `src/dev/*` spikes from release builds; remove stray sample files. (S)
-- [ ] Opt-in crash reporting so that real-device crashes are visible without breaking the privacy promise. (S)
+Step-by-step plan: [docs/plan/00-foundation.md](plan/00-foundation.md). Code status below; the
+device checks in that plan's "Verification" section are still to do.
+
+- [x] Keep a high-resolution master per page (about 2400 px long side); previews use a small copy. (M) — F5
+- [x] Make every export from the master. Stop re-encoding JPEGs one generation after another. (M) — F5
+- [x] OCR text layer for every script (one glyphless font instead of a per-script font registry),
+      fix the silently dropped lines. (M) — F6
+- [x] Remove the `RECORD_AUDIO` permission, set the real bundle ID and package name, allow dark
+      mode in `app.json`. (S) — F2. The slug stays until the EAS project is renamed on expo.dev.
+- [x] Hide "Protect" and the dead "Unlock Pro" button until they work. (S) — F2
+- [x] Escape FTS5 search input (and LIKE wildcards). (S) — F3/F7
+- [x] Library storage moves to SQLite as the single source of truth, with a data-loss guard. (M) — F3
+- [x] Unify the two folder systems (`folderId` and `courseFolder`) into one **Course** model (§3). (M) — F4
+- [x] Test setup (Jest + React Native preset) with unit tests for `pdfService`,
+      `libraryOperations`, DB migrations and search. (M) — F1 onwards
+- [x] CI: typecheck and tests on every push (GitHub Actions). (S) — F1
+- [x] Exclude `src/dev/*` spikes from release builds; remove stray sample files. (S) — F2
+- [x] App-wide error boundary. (S) — F7
+- [x] Opt-in crash reporting so that real-device crashes are visible without breaking the privacy promise. (S) — F8
 
 **Done when:** tests pass in CI, a 10-page scan exports sharp enough to read 8 pt print, and OCR
 text in every supported script is searchable in an external PDF viewer.

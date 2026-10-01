@@ -76,8 +76,9 @@ so scanned documents never touch a server.
   device.
 - Five script models: **Latin, Devanagari (Hindi/Marathi/Nepali), Chinese, Japanese, Korean**.
 - Recognized text is embedded as an invisible, position-matched text layer in the exported
-  PDF, so pages are searchable and selectable in any PDF viewer — and searchable inside the
-  app's own library search.
+  PDF (via a tiny bundled "glyphless" font, so it works for every script — accented Latin,
+  CJK and Devanagari alike), so pages are searchable and selectable in any PDF viewer — and
+  searchable inside the app's own library search.
 
 ### PDF toolkit
 - **Merge, split, compress and sign** documents in bulk from the library — long-press to
@@ -98,14 +99,16 @@ so scanned documents never touch a server.
 - Registers as a system PDF handler on both platforms (open-in from Mail, Files, Drive, etc.).
 
 ### Library & organization
-- Folders, starring, recents, and full-text search that matches OCR content — not just
-  filenames.
+- Courses, starring, recents, and full-text search that matches OCR content — not just
+  filenames. The library lives in SQLite (FTS5 full-text index).
 - Per-platform export: share sheet, save to the app's own library, or (Android) auto-copy
   every export into a user-chosen folder via the Storage Access Framework.
 
 ### Privacy by design
 - No account, no cloud upload, no watermark on exports. Scanning, OCR, and PDF assembly all
   happen on-device; the only network-free promise the app makes, it keeps.
+- Crash reporting is opt-in (off by default) and scrubbed of document names, paths and text —
+  see [docs/crash-reporting.md](docs/crash-reporting.md).
 
 ## Tech stack
 
@@ -203,9 +206,20 @@ The **Pro** tier surfaced in-app is scaffolded for the following (not yet moneti
 - Automatic backup to Drive/Dropbox
 
 Other known gaps:
-- "Password protect" in the export sheet currently tags a document as protected in the
-  library UI; it does not yet encrypt the PDF itself.
-- Bengali script isn't covered by the current OCR script set.
+- PDF password protection isn't available yet (the old "Protect" toggle, which only tagged a
+  document without encrypting it, has been removed).
+- Bengali script isn't covered by the current OCR script set (reserved in
+  `src/services/scripts/registry.ts`).
+
+## Development
+
+```bash
+npm ci
+npm run typecheck
+npm test
+```
+
+CI runs both on every push (`.github/workflows/ci.yml`).
 
 ## License
 
