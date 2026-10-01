@@ -32,6 +32,9 @@ export type SessionPage = {
   adjust?: AdjustValues;
   err?: boolean;
   ocr?: PageOcr;
+  // Set on both halves of a Book-mode spread split (C3): the original spread's master, so Review
+  // can "Undo split" without re-encoding anything. Halves of one spread share `groupId`.
+  splitFrom?: { groupId: string; uri: string; thumbUri?: string; width: number; height: number };
 };
 
 export type LibraryPage = {

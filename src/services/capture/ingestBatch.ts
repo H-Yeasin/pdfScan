@@ -4,7 +4,10 @@ import type { OcrScript, SessionPage } from '../../types/models';
 import { hapticSuccess, hapticWarning } from '../feedback/haptics';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
 import type { CaptureModeSpec } from './captureModes';
-import { ingestPage } from './ingest';
+import { splitSpread } from '../enhance/splitSpread';
+import { runOcr } from '../ocr/ocrService';
+import { createId } from '../../utils/id';
+import { ingestPage, pageFromMaster } from './ingest';
 import { beginProcessing, endProcessing } from './processingSession';
 import { processSequentially } from './processSequentially';
 
@@ -17,6 +20,41 @@ export type IngestBatchOptions = {
   // Offered as the snack's "Scan more" action after a successful batch.
   onScanMore?: () => void;
 };
+
+// One raw capture -> its session page(s), applying the mode's post-processing. Book mode splits a
+// landscape spread into left + right pages (OCR'd per half, not on the whole spread); a portrait
+// capture in Book mode stays one page. If splitting itself fails, the whole spread is kept as one
+// page rather than losing the capture.
+export async function ingestOne(
+  uri: string,
+  options: Pick<IngestBatchOptions, 'script' | 'spec' | 'ownsInputs'>
+): Promise<SessionPage[]> {
+  const { script, spec, ownsInputs } = options;
+  const base = { deleteSource: ownsInputs, enhance: spec.defaultEnhance };
+  if (spec.postProcess !== 'splitSpread') return [await ingestPage(uri, script, base)];
+
+  const spread = await ingestPage(uri, script, { ...base, ocr: false });
+  let halves: Awaited<ReturnType<typeof splitSpread>> = null;
+  try {
+    halves = await splitSpread(spread.uri);
+  } catch (error) {
+    console.warn('ingestOne: spread split failed, keeping the whole page', error);
+  }
+  if (!halves) return [{ ...spread, ocr: await runOcr(spread.uri, script) }];
+
+  const splitFrom = {
+    groupId: createId('spread'),
+    uri: spread.uri,
+    thumbUri: spread.thumbUri,
+    width: spread.width,
+    height: spread.height,
+  };
+  const pages: SessionPage[] = [];
+  for (const half of halves) {
+    pages.push({ ...(await pageFromMaster(half, script, { enhance: spec.defaultEnhance })), splitFrom });
+  }
+  return pages;
+}
 
 function pagesLabel(n: number): string {
   return `${n} ${n === 1 ? 'page' : 'pages'}`;
@@ -37,7 +75,7 @@ export async function ingestBatch(
 
   const result = await processSequentially(
     rawUris,
-    (uri) => ingestPage(uri, script, { deleteSource: ownsInputs, enhance: spec.defaultEnhance }),
+    (uri) => ingestOne(uri, { script, spec, ownsInputs }),
     {
       signal,
       onProgress: (progress) => dispatch({ type: 'capture/SET_PROGRESS', progress }),
@@ -47,7 +85,7 @@ export async function ingestBatch(
   endProcessing(signal);
 
   dispatch({ type: 'capture/SET_PROGRESS', progress: null });
-  const pages: SessionPage[] = result.items;
+  const pages: SessionPage[] = result.items.flat();
   if (pages.length > 0) dispatch({ type: 'capture/BULK_ADD_PAGES', pages });
 
   if (result.error !== undefined) {

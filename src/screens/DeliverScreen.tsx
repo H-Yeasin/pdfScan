@@ -174,6 +174,11 @@ export function DeliverScreen() {
         pages.forEach((page) => {
           transientUris.add(page.uri);
           if (page.thumbUri) transientUris.add(page.thumbUri);
+          // A Book-mode half keeps its original spread around for "Undo split".
+          if (page.splitFrom) {
+            transientUris.add(page.splitFrom.uri);
+            if (page.splitFrom.thumbUri) transientUris.add(page.splitFrom.thumbUri);
+          }
         });
         cleanTemporaryCache(Array.from(transientUris));
 

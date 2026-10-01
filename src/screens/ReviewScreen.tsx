@@ -283,6 +283,19 @@ export function ReviewScreen() {
 
   const showErrHint = !!selectedPage?.err && selectedPage.enhance !== 'bw';
 
+  // Book mode split this page out of a two-page spread; put the pair back together. The halves'
+  // own files are no longer referenced afterwards, so they're deleted.
+  const handleUndoSplit = useCallback(() => {
+    const groupId = selectedPage?.splitFrom?.groupId;
+    if (!groupId) return;
+    const halves = pages.filter((p) => p.splitFrom?.groupId === groupId);
+    const firstIndex = pages.indexOf(halves[0]);
+    dispatch({ type: 'capture/UNSPLIT', groupId, id: createId('page') });
+    dispatch({ type: 'review/SELECT_PAGE', index: Math.max(0, firstIndex) });
+    cleanTemporaryCache(halves.flatMap((p) => (p.thumbUri ? [p.uri, p.thumbUri] : [p.uri])));
+    dispatch({ type: 'ui/SHOW_SNACK', msg: 'Spread restored as one page' });
+  }, [dispatch, pages, selectedPage]);
+
   if (!selectedPage) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
@@ -404,6 +417,15 @@ export function ReviewScreen() {
           onCompareOut={() => setComparing(false)}
         />
       </View>
+
+      {selectedPage.splitFrom && (
+        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>Split from a book spread</Text>
+          <Pressable onPress={handleUndoSplit} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Undo split</Text>
+          </Pressable>
+        </View>
+      )}
 
       {showErrHint && (
         <View style={[styles.errHint, { backgroundColor: `${tokens.danger}1A` }]}>
@@ -593,6 +615,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splitChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   errHint: {
     marginHorizontal: spacing.lg,

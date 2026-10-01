@@ -37,6 +37,7 @@ export type CaptureAction =
   | { type: 'capture/ROTATE_PAGE'; id: string }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
   | { type: 'capture/REPLACE_PAGES'; ids: string[]; page: SessionPage }
+  | { type: 'capture/UNSPLIT'; groupId: string; id: string }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
   | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string }
@@ -103,6 +104,27 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       if (firstIndex === -1) return state;
       const pages = state.pages.filter((p) => !action.ids.includes(p.id));
       pages.splice(firstIndex, 0, action.page);
+      return { ...state, pages };
+    }
+    case 'capture/UNSPLIT': {
+      // Puts a split spread back together: both halves become the original spread page again, at
+      // the first half's position, keeping the first half's filter settings.
+      const halves = state.pages.filter((p) => p.splitFrom?.groupId === action.groupId);
+      const source = halves[0]?.splitFrom;
+      if (!source) return state;
+      const firstIndex = state.pages.indexOf(halves[0]);
+      const joined: SessionPage = {
+        id: action.id,
+        uri: source.uri,
+        thumbUri: source.thumbUri,
+        width: source.width,
+        height: source.height,
+        rotation: 0,
+        enhance: halves[0].enhance,
+        adjust: halves[0].adjust,
+      };
+      const pages = state.pages.filter((p) => p.splitFrom?.groupId !== action.groupId);
+      pages.splice(firstIndex, 0, joined);
       return { ...state, pages };
     }
     case 'capture/CLEAR_PAGES':

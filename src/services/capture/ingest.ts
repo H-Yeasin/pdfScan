@@ -17,6 +17,9 @@ export async function ingestPage(
     deleteSource?: boolean;
     // The capture mode's default filter (see captureModes.ts).
     enhance?: EnhanceMode;
+    // false skips OCR, for a page that's about to be post-processed (e.g. split) and OCR'd
+    // per resulting page instead.
+    ocr?: boolean;
   } = {}
 ): Promise<SessionPage> {
   const master = await downscaleAndCompressPage(rawUri, MASTER_MAX_DIM, MASTER_JPEG_Q);
@@ -26,8 +29,18 @@ export async function ingestPage(
     const raw = new File(rawUri);
     if (raw.exists) raw.delete();
   }
+  return pageFromMaster(master, script, { enhance: options.enhance, ocr: options.ocr });
+}
+
+// Wraps an already-final master (e.g. one half of a split spread) as a session page: thumbnail
+// plus optional OCR. Never re-encodes the master itself.
+export async function pageFromMaster(
+  master: { uri: string; width: number; height: number },
+  script: OcrScript,
+  options: { enhance?: EnhanceMode; ocr?: boolean } = {}
+): Promise<SessionPage> {
   const thumb = await downscaleAndCompressPage(master.uri, THUMB_MAX_DIM, THUMB_JPEG_Q);
-  const ocr = await runOcr(master.uri, script);
+  const ocr = options.ocr === false ? undefined : await runOcr(master.uri, script);
 
   return {
     id: createId('page'),
