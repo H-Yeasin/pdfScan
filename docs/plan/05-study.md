@@ -110,7 +110,21 @@ As built:
 and an OCR word end up on.
 
 ### T2 · Search results by page, with jump and highlight *(M)*
-Status: todo
+Status: done in code (commit 38e4fd8).
+
+As built:
+- `dbService.searchPages(query, { courseId?: string | null, type?, limit = 50 })` →
+  `PageHit { documentId, pageId, idx, snippet, rank }`, ordered by bm25 (which favours short
+  pages), then newest document, then page. `courseId: null` = Unsorted. Uses the same
+  `buildFtsMatchQuery` as `searchDocumentsByText`.
+- Library: `components/library/PageResults` in the list footer while searching (follows the
+  course and type chips). Opening one uses `useOpenDocument`, then `reader/SET_TARGET`.
+- Reader: `reader.target` (cleared by `SET_READER_ID`) → after `onLoad`, `goToPage` and Find
+  on that page only (`targetPage`); typing in Find searches the whole document again.
+- **Not built: the iOS OCR-box overlay.** `react-native-pdf-jsi` doesn't expose the on-screen
+  page geometry needed to place it; on iOS the page jump works without the highlight. The
+  open-to-highlight timing is still to be measured on a device.
+- Tests: `persistence/__tests__/searchPages.test.ts`.
 
 - `dbService.searchPages(query, { courseId?, type?, limit = 50 })` →
   `{ documentId, pageId, idx, snippet, rank }[]`, using FTS5 `snippet(pages_fts, 0, '[', ']', '…', 12)`
