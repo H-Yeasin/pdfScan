@@ -160,7 +160,17 @@ Status: done (commit 1e925cf). As built:
 §3 "done when").
 
 ### K4 · Document types *(S)*
-Status: todo
+Status: done (commit 080c5b7). As built:
+- `docTypes.ts` specs also have `plural` (filter chips) and `short`, which is what `{type}` writes
+  in §4's template (`HW`, `Notes`, `Handout`, `Exam`, `Lab`, `Doc`), so `{type}{n}` gives `HW3`.
+- `nextTypeNumber` exists twice with the same rule: `docTypes.nextTypeNumber(docs, courseId, type)`
+  for in-memory state (what Deliver will use) and `libraryRepo.nextTypeNumber(db, courseId, type)`
+  in SQL. It counts the documents that exist (deleted ones free their number), per course; untyped
+  ones count as `other`.
+- Deliver: `deliver.docType` (null = the capture mode's default) shown as six chips under Course.
+- Filter chips hide when every document has the same type. In Library they apply on Recent and
+  Starred (the Courses tab is the course list) and count the search results.
+- "Set type" is a fifth SelectionBar tool. The list hook's overlay element is now `overlays`.
 
 - `src/services/courses/docTypes.ts`: a registry `{ id, label, icon }` for Assignment, Notes,
   Handout, Exam, Lab and Other.
