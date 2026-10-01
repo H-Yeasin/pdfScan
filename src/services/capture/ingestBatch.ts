@@ -7,6 +7,7 @@ import type { CaptureModeSpec } from './captureModes';
 import { splitSpread } from '../enhance/splitSpread';
 import { runOcr } from '../ocr/ocrService';
 import { createId } from '../../utils/id';
+import { composeIdCardPages } from './idCardPages';
 import { ingestPage, pageFromMaster } from './ingest';
 import { beginProcessing, endProcessing } from './processingSession';
 import { processSequentially } from './processSequentially';
@@ -31,6 +32,9 @@ export async function ingestOne(
 ): Promise<SessionPage[]> {
   const { script, spec, ownsInputs } = options;
   const base = { deleteSource: ownsInputs, enhance: spec.defaultEnhance };
+  // ID card scans are composed in pairs after the batch (composeIdCardPages); only the composed
+  // page is OCR'd.
+  if (spec.postProcess === 'idCard') return [await ingestPage(uri, script, { ...base, ocr: false })];
   if (spec.postProcess !== 'splitSpread') return [await ingestPage(uri, script, base)];
 
   const spread = await ingestPage(uri, script, { ...base, ocr: false });
@@ -85,7 +89,8 @@ export async function ingestBatch(
   endProcessing(signal);
 
   dispatch({ type: 'capture/SET_PROGRESS', progress: null });
-  const pages: SessionPage[] = result.items.flat();
+  let pages: SessionPage[] = result.items.flat();
+  if (spec.postProcess === 'idCard' && pages.length > 0) pages = await composeIdCardPages(pages, script);
   if (pages.length > 0) dispatch({ type: 'capture/BULK_ADD_PAGES', pages });
 
   if (result.error !== undefined) {

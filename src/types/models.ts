@@ -35,7 +35,19 @@ export type SessionPage = {
   // Set on both halves of a Book-mode spread split (C3): the original spread's master, so Review
   // can "Undo split" without re-encoding anything. Halves of one spread share `groupId`.
   splitFrom?: { groupId: string; uri: string; thumbUri?: string; width: number; height: number };
+  // ID card mode (C4): the scanned card images this page was composed from, kept so Review can
+  // swap front/back or retake the back and recompose from the originals.
+  idCard?: { front: SourceImage; back?: SourceImage };
+  // See PageLayout.
+  layout?: PageLayout;
 };
+
+export type SourceImage = { uri: string; width: number; height: number };
+
+// How a page image goes onto its PDF page. undefined = fit inside the standard margin (every
+// normal page). 'fullPage' = edge to edge on A4 at 100 % - for images that are already a
+// true-size A4 canvas (ID card mode), so they print at real size.
+export type PageLayout = 'fullPage';
 
 export type LibraryPage = {
   id: string;
@@ -50,6 +62,8 @@ export type LibraryPage = {
   width: number;
   height: number;
   ocr?: PageOcr;
+  // See PageLayout; must survive rebuilds (merge, split, compress) or an ID card would shrink.
+  layout?: PageLayout;
   // True when OCR ran at save time and failed (as opposed to finding no text), so the reader can
   // offer "Retry OCR" later.
   ocrFailed?: boolean;

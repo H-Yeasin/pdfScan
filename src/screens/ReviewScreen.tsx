@@ -15,6 +15,7 @@ import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModa
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
+import { recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
 import { cancelProcessing } from '../services/capture/processingSession';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
 import { warpPerspectiveCrop } from '../services/enhance/perspectiveCrop';
@@ -28,7 +29,7 @@ import { saveSignatureForReuse } from '../services/signature/savedSignatureStora
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
-import type { AdjustValues, EnhanceMode, SessionPage } from '../types/models';
+import type { AdjustValues, EnhanceMode, SessionPage, SourceImage } from '../types/models';
 
 const OCR_SPARSE_THRESHOLD = 6;
 
@@ -283,6 +284,43 @@ export function ReviewScreen() {
 
   const showErrHint = !!selectedPage?.err && selectedPage.enhance !== 'bw';
 
+  // ID card mode: recompose the true-size page from its kept card images.
+  const [idCardBusy, setIdCardBusy] = useState(false);
+  const updateIdCard = useCallback(
+    async (getNext: () => Promise<{ front: SourceImage; back?: SourceImage } | null>, doneMsg: string) => {
+      if (!selectedPage?.idCard || idCardBusy) return;
+      setIdCardBusy(true);
+      try {
+        const next = await getNext();
+        if (!next) return;
+        const patch = await recomposeIdCard(selectedPage, next, state.settings.ocrScript);
+        dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: doneMsg });
+      } catch (error) {
+        console.warn('ReviewScreen: ID card update failed', error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't update the ID card" });
+      } finally {
+        setIdCardBusy(false);
+      }
+    },
+    [dispatch, idCardBusy, selectedPage, state.settings.ocrScript]
+  );
+
+  const handleSwapIdSides = useCallback(() => {
+    const card = selectedPage?.idCard;
+    if (!card?.back) return;
+    void updateIdCard(async () => ({ front: card.back!, back: card.front }), 'Front and back swapped');
+  }, [selectedPage, updateIdCard]);
+
+  const handleRetakeIdBack = useCallback(() => {
+    const card = selectedPage?.idCard;
+    if (!card) return;
+    void updateIdCard(async () => {
+      const back = await scanIdCardSide(state.settings.ocrScript);
+      return back ? { front: card.front, back } : null;
+    }, card.back ? 'Back replaced' : 'Back added');
+  }, [selectedPage, updateIdCard, state.settings.ocrScript]);
+
   // Book mode split this page out of a two-page spread; put the pair back together. The halves'
   // own files are no longer referenced afterwards, so they're deleted.
   const handleUndoSplit = useCallback(() => {
@@ -417,6 +455,24 @@ export function ReviewScreen() {
           onCompareOut={() => setComparing(false)}
         />
       </View>
+
+      {selectedPage.idCard && (
+        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
+            {idCardBusy ? 'Updating ID card…' : 'ID card · prints at real size'}
+          </Text>
+          {selectedPage.idCard.back && (
+            <Pressable onPress={handleSwapIdSides} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
+              <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Swap sides</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={handleRetakeIdBack} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
+              {selectedPage.idCard.back ? 'Retake back' : 'Add back'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       {selectedPage.splitFrom && (
         <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>

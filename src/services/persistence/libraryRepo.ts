@@ -35,6 +35,7 @@ type PageRow = {
   ocr_text: string | null;
   ocr_json: string | null;
   ocr_failed: number;
+  layout: string | null;
 };
 
 type CourseRow = {
@@ -70,6 +71,7 @@ function rowToPage(row: PageRow): LibraryPage {
     height: row.height,
     ocr: parseOcr(row.ocr_text, row.ocr_json),
     ocrFailed: row.ocr_failed ? true : undefined,
+    layout: row.layout === 'fullPage' ? 'fullPage' : undefined,
   };
 }
 
@@ -164,8 +166,8 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
 
   const pageStmt = await db.prepareAsync(
     `INSERT INTO pages (id, document_id, idx, master_path, display_path, thumb_path, width, height, ocr_text,
-       ocr_json, ocr_failed)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ocr_json, ocr_failed, layout)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   try {
     for (let i = 0; i < doc.pages.length; i++) {
@@ -182,6 +184,7 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
         page.ocr?.text ?? null,
         page.ocr && page.ocr.blocks.length > 0 ? JSON.stringify(page.ocr) : null,
         page.ocrFailed ? 1 : 0,
+        page.layout ?? null,
       ]);
     }
   } finally {

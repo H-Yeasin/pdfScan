@@ -40,6 +40,13 @@ describe('libraryRepo', () => {
     expect(loaded.documents[0]).toEqual({ ...doc, searchHaystack: 'scan hello ', contentUri: undefined, sourceKind: undefined });
   });
 
+  it("keeps a page's full-page layout (ID cards) through a save and reload", async () => {
+    const doc = makeDoc({ pages: [makePage({ layout: 'fullPage' }), makePage()] });
+    await seed({ documents: [doc], courses: [] });
+    const loaded = await loadAll(await getDb());
+    expect(loaded.documents[0].pages.map((p) => p.layout)).toEqual(['fullPage', undefined]);
+  });
+
   it('stores paths relative to the document directory', async () => {
     const doc = makeDoc();
     await seed({ documents: [doc], courses: [] });

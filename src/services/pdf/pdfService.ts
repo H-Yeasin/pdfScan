@@ -5,7 +5,7 @@ import { renderPage } from '../enhance/skiaEnhance';
 import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { fitBox } from '../../utils/fitBox';
-import type { LibraryDocument, PageOcr } from '../../types/models';
+import type { LibraryDocument, PageLayout, PageOcr } from '../../types/models';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
 
 // Standard-mode pages and the cover page are both fixed at true ISO A4 size, with each image
@@ -48,7 +48,20 @@ export type PdfSourcePage = {
   width: number;
   height: number;
   ocr?: PageOcr;
+  layout?: PageLayout;
 };
+
+// The box a standard-layout page image is fit into: the margin box, or the whole A4 sheet for a
+// 'fullPage' image (an A4-ratio canvas then fills it exactly, at true size).
+function contentBox(layout: PageLayout | undefined): { x: number; y: number; width: number; height: number } {
+  if (layout === 'fullPage') return { x: 0, y: 0, width: A4_WIDTH_PT, height: A4_HEIGHT_PT };
+  return {
+    x: CONTENT_MARGIN_PT,
+    y: CONTENT_MARGIN_PT,
+    width: A4_WIDTH_PT - CONTENT_MARGIN_PT * 2,
+    height: A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2,
+  };
+}
 
 // 'standard': one source page per PDF page, sized to that page's own aspect ratio (existing
 // behavior). '2_in_1': two source pages side-by-side per landscape sheet - see the
@@ -258,15 +271,14 @@ async function buildStandardContentPages(
   stampFont: PDFFont,
   ocrFont: PDFRef
 ): Promise<void> {
-  const boxWidthPt = A4_WIDTH_PT - CONTENT_MARGIN_PT * 2;
-  const boxHeightPt = A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2;
   let contentPageNumber = 0;
   const totalContentPages = pages.length;
   for (const page of pages) {
     contentPageNumber += 1;
     const jpgImage = await embedPageImage(pdfDoc, page.uri, encoding);
 
-    const placement = fitBox(page.width, page.height, CONTENT_MARGIN_PT, CONTENT_MARGIN_PT, boxWidthPt, boxHeightPt);
+    const box = contentBox(page.layout);
+    const placement = fitBox(page.width, page.height, box.x, box.y, box.width, box.height);
 
     const pdfPage = pdfDoc.addPage(PageSizes.A4);
     pdfPage.drawImage(jpgImage, {
@@ -488,7 +500,7 @@ export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDo
   if (doc.pdfUri) return doc;
   const result = await buildPdfFromPages(
     doc.id,
-    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is'
   );
   return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes };

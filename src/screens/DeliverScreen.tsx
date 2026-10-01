@@ -24,7 +24,7 @@ import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistenc
 import { shareDocument } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
-import type { LibraryDocument, LibraryPage, PageOcr } from '../types/models';
+import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { formatBytes } from '../utils/format';
 import { createId } from '../utils/id';
 
@@ -51,6 +51,7 @@ type LibraryInputPage = {
   height: number;
   ocr?: PageOcr;
   ocrFailed?: boolean;
+  layout?: PageLayout;
 };
 
 export function DeliverScreen() {
@@ -119,6 +120,7 @@ export function DeliverScreen() {
             height: master.height,
             ocr,
             ocrFailed: ocr === undefined,
+            layout: page.layout,
           });
         }
 
@@ -155,7 +157,7 @@ export function DeliverScreen() {
         setProgress('Building PDF…');
         const pdfResult = await buildPdfFromPages(
           documentId,
-          contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr })),
+          contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
           'as-is',
           academicConfig ?? undefined,
           layoutMode
@@ -175,6 +177,11 @@ export function DeliverScreen() {
           transientUris.add(page.uri);
           if (page.thumbUri) transientUris.add(page.thumbUri);
           // A Book-mode half keeps its original spread around for "Undo split".
+          // An ID card page keeps its scanned card images for swap/retake.
+          if (page.idCard) {
+            transientUris.add(page.idCard.front.uri);
+            if (page.idCard.back) transientUris.add(page.idCard.back.uri);
+          }
           if (page.splitFrom) {
             transientUris.add(page.splitFrom.uri);
             if (page.splitFrom.thumbUri) transientUris.add(page.splitFrom.thumbUri);
@@ -189,6 +196,7 @@ export function DeliverScreen() {
           height: page.height,
           ocr: page.ocr,
           ocrFailed: page.ocrFailed || undefined,
+          layout: page.layout,
         }));
 
         const finalName = name.trim() || defaultName();

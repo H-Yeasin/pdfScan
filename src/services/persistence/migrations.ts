@@ -83,6 +83,13 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v2: pages.layout - 'fullPage' for true-size ID card canvases (C4), NULL for normal pages.
+    version: 2,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE pages ADD COLUMN layout TEXT;');
+    },
+  },
 ];
 
 export async function getSchemaVersion(db: SQLiteDatabase): Promise<number> {

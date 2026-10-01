@@ -45,7 +45,7 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
 
   const pdfResult = await buildPdfFromPages(
     documentId,
-    mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is',
     undefined
   );
@@ -83,7 +83,7 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
     // PDF for every library document (see DeliverScreen.tsx's matching change).
     const pdfResult = await buildPdfFromPages(
       documentId,
-      [{ uri: page.fileUri, width: page.width, height: page.height, ocr: page.ocr }],
+      [{ uri: page.fileUri, width: page.width, height: page.height, ocr: page.ocr, layout: page.layout }],
       'as-is',
       undefined
     );
@@ -117,7 +117,7 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
-    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     encodingForQuality(quality),
     undefined
   );
@@ -159,7 +159,7 @@ export async function applySignedPage(
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
-    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
+    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is',
     undefined
   );
@@ -277,13 +277,15 @@ export async function applySignatureToDocument(
   // - every other page, including page 0 when there's no cover or an imported-image cover, was
   // built with its image fit inside CONTENT_MARGIN_PT. See coverKind's doc comment in models.ts.
   const isTemplateCover = pageIndex === 0 && doc.coverKind === 'template';
+  // A full-page (true-size ID card) image fills the sheet just like a template cover does.
+  const fillsPage = isTemplateCover || page.layout === 'fullPage';
   const pdfResult = await applySignatureToPdf(
     doc.id,
     doc.pdfUri,
     pageIndex,
     page.width,
     page.height,
-    !isTemplateCover,
+    !fillsPage,
     signatureUri,
     placement
   );
