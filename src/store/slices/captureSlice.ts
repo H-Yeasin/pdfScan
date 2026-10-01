@@ -90,9 +90,15 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
         ...state,
         pages: state.pages.map((p) => {
           if (p.id !== action.id) return p;
-          // A new master (crop, signature) makes the old thumbnail stale unless one is supplied.
-          const staleThumb = action.patch.uri !== undefined && action.patch.thumbUri === undefined;
-          return { ...p, ...action.patch, ...(staleThumb ? { thumbUri: undefined } : null) };
+          // A new master (crop, signature) makes the old thumbnail stale unless one is supplied,
+          // and settles any pending crop check (its suggested outline was for the old image).
+          const newMaster = action.patch.uri !== undefined;
+          return {
+            ...p,
+            ...(newMaster ? { needsCropReview: undefined, cropSuggestion: undefined } : null),
+            ...action.patch,
+            ...(newMaster && action.patch.thumbUri === undefined ? { thumbUri: undefined } : null),
+          };
         }),
       };
     case 'capture/REPLACE_PAGES': {

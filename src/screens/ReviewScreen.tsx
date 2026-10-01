@@ -200,6 +200,35 @@ export function ReviewScreen() {
     [dispatch, selectedPage]
   );
 
+  // "Check crops": steps through every page gallery import couldn't crop confidently, starting each
+  // from the suggested outline when there is one. Confirming warps the page (which clears its
+  // flag); "Keep as is" accepts the photo uncropped. Either way it moves on to the next page.
+  const [checkingCrops, setCheckingCrops] = useState(false);
+  const cropCheckPages = pages.filter((p) => p.needsCropReview);
+  const cropCheckPage = checkingCrops ? cropCheckPages[0] : undefined;
+  useEffect(() => {
+    if (checkingCrops && cropCheckPages.length === 0) setCheckingCrops(false);
+  }, [checkingCrops, cropCheckPages.length]);
+
+  const handleCropCheckConfirm = useCallback(
+    async (points: [Point, Point, Point, Point]) => {
+      if (!cropCheckPage) return;
+      const cropped = await warpPerspectiveCrop(cropCheckPage.uri, points);
+      cleanTemporaryCache(cropCheckPage.thumbUri ? [cropCheckPage.uri, cropCheckPage.thumbUri] : [cropCheckPage.uri]);
+      dispatch({ type: 'capture/UPDATE_PAGE', id: cropCheckPage.id, patch: cropped });
+    },
+    [dispatch, cropCheckPage]
+  );
+
+  const handleCropCheckKeep = useCallback(() => {
+    if (!cropCheckPage) return;
+    dispatch({
+      type: 'capture/UPDATE_PAGE',
+      id: cropCheckPage.id,
+      patch: { needsCropReview: undefined, cropSuggestion: undefined },
+    });
+  }, [dispatch, cropCheckPage]);
+
   const handleMergeRequest = useCallback((ids: [string, string]) => {
     setMergeCrop({ ids, stage: 'first' });
   }, []);
@@ -456,6 +485,19 @@ export function ReviewScreen() {
         />
       </View>
 
+      {cropCheckPages.length > 0 && !scanProcessing && (
+        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
+            {cropCheckPages.length === 1 ? "1 page couldn't be cropped automatically" : `${cropCheckPages.length} pages couldn't be cropped automatically`}
+          </Text>
+          <Pressable onPress={() => setCheckingCrops(true)} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
+              Check crops ({cropCheckPages.length})
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       {selectedPage.idCard && (
         <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
@@ -529,6 +571,20 @@ export function ReviewScreen() {
           naturalHeight={selectedPage.height}
           onConfirm={handleCropConfirm}
           onCancel={() => setCropTarget(null)}
+        />
+      )}
+
+      {cropCheckPage && (
+        <CropOverlay
+          key={cropCheckPage.id}
+          uri={cropCheckPage.uri}
+          naturalWidth={cropCheckPage.width}
+          naturalHeight={cropCheckPage.height}
+          initialQuad={cropCheckPage.cropSuggestion}
+          stepLabel={`Check crop · ${cropCheckPages.length} left`}
+          cancelLabel="Keep as is"
+          onConfirm={handleCropCheckConfirm}
+          onCancel={handleCropCheckKeep}
         />
       )}
 

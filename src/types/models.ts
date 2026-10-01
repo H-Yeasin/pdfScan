@@ -40,7 +40,14 @@ export type SessionPage = {
   idCard?: { front: SourceImage; back?: SourceImage };
   // See PageLayout.
   layout?: PageLayout;
+  // Gallery import (C5) couldn't crop this page confidently; Review's "Check crops" goes through
+  // these. cropSuggestion is a doubtful detected outline to start the crop from, in this page's
+  // natural pixels (topLeft, topRight, bottomRight, bottomLeft).
+  needsCropReview?: boolean;
+  cropSuggestion?: [CropPoint, CropPoint, CropPoint, CropPoint];
 };
+
+export type CropPoint = { x: number; y: number };
 
 export type SourceImage = { uri: string; width: number; height: number };
 

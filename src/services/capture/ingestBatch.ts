@@ -1,13 +1,15 @@
 import type { Dispatch } from 'react';
 import type { AppAction } from '../../store/appReducer';
-import type { OcrScript, SessionPage } from '../../types/models';
+import type { EnhanceMode, OcrScript, SessionPage } from '../../types/models';
 import { hapticSuccess, hapticWarning } from '../feedback/haptics';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
 import type { CaptureModeSpec } from './captureModes';
+import { warpPerspectiveCrop } from '../enhance/perspectiveCrop';
 import { splitSpread } from '../enhance/splitSpread';
 import { runOcr } from '../ocr/ocrService';
 import { createId } from '../../utils/id';
 import { composeIdCardPages } from './idCardPages';
+import { detectDocumentQuad } from './quadDetector';
 import { ingestPage, pageFromMaster } from './ingest';
 import { beginProcessing, endProcessing } from './processingSession';
 import { processSequentially } from './processSequentially';
@@ -20,31 +22,63 @@ export type IngestBatchOptions = {
   ownsInputs: boolean;
   // Offered as the snack's "Scan more" action after a successful batch.
   onScanMore?: () => void;
+  // Find and straighten the page in each image (gallery photos; scanner output is pre-cropped).
+  autoCrop?: boolean;
 };
+
+// Gallery photos (unlike scanner output, which Google's scanner has already cropped) get their
+// page found and straightened: a confident detection is warped into a new master (one encode);
+// a doubtful one is only suggested, and no detection keeps the full photo - both flagged
+// needsCropReview for Review's "Check crops". Returns the page without OCR.
+async function autoCropPage(page: SessionPage, script: OcrScript, enhance: EnhanceMode): Promise<SessionPage> {
+  const detection = await detectDocumentQuad(page.uri);
+  if (detection?.confidence === 'high') {
+    try {
+      const cropped = await warpPerspectiveCrop(page.uri, detection.quad);
+      cleanTemporaryCache(page.thumbUri ? [page.uri, page.thumbUri] : [page.uri]);
+      return pageFromMaster(cropped, script, { enhance, ocr: false });
+    } catch (error) {
+      console.warn('autoCropPage: warp failed, leaving the photo for manual cropping', error);
+    }
+  }
+  return {
+    ...page,
+    needsCropReview: true,
+    cropSuggestion: detection?.confidence === 'low' ? detection.quad : undefined,
+  };
+}
 
 // One raw capture -> its session page(s), applying the mode's post-processing. Book mode splits a
 // landscape spread into left + right pages (OCR'd per half, not on the whole spread); a portrait
 // capture in Book mode stays one page. If splitting itself fails, the whole spread is kept as one
-// page rather than losing the capture.
+// page rather than losing the capture. ID card pages are left un-OCR'd: they're composed in pairs
+// after the batch (composeIdCardPages) and only the composed page is OCR'd.
 export async function ingestOne(
   uri: string,
-  options: Pick<IngestBatchOptions, 'script' | 'spec' | 'ownsInputs'>
+  options: Pick<IngestBatchOptions, 'script' | 'spec' | 'ownsInputs'> & { autoCrop?: boolean }
 ): Promise<SessionPage[]> {
-  const { script, spec, ownsInputs } = options;
-  const base = { deleteSource: ownsInputs, enhance: spec.defaultEnhance };
-  // ID card scans are composed in pairs after the batch (composeIdCardPages); only the composed
-  // page is OCR'd.
-  if (spec.postProcess === 'idCard') return [await ingestPage(uri, script, { ...base, ocr: false })];
-  if (spec.postProcess !== 'splitSpread') return [await ingestPage(uri, script, base)];
+  const { script, spec, ownsInputs, autoCrop } = options;
+  const enhance = spec.defaultEnhance;
+  const base = { deleteSource: ownsInputs, enhance };
+  if (!autoCrop && spec.postProcess === 'none') return [await ingestPage(uri, script, base)];
 
-  const spread = await ingestPage(uri, script, { ...base, ocr: false });
+  let page = await ingestPage(uri, script, { ...base, ocr: false });
+  if (autoCrop) page = await autoCropPage(page, script, enhance);
+
+  if (spec.postProcess === 'idCard') return [page];
+  const ocrPage = async (p: SessionPage) => ({ ...p, ocr: await runOcr(p.uri, script) });
+  // An uncropped photo still shows the desk around the book; splitting that would put the gutter
+  // in the wrong place, so it waits for a manual crop as one page.
+  if (spec.postProcess !== 'splitSpread' || page.needsCropReview) return [await ocrPage(page)];
+
+  const spread = page;
   let halves: Awaited<ReturnType<typeof splitSpread>> = null;
   try {
     halves = await splitSpread(spread.uri);
   } catch (error) {
     console.warn('ingestOne: spread split failed, keeping the whole page', error);
   }
-  if (!halves) return [{ ...spread, ocr: await runOcr(spread.uri, script) }];
+  if (!halves) return [await ocrPage(spread)];
 
   const splitFrom = {
     groupId: createId('spread'),
@@ -55,7 +89,7 @@ export async function ingestOne(
   };
   const pages: SessionPage[] = [];
   for (const half of halves) {
-    pages.push({ ...(await pageFromMaster(half, script, { enhance: spec.defaultEnhance })), splitFrom });
+    pages.push({ ...(await pageFromMaster(half, script, { enhance })), splitFrom });
   }
   return pages;
 }
@@ -74,12 +108,12 @@ export async function ingestBatch(
   rawUris: readonly string[],
   options: IngestBatchOptions
 ): Promise<void> {
-  const { script, spec, ownsInputs, onScanMore } = options;
+  const { script, spec, ownsInputs, onScanMore, autoCrop } = options;
   const signal = beginProcessing();
 
   const result = await processSequentially(
     rawUris,
-    (uri) => ingestOne(uri, { script, spec, ownsInputs }),
+    (uri) => ingestOne(uri, { script, spec, ownsInputs, autoCrop }),
     {
       signal,
       onProgress: (progress) => dispatch({ type: 'capture/SET_PROGRESS', progress }),
@@ -122,7 +156,7 @@ export async function ingestBatch(
   });
 }
 
-// Our Gallery button. (C5 adds automatic edge detection and cropping per photo.)
+// Our Gallery button: every photo is auto-cropped (see autoCropPage), one at a time.
 export async function ingestGalleryBatch(
   dispatch: Dispatch<AppAction>,
   uris: readonly string[],
@@ -130,5 +164,5 @@ export async function ingestGalleryBatch(
   spec: CaptureModeSpec
 ): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
-  await ingestBatch(dispatch, uris, { script, spec, ownsInputs: false });
+  await ingestBatch(dispatch, uris, { script, spec, ownsInputs: false, autoCrop: true });
 }
