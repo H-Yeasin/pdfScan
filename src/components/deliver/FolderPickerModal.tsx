@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CourseBadge } from '../courses/CourseBadge';
 import { TextPromptModal } from '../shared/TextPromptModal';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Course } from '../../types/models';
@@ -24,6 +25,8 @@ export function FolderPickerModal({
 }: FolderPickerModalProps) {
   const { tokens } = useTheme();
   const [creating, setCreating] = useState(false);
+  // Archived courses can't be picked for new documents; the current choice stays visible though.
+  const pickable = courses.filter((c) => !c.archived || c.id === selectedCourseId);
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -41,7 +44,7 @@ export function FolderPickerModal({
               <Text style={[styles.rowLabel, { color: tokens.ink }]}>Unsorted</Text>
               {selectedCourseId === null && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
             </Pressable>
-            {courses.map((course) => (
+            {pickable.map((course) => (
               <Pressable
                 key={course.id}
                 style={styles.row}
@@ -50,6 +53,7 @@ export function FolderPickerModal({
                   onClose();
                 }}
               >
+                <CourseBadge course={course} size={28} />
                 <Text style={[styles.rowLabel, { color: tokens.ink }]} numberOfLines={1}>
                   {course.name}
                 </Text>
@@ -112,6 +116,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
   },

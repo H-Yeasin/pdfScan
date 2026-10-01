@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
-import { FolderList, UNSORTED_COURSE_ID } from '../components/library/FolderList';
+import { CourseList, UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar, type SelectionToolId } from '../components/library/SelectionBar';
@@ -31,7 +31,6 @@ import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument } from '../types/models';
-import { createId } from '../utils/id';
 
 // Formats reachable via the in-app picker today. Widens as DOCX/XLSX/XLS viewers land (see the
 // universal-reader plan's phasing) - deliberately narrower than docFormat.ts's full MIME_BY_FORMAT
@@ -91,19 +90,6 @@ export function LibraryScreen() {
     if (activeCourseId === UNSORTED_COURSE_ID) return 'Unsorted';
     return courses.find((c) => c.id === activeCourseId)?.name ?? 'Course';
   }, [activeCourseId, courses]);
-
-  const handleCreateCourse = useCallback(
-    (name: string) => dispatch({ type: 'library/CREATE_COURSE', id: createId('course'), name }),
-    [dispatch]
-  );
-  const handleRenameCourse = useCallback(
-    (id: string, name: string) => dispatch({ type: 'library/UPDATE_COURSE', id, patch: { name } }),
-    [dispatch]
-  );
-  const handleDeleteCourse = useCallback(
-    (id: string) => dispatch({ type: 'library/DELETE_COURSE', id }),
-    [dispatch]
-  );
 
   const handlePressRow = useCallback(
     (doc: LibraryDocument) => {
@@ -277,14 +263,10 @@ export function LibraryScreen() {
         />
       ) : tab === 'courses' && activeCourseId === null ? (
         <ScrollView>
-          <FolderList
-            courses={courses}
+          <CourseList
             counts={courseCounts}
             unsortedCount={unsortedCount}
             onOpenCourse={(id) => dispatch({ type: 'library/SET_ACTIVE_COURSE', id })}
-            onCreate={handleCreateCourse}
-            onRename={handleRenameCourse}
-            onDelete={handleDeleteCourse}
           />
         </ScrollView>
       ) : isEmptyLibrary ? (

@@ -1,18 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FolderList } from '../components/library/FolderList';
+import { CourseList } from '../components/courses/CourseList';
 import { useRouter } from '../navigation/router';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
-import { createId } from '../utils/id';
 
 export function ManageFoldersScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
-  const { courses, files } = state.library;
+  const { state } = useAppState();
+  const { files } = state.library;
 
   const counts = useMemo(() => {
     const result: Record<string, number> = {};
@@ -24,16 +23,6 @@ export function ManageFoldersScreen() {
 
   const unsortedCount = useMemo(() => files.filter((f) => !f.courseId).length, [files]);
 
-  const handleCreate = useCallback(
-    (name: string) => dispatch({ type: 'library/CREATE_COURSE', id: createId('course'), name }),
-    [dispatch]
-  );
-  const handleRename = useCallback(
-    (id: string, name: string) => dispatch({ type: 'library/UPDATE_COURSE', id, patch: { name } }),
-    [dispatch]
-  );
-  const handleDelete = useCallback((id: string) => dispatch({ type: 'library/DELETE_COURSE', id }), [dispatch]);
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
@@ -44,14 +33,7 @@ export function ManageFoldersScreen() {
       </View>
 
       <ScrollView>
-        <FolderList
-          courses={courses}
-          counts={counts}
-          unsortedCount={unsortedCount}
-          onCreate={handleCreate}
-          onRename={handleRename}
-          onDelete={handleDelete}
-        />
+        <CourseList counts={counts} unsortedCount={unsortedCount} />
       </ScrollView>
     </SafeAreaView>
   );
