@@ -30,8 +30,8 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 ```
 App.tsx                 AppProviders > AppNavigator + Snackbar
 src/bootstrap/          AppProviders (theme, ErrorBoundary, store), AppNavigator (screen switch, boot hooks)
-src/navigation/         router.tsx: custom state router, useRouter().go(screen) — NOT React Navigation
-src/screens/            Capture, Review, Deliver, Library, Reader, Settings, Pro (hidden), ManageFolders (= courses), AcademicOptions
+src/navigation/         router.tsx: custom state router, useRouter().go(screen) — NOT React Navigation; `hub`/`tabHub` = where Back returns
+src/screens/            Home (start screen once a course exists), Course, Capture, Review, Deliver, Library, Reader, Settings, Pro (hidden), ManageFolders (= courses), AcademicOptions
 src/components/<area>/  UI split by screen area (capture, review, deliver, library, reader, settings, shared)
 src/store/              AppStateContext (useAppState → {state, dispatch}), appReducer, slices/*, use*Persistence hooks
 src/services/           all logic, no UI (see pipeline below)

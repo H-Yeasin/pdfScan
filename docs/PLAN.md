@@ -124,7 +124,7 @@ Goal: everything is filed by course without the student thinking about it.
 **Detailed steps:** [`docs/plan/03-courses.md`](plan/03-courses.md) (builds on §0 F4's Course model)
 
 - [x] K1 Course and semester data model (archive a whole semester at once)
-- [ ] K2 Home tab: course hub with Continue card, course grid and course page
+- [x] K2 Home tab: course hub with Continue card, course grid and course page
 - [x] K3 Course setup and editing (quick "Add your courses" sheet, reused by onboarding)
 - [ ] K4 Document types (Assignment, Notes, Handout, Exam, Lab, Other)
 - [ ] K5 Automatic filing: course suggestions and an optional timetable

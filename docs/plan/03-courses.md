@@ -88,7 +88,25 @@ Status: done (commit 9574adb). As built:
 survive a restart, and pre-F4 data still opens.
 
 ### K2 · Home tab: course hub *(M)*
-Status: todo
+Status: done (commit f98b0d8). As built:
+- Start screen: `AppNavigator` renders nothing until the library and settings have loaded, then
+  `router.replace('home')` if an active course exists. Without that wait, Capture (which opens the
+  scanner on mount) would flash up first.
+- The router now tracks `hub` (home | library | course) and `tabHub` (home | library). Reader and
+  Settings go back to `hub`, the course page to `tabHub`. This replaces the hardcoded
+  `go('library', 'back')`.
+- Home's semester switcher (`components/courses/SemesterSwitcher.tsx`) also archives the shown
+  semester. `library.homeSemesterId` (null = follow the date) is in-memory only. "Show archived"
+  stays on the course list (K3), not Home.
+- Continue card: `settings.lastOpened` (persisted) vs the newest save. Opening a document goes
+  through `useOpenDocument` (`components/library/useDocumentListActions.tsx`).
+- Long-press reorder is "Move earlier / later" in the menu (`moveCourse`), not drag and drop.
+- `services/courses/startScan.ts` sets Deliver's course for every new scan. After saving, Deliver
+  opens the document's course page (Library for unsorted ones).
+- Library's Courses tab opens `CourseScreen` instead of drilling in. Its search doesn't apply to
+  the course list.
+- Tests: `homeSelectors.test.ts`, `startScan.test.ts`, `navigation/__tests__/router.test.tsx`,
+  `screens/__tests__/HomeScreen.test.tsx` (4 courses on Home → open one → scan files into it).
 
 - `TabBar` becomes **Home · Scan · Library** (the Settings icon stays at the top). Add the
   `ScreenName` value `'home'` and a `HomeScreen`. Home becomes the start screen once at least
