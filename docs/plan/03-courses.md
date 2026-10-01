@@ -189,7 +189,25 @@ Status: done (commit 080c5b7). As built:
 assignments.
 
 ### K5 · Automatic filing: suggestions and an optional timetable *(M)*
-Status: todo
+Status: done (commit 10286d8). As built:
+- `suggestCourses` also takes `courses` (to drop archived ones and list the rest). Rule 3 adds every
+  course used in the last 7 days, most-used first (ties: most recent), not only the top one, so
+  the three chips are useful.
+- The time used is when the session's first pages arrived (`capture.startedAt`), not when Save is
+  pressed.
+- Deliver's course is automatic until picked: `deliver.coursePicked` is set by picking (Deliver
+  chips, "More…", Capture's chip) and by `startScan(courseId)` from a course page.
+  `deliver/AUTO_COURSE` (a general scan with no session open) returns to automatic.
+  `store/useFilingCourse` gives Deliver and Capture the same answer.
+- Timetable: migration **v4** `timetable_slots` (ON DELETE CASCADE with the course),
+  `TimetableSlot` in models, `library.timetable`. The editor (`components/courses/TimetableEditor`)
+  is a per-course list of weekly slots with typed times ("9:30", "2pm"; no picker dependency),
+  edited as a draft that Done applies. It opens from the course editor ("Class times", existing
+  courses only) and from Settings → Organization (all active courses).
+- Tests: `suggestCourse.test.ts` (each rule, slack at the edges, archived, empty history, time
+  parsing, slot diffing), `store/__tests__/useFilingCourse.test.tsx` (the "done when": a class on
+  now with no taps; without a timetable, the last course for the mode; a pick wins), and timetable
+  persistence and reducer tests.
 
 - `src/services/courses/suggestCourse.ts`:
   `suggestCourses({ now, mode, timetable, history }) → courseId[]`, a pure function.
