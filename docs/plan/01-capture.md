@@ -200,7 +200,7 @@ iOS support too.
 with no manual work, and memory stays flat during the batch (Android Studio profiler).
 
 ### C6 · Feedback, progress and the capture loop *(S)*
-Status: todo
+Status: done (commit 53aba95). `ingestGalleryBatch` exists now (in `capture/ingestBatch.ts`, on top of `processSequentially`); C5 adds auto-crop to it. Device check pending: 10 handwritten pages, Scan → Review ready in under 60 s.
 
 - Add `expo-haptics@~57.0.3`: a light impact when the scanner returns pages, success when
   processing finishes, a warning on error.
