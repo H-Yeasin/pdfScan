@@ -3,6 +3,8 @@ import type { SkColorFilter, SkImage, SkShader } from '@shopify/react-native-ski
 import type { Ionicons } from '@expo/vector-icons';
 import { autoMatrices, COLOR_MIN_SPAN, COLOR_SATURATION_BOOST, colorMatrices, grayMatrices, LUMA_MIN_SPAN } from './filterMath';
 import type { ColorMatrix } from './filterMath';
+import { kneesFromStats, makeInkShader } from './ink';
+import { DEFAULT_FADE_LINES, DEFAULT_KEEP_INK_COLOR, INK_CEIL, INK_GAMMA, LINE_FRAC, LINE_SAT_MAX } from './inkMath';
 import { LIGHT_RADIUS, LIGHT_SIGMA, PAPER_WHITE } from './lightCorrect';
 import type { LightCorrectParams } from './lightCorrect';
 import { makeSauvolaShader, SAMPLE_RADIUS_RATIO, SAUVOLA_K, SAUVOLA_R } from './sauvola';
@@ -41,8 +43,8 @@ export type FilterSpec = {
   // shadows and lamp tints are divided out before levels. Its stats are measured on the corrected
   // page too (stats.ts), so this is only meaningful for filters built on `source` or a colour filter.
   lightCorrect: boolean;
-  // False hides the filter from the Review picker. Ink (E4) and Board (E5) have registry entries
-  // so every EnhanceMode has a spec, but their real pipelines don't exist yet.
+  // False hides the filter from the Review picker. Board (E5) has a registry entry so every
+  // EnhanceMode has a spec, but its real pipeline doesn't exist yet.
   available: boolean;
   params: FilterParam[];
   build: (ctx: FilterContext) => FilterOutput;
@@ -126,15 +128,33 @@ export const FILTERS: FilterSpec[] = [
     build: ({ stats, params }) => ({ colorFilter: matrixChainFilter(grayMatrices(stats, params.minSpan)) }),
   },
   {
-    // Placeholder until E4: renders as Gray so a page set to 'ink' never looks broken.
+    // Handwritten notes: a soft tone curve instead of a threshold, so pencil keeps smooth edges;
+    // optional ruling-line fade and pen colour (FilterOptions). See inkMath.ts.
     id: 'ink',
     label: 'Ink',
     icon: 'create-outline',
     adjustable: true,
     lightCorrect: true,
-    available: false,
-    params: LIGHT_PARAMS,
-    build: ({ stats }) => ({ colorFilter: matrixChainFilter(grayMatrices(stats)) }),
+    available: true,
+    params: [
+      { key: 'inkCeil', label: 'Ink tone at knee', min: 0, max: 0.6, default: INK_CEIL },
+      { key: 'inkGamma', label: 'Ink darkening (gamma)', min: 0.5, max: 3, default: INK_GAMMA },
+      { key: 'lineFrac', label: 'Line threshold', min: 0, max: 1, default: LINE_FRAC },
+      { key: 'lineSatMax', label: 'Line max chroma', min: 0.05, max: 0.6, default: LINE_SAT_MAX },
+      ...LIGHT_PARAMS,
+    ],
+    build: ({ source, stats, options, params }) => ({
+      shader: makeInkShader(
+        source,
+        kneesFromStats(stats),
+        { inkCeil: params.inkCeil, inkGamma: params.inkGamma },
+        { lineFrac: params.lineFrac, lineSatMax: params.lineSatMax },
+        {
+          fadeLines: options.fadeLines ?? DEFAULT_FADE_LINES,
+          keepInkColor: options.keepInkColor ?? DEFAULT_KEEP_INK_COLOR,
+        }
+      ),
+    }),
   },
   {
     // Placeholder until E5: renders as Auto.

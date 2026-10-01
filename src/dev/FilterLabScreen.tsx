@@ -8,6 +8,7 @@ import { FontStyle, ImageFormat, Skia } from '@shopify/react-native-skia';
 import type { SkImage, SkPicture } from '@shopify/react-native-skia';
 import { AdjustSlider } from '../components/review/AdjustSlider';
 import { FilteredPreview } from '../components/review/FilteredPreview';
+import { InkOptions } from '../components/review/InkOptions';
 import { useRouter } from '../navigation/router';
 import { drawFiltered } from '../services/enhance/filters/drawFiltered';
 import { FILTERS, resolveFilterParams } from '../services/enhance/filters/registry';
@@ -17,7 +18,7 @@ import { loadPreviewImage } from '../services/enhance/previewImageCache';
 import { shareFileUri } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
-import type { EnhanceMode, ImageStats } from '../types/models';
+import type { EnhanceMode, FilterOptions, ImageStats } from '../types/models';
 
 // Dev-only (reachable from Settings when __DEV__): every filter side by side on one image, with a
 // slider per tunable constant (FilterSpec.params). E3-E5 tune their parameters here before
@@ -33,10 +34,15 @@ const SHEET_GAP = 16;
 type LabImage = { image: SkImage; stats: ImageStats; width: number; height: number };
 type OverridesByFilter = Partial<Record<EnhanceMode, FilterParamOverrides>>;
 
-function recordFilter(lab: LabImage, spec: FilterSpec, overrides: FilterParamOverrides | undefined): SkPicture {
+function recordFilter(
+  lab: LabImage,
+  spec: FilterSpec,
+  overrides: FilterParamOverrides | undefined,
+  filterOptions: FilterOptions
+): SkPicture {
   const recorder = Skia.PictureRecorder();
   const rect = Skia.XYWHRect(0, 0, lab.width, lab.height);
-  drawFiltered(recorder.beginRecording(rect), lab.image, { enhance: spec.id, stats: lab.stats }, rect, overrides);
+  drawFiltered(recorder.beginRecording(rect), lab.image, { enhance: spec.id, stats: lab.stats, filterOptions }, rect, overrides);
   return recorder.finishRecordingAsPicture();
 }
 
@@ -51,7 +57,7 @@ const fromSlider = (param: FilterParam, v: number) => param.min + ((v + 1) / 2) 
 
 // One labelled JPEG of every filter, written under Paths.document/filter-lab/ (not the cache, so
 // the E7 benchmark sheets survive) and handed to the share sheet.
-async function exportContactSheet(lab: LabImage, overrides: OverridesByFilter): Promise<string> {
+async function exportContactSheet(lab: LabImage, overrides: OverridesByFilter, filterOptions: FilterOptions): Promise<string> {
   const cellHeight = Math.round((SHEET_CELL_WIDTH * lab.height) / lab.width);
   const rows = Math.ceil(FILTERS.length / SHEET_COLUMNS);
   const width = SHEET_COLUMNS * SHEET_CELL_WIDTH + (SHEET_COLUMNS + 1) * SHEET_GAP;
@@ -71,7 +77,8 @@ async function exportContactSheet(lab: LabImage, overrides: OverridesByFilter): 
   FILTERS.forEach((spec, i) => {
     const x = SHEET_GAP + (i % SHEET_COLUMNS) * (SHEET_CELL_WIDTH + SHEET_GAP);
     const y = SHEET_GAP + Math.floor(i / SHEET_COLUMNS) * (cellHeight + SHEET_LABEL_HEIGHT + SHEET_GAP);
-    drawFiltered(canvas, lab.image, { enhance: spec.id, stats: lab.stats }, Skia.XYWHRect(x, y, SHEET_CELL_WIDTH, cellHeight), overrides[spec.id]);
+    const page = { enhance: spec.id, stats: lab.stats, filterOptions };
+    drawFiltered(canvas, lab.image, page, Skia.XYWHRect(x, y, SHEET_CELL_WIDTH, cellHeight), overrides[spec.id]);
     canvas.drawText(spec.available ? spec.label : `${spec.label} (WIP)`, x, y + cellHeight + 30, textPaint, titleFont);
     canvas.drawText(formatParams(spec, overrides[spec.id]), x, y + cellHeight + 56, textPaint, metaFont);
   });
@@ -94,6 +101,8 @@ export function FilterLabScreen() {
   const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<EnhanceMode>('auto');
   const [overrides, setOverrides] = useState<OverridesByFilter>({});
+  // Shared by every cell (only Ink reads them today), like a page's FilterOptions.
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({});
 
   const handlePick = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -112,8 +121,8 @@ export function FilterLabScreen() {
   }, [dispatch]);
 
   const pictures = useMemo(
-    () => (lab ? FILTERS.map((spec) => ({ spec, picture: recordFilter(lab, spec, overrides[spec.id]) })) : []),
-    [lab, overrides]
+    () => (lab ? FILTERS.map((spec) => ({ spec, picture: recordFilter(lab, spec, overrides[spec.id], filterOptions) })) : []),
+    [lab, overrides, filterOptions]
   );
 
   const selectedSpec = FILTERS.find((spec) => spec.id === selected) ?? FILTERS[0];
@@ -126,14 +135,14 @@ export function FilterLabScreen() {
     if (!lab) return;
     setExporting(true);
     try {
-      const uri = await exportContactSheet(lab, overrides);
+      const uri = await exportContactSheet(lab, overrides, filterOptions);
       await shareFileUri(uri, 'image/jpeg', 'Filter Lab contact sheet');
     } catch (error) {
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Export failed: ${String(error)}` });
     } finally {
       setExporting(false);
     }
-  }, [lab, overrides, dispatch]);
+  }, [lab, overrides, filterOptions, dispatch]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -196,6 +205,9 @@ export function FilterLabScreen() {
         {lab && (
           <View style={[styles.params, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
             <Text style={[styles.paramsTitle, { color: tokens.ink }]}>{selectedSpec.label} parameters</Text>
+            {selectedSpec.id === 'ink' && (
+              <InkOptions value={filterOptions} onChange={(next) => setFilterOptions((prev) => ({ ...prev, ...next }))} />
+            )}
             {selectedSpec.params.length === 0 && (
               <Text style={{ color: tokens.muted }}>This filter has no tunable parameters yet.</Text>
             )}

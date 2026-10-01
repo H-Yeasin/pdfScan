@@ -29,6 +29,8 @@ export type ImageStats = {
   b: ChannelStats;
   luma: ChannelStats;
   light?: { dark: boolean; bgMean: [number, number, number] };
+  // Corrected-page paper (median) and ink (2nd percentile) luma, for the Ink filter's knees.
+  tone?: { paper: number; ink: number };
 };
 
 // Per-page options for the Ink (E4) and Board (E5) filters. Ignored by every other filter.

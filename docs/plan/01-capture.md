@@ -71,7 +71,7 @@ Status: todo
 
   | Mode | Default filter | Page limit | Post-processing |
   |---|---|---|---|
-  | **Notes** | `bw` | 50 | none |
+  | **Notes** | `ink` | 50 | none |
   | **Document** | `auto` | 50 | none |
   | **Board** | `color` | 20 | none |
   | **Book** | `auto` | 50 | `splitSpread` |

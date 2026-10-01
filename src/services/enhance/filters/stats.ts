@@ -2,6 +2,7 @@ import { AlphaType, ColorType, FilterMode, MipmapMode, Skia } from '@shopify/rea
 import type { SkImage } from '@shopify/react-native-skia';
 import { channelStatsFromHistogram, LUMA_B, LUMA_G, LUMA_R } from './filterMath';
 import { makeBackgroundImage } from './lightCorrect';
+import { INK_PERCENTILE, percentileFromHistogram } from './inkMath';
 import { correctionTarget, DARK_PAGE_MEDIAN, divideByBackground, medianFromHistogram } from './lightCorrectMath';
 import type { LightStats } from './lightCorrectMath';
 import type { ImageStats } from '../../../types/models';
@@ -19,23 +20,27 @@ import type { ImageStats } from '../../../types/models';
 // paper. The raw histogram is still used for one thing - deciding whether the page is dark.
 
 const ANALYSIS_SIZE = 48;
+// The Ink knees need the ink's own luma, and at 48x48 a pen stroke is averaged into the paper
+// around it. At 512 a 2-3 px stroke on a 1200 px scan still mostly survives. Square on purpose:
+// only the histogram matters, not the aspect ratio.
+const TONE_ANALYSIS_SIZE = 512;
 
-function readSmall(image: SkImage): Uint8Array {
-  const surface = Skia.Surface.MakeOffscreen(ANALYSIS_SIZE, ANALYSIS_SIZE);
+function readSmall(image: SkImage, size = ANALYSIS_SIZE): Uint8Array {
+  const surface = Skia.Surface.MakeOffscreen(size, size);
   if (!surface) throw new Error('Skia failed to create the analysis offscreen surface');
   surface
     .getCanvas()
     .drawImageRectOptions(
       image,
       Skia.XYWHRect(0, 0, image.width(), image.height()),
-      Skia.XYWHRect(0, 0, ANALYSIS_SIZE, ANALYSIS_SIZE),
+      Skia.XYWHRect(0, 0, size, size),
       FilterMode.Linear,
       MipmapMode.Linear
     );
   surface.flush();
   const pixels = surface.makeImageSnapshot().readPixels(0, 0, {
-    width: ANALYSIS_SIZE,
-    height: ANALYSIS_SIZE,
+    width: size,
+    height: size,
     colorType: ColorType.RGBA_8888,
     alphaType: AlphaType.Unpremul,
   }) as Uint8Array | null;
@@ -56,7 +61,8 @@ export function analyzeImage(image: SkImage): ImageStats {
   for (let i = 0; i < pixels.length; i += 4) rawLuma[lumaOf(pixels[i], pixels[i + 1], pixels[i + 2])]++;
   const dark = medianFromHistogram(rawLuma, total) < DARK_PAGE_MEDIAN;
 
-  const bgPixels = readSmall(makeBackgroundImage(image, dark));
+  const background = makeBackgroundImage(image, dark);
+  const bgPixels = readSmall(background);
   let sumR = 0;
   let sumG = 0;
   let sumB = 0;
@@ -88,7 +94,24 @@ export function analyzeImage(image: SkImage): ImageStats {
     b: channelStatsFromHistogram(bCounts, total),
     luma: channelStatsFromHistogram(lumaCounts, total),
     light,
+    tone: analyzeTone(image, background, [tr, tg, tb]),
   };
+}
+
+// Paper and ink luma of the corrected page at TONE_ANALYSIS_SIZE, for the Ink filter's knees
+// (inkMath.inkKnees). Same divide as above; luma only.
+function analyzeTone(image: SkImage, background: SkImage, target: [number, number, number]): { paper: number; ink: number } {
+  const pixels = readSmall(image, TONE_ANALYSIS_SIZE);
+  const bgPixels = readSmall(background, TONE_ANALYSIS_SIZE);
+  const counts = new Uint32Array(256);
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = divideByBackground(pixels[i] / 255, bgPixels[i] / 255, target[0]);
+    const g = divideByBackground(pixels[i + 1] / 255, bgPixels[i + 1] / 255, target[1]);
+    const b = divideByBackground(pixels[i + 2] / 255, bgPixels[i + 2] / 255, target[2]);
+    counts[Math.round((LUMA_R * r + LUMA_G * g + LUMA_B * b) * 255)]++;
+  }
+  const total = TONE_ANALYSIS_SIZE * TONE_ANALYSIS_SIZE;
+  return { paper: medianFromHistogram(counts, total), ink: percentileFromHistogram(counts, total, INK_PERCENTILE) };
 }
 
 // Decode + analyze for callers that only hold a file URI (page ingest). Best-effort like OCR: a

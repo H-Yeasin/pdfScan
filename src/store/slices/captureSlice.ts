@@ -1,4 +1,4 @@
-import type { AdjustValues, CaptureMode, EnhanceMode, ImageStats, SessionPage } from '../../types/models';
+import type { AdjustValues, CaptureMode, EnhanceMode, FilterOptions, ImageStats, SessionPage } from '../../types/models';
 
 export type ProcessingStatus = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
 
@@ -30,6 +30,8 @@ export type CaptureAction =
   | { type: 'capture/SET_ALL_PAGES_ENHANCE'; enhance: EnhanceMode }
   | { type: 'capture/SET_PAGE_ADJUST'; id: string; adjust: AdjustValues }
   | { type: 'capture/SET_ALL_PAGES_ADJUST'; adjust: AdjustValues }
+  // Merged into each page's existing filterOptions; id null means every page (apply to all).
+  | { type: 'capture/SET_FILTER_OPTIONS'; id: string | null; options: FilterOptions }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
   // `uri` is the image the stats were measured from; they're dropped if the page moved on since.
   | { type: 'capture/SET_PAGE_STATS'; id: string; uri: string; stats: ImageStats }
@@ -71,6 +73,13 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       return {
         ...state,
         pages: state.pages.map((p) => ({ ...p, adjust: action.adjust })),
+      };
+    case 'capture/SET_FILTER_OPTIONS':
+      return {
+        ...state,
+        pages: state.pages.map((p) =>
+          action.id === null || p.id === action.id ? { ...p, filterOptions: { ...p.filterOptions, ...action.options } } : p
+        ),
       };
     case 'capture/UPDATE_PAGE':
       return {

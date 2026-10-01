@@ -7,6 +7,7 @@ import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
 import { FilteredPreview } from '../components/review/FilteredPreview';
+import { InkOptions } from '../components/review/InkOptions';
 import { GridPagesModal } from '../components/review/GridPagesModal';
 import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
@@ -31,7 +32,7 @@ import { saveSignatureForReuse } from '../services/signature/savedSignatureStora
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
-import type { AdjustValues, EnhanceMode, SessionPage } from '../types/models';
+import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage } from '../types/models';
 
 const OCR_SPARSE_THRESHOLD = 6;
 
@@ -152,6 +153,14 @@ export function ReviewScreen() {
       if (!selectedPage) return;
       if (applyToAll) dispatch({ type: 'capture/SET_ALL_PAGES_ENHANCE', enhance });
       else dispatch({ type: 'capture/SET_PAGE_ENHANCE', id: selectedPage.id, enhance });
+    },
+    [dispatch, selectedPage, applyToAll]
+  );
+
+  const handleFilterOptionsChange = useCallback(
+    (options: FilterOptions) => {
+      if (!selectedPage) return;
+      dispatch({ type: 'capture/SET_FILTER_OPTIONS', id: applyToAll ? null : selectedPage.id, options });
     },
     [dispatch, selectedPage, applyToAll]
   );
@@ -464,6 +473,9 @@ export function ReviewScreen() {
           <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} onLive={setLiveAdjust} />
         )}
         <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
+        {selectedPage.enhance === 'ink' && (
+          <InkOptions value={selectedPage.filterOptions} onChange={handleFilterOptionsChange} />
+        )}
       </View>
 
       <ContextBar onPress={handleContextBarPress} ocrRunning={ocrRunning} />

@@ -178,7 +178,24 @@ Status: done (see git log); needs the Filter Lab check on a device. As built:
 out with even paper under Auto, and nothing goes grey or blotchy.
 
 ### E4 · Ink filter for handwritten notes *(L)*
-Status: todo
+Status: done (see git log); the 5-page Filter Lab check on a device is still open. As built:
+- `filters/inkMath.ts` holds the pure formulas: `inkKnees`, `inkTone`, `lineFade` and
+  `percentileFromHistogram`. `filters/ink.ts` mirrors them line for line in SkSL, built on the
+  light-corrected `source`.
+- Knee adaptation: `ImageStats.tone = { paper, ink }` is the corrected-luma median and 2nd
+  percentile, measured at 512×512 (at 48×48 a stroke averages into the paper). A paper-ink gap
+  under 0.2 (almost no ink) falls back to the 0.45 / 0.82 knees.
+- Ruling lines fade on luma plus low chroma, whatever the hue, so faint green grids fade too.
+  This is a deliberate widening of "blue or red": pen ink survives by being darker or more
+  saturated.
+- "Keep pen colour" scales the corrected colour by tone/luma.
+- UI: `components/review/InkOptions.tsx` sits under the picker when Ink is selected. It
+  dispatches `capture/SET_FILTER_OPTIONS`, which respects Apply to all. The Filter Lab has the
+  same toggles and sliders for the ink constants.
+- Notes mode: C1's table in `01-capture.md` now defaults to `ink`.
+- Scratch check (turn it into a jest test in F1), using synthetic pages:
+  - pencil on lined paper: core 0.50 → 0.20, edges 0.70 → 0.40, rulings → white;
+  - blue pen on grid paper: pen 0.27 → 0.11 and stays navy with keep-colour, grid → white.
 
 - `filters/ink.ts`, after light correction:
   1. Luma, then a **soft tone curve** (SkSL smoothstep): paper (above about 0.82) becomes pure
