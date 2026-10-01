@@ -103,7 +103,7 @@ Goal: the best camera experience for school material.
 - [x] C2 Scanner plugin options patch (page limit per mode, gallery import in Google's scanner)
 - [x] C3 Book mode: split two-page spreads at the gutter
 - [x] C4 ID card mode: front and back at true size on one A4 page
-- [ ] C5 Batch gallery import with automatic cropping (OpenCV spike first)
+- [x] C5 Batch gallery import with automatic cropping (OpenCV spike first)
 - [x] C6 Haptics, per-page progress, "Scan more" loop, cancel
 - [ ] C7 Fallback when Google's scanner is unavailable (custom live camera stays in P3)
 

@@ -162,7 +162,21 @@ Status: done (commit ee5a8aa). Needed a new `layout: 'fullPage'` page property (
 85.6×54 mm.
 
 ### C5 · Batch gallery import with automatic cropping *(L — starts with a spike)*
-Status: todo
+Status: done with the no-native-dependency detector (commit da8e429); **OpenCV spike still to do on a device.**
+
+Spike results / decision (so far):
+- The spike needs an Android dev build (APK size per ABI) and real photos, neither available in
+  the cloud session that implemented this. Not done yet.
+- Shipped instead: a pure-JS detector (`capture/quadDetect.ts`: Otsu, largest bright component,
+  convex hull, largest quad on the hull) on a ~400 px copy read through Skia. It produces real
+  perspective quads (not just a bounding box) with no APK cost. Confidence comes from how solidly
+  the component fills its quad: 'high' crops automatically, 'low' is a suggestion to check, and
+  no detection keeps the photo; both of the latter go to Review's "Check crops".
+- Its weak case is a light page on a light background (sheet on a white bed): no contrast, so it
+  falls back to manual cropping rather than guessing.
+- To finish the spike: on a device, run the 30-photo set through `detectDocumentQuad` and count
+  correct crops. If below the 17/20 target, add `react-native-fast-opencv` (measure APK size
+  first, budget 8 MB) behind the same `detectDocumentQuad` interface.
 
 Google's scanner gallery import (C2) covers Android when the user starts from the scanner. C5
 covers our own Gallery button: multi-select 20 or more photos, crop each automatically, with
