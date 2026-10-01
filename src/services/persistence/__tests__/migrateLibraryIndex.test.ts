@@ -1,4 +1,4 @@
-import { migrateLibraryIndex } from '../libraryStore';
+import { migrateLibraryIndex } from '../legacyLibrary';
 
 const doc = { id: 'doc_1', name: 'A' };
 

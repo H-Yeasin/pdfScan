@@ -17,7 +17,6 @@ import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useAppState } from '../store/AppStateContext';
-import { initializeDatabase } from '../services/persistence/dbService';
 import { FEATURES } from '../config/features';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
@@ -38,9 +37,6 @@ export function AppNavigator() {
   useSettingsPersistence();
   useSignaturePersistence();
   useExternalFileLinking(libraryLoaded);
-  useEffect(() => {
-    initializeDatabase().catch((e) => console.warn('DB init failed', e));
-  }, []);
   const { screen, navDir, navTick, go } = useRouter();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(1)).current;

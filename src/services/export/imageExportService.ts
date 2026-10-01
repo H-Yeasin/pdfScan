@@ -7,10 +7,9 @@ export type ExportSourcePage = { uri: string };
 export async function saveImagesToLibrary(
   documentId: string,
   pages: ExportSourcePage[],
-  quality: number,
-  courseFolder?: string
+  quality: number
 ): Promise<{ uris: string[]; sizeBytes: number }> {
-  const dir = getDocumentDir(documentId, courseFolder);
+  const dir = getDocumentDir(documentId);
   const compressQuality = 0.2 + (quality - 1) * 0.2; // quality 1-5 -> 0.2-1.0
 
   const uris: string[] = [];

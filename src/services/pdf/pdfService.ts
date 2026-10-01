@@ -406,7 +406,6 @@ export async function buildPdfFromPages(
   quality: number,
   academicConfig?: AcademicConfig,
   ocrScript?: OcrScript,
-  courseFolder?: string,
   layoutMode: LayoutMode = 'standard'
 ): Promise<{ uri: string; sizeBytes: number }> {
   const compressQuality = 0.2 + (quality - 1) * 0.2; // quality 1-5 -> 0.2-1.0, same convention as enhanceService/imageExportService
@@ -448,7 +447,7 @@ export async function buildPdfFromPages(
 
   const pdfBytes = await pdfDoc.save();
 
-  const dir = getDocumentDir(documentId, courseFolder);
+  const dir = getDocumentDir(documentId);
   const dest = new File(dir, 'document.pdf');
   if (dest.exists) dest.delete();
   dest.write(pdfBytes);
@@ -473,8 +472,7 @@ export async function applySignatureToPdf(
   pageNaturalHeight: number,
   fitToMarginBox: boolean,
   signatureUri: string,
-  placement: { originX: number; originY: number; width: number; height: number },
-  courseFolder?: string
+  placement: { originX: number; originY: number; width: number; height: number }
 ): Promise<{ uri: string; sizeBytes: number }> {
   const existingBytes = await new File(pdfUri).bytes();
   const pdfDoc = await PDFDocument.load(existingBytes);
@@ -523,7 +521,7 @@ export async function applySignatureToPdf(
 
   const pdfBytes = await pdfDoc.save();
 
-  const dir = getDocumentDir(documentId, courseFolder);
+  const dir = getDocumentDir(documentId);
   const dest = new File(dir, 'document.pdf');
   if (dest.exists) dest.delete();
   dest.write(pdfBytes);
@@ -543,8 +541,7 @@ export async function ensureDocumentPdf(doc: LibraryDocument, ocrScript: OcrScri
     doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
     5,
     undefined,
-    ocrScript,
-    doc.courseFolder
+    ocrScript
   );
   return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes };
 }

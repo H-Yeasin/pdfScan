@@ -18,7 +18,6 @@ import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { insertScannedDocument } from '../services/persistence/dbService';
 import { shareDocument } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -47,21 +46,21 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, folderId, courseFolder, exportCopy, academicConfig, layoutMode } = state.deliver;
-  const { folders } = state.library;
+  const { name, format, quality, more, courseId, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { courses } = state.library;
   const { androidExportFolderUri, androidExportFolderLabel, ocrScript } = state.settings;
   const [saving, setSaving] = useState(false);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
 
-  const folderName = useMemo(
-    () => folders.find((f) => f.id === folderId)?.name ?? 'My Scans',
-    [folders, folderId]
+  const courseName = useMemo(
+    () => courses.find((c) => c.id === courseId)?.name ?? 'Unsorted',
+    [courses, courseId]
   );
 
-  const handleCreateFolder = useCallback(
-    (folderName: string) => {
-      const id = createId('folder');
-      dispatch({ type: 'library/CREATE_FOLDER', id, name: folderName });
+  const handleCreateCourse = useCallback(
+    (name: string) => {
+      const id = createId('course');
+      dispatch({ type: 'library/CREATE_COURSE', id, name });
       return id;
     },
     [dispatch]
@@ -81,7 +80,6 @@ export function DeliverScreen() {
       setSaving(true);
       try {
         const documentId = createId('doc');
-        const trimmedCourseFolder = courseFolder.trim() || undefined;
 
         // Every page gets a real pixel bake (Skia) into a fresh file before export, so the
         // effect survives into the saved PDF/JPG rather than staying a UI-only selection.
@@ -127,7 +125,7 @@ export function DeliverScreen() {
           ? [coverPageForLibrary, ...contentPagesForLibrary]
           : contentPagesForLibrary;
 
-        const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality, trimmedCourseFolder);
+        const savedImages = await saveImagesToLibrary(documentId, libraryInputPages, quality);
 
         // Always build a document.pdf now, regardless of the chosen export `format` - the unified
         // reader (ReaderScreen) renders every library doc through the real PDF engine, so a
@@ -139,7 +137,6 @@ export function DeliverScreen() {
           quality,
           academicConfig ?? undefined,
           ocrScript,
-          trimmedCourseFolder,
           layoutMode
         );
         const pdfUri: string = pdfResult.uri;
@@ -179,14 +176,12 @@ export function DeliverScreen() {
           tag: finalName.slice(0, 4).toUpperCase(),
           locked: false,
           searchHaystack: haystack,
-          folderId: folderId ?? undefined,
-          courseFolder: trimmedCourseFolder,
+          courseId: courseId ?? undefined,
           // Only set when a cover page actually made it into libraryPages[0] - mirrors
           // coverPageForLibrary's own condition, not just whether academicConfig exists.
           coverKind: coverPageForLibrary ? academicConfig?.coverPage?.mode : undefined,
         };
 
-        insertScannedDocument(doc).catch((e) => console.warn('dbService.insertScannedDocument failed', e));
         dispatch({ type: 'library/ADD_FILE', file: doc });
         dispatch({ type: 'capture/CLEAR_PAGES' });
         dispatch({ type: 'review/RESET' });
@@ -195,13 +190,13 @@ export function DeliverScreen() {
 
         // The device-folder copy runs after the in-app save has already succeeded and never
         // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.
-        let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${folderName}`;
+        let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${courseName}`;
         if (!shareAfter && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
           const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
           snackMsg =
             result.failed === 0
-              ? `Saved · ${folderName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
-              : `Saved · ${folderName} · copy to device folder failed`;
+              ? `Saved · ${courseName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
+              : `Saved · ${courseName} · copy to device folder failed`;
         }
 
         dispatch({
@@ -210,7 +205,7 @@ export function DeliverScreen() {
           action: 'Undo',
           onAction: () => {
             dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
-            deleteDocumentFiles(documentId, doc.courseFolder);
+            deleteDocumentFiles(documentId);
           },
         });
 
@@ -225,9 +220,8 @@ export function DeliverScreen() {
       quality,
       format,
       name,
-      folderId,
-      folderName,
-      courseFolder,
+      courseId,
+      courseName,
       ocrScript,
       exportCopy,
       academicConfig,
@@ -302,17 +296,9 @@ export function DeliverScreen() {
           style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
           onPress={() => setFolderPickerOpen(true)}
         >
-          <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
-          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{folderName}</Text>
+          <Text style={{ color: tokens.ink, fontSize: 15 }}>Course</Text>
+          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
         </Pressable>
-
-        <NameField
-          label="Courses folder (optional)"
-          value={courseFolder}
-          onChange={(value) => dispatch({ type: 'deliver/SET_COURSE_FOLDER', courseFolder: value })}
-          placeholder="e.g. CS 101"
-          helperText="Routes this file into Library ▸ Courses ▸ <name> on disk — separate from the 'Course code' printed on the Academic export cover page."
-        />
 
         <Pressable
           style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
@@ -333,10 +319,10 @@ export function DeliverScreen() {
 
       <FolderPickerModal
         visible={folderPickerOpen}
-        folders={folders}
-        selectedFolderId={folderId}
-        onSelect={(id) => dispatch({ type: 'deliver/SET_FOLDER', folderId: id })}
-        onCreate={handleCreateFolder}
+        courses={courses}
+        selectedCourseId={courseId}
+        onSelect={(id) => dispatch({ type: 'deliver/SET_COURSE', courseId: id })}
+        onCreate={handleCreateCourse}
         onClose={() => setFolderPickerOpen(false)}
       />
     </SafeAreaView>

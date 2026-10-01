@@ -81,8 +81,8 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Organization</Text>
           <SettingRow
-            title="Manage folders"
-            subtitle="Create, rename, and organize save locations"
+            title="Manage courses"
+            subtitle="Create, rename, and organize your courses"
             chevron
             onPress={() => go('manageFolders')}
           />

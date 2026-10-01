@@ -12,27 +12,27 @@ export function ManageFoldersScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { folders, files } = state.library;
+  const { courses, files } = state.library;
 
   const counts = useMemo(() => {
     const result: Record<string, number> = {};
     files.forEach((f) => {
-      if (f.folderId) result[f.folderId] = (result[f.folderId] ?? 0) + 1;
+      if (f.courseId) result[f.courseId] = (result[f.courseId] ?? 0) + 1;
     });
     return result;
   }, [files]);
 
-  const unfiledCount = useMemo(() => files.filter((f) => !f.folderId).length, [files]);
+  const unsortedCount = useMemo(() => files.filter((f) => !f.courseId).length, [files]);
 
   const handleCreate = useCallback(
-    (name: string) => dispatch({ type: 'library/CREATE_FOLDER', id: createId('folder'), name }),
+    (name: string) => dispatch({ type: 'library/CREATE_COURSE', id: createId('course'), name }),
     [dispatch]
   );
   const handleRename = useCallback(
-    (id: string, name: string) => dispatch({ type: 'library/RENAME_FOLDER', id, name }),
+    (id: string, name: string) => dispatch({ type: 'library/RENAME_COURSE', id, name }),
     [dispatch]
   );
-  const handleDelete = useCallback((id: string) => dispatch({ type: 'library/DELETE_FOLDER', id }), [dispatch]);
+  const handleDelete = useCallback((id: string) => dispatch({ type: 'library/DELETE_COURSE', id }), [dispatch]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -40,14 +40,14 @@ export function ManageFoldersScreen() {
         <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Manage folders</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>Manage courses</Text>
       </View>
 
       <ScrollView>
         <FolderList
-          folders={folders}
+          courses={courses}
           counts={counts}
-          unfiledCount={unfiledCount}
+          unsortedCount={unsortedCount}
           onCreate={handleCreate}
           onRename={handleRename}
           onDelete={handleDelete}

@@ -30,10 +30,20 @@ export type SessionPage = {
 
 export type LibraryPage = {
   id: string;
+  // The clean master image: rotation/enhance already applied, never academic-stamped, never
+  // recompressed by Compress. Every rebuild (merge, split, compress, sign) starts from this.
   fileUri: string;
+  // Optional stamped copy (academic border/header/footer) shown in the in-app viewer instead of
+  // the master. Undefined means "show the master".
+  displayUri?: string;
+  // Small preview for lists/strips, so they don't decode full-resolution masters.
+  thumbUri?: string;
   width: number;
   height: number;
   ocr?: PageOcr;
+  // True when OCR ran at save time and failed (as opposed to finding no text), so the reader can
+  // offer "Retry OCR" later.
+  ocrFailed?: boolean;
 };
 
 export type LibraryDocument = {
@@ -55,16 +65,14 @@ export type LibraryDocument = {
   // UI-only signal: no real PDF encryption is implemented. Every surface that shows
   // this badge must also show the "not actually protected" disclosure.
   locked: boolean;
+  // Derived from name + OCR text when the library loads (and when a document is created); never
+  // persisted.
   searchHaystack: string;
-  // Undefined means "unfiled" — every document saved before folders shipped has no
-  // key here at all, so undefined and null must be treated identically everywhere.
-  folderId?: string;
-  // Additive "Courses" physical routing - separate from folderId's logical library-folder system,
-  // and unrelated to AcademicConfig.coverPage.courseCode (which only prints on the PDF cover page).
-  // Raw display name (e.g. "CS 101"); undefined/"" both mean "no course, flat layout." See
-  // sanitizeFolderSegment (utils/sanitize.ts) for how this becomes a physical directory segment,
-  // and libraryFiles.ts's getDocumentDir for where that segment is actually used.
-  courseFolder?: string;
+  // The Course this document is filed under. Undefined means "Unsorted". Purely logical: a
+  // document's files always live in library/<id>/ regardless of course, so moving a document
+  // between courses never touches the filesystem. Unrelated to AcademicConfig.coverPage.courseCode
+  // (which only prints on the PDF cover page).
+  courseId?: string;
   // Mirrors the AcademicConfig.coverPage.mode this document's page 0 was built with, if any.
   // undefined means "no cover page" OR "saved before this field existed" - both are treated
   // identically (fitToMarginBox=true) by applySignatureToDocument, since a missing cover is far
@@ -97,21 +105,14 @@ export type ExternalFileDocument = {
   pageCount?: number;
 };
 
-export type LibraryFolder = {
+// One organizing unit for the library (replaces both the old logical folders and the free-text
+// "courseFolder" routing). code/color/semester are optional until the full Course UI lands (§3).
+export type Course = {
   id: string;
   name: string;
+  code?: string;
+  color?: string;
+  semester?: string;
+  archived: boolean;
   createdAt: number;
 };
-
-export type LibraryIndexV1 = {
-  version: 1;
-  documents: LibraryDocument[];
-};
-
-export type LibraryIndexV2 = {
-  version: 2;
-  documents: LibraryDocument[];
-  folders: LibraryFolder[];
-};
-
-export type LibraryIndex = LibraryIndexV1 | LibraryIndexV2;

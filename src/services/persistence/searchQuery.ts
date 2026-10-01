@@ -10,3 +10,8 @@ export function buildFtsMatchQuery(query: string): string {
     .map((token) => `"${token.replace(/"/g, '""')}"*`)
     .join(' ');
 }
+
+// Escapes LIKE's wildcards so "100%" or "a_b" match literally. Pair with `ESCAPE '\'`.
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
