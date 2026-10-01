@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useAppFonts, useTheme } from '../theme';
 import { AppStateProvider } from '../store/AppStateContext';
 import { RouterProvider } from '../navigation/router';
+import { ErrorBoundary } from './ErrorBoundary';
 
 function FontGate({ children }: PropsWithChildren) {
   const { fontsReady } = useAppFonts();
@@ -18,11 +19,13 @@ export function AppProviders({ children }: PropsWithChildren) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <FontGate>
-            <AppStateProvider>
-              <RouterProvider>{children}</RouterProvider>
-            </AppStateProvider>
-          </FontGate>
+          <ErrorBoundary>
+            <FontGate>
+              <AppStateProvider>
+                <RouterProvider>{children}</RouterProvider>
+              </AppStateProvider>
+            </FontGate>
+          </ErrorBoundary>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
