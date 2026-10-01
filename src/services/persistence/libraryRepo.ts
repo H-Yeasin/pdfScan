@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type {
   Course,
+  Deadline,
   DocFormat,
   DocType,
   CaptureMode,
@@ -77,6 +78,17 @@ type SemesterRow = {
 
 type SlotRow = { id: string; course_id: string; weekday: number; start_min: number; end_min: number };
 
+type DeadlineRow = {
+  id: string;
+  course_id: string;
+  title: string;
+  due_at: number;
+  doc_type: string | null;
+  reminder_ids: string;
+  done_submission_id: string | null;
+  created_at: number;
+};
+
 type SubmissionRow = {
   id: string;
   document_id: string;
@@ -98,6 +110,8 @@ export type LoadedLibrary = {
   // §4 S7, newest first. Optional so callers that predate it (the legacy import, tests) needn't
   // pass it; missing means "none".
   submissions?: Submission[];
+  // §4 S8, by due date. Optional for the same reason.
+  deadlines?: Deadline[];
 };
 
 const DOC_TYPES: readonly DocType[] = ['assignment', 'notes', 'handout', 'exam', 'lab', 'other'];
@@ -168,6 +182,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
   const semesterRows = await db.getAllAsync<SemesterRow>('SELECT * FROM semesters ORDER BY starts_on DESC, created_at DESC, id');
   const slotRows = await db.getAllAsync<SlotRow>('SELECT * FROM timetable_slots ORDER BY weekday, start_min, id');
   const submissionRows = await db.getAllAsync<SubmissionRow>(SUBMISSIONS_QUERY);
+  const deadlineRows = await db.getAllAsync<DeadlineRow>('SELECT * FROM deadlines ORDER BY due_at, id');
 
   const pagesByDoc = new Map<string, LibraryPage[]>();
   for (const row of pageRows) {
@@ -211,7 +226,40 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       endMin: row.end_min,
     })),
     submissions: submissionRows.map(rowToSubmission),
+    deadlines: deadlineRows.map(rowToDeadline),
   };
+}
+
+function parseIds(json: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function rowToDeadline(row: DeadlineRow): Deadline {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    title: row.title,
+    dueAt: row.due_at,
+    docType: toDocType(row.doc_type),
+    reminderIds: parseIds(row.reminder_ids),
+    doneSubmissionId: row.done_submission_id ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+async function writeDeadline(db: SQLiteDatabase, d: Deadline): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO deadlines (id, course_id, title, due_at, doc_type, reminder_ids, done_submission_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET course_id = excluded.course_id, title = excluded.title, due_at = excluded.due_at,
+       doc_type = excluded.doc_type, reminder_ids = excluded.reminder_ids, done_submission_id = excluded.done_submission_id`,
+    [d.id, d.courseId, d.title, d.dueAt, d.docType ?? null, JSON.stringify(d.reminderIds), d.doneSubmissionId ?? null, d.createdAt]
+  );
 }
 
 const SUBMISSIONS_QUERY = 'SELECT * FROM submissions ORDER BY created_at DESC, id';
@@ -389,7 +437,7 @@ async function writeSlot(db: SQLiteDatabase, slot: TimetableSlot): Promise<void>
 
 async function deleteRows(
   db: SQLiteDatabase,
-  table: 'documents' | 'courses' | 'semesters' | 'timetable_slots' | 'submissions',
+  table: 'documents' | 'courses' | 'semesters' | 'timetable_slots' | 'submissions' | 'deadlines',
   ids: string[]
 ): Promise<void> {
   for (const id of ids) await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [id]);
@@ -486,7 +534,8 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
   const documents = diffById(prev.documents, next.documents);
   const slots = diffById(prev.timetable, next.timetable);
   const submissions = diffById(prev.submissions ?? [], next.submissions ?? []);
-  const diffs = [semesters, courses, documents, slots, submissions];
+  const deadlines = diffById(prev.deadlines ?? [], next.deadlines ?? []);
+  const diffs = [semesters, courses, documents, slots, submissions, deadlines];
   if (diffs.every((d) => d.changed.length + d.removedIds.length === 0)) return;
   await db.withTransactionAsync(async () => {
     for (const semester of semesters.changed) await writeSemester(db, semester);
@@ -496,6 +545,8 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
     // After documents and courses, which they reference.
     for (const submission of submissions.changed) await writeSubmission(db, submission);
     await deleteRows(db, 'submissions', submissions.removedIds);
+    for (const deadline of deadlines.changed) await writeDeadline(db, deadline);
+    await deleteRows(db, 'deadlines', deadlines.removedIds);
     await deleteRows(db, 'timetable_slots', slots.removedIds);
     await deleteRows(db, 'documents', documents.removedIds);
     await deleteRows(db, 'courses', courses.removedIds);

@@ -8,6 +8,9 @@ import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { QuickSetupSheet } from '../components/courses/QuickSetupSheet';
 import { SemesterSwitcher } from '../components/courses/SemesterSwitcher';
 import { useOpenDocument } from '../components/library/useDocumentListActions';
+import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
+import { DeadlineList } from '../components/deadlines/DeadlineList';
+import { dueSoon } from '../services/submit/deadlines';
 import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
 import {
@@ -39,6 +42,7 @@ export function HomeScreen() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [quickSetup, setQuickSetup] = useState(false);
   const [editing, setEditing] = useState<{ course?: Course } | null>(null);
+  const [addingDeadline, setAddingDeadline] = useState(false);
 
   const now = Date.now();
   const today = toLocalDateString(now);
@@ -48,6 +52,8 @@ export function HomeScreen() {
   const activity = useMemo(() => courseActivity(files), [files]);
   const resume = useMemo(() => continueDocument(files, state.settings.lastOpened), [files, state.settings.lastOpened]);
   const hasActiveCourse = courses.some((c) => !c.archived);
+  // §4 S8: the next 7 days' deadlines, overdue first.
+  const soon = useMemo(() => dueSoon(state.library.deadlines, now), [state.library.deadlines, now]);
 
   const openCourse = (id: string) => {
     dispatch({ type: 'library/SET_ACTIVE_COURSE', id });
@@ -126,6 +132,33 @@ export function HomeScreen() {
           </Pressable>
         ) : null}
 
+        {hasActiveCourse ? (
+          <View style={styles.dueSoon}>
+            <View style={styles.dueSoonHeader}>
+              <Text style={[styles.overline, { color: tokens.muted }]}>Due soon</Text>
+              <Pressable onPress={() => setAddingDeadline(true)} accessibilityRole="button" hitSlop={8}>
+                <Text style={[styles.addDeadline, { color: tokens.accentInk }]}>+ Add deadline</Text>
+              </Pressable>
+            </View>
+            {soon.length > 0 ? (
+              <DeadlineList
+                deadlines={soon}
+                now={now}
+                courseLabel={(d) => {
+                  const c = courses.find((x) => x.id === d.courseId);
+                  return c?.code || c?.name;
+                }}
+                onPress={(d) => {
+                  dispatch({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: d.id });
+                  openCourse(d.courseId);
+                }}
+              />
+            ) : (
+              <Text style={[styles.meta, { color: tokens.muted }]}>Nothing due in the next 7 days.</Text>
+            )}
+          </View>
+        ) : null}
+
         {!hasActiveCourse ? (
           <View style={[styles.emptyCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
             <Text style={[styles.emptyTitle, { color: tokens.ink }]}>Add your courses</Text>
@@ -189,6 +222,8 @@ export function HomeScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      <DeadlineEditorSheet visible={addingDeadline} onClose={() => setAddingDeadline(false)} />
 
       <Pressable
         style={[styles.scanButton, { backgroundColor: tokens.accent }]}
@@ -346,5 +381,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
+  },
+  dueSoon: {
+    gap: spacing.sm,
+  },
+  dueSoonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addDeadline: {
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

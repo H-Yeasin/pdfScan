@@ -6,6 +6,7 @@ import { defaultSubmitPreset } from '../services/submit/preset';
 import { formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { submitDocument } from '../services/submit/submitDocument';
 import { ensureSubmissionFile, submissionRecord } from '../services/submit/history';
+import { matchDeadline } from '../services/submit/deadlines';
 import type { LibraryDocument, Submission } from '../types/models';
 import { useAppState } from './AppStateContext';
 
@@ -14,7 +15,7 @@ import { useAppState } from './AppStateContext';
 // document can't be submitted (no page images, e.g. an imported PDF or a DOCX).
 export function useSubmitDocument() {
   const { state, dispatch } = useAppState();
-  const { files, courses } = state.library;
+  const { files, courses, deadlines } = state.library;
   const { profile } = state.settings;
 
   return useCallback(
@@ -29,13 +30,22 @@ export function useSubmitDocument() {
       try {
         const n = typeNumberOf(doc, files);
         const result = await submitDocument({ doc, preset, profile, course, n });
-        dispatch({ type: 'library/ADD_SUBMISSION', submission: submissionRecord(doc, result, preset, n) });
-        dispatch({
-          type: 'ui/SHOW_SNACK',
-          msg: result.fits
-            ? `Submitting ${result.fileName} · ${formatLimit(result.sizeBytes)}`
-            : tooLargeMessage(result, preset.sizeLimitBytes ?? 0),
-        });
+        const record = submissionRecord(doc, result, preset, n);
+        dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
+        const msg = result.fits
+          ? `Submitting ${result.fileName} · ${formatLimit(result.sizeBytes)}`
+          : tooLargeMessage(result, preset.sizeLimitBytes ?? 0);
+        const deadline = matchDeadline(doc, deadlines);
+        dispatch(
+          deadline
+            ? {
+                type: 'ui/SHOW_SNACK',
+                msg: `${msg} · Mark '${deadline.title}' as done?`,
+                action: 'Done',
+                onAction: () => dispatch({ type: 'library/UPDATE_DEADLINE', id: deadline.id, patch: { doneSubmissionId: record.id } }),
+              }
+            : { type: 'ui/SHOW_SNACK', msg }
+        );
         await shareAs(result.uri, result.fileName, 'application/pdf');
         return true;
       } catch (error) {
@@ -44,7 +54,7 @@ export function useSubmitDocument() {
         return false;
       }
     },
-    [files, courses, profile, dispatch]
+    [files, courses, deadlines, profile, dispatch]
   );
 }
 

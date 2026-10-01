@@ -87,7 +87,14 @@
       ],
       "expo-asset",
       "react-native-pdf-jsi",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#16a085"
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -83,3 +83,25 @@ describe('submissions (migration v6)', () => {
     expect((await loadAll(await getDb())).submissions).toEqual([]);
   });
 });
+
+describe('deadlines (migration v7)', () => {
+  const d = {
+    id: 'dl1',
+    courseId: 'cse',
+    title: 'HW3',
+    dueAt: 2_000,
+    docType: 'assignment' as const,
+    reminderIds: ['n1', 'n2'],
+    createdAt: 1_000,
+  };
+
+  it('round-trip, and go with their course', async () => {
+    const before = await seed();
+    const after = { ...before, deadlines: [d, { ...d, id: 'dl2', courseId: 'phy', docType: undefined, reminderIds: [], doneSubmissionId: 's9' }] };
+    await syncLibrary(await getDb(), before, after);
+    expect((await loadAll(await getDb())).deadlines).toEqual(after.deadlines);
+
+    await deleteCourses(await getDb(), ['cse']);
+    expect((await loadAll(await getDb())).deadlines?.map((x) => x.id)).toEqual(['dl2']);
+  });
+});

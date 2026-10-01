@@ -1,4 +1,4 @@
-import type { Course, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
+import type { Course, Deadline, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
@@ -22,6 +22,10 @@ export type LibraryState = {
   timetable: TimetableSlot[];
   // §4 S7: every file handed in, newest first. Rows go with their document.
   submissions: Submission[];
+  // §4 S8: course deadlines, by due date. Done ones stay (they record the submission).
+  deadlines: Deadline[];
+  // UI-only: the deadline a tapped reminder points at, highlighted on its course page.
+  highlightDeadlineId: string | null;
   // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
   homeSemesterId: string | null;
   // UI-only drill-in state for the Courses tab: null = showing the course list,
@@ -44,6 +48,8 @@ export const initialLibraryState: LibraryState = {
   semesters: [],
   timetable: [],
   submissions: [],
+  deadlines: [],
+  highlightDeadlineId: null,
   homeSemesterId: null,
   activeCourseId: null,
   selection: [],
@@ -85,6 +91,11 @@ export type LibraryAction =
   | { type: 'library/SET_TIMETABLE'; timetable: TimetableSlot[] }
   | { type: 'library/SET_SUBMISSIONS'; submissions: Submission[] }
   | { type: 'library/ADD_SUBMISSION'; submission: Submission }
+  | { type: 'library/SET_DEADLINES'; deadlines: Deadline[] }
+  | { type: 'library/ADD_DEADLINE'; deadline: Deadline }
+  | { type: 'library/UPDATE_DEADLINE'; id: string; patch: Partial<Omit<Deadline, 'id'>> }
+  | { type: 'library/DELETE_DEADLINE'; id: string }
+  | { type: 'library/SET_HIGHLIGHT_DEADLINE'; id: string | null }
   | { type: 'library/ADD_SLOT'; slot: TimetableSlot }
   | { type: 'library/UPDATE_SLOT'; id: string; patch: Partial<Omit<TimetableSlot, 'id'>> }
   | { type: 'library/REMOVE_SLOT'; id: string }
@@ -95,6 +106,10 @@ export type LibraryAction =
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
 // creation time.
 export type CourseFields = Omit<Course, 'id' | 'sortOrder' | 'createdAt'>;
+
+function byDueAt(deadlines: Deadline[]): Deadline[] {
+  return [...deadlines].sort((a, b) => a.dueAt - b.dueAt || a.id.localeCompare(b.id));
+}
 
 function sortSlots(slots: TimetableSlot[]): TimetableSlot[] {
   return [...slots].sort((a, b) => a.weekday - b.weekday || a.startMin - b.startMin || a.id.localeCompare(b.id));
@@ -215,6 +230,8 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         timetable: state.timetable.filter((s) => s.courseId !== action.id),
         files: state.files.map((f) => (f.courseId === action.id ? { ...f, courseId: undefined } : f)),
         submissions: state.submissions.map((s) => (s.courseId === action.id ? { ...s, courseId: undefined } : s)),
+        // Its deadlines go with it (ON DELETE CASCADE); useDeadlineReminders cancels their reminders.
+        deadlines: state.deadlines.filter((d) => d.courseId !== action.id),
         activeCourseId: state.activeCourseId === action.id ? null : state.activeCourseId,
       };
     case 'library/ASSIGN_COURSE':
@@ -258,6 +275,20 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return { ...state, submissions: action.submissions };
     case 'library/ADD_SUBMISSION':
       return { ...state, submissions: [action.submission, ...state.submissions] };
+    case 'library/SET_DEADLINES':
+      return { ...state, deadlines: byDueAt(action.deadlines) };
+    case 'library/ADD_DEADLINE':
+      return { ...state, deadlines: byDueAt([...state.deadlines, action.deadline]) };
+    case 'library/UPDATE_DEADLINE':
+      return { ...state, deadlines: byDueAt(state.deadlines.map((d) => (d.id === action.id ? { ...d, ...action.patch } : d))) };
+    case 'library/DELETE_DEADLINE':
+      return {
+        ...state,
+        deadlines: state.deadlines.filter((d) => d.id !== action.id),
+        highlightDeadlineId: state.highlightDeadlineId === action.id ? null : state.highlightDeadlineId,
+      };
+    case 'library/SET_HIGHLIGHT_DEADLINE':
+      return { ...state, highlightDeadlineId: action.id };
     case 'library/ADD_SLOT':
       return { ...state, timetable: sortSlots([...state.timetable, action.slot]) };
     case 'library/UPDATE_SLOT':

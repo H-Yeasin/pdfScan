@@ -254,3 +254,18 @@ export type Submission = {
   preset?: SubmitPreset;
   typeNumber?: number;
 };
+
+// A due date for a course (§4 S8), with local reminders 24 h and 2 h before it.
+export type Deadline = {
+  id: string;
+  courseId: string;
+  title: string;
+  dueAt: number;
+  // Only a submission of this type marks it done; undefined = any type.
+  docType?: DocType;
+  // The scheduled notifications (expo-notifications identifiers), to cancel on edit or done.
+  reminderIds: string[];
+  // The submission that settled it; undefined = still open.
+  doneSubmissionId?: string;
+  createdAt: number;
+};

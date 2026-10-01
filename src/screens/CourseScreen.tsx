@@ -11,6 +11,9 @@ import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
 import { SubmissionList } from '../components/submit/SubmissionList';
+import { DeadlineList } from '../components/deadlines/DeadlineList';
+import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
+import type { Deadline } from '../types/models';
 import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
 import { docTypeOf } from '../services/courses/docTypes';
@@ -44,6 +47,14 @@ export function CourseScreen() {
     [state.library.submissions, isUnsorted, activeCourseId]
   );
   const shareSubmission = useShareSubmission();
+  // §4 S8: this course's open deadlines; a tapped reminder highlights one.
+  const { highlightDeadlineId } = state.library;
+  const deadlines = useMemo(
+    () => (course ? state.library.deadlines.filter((d) => d.courseId === course.id && !d.doneSubmissionId) : []),
+    [course, state.library.deadlines]
+  );
+  const [deadlineEditor, setDeadlineEditor] = useState<{ deadline?: Deadline } | null>(null);
+  const now = Date.now();
   const openDocument = useOpenDocument();
   const shownDocs = useMemo(
     () => (typeFilter ? docs.filter((d) => docTypeOf(d) === typeFilter) : docs),
@@ -52,6 +63,7 @@ export function CourseScreen() {
 
   const goBack = () => {
     dispatch({ type: 'library/CLEAR_SELECTION' });
+    if (highlightDeadlineId) dispatch({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null });
     go(tabHub, 'back');
   };
 
@@ -100,6 +112,26 @@ export function CourseScreen() {
           ) : null}
         </View>
       )}
+
+      {course && !selMode ? (
+        <View style={styles.deadlines}>
+          <View style={styles.deadlinesHeader}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Deadlines</Text>
+            <Pressable onPress={() => setDeadlineEditor({})} accessibilityRole="button" hitSlop={8}>
+              <Text style={[styles.addLink, { color: tokens.accentInk }]}>+ Add deadline</Text>
+            </Pressable>
+          </View>
+          {deadlines.length > 0 ? (
+            <DeadlineList
+              deadlines={deadlines}
+              now={now}
+              highlightId={highlightDeadlineId}
+              onPress={(deadline) => setDeadlineEditor({ deadline })}
+              onScanNow={handleScan}
+            />
+          ) : null}
+        </View>
+      ) : null}
 
       {docs.length === 0 ? (
         <EmptyState
@@ -159,6 +191,14 @@ export function CourseScreen() {
       ) : null}
 
       {course ? <CourseEditorSheet visible={editing} course={course} onClose={() => setEditing(false)} /> : null}
+      {course ? (
+        <DeadlineEditorSheet
+          visible={deadlineEditor !== null}
+          deadline={deadlineEditor?.deadline}
+          courseId={course.id}
+          onClose={() => setDeadlineEditor(null)}
+        />
+      ) : null}
       {overlays}
     </SafeAreaView>
   );
@@ -225,5 +265,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  deadlines: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  deadlinesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addLink: {
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

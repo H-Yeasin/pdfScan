@@ -19,6 +19,7 @@ import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
+import { useDeadlineReminders } from '../store/useDeadlines';
 import { useAppState } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
 import { initCrashReporting } from '../services/telemetry/crash';
@@ -45,6 +46,7 @@ export function AppNavigator() {
   useSettingsPersistence();
   useSignaturePersistence();
   useExternalFileLinking(libraryLoaded);
+  useDeadlineReminders(libraryLoaded);
   const { screen, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();

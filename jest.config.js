@@ -12,6 +12,7 @@ module.exports = {
     '^expo-sqlite$': '<rootDir>/src/test/mocks/expoSqlite.ts',
     '^rn-mlkit-ocr$': '<rootDir>/src/test/mocks/rnMlkitOcr.ts',
     '^expo-haptics$': '<rootDir>/src/test/mocks/expoHaptics.ts',
+    '^expo-notifications$': '<rootDir>/src/test/mocks/expoNotifications.ts',
     '^@shopify/react-native-skia$': '<rootDir>/src/test/mocks/skia.ts',
     '^react-native-document-scanner-plugin$': '<rootDir>/src/test/mocks/documentScanner.ts',
     '^@react-native-async-storage/async-storage$':

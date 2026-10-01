@@ -35,6 +35,8 @@ import { defaultSubmitPreset, presetFromDeliver, presetsEqual, summarizePreset }
 import { isProfileComplete } from '../services/submit/profile';
 import { submitDocument, type SubmitResult } from '../services/submit/submitDocument';
 import { submissionRecord } from '../services/submit/history';
+import { matchDeadline } from '../services/submit/deadlines';
+import type { Submission } from '../types/models';
 import type { PageSizeId } from '../services/pdf/pageSize';
 import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppState } from '../store/AppStateContext';
@@ -311,6 +313,7 @@ export function DeliverScreen() {
         // §4 S6: the teacher's copy, built while this screen still shows progress. The library
         // document is already saved, so a failure here only loses the submission.
         let submission: SubmitResult | null = null;
+        let record: Submission | null = null;
         let submitFailed = false;
         if (mode === 'submit') {
           try {
@@ -329,7 +332,8 @@ export function DeliverScreen() {
               fileName: doc.name,
               onProgress: setProgress,
             });
-            dispatch({ type: 'library/ADD_SUBMISSION', submission: submissionRecord(doc, submission, currentPreset, typeNumber) });
+            record = submissionRecord(doc, submission, currentPreset, typeNumber);
+            dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
           } catch (error) {
             console.warn('DeliverScreen: submission build failed', error);
             submitFailed = true;
@@ -366,15 +370,27 @@ export function DeliverScreen() {
               : `Saved · ${courseName} · copy to device folder failed`;
         }
 
-        dispatch({
-          type: 'ui/SHOW_SNACK',
-          msg: snackMsg,
-          action: 'Undo',
-          onAction: () => {
-            dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
-            deleteDocumentFiles(documentId);
-          },
-        });
+        // §4 S8: a submission that answers an open deadline offers to settle it, instead of Undo.
+        const deadline = record ? matchDeadline(doc, state.library.deadlines) : undefined;
+        if (deadline && record) {
+          const submissionId = record.id;
+          dispatch({
+            type: 'ui/SHOW_SNACK',
+            msg: `${snackMsg} · Mark '${deadline.title}' as done?`,
+            action: 'Done',
+            onAction: () => dispatch({ type: 'library/UPDATE_DEADLINE', id: deadline.id, patch: { doneSubmissionId: submissionId } }),
+          });
+        } else {
+          dispatch({
+            type: 'ui/SHOW_SNACK',
+            msg: snackMsg,
+            action: 'Undo',
+            onAction: () => {
+              dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
+              deleteDocumentFiles(documentId);
+            },
+          });
+        }
 
         if (shareAfter) await shareDocument(doc);
         if (submission) await shareAs(submission.uri, submission.fileName, 'application/pdf');
@@ -400,6 +416,7 @@ export function DeliverScreen() {
       course,
       state.deliver.academicConfig,
       state.library.files,
+      state.library.deadlines,
       state.review.history,
       courseId,
       courseName,

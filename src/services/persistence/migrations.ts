@@ -168,6 +168,26 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v7 (§4 S8): deadlines with local reminders. A deadline goes with its course; its reminder
+    // ids are JSON (expo-notifications identifiers).
+    version: 7,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE deadlines (
+          id TEXT PRIMARY KEY NOT NULL,
+          course_id TEXT NOT NULL REFERENCES courses (id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          due_at INTEGER NOT NULL,
+          doc_type TEXT,
+          reminder_ids TEXT NOT NULL DEFAULT '[]',
+          done_submission_id TEXT,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_deadlines_course_id ON deadlines (course_id);
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name
