@@ -8,12 +8,16 @@
 - When you finish a step, update its `Status:` line (`done (commit <sha>)`) and tick it in
   `docs/PLAN.md`. If the code no longer matches what a step describes, fix the step text too.
 
+## Progress
+K1–K5 done (see each step's "As built"). **Next: K6.** The scanner-launch change after K5 is
+in `docs/plan/README.md`.
+
 ## Context
 §3 files everything by course without the student having to think about it: semesters, a
 Home screen with the courses, document types, and automatic course suggestions.
 
-### What exists today and what F4 already covers
-- **Today:** a `LibraryFolder` (id, name, createdAt) plus a free-text `courseFolder` string
+### What existed before §3 (as planned; see the steps for the current code)
+- **Before §3:** a `LibraryFolder` (id, name, createdAt) plus a free-text `courseFolder` string
   that also decides the file path. `LibraryScreen` has tabs Starred, Recent and Folders
   (`LibraryTabs`). `FolderList` provides create, rename and delete, plus a synthetic "Unfiled"
   bucket (`UNFILED_FOLDER_ID`). `ManageFoldersScreen` exists. `FolderPickerModal` is used in
@@ -231,7 +235,15 @@ the right course with no taps, and without a timetable the suggestion matches th
 used for that mode.
 
 ### K6 · Organising existing documents *(S)*
-Status: todo
+Status: todo. What's already there for it (from K1–K5):
+- Actions: `library/ASSIGN_COURSE` (move), `library/SET_DOC_TYPE` (set type). Multi-select
+  already has "Set type" (`SelectionBar` + `useDocumentListActions`). It needs a "Move" tool.
+- Pickers: `FolderPickerModal` (course; hides archived ones) and `DocTypePickerModal`.
+- Filters: `DocTypeFilterChips` on Library (Recent/Starred) and course pages. Unsorted is
+  `UNSORTED_COURSE_ID`, opened as a course page. `suggestCourses` can rank courses for sorting
+  Unsorted.
+- Search: `searchDocumentsByText` (FTS) in `persistence/dbService.ts`. Course/type filters for
+  search are not there yet.
 
 - Multi-select in Library and CourseScreen: "Move to course" (reuse the course picker; this
   changes no files thanks to F4), "Set type" (K4), and "Archive".

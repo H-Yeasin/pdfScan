@@ -8,6 +8,21 @@
 - When you finish a step, update its `Status:` line (`done (commit <sha>)`) and tick it in
   `docs/PLAN.md`. If the code no longer matches what a step describes, fix the step text too.
 
+## Since §0/§1 were merged in (505563c)
+E1–E6 were built before F5 and C1 existed, so their "As built" notes mention stopgaps that are
+now gone. The merge left the code like this:
+- `skiaEnhance.renderPage(uri, edits, target)` is the only export path (`bakeEnhance` is gone).
+  It draws through `drawFiltered`, and `edits` carries `rotation`, `enhance`, `adjust`, `stats`
+  and `filterOptions`.
+- Rotation is a page setting (`capture/ROTATE_PAGE`, undoable), never a re-encode. Export and
+  `useFilteredPicture` both rotate with `drawRotated` (`enhance/filters/drawFiltered.ts`), so
+  academic overlays stay upright on rotated pages. `useEnhancedPreview` is gone.
+- Ingest (`capture/ingest.pageFromMaster`) measures `stats`. `UPDATE_PAGE` with a new `uri`
+  drops `stats` and `thumbUri`, and undo restores both.
+- `captureModes.ts`: Notes → `ink`, Board → `board`. The user's per-mode choice
+  (`settings.defaultEnhanceByMode`) wins via `settingsSlice.captureSpecFor`.
+- The Filter Lab times `renderPage` at `MASTER_PRESET`.
+
 ## Context
 §2 makes handwriting, handouts and boards look like clean photocopies, with fast live previews
 and an easy review flow.
@@ -99,7 +114,7 @@ Status: done (commit a993721), adapted. It was built before its prerequisites F1
 `renderPage` plus thin wrappers.
 
 ### E2 · Live preview without temporary files, plus the Filter Lab *(M)*
-Status: done (see git log), adapted. Built before F5, so "the master" is `SessionPage.uri`. As built:
+Status: done (commit 389d29c), adapted. Built before F5, so "the master" is `SessionPage.uri`. As built:
 - `useFilteredPicture(page, previewMaxDim, { adjust, prefetchUris, overlay })` in
   `services/enhance/`. Decoding and the LRU of 3 live in `previewImageCache.ts`. It returns
   `{ picture, originalPicture, width, height }`, and `components/review/FilteredPreview.tsx` draws
@@ -141,7 +156,7 @@ Status: done (see git log), adapted. Built before F5, so "the master" is `Sessio
 (checked by listing the cache), and the preview matches the exported page.
 
 ### E3 · Shadow and lighting correction *(M)*
-Status: done (see git log); needs the Filter Lab check on a device. As built:
+Status: done (commit f2398b5); needs the Filter Lab check on a device. As built:
 - `filters/lightCorrect.ts` does the work. `makeBackgroundImage(image, dark, radius, sigma)`
   always works at a 160 px long side instead of 1/8 scale, so the radius and sigma are fractions
   of the page, and the 1400 px preview gets the same background as the full-size export. The
@@ -181,7 +196,7 @@ Status: done (see git log); needs the Filter Lab check on a device. As built:
 out with even paper under Auto, and nothing goes grey or blotchy.
 
 ### E4 · Ink filter for handwritten notes *(L)*
-Status: done (see git log); the 5-page Filter Lab check on a device is still open. As built:
+Status: done (commit 45c2ceb); the 5-page Filter Lab check on a device is still open. As built:
 - `filters/inkMath.ts` holds the pure formulas: `inkKnees`, `inkTone`, `lineFade` and
   `percentileFromHistogram`. `filters/ink.ts` mirrors them line for line in SkSL, built on the
   light-corrected `source`.
@@ -223,7 +238,7 @@ plastic sleeve), the paper is white, the lines are faded, and pencil is clearly 
 least as good as `bw` (Sauvola) on every page.
 
 ### E5 · Board filter for whiteboards, blackboards and slides *(M)*
-Status: done (see git log); the Filter Lab check (3 whiteboards, 2 blackboards) on a device is still open. As built:
+Status: done (commit 15b6487); the Filter Lab check (3 whiteboards, 2 blackboards) on a device is still open. As built:
 - `filters/boardMath.ts` holds the pure formulas and `filters/board.ts` mirrors them in SkSL.
   `boardStyle: 'auto'` reuses E3's dark-page flag (`stats.light.dark`, the same median < 0.35
   rule), so the board type and the light correction always agree. A forced style also switches
@@ -264,7 +279,7 @@ Status: done (see git log); the Filter Lab check (3 whiteboards, 2 blackboards) 
 photos come out readable with a white background.
 
 ### E6 · Review UX: filter strip, undo, smarter apply-to-all *(M)*
-Status: done (see git log); not yet tried on a device. As built (built before F5 and C1):
+Status: done (commit cc0648b); not yet tried on a device. As built (built before F5 and C1):
 - `components/review/FilterStrip.tsx` replaces `EnhanceSegmented`, which is deleted. Each
   thumbnail is `drawFiltered` on a 240 px decode from `loadThumbImage`, a second LRU in
   `previewImageCache`, so thumbnails never evict the previews. There's no F5 thumbnail file yet.
@@ -327,7 +342,7 @@ Status: done (see git log); not yet tried on a device. As built (built before F5
 choice to a 10-page scan with one tap and one undo.
 
 ### E7 · Benchmark against CamScanner and tune *(M)*
-Status: in progress. The tooling is done; the benchmark itself needs real pages, raters and a
+Status: in progress. The tooling is done (commit ae88e8e); the benchmark itself needs real pages, raters and a
 phone. Done so far:
 - `docs/qa/filter-benchmark.md` has the protocol: groups and file names, the folder layout
   outside the repo, how to make both apps' outputs from the same photo, rating, scoring, the

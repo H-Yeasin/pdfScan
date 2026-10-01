@@ -16,9 +16,9 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 - `docs/plan/NN-*.md`: step-by-step plans per section. **Implement one step per session. Read
   only that step**, open only the files it names, then update its `Status:` line and tick it
   in `docs/PLAN.md`.
-- §0, §1 and §2 (except E7's benchmark run) are done in code; their device checks are in the
-  Verification sections of `docs/plan/0{0,1,2}-*.md`. Current phase: **§3 Courses**
-  (`docs/plan/03-courses.md`).
+- **Progress:** `docs/plan/README.md` lists every step's status and commit and what comes next.
+  Read it before starting. §0, §1, §2 (except E7's benchmark run) and §3 K1–K5 are done in code.
+  **Next: §3 K6.** Device checks are in each file's Verification section and are still open.
 
 ## Commands
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),
