@@ -3,13 +3,14 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 
-export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete' | 'addToLibrary';
+export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete' | 'addToLibrary' | 'changeType';
 
 type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
 // Share/Sign/Export/Print live in the persistent ReaderActionBar; management/destructive actions
 // stay here so there's exactly one, deliberately-gated path to each.
 const DELETE_ITEM: Item = { id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true };
+const CHANGE_TYPE_ITEM: Item = { id: 'changeType', label: 'Change type', icon: 'pricetag-outline' };
 const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', label: 'Add to Library', icon: 'add-circle-outline' };
 
 type OverflowSheetProps = {
@@ -33,7 +34,8 @@ export function OverflowSheet({
   const insets = useSafeAreaInsets();
   const items: Item[] = [
     ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
-    ...(showDelete ? [DELETE_ITEM] : []),
+    // Library documents only, like Delete: an external file has no type until it's added.
+    ...(showDelete ? [CHANGE_TYPE_ITEM, DELETE_ITEM] : []),
   ];
 
   return (

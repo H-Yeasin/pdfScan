@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { DocTypePickerModal } from '../courses/DocTypeChips';
 import { SignatureCaptureModal } from '../shared/SignatureCaptureModal';
 import { SignatureModal } from '../shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
@@ -15,6 +16,7 @@ import {
 import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { canSign } from '../../services/documents/formatCapabilities';
 import { useAppState } from '../../store/AppStateContext';
+import { docTypeOf } from '../../services/courses/docTypes';
 import type { LibraryDocument } from '../../types/models';
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
@@ -33,8 +35,8 @@ export function useOpenDocument() {
 
 // What a document list does with its rows, shared by the Library and Course screens: tap opens
 // (or toggles, in selection mode), long-press starts selecting, and the SelectionBar's tools
-// (merge, split, compress, sign). Selection lives in state.library, so it's one selection app-wide.
-// Render `signingUi` once in the screen: it holds the signature capture/placement overlays.
+// (merge, split, compress, sign, set type). Selection lives in state.library, so it's one selection
+// app-wide. Render `overlays` once in the screen: it holds the signing overlays and the type picker.
 export function useDocumentListActions() {
   const { state, dispatch } = useAppState();
   const { files, selection, selMode } = state.library;
@@ -42,6 +44,7 @@ export function useDocumentListActions() {
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
 
@@ -67,6 +70,11 @@ export function useDocumentListActions() {
   const handleSelectionTool = useCallback(
     async (id: SelectionToolId) => {
       if (selectedDocs.length === 0) return;
+
+      if (id === 'type') {
+        setTypePickerOpen(true);
+        return;
+      }
 
       if (id === 'merge' && selectedDocs.length >= 2) {
         const merged = await mergeDocuments(selectedDocs);
@@ -146,8 +154,23 @@ export function useDocumentListActions() {
     [signTarget, capturedSignature, dispatch]
   );
 
-  const signingUi = (
+  // The picker marks a type only when every selected document already has it.
+  const firstType = selectedDocs.length > 0 ? docTypeOf(selectedDocs[0]) : null;
+  const sharedType = firstType && selectedDocs.every((d) => docTypeOf(d) === firstType) ? firstType : null;
+
+  const overlays = (
     <>
+      <DocTypePickerModal
+        visible={typePickerOpen}
+        title={selectedDocs.length === 1 ? 'Set type' : `Set type for ${selectedDocs.length} documents`}
+        value={sharedType}
+        onSelect={(docType) => {
+          dispatch({ type: 'library/SET_DOC_TYPE', ids: selectedDocs.map((d) => d.id), docType });
+          dispatch({ type: 'library/CLEAR_SELECTION' });
+        }}
+        onClose={() => setTypePickerOpen(false)}
+      />
+
       {signTarget && signTarget.format === 'JPG' && (
         <SignatureModal
           visible
@@ -178,5 +201,5 @@ export function useDocumentListActions() {
     </>
   );
 
-  return { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, signingUi };
+  return { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays };
 }

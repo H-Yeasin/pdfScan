@@ -1,6 +1,7 @@
 import { initialLibraryState, libraryReducer } from '../slices/librarySlice';
 import type { LibraryAction, LibraryState } from '../slices/librarySlice';
 import { COURSE_COLORS } from '../../services/courses/palette';
+import { makeDoc } from '../../test/fixtures';
 
 function run(...actions: LibraryAction[]): LibraryState {
   return actions.reduce(libraryReducer, initialLibraryState);
@@ -110,5 +111,18 @@ describe('librarySlice semesters', () => {
       ['c', 's_spring'],
       ['d', undefined],
     ]);
+  });
+});
+
+describe('librarySlice doc types', () => {
+  it('sets the type on the listed documents and leaves the rest (and unchanged ones) as they were', () => {
+    const before = run({
+      type: 'library/SET_FILES',
+      files: [makeDoc({ id: 'a' }), makeDoc({ id: 'b', docType: 'lab' }), makeDoc({ id: 'c' })],
+    });
+    const after = libraryReducer(before, { type: 'library/SET_DOC_TYPE', ids: ['a', 'b'], docType: 'lab' });
+    expect(after.files.map((f) => f.docType)).toEqual(['lab', 'lab', undefined]);
+    expect(after.files[1]).toBe(before.files[1]);
+    expect(after.files[2]).toBe(before.files[2]);
   });
 });

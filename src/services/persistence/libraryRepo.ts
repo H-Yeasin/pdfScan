@@ -298,6 +298,18 @@ export async function deleteCourses(db: SQLiteDatabase, ids: string[]): Promise<
   await db.withTransactionAsync(() => deleteRows(db, 'courses', ids));
 }
 
+// `{n}` for §4's naming template, from the database: the number the next document of `type` in this
+// course gets. Same rule as docTypes.nextTypeNumber (which works on in-memory state): count the
+// documents that exist (deleted ones are gone, so they free their number), per course, with a
+// missing doc_type counting as 'other'. `courseId` undefined = Unsorted.
+export async function nextTypeNumber(db: SQLiteDatabase, courseId: string | undefined, type: DocType): Promise<number> {
+  const row = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM documents WHERE course_id IS ? AND COALESCE(doc_type, 'other') = ?`,
+    [courseId ?? null, type]
+  );
+  return (row?.n ?? 0) + 1;
+}
+
 // Sets every listed course's sort_order to its position in `ids`. Courses not listed keep theirs.
 export async function reorderCourses(db: SQLiteDatabase, ids: string[]): Promise<void> {
   await db.withTransactionAsync(async () => {

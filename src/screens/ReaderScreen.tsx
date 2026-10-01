@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { searchTextDirect, type PDFSearchResultItem } from 'react-native-pdf-jsi';
+import { DocTypePickerModal } from '../components/courses/DocTypeChips';
 import { OverflowSheet, type OverflowItemId } from '../components/reader/OverflowSheet';
+import { docTypeOf, getDocType } from '../services/courses/docTypes';
 import { PdfPageView, type PdfPageViewHandle } from '../components/reader/PdfPageView';
 import { ReaderActionBar } from '../components/reader/ReaderActionBar';
 import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
@@ -44,6 +46,7 @@ export function ReaderScreen() {
   const chromeVisible = useRef(new Animated.Value(1)).current;
   const [chrome, setChrome] = useState(true);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PDFSearchResultItem[]>([]);
@@ -182,6 +185,8 @@ export function ReaderScreen() {
         dispatch({ type: 'library/ADD_FILE', file: promoted });
         dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Added to Library' });
+      } else if (id === 'changeType') {
+        if (doc) setTypePickerOpen(true);
       } else if (id === 'delete') {
         if (!doc) return;
         Alert.alert(
@@ -202,7 +207,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, state.signature.saved]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
@@ -364,6 +369,19 @@ export function ReaderScreen() {
         onPress={handleOverflowSelect}
         hiddenIds={[...(signVisible ? [] : (['sign'] as const)), ...(isPageRaster ? [] : (['export'] as const))]}
       />
+
+      {doc ? (
+        <DocTypePickerModal
+          visible={typePickerOpen}
+          title="Change type"
+          value={docTypeOf(doc)}
+          onSelect={(docType) => {
+            dispatch({ type: 'library/SET_DOC_TYPE', ids: [doc.id], docType });
+            dispatch({ type: 'ui/SHOW_SNACK', msg: `Type · ${getDocType(docType).label}` });
+          }}
+          onClose={() => setTypePickerOpen(false)}
+        />
+      ) : null}
 
       <OverflowSheet
         visible={overflowOpen}

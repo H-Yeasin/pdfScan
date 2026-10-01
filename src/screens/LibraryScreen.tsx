@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { CourseList } from '../components/courses/CourseList';
+import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
+import { docTypeOf } from '../services/courses/docTypes';
+import type { DocType } from '../types/models';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar } from '../components/library/SelectionBar';
@@ -30,7 +33,8 @@ export function LibraryScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { loadStatus, files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
-  const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, signingUi } = useDocumentListActions();
+  const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
+  const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
 
   useEffect(() => {
     const query = search.trim();
@@ -46,7 +50,8 @@ export function LibraryScreen() {
     return () => clearTimeout(timer);
   }, [search, dispatch]);
 
-  const visibleFiles = useMemo(() => {
+  // The tab's documents after search; the type chips count these, then filter them.
+  const searchedFiles = useMemo(() => {
     // The Courses tab shows the course list; a course's documents are on its own page (CourseScreen).
     const tabbed = tab === 'starred' ? files.filter((f) => f.star) : files;
     if (!search.trim()) return tabbed;
@@ -54,6 +59,11 @@ export function LibraryScreen() {
     const idSet = new Set(searchResultIds);
     return tabbed.filter((f) => idSet.has(f.id));
   }, [files, tab, search, searchResultIds]);
+
+  const visibleFiles = useMemo(
+    () => (typeFilter ? searchedFiles.filter((f) => docTypeOf(f) === typeFilter) : searchedFiles),
+    [searchedFiles, typeFilter]
+  );
 
   const courseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -158,22 +168,25 @@ export function LibraryScreen() {
           body="Search also looks inside scans — OCR text is indexed for every document, free."
         />
       ) : (
-        <FlatList
-          data={visibleFiles}
-          keyExtractor={(doc) => doc.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <FileRow
-              doc={item}
-              selected={selection.includes(item.id)}
-              selectionMode={selMode}
-              matchSnippet={getMatchSnippet(item, search)}
-              onPress={() => handlePressRow(item)}
-              onLongPress={() => handleLongPress(item)}
-              onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
-            />
-          )}
-        />
+        <>
+          <DocTypeFilterChips docs={searchedFiles} value={typeFilter} onChange={setTypeFilter} />
+          <FlatList
+            data={visibleFiles}
+            keyExtractor={(doc) => doc.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <FileRow
+                doc={item}
+                selected={selection.includes(item.id)}
+                selectionMode={selMode}
+                matchSnippet={getMatchSnippet(item, search)}
+                onPress={() => handlePressRow(item)}
+                onLongPress={() => handleLongPress(item)}
+                onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
+              />
+            )}
+          />
+        </>
       )}
 
       {selMode ? (
@@ -188,7 +201,7 @@ export function LibraryScreen() {
         />
       )}
 
-      {signingUi}
+      {overlays}
     </SafeAreaView>
   );
 }

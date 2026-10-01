@@ -1,4 +1,4 @@
-import type { Course, LibraryDocument, Semester } from '../../types/models';
+import type { Course, DocType, LibraryDocument, Semester } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
@@ -77,6 +77,7 @@ export type LibraryAction =
   | { type: 'library/DELETE_SEMESTER'; id: string }
   | { type: 'library/SET_HOME_SEMESTER'; id: string | null }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
+  | { type: 'library/SET_DOC_TYPE'; ids: string[]; docType: DocType }
   | { type: 'library/SET_ACTIVE_COURSE'; id: string | null };
 
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
@@ -228,6 +229,11 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       };
     case 'library/SET_HOME_SEMESTER':
       return { ...state, homeSemesterId: action.id };
+    case 'library/SET_DOC_TYPE':
+      return {
+        ...state,
+        files: state.files.map((f) => (action.ids.includes(f.id) && f.docType !== action.docType ? { ...f, docType: action.docType } : f)),
+      };
     case 'library/SET_ACTIVE_COURSE':
       return { ...state, activeCourseId: action.id };
     default:

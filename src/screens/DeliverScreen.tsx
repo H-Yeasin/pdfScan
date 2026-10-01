@@ -23,6 +23,9 @@ import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../ser
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { shareDocument } from '../services/sharing/shareService';
 import { historyUris } from '../store/pageHistory';
+import { DocTypeSelector } from '../components/courses/DocTypeChips';
+import { getCaptureModeSpec } from '../services/capture/captureModes';
+import { defaultDocTypeFor } from '../services/courses/docTypes';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
@@ -61,6 +64,8 @@ export function DeliverScreen() {
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
   const { name, format, quality, more, courseId, exportCopy, academicConfig, layoutMode } = state.deliver;
+  // Every saved document gets a type: the student's pick, or the capture mode's default.
+  const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
   const { androidExportFolderUri, androidExportFolderLabel, ocrScript } = state.settings;
   const [saving, setSaving] = useState(false);
@@ -226,6 +231,7 @@ export function DeliverScreen() {
           locked: false,
           searchHaystack: haystack,
           courseId: courseId ?? undefined,
+          docType,
           // Only set when a cover page actually made it into libraryPages[0] - mirrors
           // coverPage's own condition, not just whether academicConfig exists.
           coverKind: coverPage ? academicConfig?.coverPage?.mode : undefined,
@@ -281,6 +287,7 @@ export function DeliverScreen() {
       name,
       courseId,
       courseName,
+      docType,
       ocrScript,
       exportCopy,
       academicConfig,
@@ -359,6 +366,11 @@ export function DeliverScreen() {
           <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
         </Pressable>
 
+        <View style={styles.typeSection}>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Type</Text>
+          <DocTypeSelector value={docType} onChange={(type) => dispatch({ type: 'deliver/SET_DOC_TYPE', docType: type })} />
+        </View>
+
         <Pressable
           style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
           onPress={() => go('academicOptions')}
@@ -436,6 +448,9 @@ const styles = StyleSheet.create({
   sizeEstimate: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  typeSection: {
+    gap: spacing.sm,
   },
   saveToRow: {
     flexDirection: 'row',

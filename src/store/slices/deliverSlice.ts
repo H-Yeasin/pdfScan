@@ -1,4 +1,4 @@
-import type { DocFormat } from '../../types/models';
+import type { DocFormat, DocType } from '../../types/models';
 import type { AcademicConfig, LayoutMode } from '../../services/pdf/pdfService';
 
 export type DeliverState = {
@@ -8,6 +8,9 @@ export type DeliverState = {
   more: boolean;
   // Course the saved document is filed under; null means Unsorted.
   courseId: string | null;
+  // The type the saved document gets. null = the capture mode's default (docTypes.defaultDocTypeFor),
+  // so switching mode mid-session still changes it until the student picks one.
+  docType: DocType | null;
   // Android-only: also write a copy to the user's chosen device folder via SAF.
   exportCopy: boolean;
   // Premium academic PDF export options (cover page, border, header/footer). No UI sets this yet;
@@ -24,6 +27,7 @@ export const initialDeliverState: DeliverState = {
   quality: 3,
   more: false,
   courseId: null,
+  docType: null,
   exportCopy: false,
   academicConfig: null,
   layoutMode: 'standard',
@@ -35,6 +39,7 @@ export type DeliverAction =
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/TOGGLE_MORE' }
   | { type: 'deliver/SET_COURSE'; courseId: string | null }
+  | { type: 'deliver/SET_DOC_TYPE'; docType: DocType | null }
   | { type: 'deliver/TOGGLE_EXPORT_COPY' }
   | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/SET_LAYOUT_MODE'; layoutMode: LayoutMode }
@@ -52,6 +57,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, more: !state.more };
     case 'deliver/SET_COURSE':
       return { ...state, courseId: action.courseId };
+    case 'deliver/SET_DOC_TYPE':
+      return { ...state, docType: action.docType };
     case 'deliver/TOGGLE_EXPORT_COPY':
       return { ...state, exportCopy: !state.exportCopy };
     case 'deliver/SET_ACADEMIC_CONFIG':

@@ -5,6 +5,7 @@ import { AppStateProvider, useAppState } from '../../store/AppStateContext';
 import { ThemeProvider } from '../../theme';
 import { CourseScreen } from '../CourseScreen';
 import { HomeScreen } from '../HomeScreen';
+import { makeDoc } from '../../test/fixtures';
 
 // Icon components load their font through expo-asset; they draw nothing these tests look at.
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -87,5 +88,31 @@ describe('Home course hub', () => {
     const { root } = mount();
     expect(texts(root)).toContain('Your courses');
     expect(texts(root)).toContain('Add your courses');
+  });
+
+  it('filters a course page by type', () => {
+    const { root, ctx } = mount();
+    act(() => {
+      const { dispatch } = ctx().app;
+      dispatch({ type: 'library/CREATE_COURSE', id: 'math', name: 'Math' });
+      dispatch({
+        type: 'library/SET_FILES',
+        files: [
+          makeDoc({ id: 'hw', name: 'Homework 1', courseId: 'math', docType: 'assignment' }),
+          makeDoc({ id: 'nt', name: 'Lecture notes', courseId: 'math', docType: 'notes' }),
+          makeDoc({ id: 'old', name: 'Old scan', courseId: 'math' }),
+        ],
+      });
+    });
+    press(root, 'Math');
+    expect(texts(root)).toEqual(expect.arrayContaining(['Homework 1', 'Lecture notes', 'Old scan', 'All 3']));
+
+    press(root, 'Assignments 1');
+    expect(texts(root)).toContain('Homework 1');
+    expect(texts(root)).not.toContain('Lecture notes');
+    expect(texts(root)).not.toContain('Old scan');
+
+    press(root, 'All 3');
+    expect(texts(root)).toContain('Old scan');
   });
 });

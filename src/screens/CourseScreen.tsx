@@ -4,33 +4,41 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CourseBadge } from '../components/courses/CourseBadge';
 import { CourseEditorSheet } from '../components/courses/CourseEditorSheet';
+import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
 import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { useDocumentListActions } from '../components/library/useDocumentListActions';
 import { useRouter } from '../navigation/router';
+import { docTypeOf } from '../services/courses/docTypes';
 import { startScan } from '../services/courses/startScan';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import type { DocType } from '../types/models';
 
 // One course's page: its header and its documents, newest first. Opened from Home's course grid
 // and Library's Courses tab (state.library.activeCourseId says which). Scanning from here files
-// the scan into this course (startScan preselects it in Deliver). Document type chips arrive in K4.
+// the scan into this course (startScan preselects it in Deliver). Type chips filter the list (K4).
 export function CourseScreen() {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
   const { go, tabHub } = useRouter();
   const { state, dispatch } = useAppState();
   const { files, courses, activeCourseId, selection, selMode } = state.library;
-  const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, signingUi } = useDocumentListActions();
+  const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   const [editing, setEditing] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
 
   const isUnsorted = activeCourseId === UNSORTED_COURSE_ID;
   const course = isUnsorted ? undefined : courses.find((c) => c.id === activeCourseId);
   const docs = useMemo(
     () => files.filter((f) => (isUnsorted ? !f.courseId : f.courseId === activeCourseId)),
     [files, isUnsorted, activeCourseId]
+  );
+  const shownDocs = useMemo(
+    () => (typeFilter ? docs.filter((d) => docTypeOf(d) === typeFilter) : docs),
+    [docs, typeFilter]
   );
 
   const goBack = () => {
@@ -92,21 +100,24 @@ export function CourseScreen() {
           onAction={course ? handleScan : undefined}
         />
       ) : (
-        <FlatList
-          data={docs}
-          keyExtractor={(doc) => doc.id}
-          contentContainerStyle={[styles.listContent, { paddingBottom: 96 + insets.bottom }]}
-          renderItem={({ item }) => (
-            <FileRow
-              doc={item}
-              selected={selection.includes(item.id)}
-              selectionMode={selMode}
-              onPress={() => handlePressRow(item)}
-              onLongPress={() => handleLongPress(item)}
-              onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
-            />
-          )}
-        />
+        <>
+          <DocTypeFilterChips docs={docs} value={typeFilter} onChange={setTypeFilter} />
+          <FlatList
+            data={shownDocs}
+            keyExtractor={(doc) => doc.id}
+            contentContainerStyle={[styles.listContent, { paddingBottom: 96 + insets.bottom }]}
+            renderItem={({ item }) => (
+              <FileRow
+                doc={item}
+                selected={selection.includes(item.id)}
+                selectionMode={selMode}
+                onPress={() => handlePressRow(item)}
+                onLongPress={() => handleLongPress(item)}
+                onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
+              />
+            )}
+          />
+        </>
       )}
 
       {selMode ? (
@@ -124,7 +135,7 @@ export function CourseScreen() {
       ) : null}
 
       {course ? <CourseEditorSheet visible={editing} course={course} onClose={() => setEditing(false)} /> : null}
-      {signingUi}
+      {overlays}
     </SafeAreaView>
   );
 }

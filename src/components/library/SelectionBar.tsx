@@ -4,7 +4,7 @@ import { spacing, useTheme } from '../../theme';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import type { LibraryDocument } from '../../types/models';
 
-export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign';
+export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign' | 'type';
 
 type Tool = { id: SelectionToolId; label: string; icon: keyof typeof Ionicons.glyphMap };
 
@@ -13,6 +13,7 @@ const TOOLS: Tool[] = [
   { id: 'split', label: 'Split', icon: 'git-branch-outline' },
   { id: 'compress', label: 'Compress', icon: 'contract-outline' },
   { id: 'sign', label: 'Sign', icon: 'create-outline' },
+  { id: 'type', label: 'Set type', icon: 'pricetag-outline' },
 ];
 
 // Merge/Split/Compress/Sign all rebuild a PDF from doc.pages' raster images - meaningless (and, for
