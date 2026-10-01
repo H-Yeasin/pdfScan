@@ -5,6 +5,7 @@ import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TimetableEditor } from '../components/courses/TimetableEditor';
 import { LanguageRow } from '../components/settings/LanguageRow';
+import { NameTemplateSection } from '../components/settings/NameTemplateSection';
 import { ProfileSection } from '../components/settings/ProfileSection';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
@@ -57,6 +58,8 @@ export function SettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <ProfileSection />
+
+        <NameTemplateSection />
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Appearance</Text>

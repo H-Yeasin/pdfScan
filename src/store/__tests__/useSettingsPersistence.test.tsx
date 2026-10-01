@@ -83,3 +83,18 @@ describe('student profile', () => {
     expect(ctx().state.settings.profile).toEqual({ name: '', roll: '', section: '', institution: '' });
   });
 });
+
+describe('naming template', () => {
+  it('survives a restart, and an empty stored template means the default', async () => {
+    const first = await mount();
+    expect(first().state.settings.nameTemplate).toBe('{roll}_{name}_{course}_{type}{n}');
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_NAME_TEMPLATE', template: '{course}_{title}' });
+    });
+    await flush();
+    expect((await mount())().state.settings.nameTemplate).toBe('{course}_{title}');
+
+    await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin', nameTemplate: ' ' }));
+    expect((await mount())().state.settings.nameTemplate).toBe('{roll}_{name}_{course}_{type}{n}');
+  });
+});

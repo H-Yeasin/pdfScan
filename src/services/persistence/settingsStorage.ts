@@ -18,6 +18,8 @@ export type PersistedSettings = {
   lastOpened?: { id: string; at: number } | null;
   // Optional: settings saved before §4 S1 don't have it (see normalizeProfile).
   profile?: StudentProfile;
+  // Optional: added in §4 S2.
+  nameTemplate?: string;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

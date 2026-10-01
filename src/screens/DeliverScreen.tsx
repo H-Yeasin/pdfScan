@@ -26,7 +26,8 @@ import { historyUris } from '../store/pageHistory';
 import { CourseChips } from '../components/courses/CourseChips';
 import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
-import { defaultDocTypeFor } from '../services/courses/docTypes';
+import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes';
+import { suggestName } from '../services/submit/naming';
 import { useAppState } from '../store/AppStateContext';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -65,13 +66,13 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, format, quality, more, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { name, nameEdited, format, quality, more, exportCopy, academicConfig, layoutMode } = state.deliver;
   // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
   const { courseId, suggestions, automatic } = useFilingCourse();
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel, ocrScript } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, ocrScript, profile, nameTemplate } = state.settings;
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
@@ -90,11 +91,28 @@ export function DeliverScreen() {
     [dispatch]
   );
 
+  // The name from the naming template (e.g. 2021331045_Rahim_CSE101_HW3). It follows the course
+  // and type, since `{n}` counts per course and type, until the student types a name of their own.
+  const files = state.library.files;
+  const course = useMemo(() => courses.find((c) => c.id === courseId), [courses, courseId]);
+  const firstPageText = pages[0]?.ocr?.text;
+  const suggestedName = useMemo(
+    () =>
+      suggestName(nameTemplate, {
+        profile,
+        course,
+        docType,
+        n: nextTypeNumber(files, courseId ?? undefined, docType),
+        date: new Date(),
+        title: firstOcrLine(firstPageText),
+      }) || defaultName(),
+    [nameTemplate, profile, course, courseId, docType, files, firstPageText]
+  );
+
   useEffect(() => {
-    if (name || pages.length === 0) return;
-    const detected = firstOcrLine(pages[0]?.ocr?.text);
-    dispatch({ type: 'deliver/SET_NAME', name: detected ?? defaultName() });
-  }, [name, pages, dispatch]);
+    if (nameEdited || pages.length === 0 || name === suggestedName) return;
+    dispatch({ type: 'deliver/SET_AUTO_NAME', name: suggestedName });
+  }, [name, nameEdited, suggestedName, pages.length, dispatch]);
 
   const sizeEstimate = useMemo(() => estimateSizeBytes(pages, quality), [pages, quality]);
 
@@ -218,7 +236,7 @@ export function DeliverScreen() {
           layout: page.layout,
         }));
 
-        const finalName = name.trim() || defaultName();
+        const finalName = name.trim() || suggestedName;
         const haystack = buildSearchHaystack(finalName, libraryPages);
 
         const doc: LibraryDocument = {
@@ -289,6 +307,7 @@ export function DeliverScreen() {
       quality,
       format,
       name,
+      suggestedName,
       courseId,
       courseName,
       docType,
@@ -318,7 +337,7 @@ export function DeliverScreen() {
         <NameField
           value={name}
           onChange={(value) => dispatch({ type: 'deliver/SET_NAME', name: value })}
-          helperText="Pre-filled from the OCR-detected title."
+          helperText={nameEdited ? undefined : 'From your naming template in Settings.'}
         />
 
         <View>

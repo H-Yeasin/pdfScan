@@ -3,6 +3,9 @@ import type { AcademicConfig, LayoutMode } from '../../services/pdf/pdfService';
 
 export type DeliverState = {
   name: string;
+  // False while `name` is the one suggested from the naming template, which then follows the
+  // course and type; true once the student types, after which the name is left alone.
+  nameEdited: boolean;
   format: DocFormat;
   quality: number; // 1-5
   more: boolean;
@@ -27,6 +30,7 @@ export type DeliverState = {
 
 export const initialDeliverState: DeliverState = {
   name: '',
+  nameEdited: false,
   format: 'PDF',
   quality: 3,
   more: false,
@@ -39,7 +43,10 @@ export const initialDeliverState: DeliverState = {
 };
 
 export type DeliverAction =
+  // Typed by the student.
   | { type: 'deliver/SET_NAME'; name: string }
+  // Suggested from the naming template (submit/naming.suggestName).
+  | { type: 'deliver/SET_AUTO_NAME'; name: string }
   | { type: 'deliver/SET_FORMAT'; format: DocFormat }
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/TOGGLE_MORE' }
@@ -55,7 +62,9 @@ export type DeliverAction =
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
   switch (action.type) {
     case 'deliver/SET_NAME':
-      return { ...state, name: action.name };
+      return { ...state, name: action.name, nameEdited: true };
+    case 'deliver/SET_AUTO_NAME':
+      return state.nameEdited ? state : { ...state, name: action.name };
     case 'deliver/SET_FORMAT':
       return { ...state, format: action.format };
     case 'deliver/SET_QUALITY':

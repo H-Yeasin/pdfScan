@@ -7,9 +7,18 @@ type NameFieldProps = {
   helperText?: string;
   label?: string;
   placeholder?: string;
+  // For callers that insert text at the cursor (the naming template's token chips).
+  onSelectionChange?: (selection: { start: number; end: number }) => void;
 };
 
-export function NameField({ value, onChange, helperText, label = 'Name', placeholder = 'Untitled scan' }: NameFieldProps) {
+export function NameField({
+  value,
+  onChange,
+  helperText,
+  label = 'Name',
+  placeholder = 'Untitled scan',
+  onSelectionChange,
+}: NameFieldProps) {
   const { tokens } = useTheme();
 
   return (
@@ -18,6 +27,7 @@ export function NameField({ value, onChange, helperText, label = 'Name', placeho
       <TextInput
         value={value}
         onChangeText={onChange}
+        onSelectionChange={onSelectionChange ? (event) => onSelectionChange(event.nativeEvent.selection) : undefined}
         style={[
           styles.input,
           { borderColor: tokens.edge, backgroundColor: tokens.surface, color: tokens.ink },

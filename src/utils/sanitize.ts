@@ -35,3 +35,19 @@ export function sanitizeFolderSegment(rawName: string): string {
     .replace(EDGE_DOTS_OR_SPACE, '')
     .toLowerCase();
 }
+
+const FILE_NAME_MAX_LENGTH = 80;
+
+// Turns a document name into a file name the receiving app (Gmail, Drive, an LMS upload form)
+// accepts as is: no path separators, no characters Windows forbids, no control characters, at
+// most 80 characters. Unlike sanitizeFolderSegment it keeps the case, since the teacher reads
+// this name. Returns '' if nothing safe survives; callers pick their own fallback.
+export function sanitizeFileName(rawName: string): string {
+  return stripControlChars(rawName)
+    .replace(PATH_SEPARATORS, '-')
+    .replace(RESERVED_CHARS, '')
+    .replace(WHITESPACE_RUNS, ' ')
+    .replace(EDGE_DOTS_OR_SPACE, '')
+    .slice(0, FILE_NAME_MAX_LENGTH)
+    .replace(EDGE_DOTS_OR_SPACE, '');
+}

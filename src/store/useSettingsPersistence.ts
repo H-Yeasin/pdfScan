@@ -40,6 +40,10 @@ export function useSettingsPersistence() {
           dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: opened });
         }
         dispatch({ type: 'settings/SET_PROFILE', profile: normalizeProfile(settings.profile) });
+        // An emptied template would name nothing; the default is the better reading of it.
+        if (typeof settings.nameTemplate === 'string' && settings.nameTemplate.trim()) {
+          dispatch({ type: 'settings/SET_NAME_TEMPLATE', template: settings.nameTemplate });
+        }
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -64,6 +68,7 @@ export function useSettingsPersistence() {
       lastCaptureMode: state.settings.lastCaptureMode,
       lastOpened: state.settings.lastOpened,
       profile: state.settings.profile,
+      nameTemplate: state.settings.nameTemplate,
     });
   }, [
     loaded,
@@ -78,5 +83,6 @@ export function useSettingsPersistence() {
     state.settings.lastCaptureMode,
     state.settings.lastOpened,
     state.settings.profile,
+    state.settings.nameTemplate,
   ]);
 }

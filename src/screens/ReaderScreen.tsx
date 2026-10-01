@@ -21,7 +21,7 @@ import {
   promoteExternalToLibrary,
 } from '../services/persistence/libraryOperations';
 import { ensureDocumentPdf } from '../services/pdf/pdfService';
-import { printDocument, printFileUri, shareDocument, shareFileUri } from '../services/sharing/shareService';
+import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { canFindInDoc, canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
@@ -166,7 +166,10 @@ export function ReaderScreen() {
         if (external) await printFileUri(external.uri);
         else if (doc) await printDocument(doc);
       } else if (id === 'export') {
-        if (pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
+        // A library PDF is shared under the document's name, not as `document.pdf` (see
+        // shareAs); an external file already has its own name.
+        if (external && pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
+        else if (pdfUri) await shareAs(pdfUri, shareFileName(title, 'pdf'), 'application/pdf');
       } else if (id === 'sign') {
         if (!doc || !signVisible) return;
         if (doc.format === 'PDF') {

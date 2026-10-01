@@ -1,5 +1,6 @@
 import { getCaptureModeSpec } from '../../services/capture/captureModes';
 import type { CaptureModeSpec } from '../../services/capture/captureModes';
+import { DEFAULT_NAME_TEMPLATE } from '../../services/submit/naming';
 import { EMPTY_PROFILE } from '../../services/submit/profile';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 
@@ -28,6 +29,8 @@ export type SettingsState = {
   lastOpened: { id: string; at: number } | null;
   // Name, roll, section and institution for §4's file names, cover pages and footers.
   profile: StudentProfile;
+  // How Deliver names a new document (services/submit/naming.ts). S6 adds a per-course override.
+  nameTemplate: string;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -42,6 +45,7 @@ export const initialSettingsState: SettingsState = {
   scannerUnavailable: false,
   lastOpened: null,
   profile: EMPTY_PROFILE,
+  nameTemplate: DEFAULT_NAME_TEMPLATE,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -67,7 +71,8 @@ export type SettingsAction =
   | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
   | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
   // A partial patch, so each profile field can be edited on its own.
-  | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> };
+  | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> }
+  | { type: 'settings/SET_NAME_TEMPLATE'; template: string };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -93,6 +98,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, lastOpened: action.lastOpened };
     case 'settings/SET_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.profile } };
+    case 'settings/SET_NAME_TEMPLATE':
+      return { ...state, nameTemplate: action.template };
     default:
       return state;
   }
