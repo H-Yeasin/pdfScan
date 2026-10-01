@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdjustPanel } from '../components/review/AdjustPanel';
 import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
-import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
 import { FilteredPreview } from '../components/review/FilteredPreview';
+import { FilterStrip } from '../components/review/FilterStrip';
 import { FilterOptionsPanel } from '../components/review/FilterOptionsPanel';
 import { GridPagesModal } from '../components/review/GridPagesModal';
 import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
@@ -30,7 +30,7 @@ import { drawAcademicStamp, hasContentPageStamp } from '../services/pdf/academic
 import { applySignatureToPage } from '../services/signature/signatureCompositeService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
-import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
 import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage } from '../types/models';
 
@@ -47,14 +47,18 @@ export function ReviewScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages, processingStatus } = state.capture;
-  const { sel, ocrRunning } = state.review;
+  const { sel, ocrRunning, history } = state.review;
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
   const scanProcessing = processingStatus === 'scanning' || processingStatus === 'processing';
   const { academicConfig } = state.deliver;
   const [cropTarget, setCropTarget] = useState<string | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
   const [gridOpen, setGridOpen] = useState(false);
-  const [applyToAll, setApplyToAll] = useState(false);
+  // Set after a filter, option or slider change on one page of a multi-page scan, to offer
+  // "Apply to all pages" right where the change was made. Cleared on page change or apply.
+  const [offerApplyAll, setOfferApplyAll] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [mergeCrop, setMergeCrop] = useState<MergeCropState>(null);
@@ -68,7 +72,10 @@ export function ReviewScreen() {
   // Slider values while a drag is in progress. Only the preview sees them; the store gets the
   // final values from handleAdjustCommit, which clears this.
   const [liveAdjust, setLiveAdjust] = useState<AdjustValues | null>(null);
-  useEffect(() => setLiveAdjust(null), [selectedPage?.id]);
+  useEffect(() => {
+    setLiveAdjust(null);
+    setOfferApplyAll(false);
+  }, [selectedPage?.id]);
 
   // Scanned pages arrive with stats measured at ingest; gallery imports, merged halves and pages
   // whose image changed (crop, rotate, sign - the reducer drops stale stats) are measured here, once,
@@ -143,37 +150,63 @@ export function ReviewScreen() {
       const nextLength = pages.length - 1;
       const nextSel = Math.max(0, Math.min(sel, nextLength - 1));
       dispatch({ type: 'review/SELECT_PAGE', index: nextSel });
-      dispatch({ type: 'ui/SHOW_SNACK', msg: `Page removed · ${nextLength} left` });
+      dispatch({
+        type: 'ui/SHOW_SNACK',
+        msg: `Page removed · ${nextLength} left`,
+        action: 'Undo',
+        onAction: () => dispatch({ type: 'review/UNDO' }),
+      });
     },
     [dispatch, pages, sel]
   );
 
   const handleEnhanceChange = useCallback(
     (enhance: EnhanceMode) => {
-      if (!selectedPage) return;
-      if (applyToAll) dispatch({ type: 'capture/SET_ALL_PAGES_ENHANCE', enhance });
-      else dispatch({ type: 'capture/SET_PAGE_ENHANCE', id: selectedPage.id, enhance });
+      if (!selectedPage || enhance === selectedPage.enhance) return;
+      dispatch({ type: 'capture/SET_PAGE_ENHANCE', id: selectedPage.id, enhance });
+      setOfferApplyAll(multiPage);
     },
-    [dispatch, selectedPage, applyToAll]
+    [dispatch, selectedPage, multiPage]
   );
 
   const handleFilterOptionsChange = useCallback(
     (options: FilterOptions) => {
       if (!selectedPage) return;
-      dispatch({ type: 'capture/SET_FILTER_OPTIONS', id: applyToAll ? null : selectedPage.id, options });
+      dispatch({ type: 'capture/SET_FILTER_OPTIONS', id: selectedPage.id, options });
+      setOfferApplyAll(multiPage);
     },
-    [dispatch, selectedPage, applyToAll]
+    [dispatch, selectedPage, multiPage]
   );
 
   const handleAdjustCommit = useCallback(
     (adjust: AdjustValues) => {
       if (!selectedPage) return;
-      if (applyToAll) dispatch({ type: 'capture/SET_ALL_PAGES_ADJUST', adjust });
-      else dispatch({ type: 'capture/SET_PAGE_ADJUST', id: selectedPage.id, adjust });
+      dispatch({ type: 'capture/SET_PAGE_ADJUST', id: selectedPage.id, adjust });
       setLiveAdjust(null);
+      setOfferApplyAll(multiPage);
     },
-    [dispatch, selectedPage, applyToAll]
+    [dispatch, selectedPage, multiPage]
   );
+
+  // Copies this page's whole look (filter, its options, sliders) to every page as one undo step,
+  // and remembers the filter as this capture mode's default for the next scan.
+  const handleApplyToAll = useCallback(() => {
+    if (!selectedPage) return;
+    dispatch({
+      type: 'capture/APPLY_LOOK_TO_ALL',
+      enhance: selectedPage.enhance,
+      adjust: selectedPage.adjust,
+      filterOptions: selectedPage.filterOptions,
+    });
+    dispatch({ type: 'settings/SET_DEFAULT_ENHANCE', mode: state.capture.mode, enhance: selectedPage.enhance });
+    dispatch({
+      type: 'ui/SHOW_SNACK',
+      msg: `Applied to ${pages.length} pages`,
+      action: 'Undo',
+      onAction: () => dispatch({ type: 'review/UNDO' }),
+    });
+    setOfferApplyAll(false);
+  }, [dispatch, selectedPage, state.capture.mode, pages.length]);
 
   const goPrevPage = useCallback(() => {
     if (sel > 0) dispatch({ type: 'review/SELECT_PAGE', index: sel - 1 });
@@ -268,13 +301,17 @@ export function ReviewScreen() {
       const firstResult = mergeCrop.firstResult;
       if (!firstResult) return;
       const merged = await compositeHalfPages(firstResult, cropped);
+      const firstPage = pages.find((p) => p.id === mergeCrop.ids[0]);
       const newPage: SessionPage = {
         id: createId('page'),
         uri: merged.uri,
         width: merged.width,
         height: merged.height,
         rotation: 0,
-        enhance: 'auto',
+        // The merged page keeps the first half's look rather than resetting to a default.
+        enhance: firstPage?.enhance ?? 'auto',
+        adjust: firstPage?.adjust,
+        filterOptions: firstPage?.filterOptions,
       };
       const insertIndex = pages.findIndex((p) => p.id === mergeCrop.ids[0]);
 
@@ -366,6 +403,24 @@ export function ReviewScreen() {
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>Review</Text>
         <View style={styles.headerRight}>
+          <Pressable
+            style={styles.historyButton}
+            onPress={() => dispatch({ type: 'review/UNDO' })}
+            disabled={!canUndo}
+            hitSlop={4}
+            accessibilityLabel="Undo"
+          >
+            <Ionicons name="arrow-undo-outline" size={20} color={canUndo ? tokens.ink : tokens.edge} />
+          </Pressable>
+          <Pressable
+            style={styles.historyButton}
+            onPress={() => dispatch({ type: 'review/REDO' })}
+            disabled={!canRedo}
+            hitSlop={4}
+            accessibilityLabel="Redo"
+          >
+            <Ionicons name="arrow-redo-outline" size={20} color={canRedo ? tokens.ink : tokens.edge} />
+          </Pressable>
           {multiPage && (
             <Pressable
               style={[styles.gridToggle, { borderColor: tokens.edge }]}
@@ -422,6 +477,8 @@ export function ReviewScreen() {
           }
           onCommitPrev={goPrevPage}
           onCommitNext={goNextPage}
+          onCompareStart={() => setComparing(true)}
+          onCompareEnd={() => setComparing(false)}
         />
         {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
@@ -445,18 +502,16 @@ export function ReviewScreen() {
       )}
 
       <View style={styles.enhanceWrap}>
-        {(multiPage || adjustable) && (
+        {(offerApplyAll || adjustable) && (
           <View style={styles.enhanceHeaderRow}>
-            {multiPage && (
-              <Pressable style={styles.headerToggle} onPress={() => setApplyToAll((v) => !v)} hitSlop={4}>
-                <Ionicons
-                  name={applyToAll ? 'checkbox' : 'square-outline'}
-                  size={18}
-                  color={applyToAll ? tokens.accent : tokens.muted}
-                />
-                <Text style={[styles.headerToggleLabel, { color: applyToAll ? tokens.accent : tokens.muted }]}>
-                  Apply to all pages
-                </Text>
+            {offerApplyAll && (
+              <Pressable
+                style={[styles.applyAllButton, { backgroundColor: tokens.accentSoft }]}
+                onPress={handleApplyToAll}
+                hitSlop={4}
+              >
+                <Ionicons name="copy-outline" size={15} color={tokens.accentInk} />
+                <Text style={[styles.headerToggleLabel, { color: tokens.accentInk }]}>Apply to all pages</Text>
               </Pressable>
             )}
             {adjustable && (
@@ -472,7 +527,7 @@ export function ReviewScreen() {
         {adjustOpen && adjustable && (
           <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} onLive={setLiveAdjust} />
         )}
-        <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
+        <FilterStrip page={selectedPage} value={selectedPage.enhance} onChange={handleEnhanceChange} />
         <FilterOptionsPanel
           mode={selectedPage.enhance}
           value={selectedPage.filterOptions}
@@ -648,6 +703,21 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: spacing.md,
     marginBottom: spacing.sm,
+  },
+  historyButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    height: 30,
+    borderRadius: radii.full,
+    marginRight: 'auto',
   },
   headerToggle: {
     flexDirection: 'row',

@@ -30,6 +30,8 @@ export type CaptureAction =
   | { type: 'capture/SET_ALL_PAGES_ENHANCE'; enhance: EnhanceMode }
   | { type: 'capture/SET_PAGE_ADJUST'; id: string; adjust: AdjustValues }
   | { type: 'capture/SET_ALL_PAGES_ADJUST'; adjust: AdjustValues }
+  // Review's "Apply to all pages": one page's whole look onto every page, as one undo step.
+  | { type: 'capture/APPLY_LOOK_TO_ALL'; enhance: EnhanceMode; adjust: AdjustValues | undefined; filterOptions: FilterOptions | undefined }
   // Merged into each page's existing filterOptions; id null means every page (apply to all).
   | { type: 'capture/SET_FILTER_OPTIONS'; id: string | null; options: FilterOptions }
   | { type: 'capture/UPDATE_PAGE'; id: string; patch: Partial<SessionPage> }
@@ -73,6 +75,11 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       return {
         ...state,
         pages: state.pages.map((p) => ({ ...p, adjust: action.adjust })),
+      };
+    case 'capture/APPLY_LOOK_TO_ALL':
+      return {
+        ...state,
+        pages: state.pages.map((p) => ({ ...p, enhance: action.enhance, adjust: action.adjust, filterOptions: action.filterOptions })),
       };
     case 'capture/SET_FILTER_OPTIONS':
       return {

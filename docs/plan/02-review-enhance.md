@@ -261,7 +261,41 @@ Status: done (see git log); the Filter Lab check (3 whiteboards, 2 blackboards) 
 photos come out readable with a white background.
 
 ### E6 · Review UX: filter strip, undo, smarter apply-to-all *(M)*
-Status: todo
+Status: done (see git log); not yet tried on a device. As built (built before F5 and C1):
+- `components/review/FilterStrip.tsx` replaces `EnhanceSegmented`, which is deleted. Each
+  thumbnail is `drawFiltered` on a 240 px decode from `loadThumbImage`, a second LRU in
+  `previewImageCache`, so thumbnails never evict the previews. There's no F5 thumbnail file yet.
+  `FilterOptionsPanel` (E4/E5) sits under the strip.
+- Apply to all: the toggle is gone. After a filter, option or slider change on a multi-page scan,
+  an "Apply to all pages" button appears. It dispatches `capture/APPLY_LOOK_TO_ALL` (filter,
+  options and sliders, as one history entry), sets `settings/SET_DEFAULT_ENHANCE` for the capture
+  mode, and shows the snack "Applied to N pages · Undo". Deleting a page also offers Undo.
+- Undo/redo: `store/pageHistory.ts` holds pure functions; the state is `review.history`.
+  Recording, undo and redo live in **appReducer**, not `reviewSlice`, because they read the
+  history and rewrite `capture.pages` in one step. Every page-editing capture action records
+  automatically, and no-op edits are skipped.
+  - `fields` entries put back only the edited fields (`enhance`, `adjust`, `filterOptions`,
+    `rotation`, `uri`, `width`, `height`, `cropRect`), so OCR results and later-added pages
+    survive an undo.
+  - `pages` entries (merge, delete) restore the page list.
+  - Old image files stay until Deliver's end-of-session sweep, which now includes `historyUris`.
+    `CLEAR_PAGES` and `review/RESET` clear the history.
+- `settings.defaultEnhanceByMode` is persisted in `app:settings`, and unknown filter IDs are
+  dropped on load. New pages (scanner pipeline, gallery import) start with
+  `defaultEnhanceFor(settings, mode)`, whose built-in fallback is `auto` until C1 supplies
+  per-mode defaults. Merged pages keep the first half's look.
+- Crop loupe: a 2.5× magnifier above the finger (below near the top edge) with a crosshair. It's
+  a reanimated view holding the same `Image`, not a Skia `Image`, so it follows the drag on the
+  UI thread.
+- Compare also works by long-pressing the preview (280 ms; it always ends on release).
+- Scratch test against the compiled `appReducer` (turn it into a jest test in F1), 22 checks:
+  - push, no-op edits skipped, OCR not recorded, cap at 20;
+  - apply-to-all is one entry, and one undo reverts all 10 pages;
+  - redo, and redo cleared by a new edit;
+  - undo of a crop restores the old uri and size, and the undone file is tracked for the sweep;
+  - undo of delete and merge;
+  - `CLEAR_PAGES` clears the history.
+  The persistence round-trip of `defaultEnhanceByMode` isn't covered (it needs AsyncStorage).
 
 - Replace `EnhanceSegmented` with `components/review/FilterStrip.tsx`: a horizontal row of
   live thumbnails (each one the current page through that filter, drawn from the F5 thumbnail

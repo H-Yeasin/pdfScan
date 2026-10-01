@@ -13,6 +13,13 @@ import type { Point } from '../../services/enhance/perspective';
 
 const HANDLE_SIZE = 28;
 const HANDLE_HIT_SLOP = 16;
+// Magnifier shown while a corner is dragged: the finger covers exactly the spot being placed.
+const LOUPE_SIZE = 112;
+const LOUPE_ZOOM = 2.5;
+const LOUPE_GAP = 36; // between the finger's point and the loupe's edge
+const LOUPE_BORDER = 3;
+// Children are laid out inside the border, so the visual centre is at half the INNER size.
+const LOUPE_CENTER = (LOUPE_SIZE - LOUPE_BORDER * 2) / 2;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
@@ -66,17 +73,47 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, stepLabel, onCon
   const bottomRight = useCornerPoint(displayWidth, displayHeight);
   const bottomLeft = useCornerPoint(0, displayHeight);
 
+  // The dragged corner's position, mirrored for the loupe (only one corner moves at a time).
+  const loupeVisible = useSharedValue(0);
+  const loupeX = useSharedValue(0);
+  const loupeY = useSharedValue(0);
+
   const makeCornerPan = (corner: Corner) =>
     Gesture.Pan()
       .hitSlop(HANDLE_HIT_SLOP)
       .onStart(() => {
         corner.startX.value = corner.x.value;
         corner.startY.value = corner.y.value;
+        loupeX.value = corner.x.value;
+        loupeY.value = corner.y.value;
+        loupeVisible.value = 1;
       })
       .onUpdate((e) => {
         corner.x.value = clamp(corner.startX.value + e.translationX, 0, displayWidth);
         corner.y.value = clamp(corner.startY.value + e.translationY, 0, displayHeight);
+        loupeX.value = corner.x.value;
+        loupeY.value = corner.y.value;
+      })
+      .onFinalize(() => {
+        loupeVisible.value = 0;
       });
+
+  // Above the finger, or below it when the corner is near the top edge.
+  const loupeStyle = useAnimatedStyle(() => {
+    const above = loupeY.value - LOUPE_GAP - LOUPE_SIZE;
+    return {
+      opacity: loupeVisible.value,
+      left: loupeX.value - LOUPE_SIZE / 2,
+      top: above >= -LOUPE_SIZE / 2 ? above : loupeY.value + LOUPE_GAP,
+    };
+  });
+  // The zoomed image is shifted so the corner's point sits at the loupe's centre.
+  const loupeImageStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: LOUPE_CENTER - loupeX.value * LOUPE_ZOOM },
+      { translateY: LOUPE_CENTER - loupeY.value * LOUPE_ZOOM },
+    ],
+  }));
 
   const topLeftPan = makeCornerPan(topLeft);
   const topRightPan = makeCornerPan(topRight);
@@ -155,6 +192,16 @@ export function CropOverlay({ uri, naturalWidth, naturalHeight, stepLabel, onCon
           <GestureDetector gesture={bottomLeftPan}>
             <Animated.View style={[styles.handle, { borderColor: tokens.accent }, bottomLeftHandleStyle]} />
           </GestureDetector>
+
+          <Animated.View style={[styles.loupe, { borderColor: tokens.accent }, loupeStyle]} pointerEvents="none">
+            <Animated.Image
+              source={{ uri }}
+              style={[{ width: displayWidth * LOUPE_ZOOM, height: displayHeight * LOUPE_ZOOM }, loupeImageStyle]}
+              resizeMode="stretch"
+            />
+            <View style={[styles.crosshairH, { backgroundColor: tokens.accent }]} />
+            <View style={[styles.crosshairV, { backgroundColor: tokens.accent }]} />
+          </Animated.View>
         </View>
 
         {stepLabel && <Text style={styles.stepLabel}>{stepLabel}</Text>}
@@ -196,6 +243,29 @@ const styles = StyleSheet.create({
     borderRadius: HANDLE_SIZE / 2,
     borderWidth: 4,
     backgroundColor: '#fff',
+  },
+  loupe: {
+    position: 'absolute',
+    width: LOUPE_SIZE,
+    height: LOUPE_SIZE,
+    borderRadius: LOUPE_SIZE / 2,
+    borderWidth: LOUPE_BORDER,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  crosshairH: {
+    position: 'absolute',
+    left: LOUPE_CENTER - 10,
+    top: LOUPE_CENTER - 1,
+    width: 20,
+    height: 2,
+  },
+  crosshairV: {
+    position: 'absolute',
+    left: LOUPE_CENTER - 1,
+    top: LOUPE_CENTER - 10,
+    width: 2,
+    height: 20,
   },
   stepLabel: {
     color: '#fff',

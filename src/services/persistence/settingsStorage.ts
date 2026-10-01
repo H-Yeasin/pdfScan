@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { OcrScript } from '../../types/models';
+import type { CaptureMode, EnhanceMode, OcrScript } from '../../types/models';
 import type { ThemePref } from '../../theme';
 
 const SETTINGS_KEY = 'app:settings';
@@ -10,6 +10,8 @@ export type PersistedSettings = {
   ocrScript: OcrScript;
   androidExportFolderUri?: string | null;
   androidExportFolderLabel?: string | null;
+  // Optional: settings saved before E6 don't have it.
+  defaultEnhanceByMode?: Partial<Record<CaptureMode, EnhanceMode>>;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

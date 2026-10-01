@@ -19,6 +19,7 @@ import { buildPdfFromPages, estimateSizeBytes } from '../services/pdf/pdfService
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { insertScannedDocument } from '../services/persistence/dbService';
 import { shareDocument } from '../services/sharing/shareService';
+import { historyUris } from '../store/pageHistory';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageOcr } from '../types/models';
@@ -152,6 +153,9 @@ export function DeliverScreen() {
         pages.forEach((page) => staleCacheUris.add(page.uri));
         bakedPages.forEach((page) => staleCacheUris.add(page.uri));
         libraryInputPages.forEach((page) => staleCacheUris.add(page.uri));
+        // Images only Review's undo history still points at (pre-crop/rotate/sign versions, merged
+        // halves) were kept alive for undo; the session ends here, so they go too.
+        historyUris(state.review.history).forEach((uri) => staleCacheUris.add(uri));
         cleanTemporaryCache(Array.from(staleCacheUris));
 
         const libraryPages: LibraryPage[] = libraryInputPages.map((page, i) => ({

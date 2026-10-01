@@ -22,7 +22,13 @@ type PagePeekCarouselProps = {
   currentContent: ReactNode | undefined;
   onCommitPrev: () => void;
   onCommitNext: () => void;
+  // Press-and-hold on the page itself shows the unfiltered original, like the Compare pill.
+  onCompareStart?: () => void;
+  onCompareEnd?: () => void;
 };
+
+const COMPARE_HOLD_MS = 280;
+const noop = () => {};
 
 // Drives an interactive, drag-following page transition (like the Photos app): the current page's
 // image slides with the finger while a raw peek of the neighboring page slides in from that edge.
@@ -30,7 +36,15 @@ type PagePeekCarouselProps = {
 // hinting that the page is swipeable before the user touches it.
 // Only the "current" panel gets the filtered/stamped `currentContent` - the peek panels use the
 // page's raw (already-captured) uri, same cheap source ThumbnailStrip renders for thumbnails.
-export function PagePeekCarousel({ pages, sel, currentContent, onCommitPrev, onCommitNext }: PagePeekCarouselProps) {
+export function PagePeekCarousel({
+  pages,
+  sel,
+  currentContent,
+  onCommitPrev,
+  onCommitNext,
+  onCompareStart = noop,
+  onCompareEnd = noop,
+}: PagePeekCarouselProps) {
   const [width, setWidth] = useState(0);
   const dragX = useSharedValue(0);
   const isAnimating = useSharedValue(false);
@@ -82,7 +96,20 @@ export function PagePeekCarousel({ pages, sel, currentContent, onCommitPrev, onC
       }
     });
 
-  const gesture = Gesture.Simultaneous(pagingPan, zoomGesture);
+  // Fails as soon as the finger travels (LongPress's own max distance), so it never fights paging,
+  // pinch or pan; onFinalize ends the comparison however the press ends.
+  const comparePress = Gesture.LongPress()
+    .minDuration(COMPARE_HOLD_MS)
+    .onStart(() => {
+      runOnJS(onCompareStart)();
+    })
+    .onFinalize(() => {
+      // Unconditional: after activation a drag cancels the press (success = false), and the
+      // comparison must still end. Ending one that never started is a no-op.
+      runOnJS(onCompareEnd)();
+    });
+
+  const gesture = Gesture.Simultaneous(pagingPan, zoomGesture, comparePress);
 
   // Once the parent has actually committed the new page (new `currentPage.id` landed via props),
   // snap the drag offset back to 0 with no animation - the pixels at the settled offset and the

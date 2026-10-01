@@ -9,6 +9,7 @@ import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { useAppState } from '../store/AppStateContext';
+import { defaultEnhanceFor } from '../store/slices/settingsSlice';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
 import type { SessionPage } from '../types/models';
@@ -20,6 +21,7 @@ export function CaptureScreen() {
   const { state, dispatch } = useAppState();
   const { pages, processingStatus } = state.capture;
   const { ocrScript } = state.settings;
+  const defaultEnhance = defaultEnhanceFor(state.settings, state.capture.mode);
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
   const hasAutoLaunched = useRef(false);
 
@@ -36,11 +38,11 @@ export function CaptureScreen() {
         width: asset.width,
         height: asset.height,
         rotation: 0,
-        enhance: 'auto',
+        enhance: defaultEnhance,
       }));
       dispatch({ type: 'capture/BULK_ADD_PAGES', pages: newPages });
     },
-    [dispatch]
+    [dispatch, defaultEnhance]
   );
 
   const handleImport = useCallback(async () => {
@@ -60,8 +62,8 @@ export function CaptureScreen() {
 
   const handleScan = useCallback(() => {
     if (busyScanning) return;
-    runNativeScannerPipeline(dispatch, ocrScript);
-  }, [busyScanning, dispatch, ocrScript]);
+    runNativeScannerPipeline(dispatch, ocrScript, defaultEnhance);
+  }, [busyScanning, dispatch, ocrScript, defaultEnhance]);
 
   useEffect(() => {
     if (hasAutoLaunched.current) return;

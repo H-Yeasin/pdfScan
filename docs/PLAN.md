@@ -111,7 +111,7 @@ Goal: handwriting and boards look like clean photocopies.
 - [x] E3 Shadow and lighting correction for every filter
 - [x] E4 Ink filter for handwritten notes (soft curve, fade ruled lines, keep pen colour)
 - [x] E5 Board filter for whiteboards, blackboards and slides
-- [ ] E6 Review UX: thumbnail filter strip, undo/redo, apply-to-all with undo, crop loupe
+- [x] E6 Review UX: thumbnail filter strip, undo/redo, apply-to-all with undo, crop loupe
 - [ ] E7 Blind benchmark against CamScanner and parameter tuning
 
 **Done when:** in side-by-side tests on 20 real student pages, our output is preferred over
