@@ -149,7 +149,22 @@ As built:
 one opens that page with the word highlighted in under 2 seconds (the §5 "done when").
 
 ### T3 · Copy and extract text *(S)*
-Status: todo
+Status: done in code (commit 4cdba0a).
+
+As built:
+- `expo-clipboard@~57.0.2` was not installed; added (native module: needs a new dev build).
+  Jest mock `src/test/mocks/expoClipboard.ts`.
+- `services/study/textSelection.ts`: `readingOrderTokens` (a line without word boxes is one
+  token), `tokenAt` (nearest token if none is under the point), `selectBetween`,
+  `selectionText`, `extractDocumentText`; `study/textExport.writeDocumentText` writes the .txt
+  to `cache/extract/`, shared with `shareAs` as `<doc name>.txt`.
+- `components/reader/PageCanvas.tsx`: plain React Native (Image + overlay views), not Skia.
+  Pinch and two-finger pan zoom the layer; one-finger drags and taps are converted to master
+  pixels by `study/canvasMath.ts` (tested both ways). Shows the display copy if there is one.
+- `components/reader/SelectTextSheet.tsx` (full-screen modal): no separate drag handles; starting
+  a drag on either end of the selection moves that end. Share uses React Native's `Share` (text).
+- Reader overflow (`OverflowSheet.showText`): Select text, Copy page text, Extract text (Copy /
+  Share .txt). On a 2-up sheet these act on its left page.
 
 - Reader overflow:
   - **Copy page text**: the current page's `ocr_text` (via `expo-clipboard`; check whether it

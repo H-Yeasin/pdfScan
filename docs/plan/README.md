@@ -14,7 +14,7 @@ code **when the section was planned**, and are kept as history.
 | §2 Review and enhance | [02-review-enhance.md](02-review-enhance.md) | E1–E7 | E1–E6 done. **E7 in progress:** the tooling is done; the benchmark needs real pages and raters. |
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | All done in code. Device checks open. |
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
-| §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T2 done. **Next: T3** (copy and extract text). T7 is for later (P4). |
+| §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T3 done. **Next: T4** (annotations). T7 is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | Planned (2026-10-02). L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | Planned (2026-10-02). R5 (SheetJS security fix) can go first; R6 waits for Pro. |
 | §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
@@ -63,6 +63,7 @@ lines here.
 | S8 Deadline reminders | 31c0083 | migration v7, `expo-notifications`, `submit/deadlines.ts`, `store/useDeadlines.ts` |
 | T1 Page mapping, word OCR | 0cfbddd | migration v9, `documents/pageMap.ts`, `pdfInfoBackfill.ts` |
 | T2 Page search, jump, highlight | 38e4fd8 | `dbService.searchPages`, `PageResults`, `reader.target` |
+| T3 Copy, extract, select text | 4cdba0a | `expo-clipboard`, `PageCanvas`, `study/textSelection.ts` |
 
 ## How the branches came together
 

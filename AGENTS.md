@@ -24,7 +24,7 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),
   `npm start`.
 - Typecheck: `npm run typecheck`. Tests: `npm test` (Jest, `jest-expo` preset, node env; mocks for
-  expo-file-system/expo-sqlite/expo-asset/expo-notifications/rn-mlkit-ocr in `src/test/mocks`). CI runs both.
+  expo-file-system/expo-sqlite/expo-asset/expo-notifications/expo-clipboard/rn-mlkit-ocr in `src/test/mocks`). CI runs both.
 
 ## Layout
 ```
