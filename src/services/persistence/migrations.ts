@@ -136,6 +136,14 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v5 (§4 S6): each course remembers how its work is submitted (size limit, cover, footer,
+    // paper, layout), as JSON (submit/preset.ts). NULL: not set up yet.
+    version: 5,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE courses ADD COLUMN submit_preset TEXT;');
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

@@ -1,3 +1,5 @@
+import type { SubmitPreset } from '../services/submit/preset';
+
 // Session-only filter IDs (the library stores baked pixels, so these can change freely). Each one
 // has exactly one FilterSpec in services/enhance/filters/registry.ts. 'bw' is the Sauvola
 // photocopy threshold (it was called 'document_scan' before E1; the old contrast-boost 'bw' is gone).
@@ -185,6 +187,9 @@ export type Course = {
   // Position in course lists; 0 first. Rewritten as a whole by library/REORDER_COURSES.
   sortOrder: number;
   createdAt: number;
+  // How work for this course is submitted (§4 S6); set by the first submit. Undefined: the app
+  // default (submit/preset.defaultSubmitPreset).
+  submitPreset?: SubmitPreset;
 };
 
 export type CourseColor =

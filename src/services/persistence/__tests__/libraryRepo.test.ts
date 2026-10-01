@@ -138,6 +138,25 @@ describe('courses and semesters', () => {
     expect(loaded.documents.find((d) => d.id === 'untyped')?.docType).toBeUndefined();
   });
 
+  it("keeps a course's submit preset, and changes to it (migration v5)", async () => {
+    const preset = {
+      sizeLimitBytes: 2_000_000,
+      coverTemplateId: 'assignment' as const,
+      footerPreset: 'namePages' as const,
+      border: false,
+      pageSize: 'Letter' as const,
+      layout: 'standard' as const,
+      nameTemplate: '{roll}_{course}_{type}{n}',
+    };
+    const before = { documents: [], semesters: [], timetable: [], courses: [courseIn('cse', 0)] };
+    await seed(before);
+    expect((await loadAll(await getDb())).courses[0].submitPreset).toBeUndefined();
+
+    const after = { ...before, courses: [{ ...before.courses[0], submitPreset: preset }] };
+    await syncLibrary(await getDb(), before, after);
+    expect((await loadAll(await getDb())).courses[0].submitPreset).toEqual(preset);
+  });
+
   it('archiveSemester archives the semester and only its courses', async () => {
     await seed({
       semesters: [fall, spring], timetable: [],

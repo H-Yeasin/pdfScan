@@ -16,6 +16,7 @@ import {
 import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { canSign } from '../../services/documents/formatCapabilities';
 import { useAppState } from '../../store/AppStateContext';
+import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { docTypeOf } from '../../services/courses/docTypes';
 import type { LibraryDocument } from '../../types/models';
 
@@ -45,6 +46,7 @@ export function useDocumentListActions() {
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const submit = useSubmitDocument();
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
 
@@ -73,6 +75,12 @@ export function useDocumentListActions() {
 
       if (id === 'type') {
         setTypePickerOpen(true);
+        return;
+      }
+
+      if (id === 'submit' && selectedDocs.length === 1) {
+        dispatch({ type: 'library/CLEAR_SELECTION' });
+        await submit(selectedDocs[0]);
         return;
       }
 
@@ -109,7 +117,7 @@ export function useDocumentListActions() {
         }
       }
     },
-    [selectedDocs, selection, dispatch, state.signature.saved]
+    [selectedDocs, selection, dispatch, state.signature.saved, submit]
   );
 
   const handleSignConfirm = useCallback(

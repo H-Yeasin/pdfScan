@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import { SIZE_LADDER } from '../capture/imageSpec';
 import { encodedBytes } from '../enhance/skiaEnhance';
-import { buildPdfFromPages, type AcademicConfig, type LayoutMode, type PageSizeId, type PdfSourcePage } from '../pdf/pdfService';
+import { buildPdfFromPages, type AcademicConfig, type BuildPdfOptions, type LayoutMode, type PageSizeId, type PdfSourcePage } from '../pdf/pdfService';
 
 // Upload forms count a megabyte as 1,000,000 bytes, so the limits here do too (unlike
 // utils/format.formatBytes, which divides by 1024 for storage sizes).
@@ -127,7 +127,8 @@ export async function buildPdfUnderLimit(
   limitBytes: number,
   academicConfig?: AcademicConfig,
   layoutMode: LayoutMode = 'standard',
-  pageSize: PageSizeId = 'A4'
+  pageSize: PageSizeId = 'A4',
+  options: BuildPdfOptions = {}
 ): Promise<SizedBuild> {
   const masterBytes = pages.map((page) => new File(page.uri).size);
   const sampled = samplePageIndexes(masterBytes);
@@ -145,7 +146,7 @@ export async function buildPdfUnderLimit(
 
   const start = await findLevel(measure, pages.length, overhead, limitBytes);
   return buildUnderLimit(
-    (level) => buildPdfFromPages(documentId, pages, level === 0 ? 'as-is' : SIZE_LADDER[level], academicConfig, layoutMode, pageSize),
+    (level) => buildPdfFromPages(documentId, pages, level === 0 ? 'as-is' : SIZE_LADDER[level], academicConfig, layoutMode, pageSize, options),
     start,
     limitBytes
   );

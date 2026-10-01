@@ -11,6 +11,7 @@ import type {
   TimetableSlot,
 } from '../../types/models';
 import { COURSE_COLORS, isCourseColor } from '../courses/palette';
+import { parseSubmitPreset, serializeSubmitPreset } from '../submit/preset';
 import { buildSearchHaystack } from '../search/searchService';
 import { fromStoredPath, toStoredPath } from './libraryFiles';
 
@@ -61,6 +62,7 @@ type CourseRow = {
   archived: number;
   sort_order: number;
   created_at: number;
+  submit_preset: string | null;
 };
 
 type SemesterRow = {
@@ -126,6 +128,7 @@ function rowToCourse(row: CourseRow): Course {
     archived: !!row.archived,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
+    submitPreset: parseSubmitPreset(row.submit_preset),
   };
 }
 
@@ -262,14 +265,14 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
 
 async function writeCourse(db: SQLiteDatabase, course: Course, conflict: 'upsert' | 'ignore'): Promise<void> {
   const insert = `INSERT INTO courses (id, name, code, color, emoji, teacher, semester_id, archived, sort_order,
-       created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       created_at, submit_preset)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const onConflict =
     conflict === 'ignore'
       ? 'ON CONFLICT (id) DO NOTHING'
       : `ON CONFLICT (id) DO UPDATE SET name = excluded.name, code = excluded.code, color = excluded.color,
            emoji = excluded.emoji, teacher = excluded.teacher, semester_id = excluded.semester_id,
-           archived = excluded.archived, sort_order = excluded.sort_order`;
+           archived = excluded.archived, sort_order = excluded.sort_order, submit_preset = excluded.submit_preset`;
   await db.runAsync(`${insert} ${onConflict}`, [
     course.id,
     course.name,
@@ -281,6 +284,7 @@ async function writeCourse(db: SQLiteDatabase, course: Course, conflict: 'upsert
     course.archived ? 1 : 0,
     course.sortOrder,
     course.createdAt,
+    serializeSubmitPreset(course.submitPreset),
   ]);
 }
 

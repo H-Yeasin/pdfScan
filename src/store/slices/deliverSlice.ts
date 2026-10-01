@@ -1,6 +1,7 @@
 import type { DocFormat, DocType } from '../../types/models';
 import type { AcademicConfig, LayoutMode } from '../../services/pdf/pdfService';
 import { defaultPageSize, type PageSizeId } from '../../services/pdf/pageSize';
+import { presetAcademicConfig, type SubmitPreset } from '../../services/submit/preset';
 
 export type DeliverState = {
   name: string;
@@ -33,6 +34,13 @@ export type DeliverState = {
   // Paper size of every PDF page (the 2-in-1 layout turns it landscape). Starts at the region's
   // usual paper; S6 makes it part of the course's preset.
   pageSize: PageSizeId;
+  // §4 S6: whose preset the options above came from. undefined until one is applied (each new
+  // session), null for Unsorted. Deliver re-applies when the filing course changes.
+  presetCourseId?: string | null;
+  // "Remember for CSE 101": option changes are saved to the course's preset.
+  rememberPreset: boolean;
+  // The course preset's file-name template, if it has its own (else settings.nameTemplate).
+  nameTemplate?: string;
 };
 
 export const initialDeliverState: DeliverState = {
@@ -49,6 +57,7 @@ export const initialDeliverState: DeliverState = {
   academicConfig: null,
   layoutMode: 'standard',
   pageSize: defaultPageSize(),
+  rememberPreset: true,
 };
 
 export type DeliverAction =
@@ -68,6 +77,10 @@ export type DeliverAction =
   | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/SET_LAYOUT_MODE'; layoutMode: LayoutMode }
   | { type: 'deliver/SET_PAGE_SIZE'; pageSize: PageSizeId }
+  // The filing course's preset (or the default) becomes the options.
+  | { type: 'deliver/APPLY_PRESET'; courseId: string | null; preset: SubmitPreset }
+  | { type: 'deliver/SET_REMEMBER_PRESET'; remember: boolean }
+  | { type: 'deliver/SET_NAME_TEMPLATE'; template: string | undefined }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -96,6 +109,34 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, academicConfig: action.config };
     case 'deliver/SET_LAYOUT_MODE':
       return { ...state, layoutMode: action.layoutMode };
+    case 'deliver/APPLY_PRESET': {
+      // A header and a photo cover belong to this document, not the course, so they survive.
+      const keep = state.academicConfig;
+      const fromPreset = presetAcademicConfig(action.preset);
+      const photoCover = keep?.coverPage?.mode === 'imported_image' ? keep.coverPage : undefined;
+      const academicConfig =
+        fromPreset || keep?.headerText || photoCover
+          ? {
+              enableBorder: fromPreset?.enableBorder ?? false,
+              footerText: fromPreset?.footerText,
+              headerText: keep?.headerText,
+              coverPage: photoCover ?? fromPreset?.coverPage,
+            }
+          : null;
+      return {
+        ...state,
+        presetCourseId: action.courseId,
+        sizeLimitBytes: action.preset.sizeLimitBytes,
+        pageSize: action.preset.pageSize,
+        layoutMode: action.preset.layout,
+        nameTemplate: action.preset.nameTemplate,
+        academicConfig,
+      };
+    }
+    case 'deliver/SET_REMEMBER_PRESET':
+      return { ...state, rememberPreset: action.remember };
+    case 'deliver/SET_NAME_TEMPLATE':
+      return { ...state, nameTemplate: action.template?.trim() ? action.template : undefined };
     case 'deliver/SET_PAGE_SIZE':
       return { ...state, pageSize: action.pageSize };
     case 'deliver/RESET':

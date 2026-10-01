@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 
-export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete' | 'addToLibrary' | 'changeType';
+export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete' | 'addToLibrary' | 'changeType' | 'submit';
 
 type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
@@ -11,6 +11,8 @@ type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.gly
 // stay here so there's exactly one, deliberately-gated path to each.
 const DELETE_ITEM: Item = { id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true };
 const CHANGE_TYPE_ITEM: Item = { id: 'changeType', label: 'Change type', icon: 'pricetag-outline' };
+// §4 S6: rebuild and share the teacher's copy with the course's preset.
+const SUBMIT_ITEM: Item = { id: 'submit', label: 'Submit', icon: 'paper-plane-outline' };
 const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', label: 'Add to Library', icon: 'add-circle-outline' };
 
 type OverflowSheetProps = {
@@ -21,6 +23,7 @@ type OverflowSheetProps = {
   // action instead - these two are mutually exclusive in practice (see ReaderScreen's usage).
   showDelete?: boolean;
   showAddToLibrary?: boolean;
+  showSubmit?: boolean;
 };
 
 export function OverflowSheet({
@@ -29,11 +32,13 @@ export function OverflowSheet({
   onSelect,
   showDelete = true,
   showAddToLibrary = false,
+  showSubmit = false,
 }: OverflowSheetProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
   const items: Item[] = [
     ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
+    ...(showSubmit ? [SUBMIT_ITEM] : []),
     // Library documents only, like Delete: an external file has no type until it's added.
     ...(showDelete ? [CHANGE_TYPE_ITEM, DELETE_ITEM] : []),
   ];

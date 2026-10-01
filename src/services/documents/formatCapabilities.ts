@@ -21,6 +21,11 @@ export function canSign(doc: LibraryDocument): boolean {
   return isPageRasterFormat(doc.format) && doc.sourceKind !== 'imported_pdf';
 }
 
+// Submit (§4) rebuilds the PDF from the page masters, so it needs the same real page images.
+export function canSubmit(doc: LibraryDocument): boolean {
+  return canSign(doc) && doc.pages.length > 0;
+}
+
 export function canFindInDoc(format: DocFormat): boolean {
   return IN_READER_FIND_FORMATS.includes(format);
 }

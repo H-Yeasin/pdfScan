@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Pressable, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { FormatSegmented } from '../components/deliver/FormatSegmented';
@@ -10,6 +10,8 @@ import { NameField } from '../components/deliver/NameField';
 import { QualitySlider } from '../components/deliver/QualitySlider';
 import { SizeTargetRow } from '../components/deliver/SizeTargetRow';
 import { StickyActions } from '../components/deliver/StickyActions';
+import { ProfilePromptSheet } from '../components/deliver/ProfilePromptSheet';
+import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
 import { summarizeAcademicConfig } from './AcademicOptionsScreen';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
@@ -22,13 +24,17 @@ import { buildSearchHaystack } from '../services/search/searchService';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { shareDocument } from '../services/sharing/shareService';
+import { shareAs, shareDocument } from '../services/sharing/shareService';
 import { historyUris } from '../store/pageHistory';
 import { CourseChips } from '../components/courses/CourseChips';
 import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
-import { defaultDocTypeFor } from '../services/courses/docTypes';
+import { defaultDocTypeFor, typeNumberOf } from '../services/courses/docTypes';
 import { suggestName } from '../services/submit/naming';
+import { defaultSubmitPreset, presetFromDeliver, presetsEqual, summarizePreset } from '../services/submit/preset';
+import { isProfileComplete } from '../services/submit/profile';
+import { submitDocument, type SubmitResult } from '../services/submit/submitDocument';
+import type { PageSizeId } from '../services/pdf/pageSize';
 import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppState } from '../store/AppStateContext';
 import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
@@ -37,6 +43,13 @@ import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { formatBytes } from '../utils/format';
 import { createId } from '../utils/id';
+
+const PAGE_SIZE_SEGMENTS: { id: PageSizeId; label: string }[] = [
+  { id: 'A4', label: 'A4' },
+  { id: 'Letter', label: 'Letter' },
+];
+
+type SaveMode = 'save' | 'share' | 'submit';
 
 function defaultName(): string {
   const now = new Date();
@@ -74,10 +87,43 @@ export function DeliverScreen() {
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel, ocrScript, nameTemplate } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, ocrScript, profile, profilePrompted } = state.settings;
+  const { presetCourseId, rememberPreset } = state.deliver;
+  // The course's own file-name template, if its preset has one, else the Settings one.
+  const nameTemplate = state.deliver.nameTemplate ?? state.settings.nameTemplate;
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [profilePromptOpen, setProfilePromptOpen] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
+
+  // §4 S6: the filing course's submit preset becomes the options whenever the course changes
+  // (Unsorted and courses without one get the default), and while "Remember" is on every change
+  // to them is saved back to the course, so the next scan for it is already set up.
+  const course = useMemo(() => courses.find((c) => c.id === courseId), [courses, courseId]);
+  const coursePreset = useMemo(() => course?.submitPreset ?? defaultSubmitPreset(courseId), [course, courseId]);
+  useEffect(() => {
+    if (presetCourseId === courseId) return;
+    dispatch({ type: 'deliver/APPLY_PRESET', courseId, preset: coursePreset });
+  }, [presetCourseId, courseId, coursePreset, dispatch]);
+
+  const currentPreset = useMemo(
+    () =>
+      presetFromDeliver({
+        sizeLimitBytes,
+        academicConfig: state.deliver.academicConfig,
+        pageSize,
+        layoutMode,
+        nameTemplate: state.deliver.nameTemplate,
+      }, coursePreset),
+    [sizeLimitBytes, state.deliver.academicConfig, pageSize, layoutMode, state.deliver.nameTemplate, coursePreset]
+  );
+  useEffect(() => {
+    if (!rememberPreset || !course || presetCourseId !== course.id) return;
+    if (presetsEqual(currentPreset, coursePreset)) return;
+    dispatch({ type: 'library/UPDATE_COURSE', id: course.id, patch: { submitPreset: currentPreset } });
+  }, [rememberPreset, course, presetCourseId, currentPreset, coursePreset, dispatch]);
 
   const courseName = useMemo(
     () => courses.find((c) => c.id === courseId)?.name ?? 'Unsorted',
@@ -105,14 +151,18 @@ export function DeliverScreen() {
   const sizeEstimate = useMemo(() => estimateSizeBytes(pages, quality), [pages, quality]);
 
   const handleSaveInternal = useCallback(
-    async (shareAfter: boolean) => {
+    async (mode: SaveMode) => {
       if (pages.length === 0 || saving) return;
+      const shareAfter = mode === 'share';
       setSaving(true);
       try {
         const documentId = createId('doc');
+        // Submit fits the separate submission file to the limit, so the library copy is built at
+        // the library quality instead of being fitted twice.
+        const librarySizeLimit = mode === 'submit' ? null : sizeLimit;
         // With a size target the level isn't known until every master exists, so the loop renders
         // masters only and buildPdfUnderLimit encodes the PDF's pages itself.
-        const encoding = sizeLimit !== null ? 'as-is' : encodingForQuality(quality);
+        const encoding = librarySizeLimit !== null ? 'as-is' : encodingForQuality(quality);
         const total = pages.length;
         const transientUris = new Set<string>();
 
@@ -181,10 +231,10 @@ export function DeliverScreen() {
         const pdfPages = contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout }));
         let pdfResult: { uri: string; sizeBytes: number };
         let sizeWarning: string | null = null;
-        if (sizeLimit !== null) {
-          setProgress(`Fitting under ${formatLimit(sizeLimit)}…`);
-          const sized = await buildPdfUnderLimit(documentId, pdfPages, sizeLimit, academicConfig ?? undefined, layoutMode, pageSize);
-          if (!sized.fits) sizeWarning = tooLargeMessage(sized, sizeLimit);
+        if (librarySizeLimit !== null) {
+          setProgress(`Fitting under ${formatLimit(librarySizeLimit)}…`);
+          const sized = await buildPdfUnderLimit(documentId, pdfPages, librarySizeLimit, academicConfig ?? undefined, layoutMode, pageSize);
+          if (!sized.fits) sizeWarning = tooLargeMessage(sized, librarySizeLimit);
           pdfResult = sized;
         } else {
           setProgress('Building PDF…');
@@ -230,7 +280,9 @@ export function DeliverScreen() {
           layout: page.layout,
         }));
 
-        const finalName = name.trim() || suggestedName;
+        // The suggestion from this render, not `name`: right after the profile sheet the name in
+        // state may still be the one suggested before the profile was filled in.
+        const finalName = (nameEdited ? name.trim() : suggestedName) || suggestedName;
         const haystack = buildSearchHaystack(finalName, libraryPages);
 
         const doc: LibraryDocument = {
@@ -254,6 +306,32 @@ export function DeliverScreen() {
         };
 
         dispatch({ type: 'library/ADD_FILE', file: doc });
+
+        // §4 S6: the teacher's copy, built while this screen still shows progress. The library
+        // document is already saved, so a failure here only loses the submission.
+        let submission: SubmitResult | null = null;
+        let submitFailed = false;
+        if (mode === 'submit') {
+          try {
+            const stored = state.deliver.academicConfig;
+            submission = await submitDocument({
+              doc,
+              preset: currentPreset,
+              profile,
+              course,
+              n: typeNumberOf(doc, [...state.library.files, doc]),
+              coverValues: stored?.coverPage?.mode === 'template' ? stored.coverPage.values : undefined,
+              headerText: stored?.headerText,
+              coverPhotoUri: stored?.coverPage?.mode === 'imported_image' ? stored.coverPage.importedUri : undefined,
+              quality,
+              fileName: doc.name,
+              onProgress: setProgress,
+            });
+          } catch (error) {
+            console.warn('DeliverScreen: submission build failed', error);
+            submitFailed = true;
+          }
+        }
         dispatch({ type: 'capture/CLEAR_PAGES' });
         dispatch({ type: 'review/RESET' });
         dispatch({ type: 'deliver/RESET' });
@@ -270,7 +348,14 @@ export function DeliverScreen() {
         let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${courseName}`;
         // Saved all the same; the student decides whether to drop pages or pick a bigger limit.
         if (sizeWarning) snackMsg = sizeWarning;
-        if (!shareAfter && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
+        if (submission) {
+          snackMsg = submission.fits
+            ? `Submitting ${submission.fileName} · ${formatLimit(submission.sizeBytes)}`
+            : tooLargeMessage(submission, currentPreset.sizeLimitBytes ?? 0);
+        } else if (submitFailed) {
+          snackMsg = `Saved · ${courseName} · couldn't build the submission`;
+        }
+        if (mode === 'save' && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
           const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
           if (!sizeWarning) snackMsg =
             result.failed === 0
@@ -289,6 +374,8 @@ export function DeliverScreen() {
         });
 
         if (shareAfter) await shareDocument(doc);
+        // TODO(§4 S7): record the submission (submissions table) here.
+        if (submission) await shareAs(submission.uri, submission.fileName, 'application/pdf');
       } catch (error) {
         console.warn('DeliverScreen: save failed', error);
         dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't save. Your pages are still here." });
@@ -304,7 +391,14 @@ export function DeliverScreen() {
       sizeLimit,
       format,
       name,
+      nameEdited,
       suggestedName,
+      currentPreset,
+      profile,
+      course,
+      state.deliver.academicConfig,
+      state.library.files,
+      state.review.history,
       courseId,
       courseName,
       docType,
@@ -320,6 +414,22 @@ export function DeliverScreen() {
       go,
     ]
   );
+
+  // The first Submit without a name and roll asks for them once (or Skip), then carries on.
+  const handleSubmit = useCallback(() => {
+    if (!isProfileComplete(profile) && !profilePrompted) {
+      setProfilePromptOpen(true);
+      return;
+    }
+    handleSaveInternal('submit');
+  }, [profile, profilePrompted, handleSaveInternal]);
+
+  // Runs after the render that has the new profile in it, so the name and cover use it.
+  useEffect(() => {
+    if (!pendingSubmit) return;
+    setPendingSubmit(false);
+    handleSaveInternal('submit');
+  }, [pendingSubmit, handleSaveInternal]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -343,31 +453,6 @@ export function DeliverScreen() {
           <FormatSegmented value={format} onChange={(value) => dispatch({ type: 'deliver/SET_FORMAT', format: value })} />
         </View>
 
-        <View>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Page Layout</Text>
-          <LayoutModeSegmented
-            value={layoutMode}
-            onChange={(value) => dispatch({ type: 'deliver/SET_LAYOUT_MODE', layoutMode: value })}
-          />
-          <Text style={[styles.helperText, { color: tokens.muted }]}>
-            {layoutMode === '2_in_1'
-              ? 'Eco-Save (2 Pages per Sheet - Side-by-Side): fewer sheets to print, PDF only.'
-              : 'Standard (1 Page per Sheet).'}
-          </Text>
-        </View>
-
-        {format === 'PDF' ? (
-          <View>
-            <View style={styles.qualityHeader}>
-              <Text style={[styles.sectionLabel, { color: tokens.ink }]}>File size</Text>
-              {sizeLimit !== null ? (
-                <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>Will be ≤ {formatLimit(sizeLimit)}</Text>
-              ) : null}
-            </View>
-            <SizeTargetRow value={sizeLimitBytes} onChange={(bytes) => dispatch({ type: 'deliver/SET_SIZE_LIMIT', bytes })} />
-          </View>
-        ) : null}
-
         {sizeLimit === null ? (
           <View>
             <View style={styles.qualityHeader}>
@@ -381,7 +466,6 @@ export function DeliverScreen() {
         <MoreOptionsPanel
           open={more}
           onToggleOpen={() => dispatch({ type: 'deliver/TOGGLE_MORE' })}
-          pageSize={format === 'PDF' ? { value: pageSize, onChange: (value) => dispatch({ type: 'deliver/SET_PAGE_SIZE', pageSize: value }) } : undefined}
           exportCopy={
             Platform.OS === 'android'
               ? {
@@ -425,22 +509,113 @@ export function DeliverScreen() {
           <DocTypeSelector value={docType} onChange={(type) => dispatch({ type: 'deliver/SET_DOC_TYPE', docType: type })} />
         </View>
 
-        <Pressable
-          style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
-          onPress={() => go('academicOptions')}
-        >
-          <Text style={{ color: tokens.ink, fontSize: 15 }}>Academic export</Text>
-          <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>
-            {summarizeAcademicConfig(academicConfig)}
-          </Text>
-        </Pressable>
+        <View style={[styles.optionsCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Pressable
+            style={styles.optionsHeader}
+            onPress={() => setOptionsOpen((open) => !open)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: optionsOpen }}
+          >
+            <View style={styles.optionsHeaderText}>
+              <Text style={[styles.sectionLabelInline, { color: tokens.ink }]}>Submission</Text>
+              <Text style={{ color: tokens.muted, fontSize: 13 }} numberOfLines={2}>
+                {summarizePreset(currentPreset)}
+              </Text>
+            </View>
+            <Ionicons name={optionsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={tokens.muted} />
+          </Pressable>
+
+          {optionsOpen && (
+            <View style={styles.optionsBody}>
+              <View>
+                <View style={styles.qualityHeader}>
+                  <Text style={[styles.sectionLabel, { color: tokens.ink }]}>File size</Text>
+                  {sizeLimitBytes !== null ? (
+                    <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>Will be ≤ {formatLimit(sizeLimitBytes)}</Text>
+                  ) : null}
+                </View>
+                <SizeTargetRow value={sizeLimitBytes} onChange={(bytes) => dispatch({ type: 'deliver/SET_SIZE_LIMIT', bytes })} />
+              </View>
+
+              <View>
+                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Page Layout</Text>
+                <LayoutModeSegmented
+                  value={layoutMode}
+                  onChange={(value) => dispatch({ type: 'deliver/SET_LAYOUT_MODE', layoutMode: value })}
+                />
+                <Text style={[styles.helperText, { color: tokens.muted }]}>
+                  {layoutMode === '2_in_1'
+                    ? 'Eco-Save (2 Pages per Sheet - Side-by-Side): fewer sheets to print, PDF only.'
+                    : 'Standard (1 Page per Sheet).'}
+                </Text>
+              </View>
+
+              <View>
+                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Page size</Text>
+                <SegmentedControl
+                  segments={PAGE_SIZE_SEGMENTS}
+                  value={pageSize}
+                  onChange={(value) => dispatch({ type: 'deliver/SET_PAGE_SIZE', pageSize: value })}
+                />
+              </View>
+
+              <Pressable
+                style={[styles.saveToRow, { backgroundColor: tokens.bg, borderColor: tokens.edge }]}
+                onPress={() => go('academicOptions')}
+              >
+                <Text style={{ color: tokens.ink, fontSize: 15 }}>Cover, footer, border</Text>
+                <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>
+                  {summarizeAcademicConfig(academicConfig)}
+                </Text>
+              </Pressable>
+
+              {course ? (
+                <>
+                  <NameField
+                    label={`File name template for ${course.code || course.name}`}
+                    value={state.deliver.nameTemplate ?? ''}
+                    onChange={(value) => dispatch({ type: 'deliver/SET_NAME_TEMPLATE', template: value })}
+                    placeholder={state.settings.nameTemplate}
+                    helperText="Empty: the template from Settings."
+                  />
+                  <View style={styles.rememberRow}>
+                    <View style={styles.optionsHeaderText}>
+                      <Text style={{ color: tokens.ink, fontSize: 15 }}>Remember for {course.code || course.name}</Text>
+                      <Text style={{ color: tokens.muted, fontSize: 12.5 }}>
+                        The next scan for this course starts with these options.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={rememberPreset}
+                      onValueChange={(remember) => dispatch({ type: 'deliver/SET_REMEMBER_PRESET', remember })}
+                      trackColor={{ true: tokens.accent, false: tokens.surface2 }}
+                    />
+                  </View>
+                </>
+              ) : null}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       <StickyActions
         saving={saving}
         progress={progress}
-        onSave={() => handleSaveInternal(false)}
-        onSaveShare={() => handleSaveInternal(true)}
+        onSubmit={handleSubmit}
+        onSave={() => handleSaveInternal('save')}
+        onSaveShare={() => handleSaveInternal('share')}
+      />
+
+      <ProfilePromptSheet
+        visible={profilePromptOpen}
+        initial={profile}
+        onDone={(patch) => {
+          if (patch) dispatch({ type: 'settings/SET_PROFILE', profile: patch });
+          dispatch({ type: 'settings/SET_PROFILE_PROMPTED' });
+          setProfilePromptOpen(false);
+          setPendingSubmit(true);
+        }}
+        onCancel={() => setProfilePromptOpen(false)}
       />
 
       <FolderPickerModal
@@ -513,5 +688,33 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  optionsCard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  optionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  optionsHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  sectionLabelInline: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  optionsBody: {
+    gap: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
 });

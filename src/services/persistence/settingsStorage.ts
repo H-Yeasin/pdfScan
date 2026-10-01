@@ -20,6 +20,8 @@ export type PersistedSettings = {
   profile?: StudentProfile;
   // Optional: added in §4 S2.
   nameTemplate?: string;
+  // Optional: added in §4 S6.
+  profilePrompted?: boolean;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

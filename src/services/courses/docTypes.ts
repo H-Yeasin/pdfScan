@@ -70,3 +70,21 @@ export function nextTypeNumber(
 ): number {
   return docs.filter((d) => d.courseId === courseId && docTypeOf(d) === type).length + 1;
 }
+
+// The number a saved document has within its course and type: 1 + the documents of that course
+// and type made before it (ties broken by id). For a document submitted after it was saved, so
+// its cover says "Assignment 3" whatever was added since.
+export function typeNumberOf(
+  doc: Pick<LibraryDocument, 'id' | 'courseId' | 'docType' | 'createdAt'>,
+  docs: readonly Pick<LibraryDocument, 'id' | 'courseId' | 'docType' | 'createdAt'>[]
+): number {
+  const type = docTypeOf(doc);
+  const earlier = docs.filter(
+    (d) =>
+      d.id !== doc.id &&
+      d.courseId === doc.courseId &&
+      docTypeOf(d) === type &&
+      (d.createdAt < doc.createdAt || (d.createdAt === doc.createdAt && d.id < doc.id))
+  );
+  return earlier.length + 1;
+}

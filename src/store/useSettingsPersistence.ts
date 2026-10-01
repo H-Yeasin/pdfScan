@@ -40,6 +40,7 @@ export function useSettingsPersistence() {
           dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: opened });
         }
         dispatch({ type: 'settings/SET_PROFILE', profile: normalizeProfile(settings.profile) });
+        if (settings.profilePrompted === true) dispatch({ type: 'settings/SET_PROFILE_PROMPTED' });
         // An emptied template would name nothing; the default is the better reading of it.
         if (typeof settings.nameTemplate === 'string' && settings.nameTemplate.trim()) {
           dispatch({ type: 'settings/SET_NAME_TEMPLATE', template: settings.nameTemplate });
@@ -69,6 +70,7 @@ export function useSettingsPersistence() {
       lastOpened: state.settings.lastOpened,
       profile: state.settings.profile,
       nameTemplate: state.settings.nameTemplate,
+      profilePrompted: state.settings.profilePrompted,
     });
   }, [
     loaded,
@@ -84,5 +86,6 @@ export function useSettingsPersistence() {
     state.settings.lastOpened,
     state.settings.profile,
     state.settings.nameTemplate,
+    state.settings.profilePrompted,
   ]);
 }

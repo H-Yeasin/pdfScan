@@ -23,7 +23,8 @@ import {
 import { ensureDocumentPdf } from '../services/pdf/pdfService';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { canFindInDoc, canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { canFindInDoc, canSign, canSubmit, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { useSubmitDocument } from '../store/useSubmitDocument';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
@@ -38,6 +39,7 @@ export function ReaderScreen() {
 
   const external = state.reader.external;
   const doc = state.library.files.find((f) => f.id === state.reader.readerId);
+  const submit = useSubmitDocument();
   const night = state.reader.night;
   const format = external?.format ?? doc?.format;
   const isPageRaster = format ? isPageRasterFormat(format) : false;
@@ -190,6 +192,8 @@ export function ReaderScreen() {
         dispatch({ type: 'ui/SHOW_SNACK', msg: 'Added to Library' });
       } else if (id === 'changeType') {
         if (doc) setTypePickerOpen(true);
+      } else if (id === 'submit') {
+        if (doc) await submit(doc);
       } else if (id === 'delete') {
         if (!doc) return;
         Alert.alert(
@@ -210,7 +214,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit]
   );
 
   const handleSignConfirm = useCallback(
@@ -392,6 +396,7 @@ export function ReaderScreen() {
         onSelect={handleOverflowSelect}
         showDelete={!external}
         showAddToLibrary={!!external}
+        showSubmit={!external && !!doc && canSubmit(doc)}
       />
 
       {signing && doc && doc.pages[activeIndex] && (

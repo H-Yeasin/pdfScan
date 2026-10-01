@@ -31,6 +31,9 @@ export type SettingsState = {
   profile: StudentProfile;
   // How Deliver names a new document (services/submit/naming.ts). S6 adds a per-course override.
   nameTemplate: string;
+  // True once the first Submit has asked for the name and roll (answered or skipped), so it
+  // never asks again; Settings > Profile is always there.
+  profilePrompted: boolean;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -46,6 +49,7 @@ export const initialSettingsState: SettingsState = {
   lastOpened: null,
   profile: EMPTY_PROFILE,
   nameTemplate: DEFAULT_NAME_TEMPLATE,
+  profilePrompted: false,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -72,7 +76,8 @@ export type SettingsAction =
   | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
   // A partial patch, so each profile field can be edited on its own.
   | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> }
-  | { type: 'settings/SET_NAME_TEMPLATE'; template: string };
+  | { type: 'settings/SET_NAME_TEMPLATE'; template: string }
+  | { type: 'settings/SET_PROFILE_PROMPTED' };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -98,6 +103,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, lastOpened: action.lastOpened };
     case 'settings/SET_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.profile } };
+    case 'settings/SET_PROFILE_PROMPTED':
+      return { ...state, profilePrompted: true };
     case 'settings/SET_NAME_TEMPLATE':
       return { ...state, nameTemplate: action.template };
     default:

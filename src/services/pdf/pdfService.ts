@@ -299,7 +299,8 @@ async function buildStandardContentPages(
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
   ocrFont: PDFRef,
-  pageDims: PageDims
+  pageDims: PageDims,
+  onPage?: (done: number, total: number) => void
 ): Promise<void> {
   let contentPageNumber = 0;
   const totalContentPages = pages.length;
@@ -327,6 +328,7 @@ async function buildStandardContentPages(
     if (academicConfig) {
       stampAcademicPage(pdfPage, pageDims.width, pageDims.height, stampFont, academicConfig, contentPageNumber, totalContentPages);
     }
+    onPage?.(contentPageNumber, totalContentPages);
   }
 }
 
@@ -373,7 +375,8 @@ async function buildTwoUpContentPages(
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
   ocrFont: PDFRef,
-  pageDims: PageDims
+  pageDims: PageDims,
+  onPage?: (done: number, total: number) => void
 ): Promise<void> {
   // The chosen paper turned landscape.
   const sheet = { width: pageDims.height, height: pageDims.width };
@@ -394,6 +397,7 @@ async function buildTwoUpContentPages(
     if (pageB) {
       await drawTwoUpColumn(pdfDoc, pdfPage, pageB, encoding, rightColumnX, ocrFont, sheet);
     }
+    onPage?.(Math.min(i + 2, pages.length), pages.length);
 
     if (academicConfig) {
       stampAcademicPage(pdfPage, sheet.width, sheet.height, stampFont, academicConfig, sheetNumber, totalSheets);
@@ -401,13 +405,22 @@ async function buildTwoUpContentPages(
   }
 }
 
+export type BuildPdfOptions = {
+  // Where to write the PDF. Default: the document's own library/<id>/document.pdf. A §4
+  // submission goes to library/<id>/submissions/<name>.pdf instead.
+  dest?: File;
+  // Called after each source page is drawn (1-based), for progress text.
+  onPage?: (done: number, total: number) => void;
+};
+
 export async function buildPdfFromPages(
   documentId: string,
   pages: PdfSourcePage[],
   encoding: PageImageEncoding,
   academicConfig?: AcademicConfig,
   layoutMode: LayoutMode = 'standard',
-  pageSize: PageSizeId = 'A4'
+  pageSize: PageSizeId = 'A4',
+  options: BuildPdfOptions = {}
 ): Promise<{ uri: string; sizeBytes: number }> {
   const pageDims = pageDimensions(pageSize);
 
@@ -438,15 +451,14 @@ export async function buildPdfFromPages(
   }
 
   if (layoutMode === '2_in_1') {
-    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims);
+    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims, options.onPage);
   } else {
-    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims);
+    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims, options.onPage);
   }
 
   const pdfBytes = await pdfDoc.save();
 
-  const dir = getDocumentDir(documentId);
-  const dest = new File(dir, 'document.pdf');
+  const dest = options.dest ?? new File(getDocumentDir(documentId), 'document.pdf');
   if (dest.exists) dest.delete();
   dest.write(pdfBytes);
 

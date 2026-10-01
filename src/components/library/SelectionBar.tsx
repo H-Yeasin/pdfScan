@@ -4,11 +4,12 @@ import { spacing, useTheme } from '../../theme';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import type { LibraryDocument } from '../../types/models';
 
-export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign' | 'type';
+export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign' | 'type' | 'submit';
 
 type Tool = { id: SelectionToolId; label: string; icon: keyof typeof Ionicons.glyphMap };
 
 const TOOLS: Tool[] = [
+  { id: 'submit', label: 'Submit', icon: 'paper-plane-outline' },
   { id: 'merge', label: 'Merge', icon: 'git-merge-outline' },
   { id: 'split', label: 'Split', icon: 'git-branch-outline' },
   { id: 'compress', label: 'Compress', icon: 'contract-outline' },
@@ -18,7 +19,7 @@ const TOOLS: Tool[] = [
 
 // Merge/Split/Compress/Sign all rebuild a PDF from doc.pages' raster images - meaningless (and, for
 // Compress/Sign, actively corrupting) for a format with no real page images.
-const RASTER_ONLY_TOOLS: SelectionToolId[] = ['merge', 'split', 'compress', 'sign'];
+const RASTER_ONLY_TOOLS: SelectionToolId[] = ['merge', 'split', 'compress', 'sign', 'submit'];
 
 type SelectionBarProps = {
   selectedDocs: LibraryDocument[];
@@ -33,7 +34,7 @@ export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
   const disabled = (id: SelectionToolId) => {
     if (RASTER_ONLY_TOOLS.includes(id) && !allRaster) return true;
     if (id === 'merge') return selectionCount < 2;
-    if (id === 'split' || id === 'sign') return selectionCount !== 1;
+    if (id === 'split' || id === 'sign' || id === 'submit') return selectionCount !== 1;
     return false;
   };
 
