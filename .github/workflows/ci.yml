@@ -17,6 +17,3 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test -- --ci
-      - name: expo-doctor (advisory)
-        run: npx expo-doctor
-        continue-on-error: true
