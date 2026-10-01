@@ -71,20 +71,16 @@ M = a few days, L = a week or more.
 ### §0 Foundation and quality fixes *(must happen first)*
 Goal: the existing app is trustworthy and store-ready before new features go in.
 
-- [ ] Keep a high-resolution master per page (about 2400 px long side); previews use a small copy. (M)
-- [ ] Make every export from the master. Stop re-encoding JPEGs one generation after another. (M)
-- [ ] Per-script font registry for the invisible OCR layer (Latin Extended, CJK, Devanagari) and
-      fix the silently dropped lines. (M)
-- [ ] Remove the `RECORD_AUDIO` permission, set the real bundle ID and package name, fix the slug,
-      allow dark mode in `app.json`. (S)
-- [ ] Hide "Protect" and the dead "Unlock Pro" button until they work. (S)
-- [ ] Escape FTS5 search input. (S)
-- [ ] Unify the two folder systems (`folderId` and `courseFolder`) into one **Course** model (§3). (M)
-- [ ] Test setup (Jest + React Native preset) with unit tests for `pdfService`,
-      `libraryOperations`, DB migrations and search. (M)
-- [ ] CI: typecheck and tests on every push (GitHub Actions). (S)
-- [ ] Exclude `src/dev/*` spikes from release builds; remove stray sample files. (S)
-- [ ] Opt-in crash reporting so that real-device crashes are visible without breaking the privacy promise. (S)
+**Detailed steps:** [`docs/plan/00-foundation.md`](plan/00-foundation.md)
+
+- [ ] F1 Test harness and CI
+- [ ] F2 Store hygiene (app ID `com.yeasin.pdfscan`, no RECORD_AUDIO, remove spikes, hide Protect/Pro)
+- [ ] F3 Library storage moves to SQLite as the single source of truth (fixes the data-loss risk)
+- [ ] F4 Folders + course folders become one Course model
+- [ ] F5 Image pipeline: high-resolution master, edits that don't re-save, one encode per export
+- [ ] F6 OCR text layer for every script (glyphless font)
+- [ ] F7 Small correctness fixes (LIKE escaping, OCR-failed flag, error boundary)
+- [ ] F8 Opt-in crash reporting (Sentry)
 
 **Done when:** tests pass in CI, a 10-page scan exports sharp enough to read 8 pt print, and OCR
 text in every supported script is searchable in an external PDF viewer.
@@ -245,14 +241,14 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 7. Open decisions (need the owner's answer before the relevant phase)
 
-1. App name and brand: keep "PDF Scan" (generic, hard to rank) or pick a student-flavoured name?
+1. App name and brand (app ID decided: `com.yeasin.pdfscan`): keep "PDF Scan" (generic, hard to rank) or pick a student-flavoured name?
 2. Target region for launch and store listing languages.
 3. iOS: launch with Android first, or both at once?
 4. Pro pricing model: one-time, yearly, or both?
-5. Crash reporting vendor (must be opt-in): Sentry or a self-hosted option?
+5. ~~Crash reporting vendor~~ Decided: Sentry, opt-in.
 
 ---
 
 ## 8. Next step
 
-Detailed step-by-step plans, one per section, starting with `docs/plan/00-foundation.md`.
+§0 is planned in `docs/plan/00-foundation.md`. Next to plan: §1 Capture (`docs/plan/01-capture.md`).
