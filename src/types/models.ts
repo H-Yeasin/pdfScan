@@ -225,3 +225,8 @@ export type TimetableSlot = {
 // What kind of document it is, for filtering and §4's `{type}` naming field. A document without
 // one is treated as 'other'.
 export type DocType = 'assignment' | 'notes' | 'handout' | 'exam' | 'lab' | 'other';
+
+// The student's details, typed once in Settings and used by §4 for file names (`{name}`,
+// `{roll}`), cover pages and footers. Stored only on the phone (AsyncStorage settings); empty
+// strings mean "not given".
+export type StudentProfile = { name: string; roll: string; section: string; institution: string };

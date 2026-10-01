@@ -1,6 +1,7 @@
 import { getCaptureModeSpec } from '../../services/capture/captureModes';
 import type { CaptureModeSpec } from '../../services/capture/captureModes';
-import type { CaptureMode, EnhanceMode, OcrScript } from '../../types/models';
+import { EMPTY_PROFILE } from '../../services/submit/profile';
+import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 
 export type SettingsState = {
   // False until persisted settings have been read, so first-run-dependent behaviour (like the
@@ -25,6 +26,8 @@ export type SettingsState = {
   // The library document last opened in the Reader, for Home's "Continue" card
   // (homeSelectors.continueDocument).
   lastOpened: { id: string; at: number } | null;
+  // Name, roll, section and institution for §4's file names, cover pages and footers.
+  profile: StudentProfile;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -38,6 +41,7 @@ export const initialSettingsState: SettingsState = {
   crashReportsEnabled: false,
   scannerUnavailable: false,
   lastOpened: null,
+  profile: EMPTY_PROFILE,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -61,7 +65,9 @@ export type SettingsAction =
   | { type: 'settings/LOAD_DEFAULT_ENHANCE'; byMode: Partial<Record<CaptureMode, EnhanceMode>> }
   | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean }
   | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
-  | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null };
+  | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
+  // A partial patch, so each profile field can be edited on its own.
+  | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -85,6 +91,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, scannerUnavailable: action.unavailable };
     case 'settings/SET_LAST_OPENED':
       return { ...state, lastOpened: action.lastOpened };
+    case 'settings/SET_PROFILE':
+      return { ...state, profile: { ...state.profile, ...action.profile } };
     default:
       return state;
   }

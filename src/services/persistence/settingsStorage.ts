@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CaptureMode, EnhanceMode, OcrScript } from '../../types/models';
+import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 import type { ThemePref } from '../../theme';
 
 const SETTINGS_KEY = 'app:settings';
@@ -16,6 +16,8 @@ export type PersistedSettings = {
   lastCaptureMode?: CaptureMode;
   scannerUnavailable?: boolean;
   lastOpened?: { id: string; at: number } | null;
+  // Optional: settings saved before §4 S1 don't have it (see normalizeProfile).
+  profile?: StudentProfile;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

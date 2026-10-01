@@ -60,3 +60,26 @@ describe('useSettingsPersistence', () => {
     expect(ctx().state.settings.lastCaptureMode).toBe('doc');
   });
 });
+
+describe('student profile', () => {
+  it('patches one field at a time and survives a restart', async () => {
+    const first = await mount();
+    expect(first().state.settings.profile).toEqual({ name: '', roll: '', section: '', institution: '' });
+
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_PROFILE', profile: { name: 'Rahim' } });
+      first().dispatch({ type: 'settings/SET_PROFILE', profile: { roll: '2021331045' } });
+    });
+    expect(first().state.settings.profile).toEqual({ name: 'Rahim', roll: '2021331045', section: '', institution: '' });
+    await flush();
+
+    const second = await mount();
+    expect(second().state.settings.profile).toEqual({ name: 'Rahim', roll: '2021331045', section: '', institution: '' });
+  });
+
+  it('starts empty when settings were saved before the profile existed', async () => {
+    await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin' }));
+    const ctx = await mount();
+    expect(ctx().state.settings.profile).toEqual({ name: '', roll: '', section: '', institution: '' });
+  });
+});

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings } from '../services/persistence/settingsStorage';
+import { normalizeProfile } from '../services/submit/profile';
 import { useAppState } from './AppStateContext';
 import { useTheme } from '../theme';
 import { FILTERS } from '../services/enhance/filters/registry';
@@ -38,6 +39,7 @@ export function useSettingsPersistence() {
         if (opened && typeof opened.id === 'string' && typeof opened.at === 'number') {
           dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: opened });
         }
+        dispatch({ type: 'settings/SET_PROFILE', profile: normalizeProfile(settings.profile) });
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -61,6 +63,7 @@ export function useSettingsPersistence() {
       scannerUnavailable: state.settings.scannerUnavailable,
       lastCaptureMode: state.settings.lastCaptureMode,
       lastOpened: state.settings.lastOpened,
+      profile: state.settings.profile,
     });
   }, [
     loaded,
@@ -74,5 +77,6 @@ export function useSettingsPersistence() {
     state.settings.scannerUnavailable,
     state.settings.lastCaptureMode,
     state.settings.lastOpened,
+    state.settings.profile,
   ]);
 }
