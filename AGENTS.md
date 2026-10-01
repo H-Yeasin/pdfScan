@@ -86,6 +86,14 @@ src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, do
 - Comments explain *why* (often long); match that density and the existing names.
 - Colors, spacing and type always come from `src/theme`.
 
+## Patched dependencies
+`patches/` is applied by `patch-package` on every `npm install`. When upgrading a patched
+package, check whether the patch still applies (and is still needed) and regenerate it with
+`npx patch-package <pkg>`.
+- `react-native-document-scanner-plugin@2.0.4`: adds `galleryImportAllowed` and `scannerMode`
+  to the scan options (TS spec in `src/`, its compiled `lib/typescript` types, and the Android
+  `DocumentScannerModule.kt`). iOS (VisionKit) ignores them.
+
 ## Security
 - `metro.config.js` once carried a hidden malicious payload (removed in 24f5ccf). Any change to
   config files (`metro.config.js`, `babel.config.js`, `app.json`, `package.json` scripts) must

@@ -21,7 +21,7 @@ jest.mock('../ingest', () => ({
 }));
 
 describe('runNativeScannerPipeline', () => {
-  it("uses the mode's page limit and default filter", async () => {
+  it("uses the mode's page limit, gallery import and default filter", async () => {
     jest.mocked(DocumentScanner.scanDocument).mockResolvedValue({
       status: 'success',
       scannedImages: ['file:///a.jpg', 'file:///b.jpg'],
@@ -30,7 +30,9 @@ describe('runNativeScannerPipeline', () => {
 
     await runNativeScannerPipeline(dispatch, 'latin', getCaptureModeSpec('notes'));
 
-    expect(DocumentScanner.scanDocument).toHaveBeenCalledWith(expect.objectContaining({ maxNumDocuments: 50 }));
+    expect(DocumentScanner.scanDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ maxNumDocuments: 50, galleryImportAllowed: true, scannerMode: 'full' })
+    );
     expect(ingestPage).toHaveBeenCalledWith('file:///a.jpg', 'latin', { deleteSource: true, enhance: 'document_scan' });
     const added = dispatch.mock.calls.find(([action]) => action.type === 'capture/BULK_ADD_PAGES')?.[0];
     expect(added.pages.map((p: { enhance: string }) => p.enhance)).toEqual(['document_scan', 'document_scan']);

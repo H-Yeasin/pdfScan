@@ -30,10 +30,15 @@ export async function runNativeScannerPipeline(
   try {
     // Edge detection, auto-capture on a steady quadrilateral, and perspective-correction
     // cropping all happen inside Google's closed-source on-device Document Scanner
-    // (Play Services GmsDocumentScanner, hardcoded to SCANNER_MODE_FULL by this plugin's
-    // native module) — this app has no code path into or visibility over that internal logic.
+    // (Play Services GmsDocumentScanner) — this app has no code path into or visibility over
+    // that internal logic. Our patch (patches/react-native-document-scanner-plugin+*.patch)
+    // exposes the scanner's own options: the mode's page limit, and gallery import so students
+    // can pull e.g. WhatsApp photos through the same edge detection. Android only; iOS's
+    // VisionKit scanner ignores both.
     const result = await DocumentScanner.scanDocument({
       maxNumDocuments: spec.pageLimit,
+      galleryImportAllowed: true,
+      scannerMode: 'full',
       responseType: ResponseType.ImageFilePath,
     });
 
