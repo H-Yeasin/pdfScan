@@ -142,7 +142,7 @@ Goal: an assignment ready to upload, in one screen.
 - [x] S2 Naming template (`{roll}_{name}_{course}_{type}{n}`) and shared files named after the document (today they arrive as `document.pdf`)
 - [x] S3 Exact size target (Under 1 / 2 / 5 / 10 MB / custom), OCR text kept
 - [x] S4 Cover page templates (Simple, Assignment, Lab report) filled from profile and course
-- [ ] S5 Footer presets (page numbers, name + roll + pages) and A4 / Letter page size
+- [x] S5 Footer presets (page numbers, name + roll + pages) and A4 / Letter page size
 - [ ] S6 Submit button and per-course submission presets (3 taps after capture)
 - [ ] S7 Submission history per course, with "Share again"
 - [ ] S8 Deadline reminders (local notifications, optional)

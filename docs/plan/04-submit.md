@@ -234,7 +234,31 @@ As built:
 "Assignment 3" without typing anything, and the library preview matches the PDF.
 
 ### S5 · Footer presets and page size *(S)*
-Status: todo
+Status: done in code (commit 00bfc5d). Printing on A4 and Letter (§4 Verification 3) needs a device and a printer.
+
+As built:
+- `naming.renderText(template, ctx)` is the text version of `renderTemplate`: no file-name
+  cleaning, and an empty token also takes a ` · `, `|`, `,` or `/` separator with it.
+  Uppercase `{X}`/`{Y}` aren't tokens there; `pdfService.fillPageNumbers` fills every occurrence
+  per page, in both the PDF and the Skia display copy. The header takes the same tokens.
+- `useDeliverContext.ts` (was `useCoverDefaults.ts`): `useNamingContext`, `useCoverDefaults` and
+  `useResolvedAcademicConfig` (cover defaults + header/footer tokens filled in), used by Deliver,
+  Academic options and Review's live stamp preview.
+- Footer presets: `submit/footerPresets.ts` (`FOOTER_PRESET_TEXT`, `footerPresetOf`), a 4-way
+  control in Academic options with "Page 1 shows: …".
+- Page size: `PageSizeId` and `defaultPageSize(locale)` in `pdf/pageSize.ts` (kept free of
+  pdf-lib so the slice can import it). The region comes from `Intl` (Hermes has it), **not**
+  `expo-localization`, so no native module was added. `deliver.pageSize`; the control is in
+  `MoreOptionsPanel` (PDF only).
+- `buildPdfFromPages(..., layoutMode, pageSize = 'A4')`; `buildPdfUnderLimit` and
+  `renderCoverPageImage` take it too. The 2-up sheet is now the chosen paper in landscape (it was
+  always Letter landscape).
+- ID-card ('fullPage') pages: the A4 canvas is placed at A4 size, centred, on any paper, so it
+  prints at true size on Letter (about 9 mm cut at top and bottom, where the ID layout is empty).
+  The ID canvas itself stays A4.
+- Not in the plan: `applySignatureToPdf` now uses the PDF page's real size for the margin box
+  (it assumed A4), and merge, split, compress and sign keep the document's paper size by reading
+  it from the existing PDF (`pageSizeOfPdf`), instead of a new DB column.
 
 - Header and footer text use the S2 token renderer, plus `{X}` and `{Y}` for page numbers.
   Presets in `AcademicOptionsScreen`:
