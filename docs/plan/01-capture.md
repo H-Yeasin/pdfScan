@@ -98,7 +98,7 @@ Status: done (commit 2249a8a). Device check pending: scan in Notes → B&W in Re
 black-and-white filter, and the chosen mode is still selected after restarting the app.
 
 ### C2 · Scanner plugin options patch *(S)*
-Status: todo
+Status: done (commit ab4d8be). Patch applies on `npm ci`; device check pending (Android build, gallery button, ID card stops at 2).
 
 - `patch-package` patch for `react-native-document-scanner-plugin`:
   - In the spec (`src/NativeDocumentScanner.ts`), add the optional fields
