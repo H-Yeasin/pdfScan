@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { LibraryDocument } from '../../types/models';
+import { buildFtsMatchQuery } from './searchQuery';
 
 const DATABASE_NAME = 'pdfscan.db';
 
@@ -115,11 +116,7 @@ export async function searchDocumentsByText(query: string): Promise<string[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const matchQuery = trimmed
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => `"${token.replace(/"/g, '""')}"*`)
-    .join(' ');
+  const matchQuery = buildFtsMatchQuery(trimmed);
   const likeParam = `%${trimmed}%`;
 
   const db = await getDb();

@@ -7,7 +7,7 @@ type LoadedLibrary = { documents: LibraryDocument[]; folders: LibraryFolder[] };
 
 // Handles both the current v2 shape and the pre-folders v1 shape (or anything
 // unrecognized), always normalizing to v2 so every caller only deals with one shape.
-function migrateLibraryIndex(parsed: unknown): LibraryIndexV2 {
+export function migrateLibraryIndex(parsed: unknown): LibraryIndexV2 {
   if (!parsed || typeof parsed !== 'object') return { version: 2, documents: [], folders: [] };
   const obj = parsed as Partial<LibraryIndexV2>;
   const documents = Array.isArray(obj.documents) ? obj.documents : [];
