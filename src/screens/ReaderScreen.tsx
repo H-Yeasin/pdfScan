@@ -24,7 +24,10 @@ import { ensureDocumentPdf } from '../services/pdf/pdfService';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { canFindInDoc, canSign, canSubmit, isPageRasterFormat } from '../services/documents/formatCapabilities';
-import { useSubmitDocument } from '../store/useSubmitDocument';
+import { useShareSubmission, useSubmitDocument } from '../store/useSubmitDocument';
+import { SubmissionsSheet } from '../components/submit/SubmissionsSheet';
+import { submittedSummary } from '../services/submit/history';
+import { formatShortDate } from '../utils/format';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
@@ -40,6 +43,12 @@ export function ReaderScreen() {
   const external = state.reader.external;
   const doc = state.library.files.find((f) => f.id === state.reader.readerId);
   const submit = useSubmitDocument();
+  const shareSubmission = useShareSubmission();
+  const [submissionsOpen, setSubmissionsOpen] = useState(false);
+  const docSubmissions = useMemo(
+    () => (doc ? state.library.submissions.filter((s) => s.documentId === doc.id) : []),
+    [doc, state.library.submissions]
+  );
   const night = state.reader.night;
   const format = external?.format ?? doc?.format;
   const isPageRaster = format ? isPageRasterFormat(format) : false;
@@ -358,6 +367,8 @@ export function ReaderScreen() {
         findQuery={findQuery}
         onChangeFindQuery={setFindQuery}
         matchCount={matchCount}
+        subtitle={submittedSummary(docSubmissions, formatShortDate)}
+        onSubtitlePress={() => setSubmissionsOpen(true)}
       />
 
       <ReaderBottomChrome
@@ -389,6 +400,16 @@ export function ReaderScreen() {
           onClose={() => setTypePickerOpen(false)}
         />
       ) : null}
+
+      <SubmissionsSheet
+        visible={submissionsOpen}
+        submissions={docSubmissions}
+        onShareAgain={(s) => {
+          setSubmissionsOpen(false);
+          shareSubmission(s);
+        }}
+        onClose={() => setSubmissionsOpen(false)}
+      />
 
       <OverflowSheet
         visible={overflowOpen}

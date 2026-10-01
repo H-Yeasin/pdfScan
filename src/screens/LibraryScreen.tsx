@@ -7,6 +7,7 @@ import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { CourseList } from '../components/courses/CourseList';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
+import { SubmittedFilterChips, type SubmittedFilter } from '../components/submit/SubmittedFilterChips';
 import { docTypeOf } from '../services/courses/docTypes';
 import type { DocType } from '../types/models';
 import { LibraryTabs } from '../components/library/LibraryTabs';
@@ -35,6 +36,8 @@ export function LibraryScreen() {
   const { loadStatus, files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
+  const [submittedFilter, setSubmittedFilter] = useState<SubmittedFilter>('all');
+  const submittedIds = useMemo(() => new Set(state.library.submissions.map((s) => s.documentId)), [state.library.submissions]);
 
   useEffect(() => {
     const query = search.trim();
@@ -60,10 +63,11 @@ export function LibraryScreen() {
     return tabbed.filter((f) => idSet.has(f.id));
   }, [files, tab, search, searchResultIds]);
 
-  const visibleFiles = useMemo(
-    () => (typeFilter ? searchedFiles.filter((f) => docTypeOf(f) === typeFilter) : searchedFiles),
-    [searchedFiles, typeFilter]
-  );
+  const visibleFiles = useMemo(() => {
+    const typed = typeFilter ? searchedFiles.filter((f) => docTypeOf(f) === typeFilter) : searchedFiles;
+    if (submittedFilter === 'all') return typed;
+    return typed.filter((f) => submittedIds.has(f.id) === (submittedFilter === 'submitted'));
+  }, [searchedFiles, typeFilter, submittedFilter, submittedIds]);
 
   const courseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -170,6 +174,7 @@ export function LibraryScreen() {
       ) : (
         <>
           <DocTypeFilterChips docs={searchedFiles} value={typeFilter} onChange={setTypeFilter} />
+          {submittedIds.size > 0 ? <SubmittedFilterChips value={submittedFilter} onChange={setSubmittedFilter} /> : null}
           <FlatList
             data={visibleFiles}
             keyExtractor={(doc) => doc.id}

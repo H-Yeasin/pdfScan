@@ -34,6 +34,7 @@ import { suggestName } from '../services/submit/naming';
 import { defaultSubmitPreset, presetFromDeliver, presetsEqual, summarizePreset } from '../services/submit/preset';
 import { isProfileComplete } from '../services/submit/profile';
 import { submitDocument, type SubmitResult } from '../services/submit/submitDocument';
+import { submissionRecord } from '../services/submit/history';
 import type { PageSizeId } from '../services/pdf/pageSize';
 import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppState } from '../store/AppStateContext';
@@ -314,12 +315,13 @@ export function DeliverScreen() {
         if (mode === 'submit') {
           try {
             const stored = state.deliver.academicConfig;
+            const typeNumber = typeNumberOf(doc, [...state.library.files, doc]);
             submission = await submitDocument({
               doc,
               preset: currentPreset,
               profile,
               course,
-              n: typeNumberOf(doc, [...state.library.files, doc]),
+              n: typeNumber,
               coverValues: stored?.coverPage?.mode === 'template' ? stored.coverPage.values : undefined,
               headerText: stored?.headerText,
               coverPhotoUri: stored?.coverPage?.mode === 'imported_image' ? stored.coverPage.importedUri : undefined,
@@ -327,6 +329,7 @@ export function DeliverScreen() {
               fileName: doc.name,
               onProgress: setProgress,
             });
+            dispatch({ type: 'library/ADD_SUBMISSION', submission: submissionRecord(doc, submission, currentPreset, typeNumber) });
           } catch (error) {
             console.warn('DeliverScreen: submission build failed', error);
             submitFailed = true;
@@ -374,7 +377,6 @@ export function DeliverScreen() {
         });
 
         if (shareAfter) await shareDocument(doc);
-        // TODO(§4 S7): record the submission (submissions table) here.
         if (submission) await shareAs(submission.uri, submission.fileName, 'application/pdf');
       } catch (error) {
         console.warn('DeliverScreen: save failed', error);

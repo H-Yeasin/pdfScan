@@ -12,6 +12,9 @@ type ReaderTopChromeProps = {
   findQuery: string;
   onChangeFindQuery: (value: string) => void;
   matchCount: number;
+  // A line under the name (e.g. "Submitted 2× · last on 3 Oct"); tappable when onSubtitlePress.
+  subtitle?: string | null;
+  onSubtitlePress?: () => void;
 };
 
 export function ReaderTopChrome({
@@ -23,6 +26,8 @@ export function ReaderTopChrome({
   findQuery,
   onChangeFindQuery,
   matchCount,
+  subtitle,
+  onSubtitlePress,
 }: ReaderTopChromeProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -55,9 +60,18 @@ export function ReaderTopChrome({
             style={[styles.findInput, { color: tokens.ink }]}
           />
         ) : (
-          <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
-            {name}
-          </Text>
+          <View style={styles.titleWrap}>
+            <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
+              {name}
+            </Text>
+            {subtitle ? (
+              <Pressable onPress={onSubtitlePress} disabled={!onSubtitlePress} hitSlop={6} accessibilityRole="button">
+                <Text style={[styles.subtitle, { color: tokens.accentInk }]} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         )}
         {findOpen ? (
           <Text style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
@@ -84,7 +98,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: spacing.sm,
-    height: 44,
+    minHeight: 44,
   },
   iconButton: {
     width: 44,
@@ -92,8 +106,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
+  titleWrap: {
     flex: 1,
+  },
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  title: {
     fontSize: 16,
     fontFamily: fontFamily.bodySemiBold,
   },

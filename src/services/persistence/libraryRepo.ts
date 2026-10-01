@@ -8,6 +8,7 @@ import type {
   LibraryPage,
   PageOcr,
   Semester,
+  Submission,
   TimetableSlot,
 } from '../../types/models';
 import { COURSE_COLORS, isCourseColor } from '../courses/palette';
@@ -76,11 +77,27 @@ type SemesterRow = {
 
 type SlotRow = { id: string; course_id: string; weekday: number; start_min: number; end_min: number };
 
+type SubmissionRow = {
+  id: string;
+  document_id: string;
+  course_id: string | null;
+  file_name: string;
+  size_bytes: number;
+  size_limit_bytes: number | null;
+  page_count: number;
+  created_at: number;
+  preset: string | null;
+  type_number: number | null;
+};
+
 export type LoadedLibrary = {
   documents: LibraryDocument[];
   courses: Course[];
   semesters: Semester[];
   timetable: TimetableSlot[];
+  // §4 S7, newest first. Optional so callers that predate it (the legacy import, tests) needn't
+  // pass it; missing means "none".
+  submissions?: Submission[];
 };
 
 const DOC_TYPES: readonly DocType[] = ['assignment', 'notes', 'handout', 'exam', 'lab', 'other'];
@@ -150,6 +167,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
   const courseRows = await db.getAllAsync<CourseRow>('SELECT * FROM courses ORDER BY sort_order, created_at, id');
   const semesterRows = await db.getAllAsync<SemesterRow>('SELECT * FROM semesters ORDER BY starts_on DESC, created_at DESC, id');
   const slotRows = await db.getAllAsync<SlotRow>('SELECT * FROM timetable_slots ORDER BY weekday, start_min, id');
+  const submissionRows = await db.getAllAsync<SubmissionRow>(SUBMISSIONS_QUERY);
 
   const pagesByDoc = new Map<string, LibraryPage[]>();
   for (const row of pageRows) {
@@ -192,7 +210,70 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       startMin: row.start_min,
       endMin: row.end_min,
     })),
+    submissions: submissionRows.map(rowToSubmission),
   };
+}
+
+const SUBMISSIONS_QUERY = 'SELECT * FROM submissions ORDER BY created_at DESC, id';
+
+function rowToSubmission(row: SubmissionRow): Submission {
+  return {
+    id: row.id,
+    documentId: row.document_id,
+    courseId: row.course_id ?? undefined,
+    fileName: row.file_name,
+    sizeBytes: row.size_bytes,
+    sizeLimitBytes: row.size_limit_bytes,
+    pageCount: row.page_count,
+    createdAt: row.created_at,
+    preset: parseSubmitPreset(row.preset),
+    typeNumber: row.type_number ?? undefined,
+  };
+}
+
+async function writeSubmission(db: SQLiteDatabase, s: Submission): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO submissions (id, document_id, course_id, file_name, size_bytes, size_limit_bytes, page_count,
+       created_at, preset, type_number)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET course_id = excluded.course_id, file_name = excluded.file_name,
+       size_bytes = excluded.size_bytes`,
+    [
+      s.id,
+      s.documentId,
+      s.courseId ?? null,
+      s.fileName,
+      s.sizeBytes,
+      s.sizeLimitBytes,
+      s.pageCount,
+      s.createdAt,
+      serializeSubmitPreset(s.preset),
+      s.typeNumber ?? null,
+    ]
+  );
+}
+
+export async function insertSubmission(db: SQLiteDatabase, submission: Submission): Promise<void> {
+  await writeSubmission(db, submission);
+}
+
+// Newest first; filtered by course and/or document when given.
+export async function listSubmissions(
+  db: SQLiteDatabase,
+  filter: { courseId?: string; documentId?: string } = {}
+): Promise<Submission[]> {
+  const where: string[] = [];
+  const params: string[] = [];
+  if (filter.courseId !== undefined) {
+    where.push('course_id = ?');
+    params.push(filter.courseId);
+  }
+  if (filter.documentId !== undefined) {
+    where.push('document_id = ?');
+    params.push(filter.documentId);
+  }
+  const sql = `SELECT * FROM submissions ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC, id`;
+  return (await db.getAllAsync<SubmissionRow>(sql, params)).map(rowToSubmission);
 }
 
 // Writes one document and replaces its pages. Pages are deleted and re-inserted (rather than
@@ -308,7 +389,7 @@ async function writeSlot(db: SQLiteDatabase, slot: TimetableSlot): Promise<void>
 
 async function deleteRows(
   db: SQLiteDatabase,
-  table: 'documents' | 'courses' | 'semesters' | 'timetable_slots',
+  table: 'documents' | 'courses' | 'semesters' | 'timetable_slots' | 'submissions',
   ids: string[]
 ): Promise<void> {
   for (const id of ids) await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [id]);
@@ -404,13 +485,17 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
   const courses = diffById(prev.courses, next.courses);
   const documents = diffById(prev.documents, next.documents);
   const slots = diffById(prev.timetable, next.timetable);
-  const diffs = [semesters, courses, documents, slots];
+  const submissions = diffById(prev.submissions ?? [], next.submissions ?? []);
+  const diffs = [semesters, courses, documents, slots, submissions];
   if (diffs.every((d) => d.changed.length + d.removedIds.length === 0)) return;
   await db.withTransactionAsync(async () => {
     for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
     for (const doc of documents.changed) await writeDocument(db, doc, 'upsert');
     for (const slot of slots.changed) await writeSlot(db, slot);
+    // After documents and courses, which they reference.
+    for (const submission of submissions.changed) await writeSubmission(db, submission);
+    await deleteRows(db, 'submissions', submissions.removedIds);
     await deleteRows(db, 'timetable_slots', slots.removedIds);
     await deleteRows(db, 'documents', documents.removedIds);
     await deleteRows(db, 'courses', courses.removedIds);

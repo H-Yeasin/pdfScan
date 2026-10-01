@@ -9,7 +9,9 @@ import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
-import { useDocumentListActions } from '../components/library/useDocumentListActions';
+import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
+import { SubmissionList } from '../components/submit/SubmissionList';
+import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
 import { docTypeOf } from '../services/courses/docTypes';
 import { startScan } from '../services/courses/startScan';
@@ -36,6 +38,13 @@ export function CourseScreen() {
     () => files.filter((f) => (isUnsorted ? !f.courseId : f.courseId === activeCourseId)),
     [files, isUnsorted, activeCourseId]
   );
+  // §4 S7: what was handed in for this course (or Unsorted), newest first.
+  const submissions = useMemo(
+    () => state.library.submissions.filter((s) => (isUnsorted ? !s.courseId : s.courseId === activeCourseId)),
+    [state.library.submissions, isUnsorted, activeCourseId]
+  );
+  const shareSubmission = useShareSubmission();
+  const openDocument = useOpenDocument();
   const shownDocs = useMemo(
     () => (typeFilter ? docs.filter((d) => docTypeOf(d) === typeFilter) : docs),
     [docs, typeFilter]
@@ -106,6 +115,21 @@ export function CourseScreen() {
             data={shownDocs}
             keyExtractor={(doc) => doc.id}
             contentContainerStyle={[styles.listContent, { paddingBottom: 96 + insets.bottom }]}
+            ListFooterComponent={
+              submissions.length > 0 ? (
+                <View style={styles.submitted}>
+                  <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Submitted</Text>
+                  <SubmissionList
+                    submissions={submissions}
+                    onShareAgain={shareSubmission}
+                    onOpen={(s) => {
+                      const doc = files.find((f) => f.id === s.documentId);
+                      if (doc) openDocument(doc);
+                    }}
+                  />
+                </View>
+              ) : null
+            }
             renderItem={({ item }) => (
               <FileRow
                 doc={item}
@@ -191,5 +215,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  submitted: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });

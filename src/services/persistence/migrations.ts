@@ -144,6 +144,30 @@ export const MIGRATIONS: Migration[] = [
       await db.execAsync('ALTER TABLE courses ADD COLUMN submit_preset TEXT;');
     },
   },
+  {
+    // v6 (§4 S7): submission history. A row goes with its document (the file is in the document's
+    // folder too); a deleted course leaves its rows Unsorted. `preset` (JSON) and `type_number`
+    // are what the file was built with, for rebuilding it if it's gone.
+    version: 6,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE submissions (
+          id TEXT PRIMARY KEY NOT NULL,
+          document_id TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+          course_id TEXT REFERENCES courses (id) ON DELETE SET NULL,
+          file_name TEXT NOT NULL,
+          size_bytes INTEGER NOT NULL,
+          size_limit_bytes INTEGER,
+          page_count INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          preset TEXT,
+          type_number INTEGER
+        );
+        CREATE INDEX idx_submissions_document_id ON submissions (document_id);
+        CREATE INDEX idx_submissions_course_id ON submissions (course_id);
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

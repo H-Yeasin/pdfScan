@@ -142,3 +142,31 @@ describe('librarySlice timetable', () => {
     expect(after.timetable.map((s) => s.id)).toEqual(['s2']);
   });
 });
+
+describe('submissions in the library state', () => {
+  const base = { id: '', fileName: 'a.pdf', sizeBytes: 1, sizeLimitBytes: null, pageCount: 1, createdAt: 1 };
+  const s1 = { ...base, id: 's1', documentId: 'd1', courseId: 'c1' };
+  const s2 = { ...base, id: 's2', documentId: 'd2', courseId: 'c1' };
+
+  function withSubmissions() {
+    let state = libraryReducer(initialLibraryState, { type: 'library/ADD_SUBMISSION', submission: s1 });
+    state = libraryReducer(state, { type: 'library/ADD_SUBMISSION', submission: s2 });
+    return state;
+  }
+
+  it('adds newest first', () => {
+    expect(withSubmissions().submissions.map((s) => s.id)).toEqual(['s2', 's1']);
+  });
+
+  it("drops a document's submissions with it, including when it's merged or split away", () => {
+    expect(libraryReducer(withSubmissions(), { type: 'library/REMOVE_FILES', ids: ['d1'] }).submissions.map((s) => s.id)).toEqual(['s2']);
+    expect(
+      libraryReducer(withSubmissions(), { type: 'library/REPLACE_FILES', ids: ['d2'], files: [] }).submissions.map((s) => s.id)
+    ).toEqual(['s1']);
+  });
+
+  it('leaves submissions of a deleted course Unsorted', () => {
+    const state = libraryReducer(withSubmissions(), { type: 'library/DELETE_COURSE', id: 'c1' });
+    expect(state.submissions.every((s) => s.courseId === undefined)).toBe(true);
+  });
+});

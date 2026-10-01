@@ -1,4 +1,4 @@
-import type { Course, DocType, LibraryDocument, Semester, TimetableSlot } from '../../types/models';
+import type { Course, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
@@ -20,6 +20,8 @@ export type LibraryState = {
   semesters: Semester[];
   // The optional weekly timetable (§3 K5), by weekday then start time.
   timetable: TimetableSlot[];
+  // §4 S7: every file handed in, newest first. Rows go with their document.
+  submissions: Submission[];
   // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
   homeSemesterId: string | null;
   // UI-only drill-in state for the Courses tab: null = showing the course list,
@@ -41,6 +43,7 @@ export const initialLibraryState: LibraryState = {
   courses: [],
   semesters: [],
   timetable: [],
+  submissions: [],
   homeSemesterId: null,
   activeCourseId: null,
   selection: [],
@@ -80,6 +83,8 @@ export type LibraryAction =
   | { type: 'library/DELETE_SEMESTER'; id: string }
   | { type: 'library/SET_HOME_SEMESTER'; id: string | null }
   | { type: 'library/SET_TIMETABLE'; timetable: TimetableSlot[] }
+  | { type: 'library/SET_SUBMISSIONS'; submissions: Submission[] }
+  | { type: 'library/ADD_SUBMISSION'; submission: Submission }
   | { type: 'library/ADD_SLOT'; slot: TimetableSlot }
   | { type: 'library/UPDATE_SLOT'; id: string; patch: Partial<Omit<TimetableSlot, 'id'>> }
   | { type: 'library/REMOVE_SLOT'; id: string }
@@ -122,6 +127,8 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         ...state,
         files: state.files.filter((f) => !action.ids.includes(f.id)),
         selection: state.selection.filter((id) => !action.ids.includes(id)),
+        // Their submissions go too (ON DELETE CASCADE on disk; the files are in the document folder).
+        submissions: state.submissions.filter((s) => !action.ids.includes(s.documentId)),
       };
     case 'library/TOGGLE_STAR':
       return {
@@ -146,6 +153,10 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         ...state,
         files: [...action.files, ...state.files.filter((f) => !action.ids.includes(f.id))],
         selection: state.selection.filter((id) => !action.ids.includes(id)),
+        // A document replaced by others (merge, split) takes its submissions with it.
+        submissions: state.submissions.filter(
+          (s) => !action.ids.includes(s.documentId) || action.files.some((f) => f.id === s.documentId)
+        ),
       };
     case 'library/TOGGLE_SELECTION': {
       const selected = state.selection.includes(action.id);
@@ -203,6 +214,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         // Its class times go with it (ON DELETE CASCADE on disk).
         timetable: state.timetable.filter((s) => s.courseId !== action.id),
         files: state.files.map((f) => (f.courseId === action.id ? { ...f, courseId: undefined } : f)),
+        submissions: state.submissions.map((s) => (s.courseId === action.id ? { ...s, courseId: undefined } : s)),
         activeCourseId: state.activeCourseId === action.id ? null : state.activeCourseId,
       };
     case 'library/ASSIGN_COURSE':
@@ -242,6 +254,10 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       };
     case 'library/SET_TIMETABLE':
       return { ...state, timetable: sortSlots(action.timetable) };
+    case 'library/SET_SUBMISSIONS':
+      return { ...state, submissions: action.submissions };
+    case 'library/ADD_SUBMISSION':
+      return { ...state, submissions: [action.submission, ...state.submissions] };
     case 'library/ADD_SLOT':
       return { ...state, timetable: sortSlots([...state.timetable, action.slot]) };
     case 'library/UPDATE_SLOT':

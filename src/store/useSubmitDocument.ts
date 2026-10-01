@@ -5,7 +5,8 @@ import { shareAs } from '../services/sharing/shareService';
 import { defaultSubmitPreset } from '../services/submit/preset';
 import { formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { submitDocument } from '../services/submit/submitDocument';
-import type { LibraryDocument } from '../types/models';
+import { ensureSubmissionFile, submissionRecord } from '../services/submit/history';
+import type { LibraryDocument, Submission } from '../types/models';
 import { useAppState } from './AppStateContext';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
@@ -26,20 +27,46 @@ export function useSubmitDocument() {
       const preset = course?.submitPreset ?? defaultSubmitPreset(doc.courseId ?? null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: preset.sizeLimitBytes ? `Fitting under ${formatLimit(preset.sizeLimitBytes)}…` : 'Building PDF…' });
       try {
-        const result = await submitDocument({ doc, preset, profile, course, n: typeNumberOf(doc, files) });
+        const n = typeNumberOf(doc, files);
+        const result = await submitDocument({ doc, preset, profile, course, n });
+        dispatch({ type: 'library/ADD_SUBMISSION', submission: submissionRecord(doc, result, preset, n) });
         dispatch({
           type: 'ui/SHOW_SNACK',
           msg: result.fits
             ? `Submitting ${result.fileName} · ${formatLimit(result.sizeBytes)}`
             : tooLargeMessage(result, preset.sizeLimitBytes ?? 0),
         });
-        // TODO(§4 S7): record the submission (submissions table) here.
         await shareAs(result.uri, result.fileName, 'application/pdf');
         return true;
       } catch (error) {
         console.warn('useSubmitDocument: submit failed', error);
         dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't build the submission" });
         return false;
+      }
+    },
+    [files, courses, profile, dispatch]
+  );
+}
+
+// "Share again" for a recorded submission: shares the stored file, rebuilding it first if it's
+// gone (history.ensureSubmissionFile).
+export function useShareSubmission() {
+  const { state, dispatch } = useAppState();
+  const { files, courses } = state.library;
+  const { profile } = state.settings;
+
+  return useCallback(
+    async (submission: Submission): Promise<void> => {
+      const doc = files.find((f) => f.id === submission.documentId);
+      if (!doc) return;
+      try {
+        const course = courses.find((c) => c.id === doc.courseId);
+        const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files });
+        if (rebuilt) dispatch({ type: 'ui/SHOW_SNACK', msg: `Rebuilt ${submission.fileName}` });
+        await shareAs(uri, submission.fileName, 'application/pdf');
+      } catch (error) {
+        console.warn('useShareSubmission: failed', error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't share the submission" });
       }
     },
     [files, courses, profile, dispatch]

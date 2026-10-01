@@ -235,3 +235,22 @@ export type DocType = 'assignment' | 'notes' | 'handout' | 'exam' | 'lab' | 'oth
 // `{roll}`), cover pages and footers. Stored only on the phone (AsyncStorage settings); empty
 // strings mean "not given".
 export type StudentProfile = { name: string; roll: string; section: string; institution: string };
+
+// One file handed in (§4 S7): a Submit of a library document. The file itself is
+// library/<documentId>/submissions/<fileName>; it goes with the document.
+export type Submission = {
+  id: string;
+  documentId: string;
+  // The document's course when it was submitted; undefined = Unsorted (or the course was deleted).
+  courseId?: string;
+  // With `.pdf`.
+  fileName: string;
+  sizeBytes: number;
+  sizeLimitBytes: number | null;
+  // Content pages, not counting a cover.
+  pageCount: number;
+  createdAt: number;
+  // What it was built with, so "Share again" can rebuild it the same way if the file is gone.
+  preset?: SubmitPreset;
+  typeNumber?: number;
+};

@@ -16,3 +16,8 @@ export function formatRelativeDate(timestamp: number): string {
 
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+// "3 Oct": a short date for lists where the year is obvious.
+export function formatShortDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
