@@ -250,7 +250,22 @@ As built:
 and still shows after Compress.
 
 ### T5 · Bookmarks *(S)*
-Status: todo
+Status: done in code (commit 2a228ad).
+
+As built:
+- Migration **v11** `bookmarks`; like annotations, no foreign key on the page row (it is
+  rewritten on every save); the store drops a page's bookmarks when the page leaves and all of a
+  document's with it. One bookmark per page (`ADD_BOOKMARK` ignores a second).
+- `study/bookmarks.ts`: `courseBookmarks(bookmarks, docs, courseId | null)` (newest document
+  first, then page order; bookmarks on missing pages skipped) and `documentBookmarks`.
+- Reader: `ReaderTopChrome` bookmark button (tap toggles, long-press labels it via
+  `TextPromptModal`); overflow "Bookmarks" opens `BookmarksSheet` (jump, remove). On a 2-up sheet
+  the bookmark is for its left page.
+- `CourseScreen`: a "Bookmarked" section (3, then "Show all n") above the documents; opening one
+  sets `reader.target` (its `query` is now optional: no query, no Find).
+- Library: `SubmittedFilterChips` gained "Bookmarked" (shown once a page is bookmarked).
+- **Not built:** a Bookmarked section on Home (Home has no single course); the course page is
+  where they're gathered, and T6 uses them from there.
 
 - Migration: `bookmarks` (id, document_id, page_id, label nullable, created_at). Cascade.
 - Reader: a bookmark button in `ReaderTopChrome` for the current page (filled when

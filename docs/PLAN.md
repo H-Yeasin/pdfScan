@@ -159,7 +159,7 @@ Goal: scans become study material, not dead files.
 - [x] T2 Search results by page, with jump and highlight
 - [x] T3 Copy page text, extract to .txt, select text on a page
 - [x] T4 Annotations (highlighter snapped to words, pen, notes) kept through every PDF rebuild
-- [ ] T5 Bookmarks
+- [x] T5 Bookmarks
 - [ ] T6 Exam pack: one revision PDF from pages across documents
 - [ ] T7 *(Later, P4)* Flashcards from highlights
 
