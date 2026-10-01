@@ -153,13 +153,15 @@ under-limit PDF takes 3 taps after capture.
 ### §5 Study
 Goal: scans become study material, not dead files.
 
-- [ ] Full-text search across all courses with page-level jump and highlight (OCR bounding boxes
-      already stored). (M)
-- [ ] Copy text / "Extract text" from a page or a selection. (S)
-- [ ] Reader annotations: highlighter, pen, text note, saved into the PDF. (L)
-- [ ] Bookmarks and "Exam pack": combine selected pages from several documents into one
-      revision PDF. (M)
-- [ ] *(Later)* Flashcards from highlighted text, all on-device. (L)
+**Detailed steps:** [`docs/plan/05-study.md`](plan/05-study.md)
+
+- [ ] T1 Page mapping (library page ↔ PDF page) and word-level OCR boxes
+- [ ] T2 Search results by page, with jump and highlight
+- [ ] T3 Copy page text, extract to .txt, select text on a page
+- [ ] T4 Annotations (highlighter snapped to words, pen, notes) kept through every PDF rebuild
+- [ ] T5 Bookmarks
+- [ ] T6 Exam pack: one revision PDF from pages across documents
+- [ ] T7 *(Later, P4)* Flashcards from highlights
 
 **Done when:** a student can search a word and land on the exact highlighted page within 2 seconds
 in a library of 500 pages.
@@ -254,4 +256,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. Next to plan: §5 Study (`docs/plan/05-study.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. Next to plan: §6 Languages and scripts (`docs/plan/06-languages.md`).

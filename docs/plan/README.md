@@ -14,7 +14,8 @@ code **when the section was planned**, and are kept as history.
 | §2 Review and enhance | [02-review-enhance.md](02-review-enhance.md) | E1–E7 | E1–E6 done. **E7 in progress:** the tooling is done; the benchmark needs real pages and raters. |
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | K1–K5 done. **Next: K6** (organising existing documents). |
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | S1–S7 done (S3–S7 have device checks open). **Next: S8** (deadline reminders). §3 K6 is still open too. |
-| §5 Study and later | — | — | Not planned yet. Next to plan: `docs/plan/05-study.md` (see `docs/PLAN.md` §5). |
+| §5 Study | [05-study.md](05-study.md) | T1–T7 | Planned (2026-10-02). T1 first; T7 (flashcards) is for later (P4). |
+| §6 Languages and later | — | — | Not planned yet. Next to plan: `docs/plan/06-languages.md` (see `docs/PLAN.md` §6). |
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
 lines here.
