@@ -1,3 +1,4 @@
+import { initialPackState } from './slices/packSlice';
 import type { AppState } from './appReducer';
 import { initialCaptureState } from './slices/captureSlice';
 import { initialReviewState } from './slices/reviewSlice';
@@ -17,4 +18,5 @@ export const initialAppState: AppState = {
   settings: initialSettingsState,
   signature: initialSignatureState,
   ui: initialUiState,
+  pack: initialPackState,
 };

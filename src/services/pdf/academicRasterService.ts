@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { FontStyle, ImageFormat, PaintStyle, Skia } from '@shopify/react-native-skia';
 import type { SkCanvas } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
-import { layoutCover, type CoverPageConfig } from './coverTemplates';
+import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
 import { fillPageNumbers, pageDimensions, type AcademicConfig, type PageSizeId } from './pdfService';
 
 // ReaderScreen now renders the real compiled PDF (via PdfPageView), so this module's cover/
@@ -68,45 +68,55 @@ export async function renderCoverPageImage(
 
   // mode === 'template'
   try {
-    const pagePt = pageDimensions(pageSize);
-    const height = COVER_RASTER_HEIGHT_PX;
-    const width = Math.round((height * pagePt.width) / pagePt.height);
-    const surface = Skia.Surface.MakeOffscreen(width, height);
-    if (!surface) throw new Error('Skia failed to create an offscreen surface for the cover page');
-    const canvas = surface.getCanvas();
-    canvas.drawColor(Skia.Color('#ffffff'));
-
-    // The same items pdfService draws, scaled from points to pixels. Text uses the system font
-    // (no font files are bundled), centred with its own metrics; line breaks come from the layout.
-    const scale = width / pagePt.width;
-    const textPaint = Skia.Paint();
-    textPaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
-    textPaint.setAntiAlias(true);
-    const strokePaint = Skia.Paint();
-    strokePaint.setStyle(PaintStyle.Stroke);
-    strokePaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
-    strokePaint.setAntiAlias(true);
-
-    for (const item of layoutCover(cover.templateId, cover.values, pagePt)) {
-      if (item.kind === 'text') {
-        const font = systemFont(item.size * scale, item.bold);
-        const x = item.align === 'center' ? item.x * scale - font.measureText(item.text, textPaint).width / 2 : item.x * scale;
-        canvas.drawText(item.text, x, item.y * scale, textPaint, font);
-      } else if (item.kind === 'line') {
-        strokePaint.setStrokeWidth(item.width * scale);
-        canvas.drawLine(item.x1 * scale, item.y1 * scale, item.x2 * scale, item.y2 * scale, strokePaint);
-      } else {
-        strokePaint.setStrokeWidth(item.borderWidth * scale);
-        canvas.drawRect(Skia.XYWHRect(item.x * scale, item.y * scale, item.width * scale, item.height * scale), strokePaint);
-      }
-    }
-
-    const uri = await writeJpeg(surface, 'cover');
-    return { uri, width, height };
+    return await renderLayoutImage(layoutCover(cover.templateId, cover.values, pageDimensions(pageSize)), pageSize, 'cover');
   } catch (error) {
     console.warn('academicRasterService: failed to render template cover page', error);
     return null;
   }
+}
+
+// Draws laid-out page items (coverTemplates: a cover, or §5 T6's exam-pack contents page) on a
+// white page-shaped canvas, COVER_RASTER_HEIGHT_PX tall, and writes it as a JPEG in the cache:
+// the same items pdfService draws as vectors, scaled from points to pixels. Text uses the system
+// font (no font files are bundled), centred with its own metrics; line breaks come from the layout.
+export async function renderLayoutImage(
+  items: readonly CoverItem[],
+  pageSize: PageSizeId,
+  prefix: string
+): Promise<{ uri: string; width: number; height: number }> {
+  const pagePt = pageDimensions(pageSize);
+  const height = COVER_RASTER_HEIGHT_PX;
+  const width = Math.round((height * pagePt.width) / pagePt.height);
+  const surface = Skia.Surface.MakeOffscreen(width, height);
+  if (!surface) throw new Error('Skia failed to create an offscreen surface for a laid-out page');
+  const canvas = surface.getCanvas();
+  canvas.drawColor(Skia.Color('#ffffff'));
+
+  const scale = width / pagePt.width;
+  const textPaint = Skia.Paint();
+  textPaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
+  textPaint.setAntiAlias(true);
+  const strokePaint = Skia.Paint();
+  strokePaint.setStyle(PaintStyle.Stroke);
+  strokePaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
+  strokePaint.setAntiAlias(true);
+
+  for (const item of items) {
+    if (item.kind === 'text') {
+      const font = systemFont(item.size * scale, item.bold);
+      const x = item.align === 'center' ? item.x * scale - font.measureText(item.text, textPaint).width / 2 : item.x * scale;
+      canvas.drawText(item.text, x, item.y * scale, textPaint, font);
+    } else if (item.kind === 'line') {
+      strokePaint.setStrokeWidth(item.width * scale);
+      canvas.drawLine(item.x1 * scale, item.y1 * scale, item.x2 * scale, item.y2 * scale, strokePaint);
+    } else {
+      strokePaint.setStrokeWidth(item.borderWidth * scale);
+      canvas.drawRect(Skia.XYWHRect(item.x * scale, item.y * scale, item.width * scale, item.height * scale), strokePaint);
+    }
+  }
+
+  const uri = await writeJpeg(surface, prefix);
+  return { uri, width, height };
 }
 
 export function hasContentPageStamp(config: AcademicConfig | null | undefined): config is AcademicConfig {

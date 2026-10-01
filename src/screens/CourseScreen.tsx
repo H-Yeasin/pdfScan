@@ -73,6 +73,20 @@ export function CourseScreen() {
     [state.library.bookmarks, files, isUnsorted, activeCourseId]
   );
   const [allBookmarks, setAllBookmarks] = useState(false);
+  // §5 T6: the exam-pack tray is filed under this course when it starts here.
+  const packCount = state.pack.items.length;
+  const openPack = () => {
+    if (packCount === 0) dispatch({ type: 'pack/SET_COURSE', courseId: course?.id ?? null });
+    go('examPack');
+  };
+  const addBookmarksToPack = () => {
+    dispatch({
+      type: 'pack/ADD',
+      items: bookmarked.map((b) => ({ documentId: b.doc.id, pageId: b.bookmark.pageId })),
+      courseId: course?.id ?? null,
+    });
+    dispatch({ type: 'ui/SHOW_SNACK', msg: `Added ${bookmarked.length} bookmarked pages to the exam pack`, action: 'Open', onAction: () => go('examPack') });
+  };
 
   // Unsorted: a one-time "Sort them now?" banner, and a Sort button that's always there.
   const [sorting, setSorting] = useState(false);
@@ -127,6 +141,16 @@ export function CourseScreen() {
               </Text>
             ) : null}
           </View>
+          {docs.length > 0 ? (
+            <Pressable style={styles.iconButton} onPress={openPack} accessibilityLabel={`Exam pack${packCount ? `, ${packCount} pages` : ''}`}>
+              <Ionicons name="layers-outline" size={21} color={tokens.ink} />
+              {packCount ? (
+                <View style={[styles.badge, { backgroundColor: tokens.accent }]}>
+                  <Text style={styles.badgeLabel}>{packCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
           {course ? (
             <Pressable style={styles.iconButton} onPress={() => setEditing(true)} accessibilityLabel="Edit course">
               <Ionicons name="create-outline" size={21} color={tokens.ink} />
@@ -179,6 +203,9 @@ export function CourseScreen() {
         <View style={styles.deadlines}>
           <View style={styles.deadlinesHeader}>
             <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Bookmarked</Text>
+            <Pressable onPress={addBookmarksToPack} accessibilityRole="button" hitSlop={8}>
+              <Text style={[styles.addLink, { color: tokens.accentInk }]}>Add all to exam pack</Text>
+            </Pressable>
             {bookmarked.length > 3 ? (
               <Pressable onPress={() => setAllBookmarks((v) => !v)} accessibilityRole="button" hitSlop={8}>
                 <Text style={[styles.addLink, { color: tokens.accentInk }]}>{allBookmarks ? 'Show less' : `Show all ${bookmarked.length}`}</Text>
@@ -372,5 +399,21 @@ const styles = StyleSheet.create({
   archivedToggle: {
     alignSelf: 'center',
     paddingVertical: spacing.md,
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeLabel: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

@@ -258,6 +258,20 @@ export function LibraryScreen() {
                     openDocument(doc);
                     dispatch({ type: 'reader/SET_TARGET', target: { pageId: hit.pageId, query: search.trim() } });
                   }}
+                  onAddAll={() => {
+                    const firstDoc = files.find((f) => f.id === pageHits[0]?.documentId);
+                    dispatch({
+                      type: 'pack/ADD',
+                      items: pageHits.map((h) => ({ documentId: h.documentId, pageId: h.pageId })),
+                      courseId: courseFilter && courseFilter !== UNSORTED_COURSE_ID ? courseFilter : (firstDoc?.courseId ?? null),
+                    });
+                    dispatch({
+                      type: 'ui/SHOW_SNACK',
+                      msg: `Added ${pageHits.length} ${pageHits.length === 1 ? 'page' : 'pages'} to the exam pack`,
+                      action: 'Open',
+                      onAction: () => go('examPack'),
+                    });
+                  }}
                 />
               ) : archivedCount > 0 ? (
                 <Pressable style={styles.archivedToggle} onPress={() => setShowArchived((v) => !v)} accessibilityRole="button">

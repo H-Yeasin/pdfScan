@@ -14,6 +14,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { ProScreen } from '../screens/ProScreen';
 import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
 import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
+import { ExamPackScreen } from '../screens/ExamPackScreen';
 import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
@@ -38,6 +39,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   pro: FEATURES.pro ? ProScreen : LibraryScreen,
   manageFolders: ManageFoldersScreen,
   academicOptions: AcademicOptionsScreen,
+  examPack: ExamPackScreen,
   filterLab: FilterLabScreen,
 };
 

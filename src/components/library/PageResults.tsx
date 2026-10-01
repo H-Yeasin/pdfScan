@@ -30,10 +30,13 @@ export function PageResults({
   hits,
   docs,
   onOpen,
+  onAddAll,
 }: {
   hits: readonly PageHit[];
   docs: readonly LibraryDocument[];
   onOpen: (doc: LibraryDocument, hit: PageHit) => void;
+  // §5 T6: puts every listed page in the exam-pack tray.
+  onAddAll?: () => void;
 }) {
   const { tokens } = useTheme();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -50,7 +53,16 @@ export function PageResults({
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.label, { color: tokens.muted }]}>Pages</Text>
+      <View style={styles.header}>
+        <Text style={[styles.label, { color: tokens.muted }]}>Pages</Text>
+        {onAddAll ? (
+          <Pressable onPress={onAddAll} accessibilityRole="button" hitSlop={8}>
+            <Text style={[styles.moreLabel, { color: tokens.accentInk }]}>
+              Add {hits.length === 1 ? 'this page' : `these ${hits.length} pages`} to an exam pack
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
       {groups.map(({ doc, hits: docHits }) => {
         const open = expanded.has(doc.id);
         const shown = open ? docHits : docHits.slice(0, SHOWN_PER_DOCUMENT);
@@ -101,6 +113,11 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.sm,
     marginTop: spacing.lg,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   label: {
     fontSize: 11,

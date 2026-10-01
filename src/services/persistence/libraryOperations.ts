@@ -23,7 +23,7 @@ function copyIfPresent(uri: string | undefined, dest: File): string | undefined 
 
 // Copies one page's master (+ display copy and thumbnail, when present) into another document's
 // directory as page N - byte-for-byte, so merging/splitting never costs image quality.
-function copyPageInto(page: LibraryPage, dir: Directory, pageNumber: number): LibraryPage {
+export function copyPageInto(page: LibraryPage, dir: Directory, pageNumber: number): LibraryPage {
   return {
     ...page,
     id: createId('page'),

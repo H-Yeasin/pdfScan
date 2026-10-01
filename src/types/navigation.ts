@@ -10,6 +10,8 @@ export type ScreenName =
   | 'pro'
   | 'manageFolders'
   | 'academicOptions'
+  // §5 T6.
+  | 'examPack'
   // Dev-only (__DEV__): see src/dev/FilterLabScreen.tsx.
   | 'filterLab';
 export type NavDir = 'fwd' | 'back';

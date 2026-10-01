@@ -1,7 +1,7 @@
 import { StandardFontEmbedder, StandardFonts } from 'pdf-lib';
 import { getDocType } from '../courses/docTypes';
 import { WIN_ANSI_CODE_POINTS } from './winAnsi';
-import type { Course, DocType, StudentProfile } from '../../types/models';
+import type { Course, DocType, PageOcr, StudentProfile } from '../../types/models';
 
 // Cover page templates (§4 S4). layoutCover turns a template and its values into positioned items
 // in PDF points, top-left origin; pdfService.buildCoverPage draws them with pdf-lib (vector text)
@@ -339,4 +339,57 @@ export function layoutCover(
     layout.centered(`Date of submission: ${v.date}`, 12, false, 1);
   }
   return layout.items;
+}
+
+// --- §5 T6: the exam pack's contents page ----------------------------------------------------
+
+export type ContentsEntry = { document: string; sourcePages: number[]; packPages: [number, number] };
+
+// "p. 2, 4–6, 9": 1-based page numbers with runs collapsed.
+export function pageList(pages: readonly number[]): string {
+  const sorted = [...pages].sort((a, b) => a - b);
+  const runs: string[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    runs.push(i === j ? `${sorted[i]}` : `${sorted[i]}–${sorted[j]}`);
+    i = j;
+  }
+  return `p. ${runs.join(', ')}`;
+}
+
+// The pack's first page: its title, a subtitle (course and date), then where each run of pages
+// came from: "Cell biology notes" / "p. 2, 4–6 · pack pages 2–5". Long lists wrap; a pack too
+// long for one page is cut with "…" (the pages themselves are all there).
+export function layoutContents(title: string, subtitle: string, entries: readonly ContentsEntry[], page: PageSizePt, measure: MeasureText = helveticaWidth): CoverItem[] {
+  const layout = new Layout(page, measure, MARGIN_PT + 20);
+  layout.centered(title, 22, true, 2, 4);
+  layout.centered(subtitle, 12, false, 1, 10);
+  layout.rule(18);
+  layout.centered('Contents', 14, true, 1, 8);
+  const bottom = page.height - MARGIN_PT;
+  for (const entry of entries) {
+    if (layout.y > bottom - 40) {
+      layout.centered('…', 12, false, 1);
+      break;
+    }
+    const [from, to] = entry.packPages;
+    layout.centered(entry.document, 12.5, true, 2, 2);
+    layout.centered(`${pageList(entry.sourcePages)} · pack ${from === to ? `page ${from}` : `pages ${from}–${to}`}`, 11, false, 2, 10);
+  }
+  return layout.items;
+}
+
+// OCR blocks for a page drawn from items, so a generated page (the contents page) is searchable
+// like a scan: each text item becomes a line, in master pixels (`scale` = pixels per point).
+export function itemsAsOcr(items: readonly CoverItem[], scale: number, measure: MeasureText = helveticaWidth): PageOcr {
+  const blocks = items
+    .filter((item): item is Extract<CoverItem, { kind: 'text' }> => item.kind === 'text')
+    .map((item) => {
+      const width = measure(item.text, item.size, item.bold);
+      const left = item.align === 'center' ? item.x - width / 2 : item.x;
+      const bounding = { left: left * scale, top: (item.y - item.size * 0.8) * scale, width: width * scale, height: item.size * scale };
+      return { text: item.text, bounding, lines: [{ text: item.text, bounding }] };
+    });
+  return { text: blocks.map((b) => b.text).join('\n'), blocks };
 }

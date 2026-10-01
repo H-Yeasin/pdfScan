@@ -6,6 +6,7 @@ import { readerReducer, ReaderAction, ReaderState } from './slices/readerSlice';
 import { settingsReducer, SettingsAction, SettingsState } from './slices/settingsSlice';
 import { signatureReducer, SignatureAction, SignatureState } from './slices/signatureSlice';
 import { uiReducer, UiAction, UiState } from './slices/uiSlice';
+import { packReducer, PackAction, PackState } from './slices/packSlice';
 import { changedAnything, emptyHistory, historyEntryFor, pushEntry, redo, undo } from './pageHistory';
 
 export type AppState = {
@@ -17,6 +18,7 @@ export type AppState = {
   settings: SettingsState;
   signature: SignatureState;
   ui: UiState;
+  pack: PackState;
 };
 
 export type AppAction =
@@ -27,7 +29,8 @@ export type AppAction =
   | ReaderAction
   | SettingsAction
   | SignatureAction
-  | UiAction;
+  | UiAction
+  | PackAction;
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   if (action.type === 'review/UNDO' || action.type === 'review/REDO') {
@@ -59,5 +62,6 @@ function slicesReducer(state: AppState, action: AppAction): AppState {
     settings: settingsReducer(state.settings, action as SettingsAction),
     signature: signatureReducer(state.signature, action as SignatureAction),
     ui: uiReducer(state.ui, action as UiAction),
+    pack: packReducer(state.pack, action as PackAction),
   };
 }
