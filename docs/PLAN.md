@@ -143,7 +143,7 @@ Goal: an assignment ready to upload, in one screen.
 - [x] S3 Exact size target (Under 1 / 2 / 5 / 10 MB / custom), OCR text kept
 - [x] S4 Cover page templates (Simple, Assignment, Lab report) filled from profile and course
 - [x] S5 Footer presets (page numbers, name + roll + pages) and A4 / Letter page size
-- [ ] S6 Submit button and per-course submission presets (3 taps after capture)
+- [x] S6 Submit button and per-course submission presets (3 taps after capture)
 - [ ] S7 Submission history per course, with "Share again"
 - [ ] S8 Deadline reminders (local notifications, optional)
 

@@ -278,7 +278,40 @@ As built:
 pages" footer shows on every content page but not on the cover.
 
 ### S6 · The Submit flow and per-course presets *(M)*
-Status: todo
+Status: done in code (commit 7d92973). The 3-tap check needs a device.
+
+As built:
+- `submit/preset.ts`: `SubmitPreset` as planned, `defaultSubmitPreset(courseId)`,
+  `parseSubmitPreset` (field by field, falls back per field), `serializeSubmitPreset`,
+  `presetAcademicConfig`, `presetFromDeliver(deliver, previous)`, `presetsEqual`,
+  `summarizePreset`. Migration v5 adds `courses.submit_preset`; `Course.submitPreset`.
+- **Default differs for Unsorted:** a course without a preset gets page numbers, as planned;
+  Unsorted gets no footer, so a plain Save of a receipt isn't stamped.
+- Deliver: `deliver/APPLY_PRESET` runs whenever the filing course differs from
+  `deliver.presetCourseId` (so once per session, and again on a course change); it keeps the
+  document's header and photo cover. While `deliver.rememberPreset` (default on) and the options
+  came from that course, any change is written to the course (`library/UPDATE_COURSE`). A photo
+  cover is never remembered; the course keeps its cover template. The cover's typed values and
+  the header aren't remembered either. `deliver.nameTemplate` is the per-course file-name
+  template (editable in the options card), else the Settings one.
+- `submitDocument(input)` takes an object: `{ doc, preset, profile, course, n, coverValues,
+  headerText, coverPhotoUri, quality, fileName, date, onProgress }` → `{ uri, fileName,
+  sizeBytes, fits, level }`. Pages are the library masters without a saved cover page. Without a
+  size limit it encodes at `quality` (default 3). The file name is the document's name, cleaned.
+  `buildPdfFromPages` and `buildPdfUnderLimit` gained `options: { dest, onPage }`.
+- `docTypes.typeNumberOf(doc, docs)`: a saved document's own number, for `{n}` and the cover.
+- On Submit the library copy is built at the quality slider (no size fitting); only the
+  submission is fitted. The submission is built before leaving Deliver, so progress shows.
+- Deliver layout: Name, Format, Quality, More options, Course, Type, then a "Submission" card
+  (summary line; opens to File size, Page Layout, Page size, "Cover, footer, border", the
+  course's file-name template and "Remember for …"). `StickyActions`: Submit (primary), then Save
+  and Save & Share. Page size moved here from More options.
+- Profile prompt: `ProfilePromptSheet` (name and roll, Skip), shown once
+  (`settings.profilePrompted`, persisted).
+- Earlier documents: `store/useSubmitDocument` (course preset as it is now, `canSubmit` =
+  `canSign` with pages), used by a "Submit" tool in the Library/Course selection bar (one
+  document) and the Reader's overflow menu. Recording the submission is left as a
+  `TODO(§4 S7)` in both places.
 
 - `SubmitPreset = { sizeLimitBytes: number | null; coverTemplateId: string | null; footerPreset: 'none' | 'pages' | 'namePages' | 'custom'; footerText?: string; border: boolean; pageSize: 'A4' | 'Letter'; layout: LayoutMode; nameTemplate?: string }`.
   Stored on the course: migration v5 adds `courses.submit_preset` (JSON text, nullable).
