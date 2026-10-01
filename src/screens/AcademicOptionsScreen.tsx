@@ -148,8 +148,7 @@ export function AcademicOptionsScreen() {
         previewId,
         bakedPages,
         'as-is',
-        cfg ?? undefined,
-        state.settings.ocrScript
+        cfg ?? undefined
       );
       await Print.printAsync({ uri: result.uri });
       lastPreviewIdRef.current = previewId;
@@ -161,7 +160,7 @@ export function AcademicOptionsScreen() {
     } finally {
       setPreviewing(false);
     }
-  }, [pages, previewing, state.deliver.quality, state.settings.ocrScript, cfg]);
+  }, [pages, previewing, state.deliver.quality, cfg]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>

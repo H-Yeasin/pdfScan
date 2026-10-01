@@ -146,21 +146,21 @@ export function LibraryScreen() {
       if (selectedDocs.length === 0) return;
 
       if (id === 'merge' && selectedDocs.length >= 2) {
-        const merged = await mergeDocuments(selectedDocs, state.settings.ocrScript);
+        const merged = await mergeDocuments(selectedDocs);
         selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
         dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `${selectedDocs.length} files merged` });
       } else if (id === 'split' && selectedDocs.length === 1) {
         const [doc] = selectedDocs;
-        const split = await splitDocument(doc, state.settings.ocrScript);
+        const split = await splitDocument(doc);
         deleteDocumentFiles(doc.id);
         dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({ type: 'ui/SHOW_SNACK', msg: `Split into ${split.length} files` });
       } else if (id === 'compress') {
         for (const doc of selectedDocs) {
-          const compressed = await compressDocument(doc, state.settings.ocrScript);
+          const compressed = await compressDocument(doc);
           dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
         }
         dispatch({ type: 'library/CLEAR_SELECTION' });
@@ -178,19 +178,19 @@ export function LibraryScreen() {
         }
       }
     },
-    [selectedDocs, selection, dispatch, state.signature.saved, state.settings.ocrScript]
+    [selectedDocs, selection, dispatch, state.signature.saved]
   );
 
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!signTarget) return;
-      const updated = await applySignedPage(signTarget, 0, flattenedUri, state.settings.ocrScript);
+      const updated = await applySignedPage(signTarget, 0, flattenedUri);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
     },
-    [signTarget, dispatch, state.settings.ocrScript]
+    [signTarget, dispatch]
   );
 
   const handleSignatureCaptured = useCallback(

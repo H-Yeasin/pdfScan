@@ -1,13 +1,12 @@
 import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues; also imported at the app entrypoint, but kept here too so this module is safe even if ever imported outside that graph (e.g. a future test file)
-import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
-import fontkit from '@pdf-lib/fontkit';
-import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFRef } from 'pdf-lib';
 import { renderPage } from '../enhance/skiaEnhance';
 import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { fitBox } from '../../utils/fitBox';
-import type { LibraryDocument, OcrLine, OcrScript, PageOcr } from '../../types/models';
+import type { LibraryDocument, PageOcr } from '../../types/models';
+import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
 
 // Standard-mode pages and the cover page are both fixed at true ISO A4 size, with each image
 // uniformly scaled to fit inside CONTENT_MARGIN_PT on every side (never stretched, never
@@ -21,14 +20,6 @@ const CONTENT_MARGIN_PT = 24; // matches LAYOUT_2IN1_MARGIN_PT's existing conven
 // fixed physical print size (see LAYOUT_2IN1_* below), unrelated to standard/cover pages' own A4
 // sizing above.
 const PDF_LONG_SIDE_PT = 792;
-
-// Heuristics for turning an OCR line's pixel box into an invisible text run. ML Kit's line
-// bounding box doesn't map 1:1 to any single font metric (cap-height vs ascender/descender vs
-// line-height all disagree) - these are starting points to be tuned from visual QA, not derived
-// constants. They only affect where the invisible, selectable text sits; the visible page is
-// unaffected either way.
-const FONT_SIZE_TO_BOX_HEIGHT_RATIO = 0.85;
-const BASELINE_INSET_RATIO = 0.2;
 
 // --- 2-in-1 ("Eco-Save") layout tuning ---
 // A 2-in-1 sheet is a fixed physical page meant to be printed - its whole point is a consistent,
@@ -51,40 +42,6 @@ const FOOTER_FONT_SIZE = 9;
 const COVER_TITLE_FONT_SIZE = 24;
 const COVER_SUBTITLE_FONT_SIZE = 14;
 const COVER_META_FONT_SIZE = 12;
-
-// Only Devanagari needs a custom embedded font today - Helvetica's WinAnsi encoding has no
-// Devanagari glyphs at all, which is why that OCR text silently fails to draw (see the catch in
-// drawOcrLine below). Other scripts (chinese/japanese/korean) aren't wired up yet; they still fall
-// back to Helvetica same as before, so their OCR text keeps failing to draw exactly like it did
-// pre-existing this change - not a regression introduced here, just not yet fixed.
-const DEVANAGARI_FONT_MODULE = require('../../../assets/fonts/NotoSansDevanagari-Regular.ttf');
-
-let devanagariFontBytesPromise: Promise<Uint8Array> | null = null;
-
-// Memoized at module scope, not per-build - the raw bytes never change, so the asset resolve+read
-// only happens once per app session no matter how many Devanagari PDFs get built afterward.
-function loadDevanagariFontBytes(): Promise<Uint8Array> {
-  if (!devanagariFontBytesPromise) {
-    devanagariFontBytesPromise = (async () => {
-      const asset = Asset.fromModule(DEVANAGARI_FONT_MODULE);
-      await asset.downloadAsync();
-      if (!asset.localUri) throw new Error('pdfService: Devanagari font asset has no localUri after downloadAsync()');
-      return new File(asset.localUri).bytes();
-    })();
-  }
-  return devanagariFontBytesPromise;
-}
-
-// registerFontkit is per-PDFDocument (pdf-lib throws FontkitNotRegisteredError on embedFont(bytes)
-// without it), so it must run once per build even though the underlying bytes are memoized above.
-// subset:true keeps the embedded font limited to glyphs actually drawn before pdfDoc.save() -
-// without it, pdf-lib would inline the full ~170KB font into every Devanagari-OCR'd PDF regardless
-// of how little text it has.
-async function embedDevanagariFont(pdfDoc: PDFDocument): Promise<PDFFont> {
-  pdfDoc.registerFontkit(fontkit);
-  const bytes = await loadDevanagariFontBytes();
-  return pdfDoc.embedFont(bytes, { subset: true });
-}
 
 export type PdfSourcePage = {
   uri: string;
@@ -119,43 +76,6 @@ export type AcademicConfig = {
 // fitBox's `origin`/`height`), so the OCR text lands glued to the image's glyphs no matter where or
 // how small it was placed.
 type ImagePlacement = { origin: { x: number; y: number }; heightPt: number };
-
-// PDF's origin is bottom-left; OCR `top` is measured from the image's top edge, hence the flip.
-// `placement.origin` shifts both axes by the image's actual draw position (0,0 in standard mode),
-// and `placement.heightPt` (the DRAWN image height, not the page height) is what the y-flip pivots
-// on - this is what makes the same formula correct whether the image fills the whole page or just
-// one half-column of a 2-in-1 sheet.
-function drawOcrLine(pdfPage: PDFPage, line: OcrLine, scale: number, placement: ImagePlacement, font: PDFFont): void {
-  const text = line.text.trim();
-  if (!text) return;
-
-  const { left, top, height } = line.bounding;
-  const boxHeightPt = height * scale;
-  if (!(boxHeightPt > 0)) return;
-
-  const x = placement.origin.x + left * scale;
-  const y = placement.origin.y + placement.heightPt - (top + height) * scale + boxHeightPt * BASELINE_INSET_RATIO;
-  const size = boxHeightPt * FONT_SIZE_TO_BOX_HEIGHT_RATIO;
-
-  try {
-    // opacity: 0 is the mechanism pdf-lib's public API actually exposes for invisible-but-
-    // selectable text (there is no direct "Tr 3" render-mode option) - text drawn this way is
-    // never rendered but its glyphs and positions remain in the content stream for search/select.
-    pdfPage.drawText(text, { x, y, size, font, opacity: 0 });
-  } catch (error) {
-    // Whichever font is in play (Helvetica/WinAnsi for non-Devanagari scripts, or the embedded
-    // Devanagari font otherwise) can still occasionally receive a character outside its supported
-    // glyphs. One bad line shouldn't sink the rest of the page's searchable text - same
-    // best-effort philosophy as ocrService.ts's own try/catch around OCR itself.
-    console.warn('pdfService: skipping unencodable OCR line', error);
-  }
-}
-
-function drawOcrLayer(pdfPage: PDFPage, ocr: PageOcr, scale: number, placement: ImagePlacement, font: PDFFont): void {
-  for (const block of ocr.blocks) {
-    for (const line of block.lines) drawOcrLine(pdfPage, line, scale, placement, font);
-  }
-}
 
 // How page images get into the PDF. 'as-is' embeds the file's bytes untouched - for pages that
 // are already final (library masters at quality 5, or pages Deliver rendered at the export preset).
@@ -195,6 +115,21 @@ function sniffImageKind(bytes: Uint8Array): 'png' | 'jpg' {
   const isPng =
     bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
   return isPng ? 'png' : 'jpg';
+}
+
+// The visible stamp/cover text uses a standard font (WinAnsi encoding), which throws on any
+// character it can't encode - e.g. a Bengali or Chinese name - and used to sink the export. Such
+// characters become '?' instead. Proper per-script visible fonts are planned for §6.
+const winAnsiSets = new WeakMap<PDFFont, Set<number>>();
+export function toWinAnsiSafe(text: string, font: PDFFont): string {
+  let supported = winAnsiSets.get(font);
+  if (!supported) {
+    supported = new Set(font.getCharacterSet());
+    winAnsiSets.set(font, supported);
+  }
+  let out = '';
+  for (const ch of text) out += supported.has(ch.codePointAt(0) ?? 0) ? ch : '?';
+  return out;
 }
 
 // Builds the academic cover page and appends it to `pdfDoc` via addPage(), so it becomes page
@@ -243,7 +178,8 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Prom
   const titleFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
   const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  const drawCentered = (text: string, y: number, font: PDFFont, size: number) => {
+  const drawCentered = (raw: string, y: number, font: PDFFont, size: number) => {
+    const text = toWinAnsiSafe(raw, font);
     const width = font.widthOfTextAtSize(text, size);
     page.drawText(text, { x: (A4_WIDTH_PT - width) / 2, y, size, font });
   };
@@ -286,7 +222,7 @@ function stampAcademicPage(
   }
 
   if (config.headerText) {
-    pdfPage.drawText(config.headerText, {
+    pdfPage.drawText(toWinAnsiSafe(config.headerText, font), {
       x: STAMP_INSET_PT,
       y: pageHeightPt - HEADER_Y_FROM_TOP_PT,
       size: HEADER_FONT_SIZE,
@@ -295,9 +231,10 @@ function stampAcademicPage(
   }
 
   if (config.footerText) {
-    const text = config.footerText
-      .replace('{X}', String(contentPageNumber))
-      .replace('{Y}', String(totalContentPages));
+    const text = toWinAnsiSafe(
+      config.footerText.replace('{X}', String(contentPageNumber)).replace('{Y}', String(totalContentPages)),
+      font
+    );
     const width = font.widthOfTextAtSize(text, FOOTER_FONT_SIZE);
     pdfPage.drawText(text, {
       x: (pageWidthPt - width) / 2,
@@ -319,7 +256,7 @@ async function buildStandardContentPages(
   encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
-  ocrFont: PDFFont
+  ocrFont: PDFRef
 ): Promise<void> {
   const boxWidthPt = A4_WIDTH_PT - CONTENT_MARGIN_PT * 2;
   const boxHeightPt = A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2;
@@ -340,7 +277,7 @@ async function buildStandardContentPages(
     });
 
     if (page.ocr && page.ocr.blocks.length > 0) {
-      drawOcrLayer(pdfPage, page.ocr, placement.scale, { origin: placement.origin, heightPt: placement.height }, ocrFont);
+      drawOcrTextLayer(pdfPage, ocrFont, page.ocr, { origin: placement.origin, heightPt: placement.height, scale: placement.scale });
     }
 
     // Cover page (if any) is intentionally excluded from this stamping and from the X/Y count -
@@ -361,7 +298,7 @@ async function drawTwoUpColumn(
   page: PdfSourcePage,
   encoding: PageImageEncoding,
   columnX: number,
-  ocrFont: PDFFont
+  ocrFont: PDFRef
 ): Promise<void> {
   const columnWidthPt = (LAYOUT_2IN1_WIDTH_PT - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
   const columnHeightPt = LAYOUT_2IN1_HEIGHT_PT - LAYOUT_2IN1_MARGIN_PT * 2;
@@ -377,7 +314,7 @@ async function drawTwoUpColumn(
   });
 
   if (page.ocr && page.ocr.blocks.length > 0) {
-    drawOcrLayer(pdfPage, page.ocr, placement.scale, { origin: placement.origin, heightPt: placement.height }, ocrFont);
+    drawOcrTextLayer(pdfPage, ocrFont, page.ocr, { origin: placement.origin, heightPt: placement.height, scale: placement.scale });
   }
 }
 
@@ -392,7 +329,7 @@ async function buildTwoUpContentPages(
   encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
-  ocrFont: PDFFont
+  ocrFont: PDFRef
 ): Promise<void> {
   const columnWidthPt = (LAYOUT_2IN1_WIDTH_PT - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
   const leftColumnX = LAYOUT_2IN1_MARGIN_PT;
@@ -423,18 +360,14 @@ export async function buildPdfFromPages(
   pages: PdfSourcePage[],
   encoding: PageImageEncoding,
   academicConfig?: AcademicConfig,
-  ocrScript?: OcrScript,
   layoutMode: LayoutMode = 'standard'
 ): Promise<{ uri: string; sizeBytes: number }> {
 
   const pdfDoc = await PDFDocument.create();
-  // stampFont is for header/footer only and always stays on the asset-free standard font, per
-  // scope ("Keep Western languages running on the asset-free standard fonts"). ocrFont is the one
-  // that may swap to the embedded Devanagari font - drawOcrLine's x/y/size math (above) is derived
-  // purely from the OCR bounding box + page scale, never from font metrics, so this swap changes
-  // only which glyphs get embedded/rendered, never where the (invisible) text sits on the page.
+  // stampFont draws the visible header/footer/cover text (WinAnsi only - see toWinAnsiSafe);
+  // ocrFont is the glyphless font carrying the invisible OCR text in any script (textLayer.ts).
   const stampFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const ocrFont = ocrScript === 'devanagari' ? await embedDevanagariFont(pdfDoc) : stampFont;
+  const ocrFont = await embedGlyphlessFont(pdfDoc);
 
   // --- Why inserting a cover page here can NEVER desync any content page's OCR text -----------
   // buildCoverPage() calls pdfDoc.addPage() before the loop below starts, so the cover becomes
@@ -551,14 +484,12 @@ export async function applySignatureToPdf(
 // splitDocument, compressDocument, applySignedPage) already always sets pdfUri now, so this only
 // ever fires for a genuinely pre-existing AsyncStorage record — a no-op for anything saved after
 // that change shipped.
-export async function ensureDocumentPdf(doc: LibraryDocument, ocrScript: OcrScript): Promise<LibraryDocument> {
+export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDocument> {
   if (doc.pdfUri) return doc;
   const result = await buildPdfFromPages(
     doc.id,
     doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
-    'as-is',
-    undefined,
-    ocrScript
+    'as-is'
   );
   return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes };
 }

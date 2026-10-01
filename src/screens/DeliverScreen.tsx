@@ -158,7 +158,6 @@ export function DeliverScreen() {
           contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr })),
           'as-is',
           academicConfig ?? undefined,
-          ocrScript,
           layoutMode
         );
         const pdfUri: string = pdfResult.uri;

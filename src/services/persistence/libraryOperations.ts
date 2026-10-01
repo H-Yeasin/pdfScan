@@ -5,7 +5,7 @@ import { THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { getDocumentDir } from './libraryFiles';
 import { buildSearchHaystack } from '../search/searchService';
 import { readTextWithEncodingFallback } from '../documents/txtService';
-import type { ExternalFileDocument, LibraryDocument, LibraryPage, OcrScript } from '../../types/models';
+import type { ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
 
@@ -34,7 +34,7 @@ function copyPageInto(page: LibraryPage, dir: Directory, pageNumber: number): Li
 
 // Merged output lands in the source docs' course only when they all share one; a merge combining
 // docs from different courses has no single obviously-correct destination, so it goes to Unsorted.
-export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScript): Promise<LibraryDocument> {
+export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const dir = getDocumentDir(documentId);
 
@@ -47,8 +47,7 @@ export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScri
     documentId,
     mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
     'as-is',
-    undefined,
-    ocrScript
+    undefined
   );
 
   const name = `Merged_${docs.length}_files`;
@@ -70,7 +69,7 @@ export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScri
 }
 
 // Split output stays in the source document's course.
-export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript): Promise<LibraryDocument[]> {
+export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocument[]> {
   const results: LibraryDocument[] = [];
 
   for (let i = 0; i < doc.pages.length; i++) {
@@ -86,8 +85,7 @@ export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript):
       documentId,
       [{ uri: page.fileUri, width: page.width, height: page.height, ocr: page.ocr }],
       'as-is',
-      undefined,
-      ocrScript
+      undefined
     );
     const pdfUri: string = pdfResult.uri;
     const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : new File(page.fileUri).size ?? 0;
@@ -115,14 +113,13 @@ export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript):
 // Rebuilds only document.pdf, from the untouched library masters, at the requested export
 // quality. Page images are never overwritten, so compressing is reversible: compress again at a
 // higher quality and the detail is still there.
-export async function compressDocument(doc: LibraryDocument, ocrScript: OcrScript, quality = 2): Promise<LibraryDocument> {
+export async function compressDocument(doc: LibraryDocument, quality = 2): Promise<LibraryDocument> {
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
     doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
     encodingForQuality(quality),
-    undefined,
-    ocrScript
+    undefined
   );
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
@@ -139,8 +136,7 @@ export async function compressDocument(doc: LibraryDocument, ocrScript: OcrScrip
 export async function applySignedPage(
   doc: LibraryDocument,
   pageIndex: number,
-  flattenedUri: string,
-  ocrScript: OcrScript
+  flattenedUri: string
 ): Promise<LibraryDocument> {
   const dir = getDocumentDir(doc.id);
   const dest = new File(dir, `page_${pageIndex + 1}.jpg`);
@@ -165,8 +161,7 @@ export async function applySignedPage(
     doc.id,
     pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr })),
     'as-is',
-    undefined,
-    ocrScript
+    undefined
   );
   const pdfUri: string = pdfResult.uri;
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;

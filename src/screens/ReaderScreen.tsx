@@ -80,7 +80,7 @@ export function ReaderScreen() {
     if (!doc || external || doc.pdfUri || !isPageRaster) return;
     let cancelled = false;
     setBackfilling(true);
-    ensureDocumentPdf(doc, state.settings.ocrScript).then((updated) => {
+    ensureDocumentPdf(doc).then((updated) => {
       if (cancelled) return;
       dispatch({ type: 'library/UPDATE_FILE', id: updated.id, patch: updated });
       setBackfilling(false);
@@ -88,7 +88,7 @@ export function ReaderScreen() {
     return () => {
       cancelled = true;
     };
-  }, [doc, external, isPageRaster, state.settings.ocrScript, dispatch]);
+  }, [doc, external, isPageRaster, dispatch]);
 
   // Resets all per-document viewer state when a different document/external file is opened.
   useEffect(() => {
@@ -207,12 +207,12 @@ export function ReaderScreen() {
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!doc) return;
-      const updated = await applySignedPage(doc, activeIndex, flattenedUri, state.settings.ocrScript);
+      const updated = await applySignedPage(doc, activeIndex, flattenedUri);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
     },
-    [doc, activeIndex, dispatch, state.settings.ocrScript]
+    [doc, activeIndex, dispatch]
   );
 
   const handleSignatureCaptured = useCallback(
