@@ -10,7 +10,7 @@ import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
-import type { OcrScript } from '../types/models';
+import { READY_SCRIPTS } from '../services/scripts/registry';
 
 const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'system', label: 'System' },
@@ -18,13 +18,6 @@ const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
-const AVAILABLE_SCRIPTS: { id: OcrScript; label: string }[] = [
-  { id: 'latin', label: 'English / Western (Latin)' },
-  { id: 'devanagari', label: 'Hindi · Marathi · Nepali (Devanagari)' },
-  { id: 'chinese', label: 'Chinese' },
-  { id: 'japanese', label: 'Japanese' },
-  { id: 'korean', label: 'Korean' },
-];
 
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
@@ -63,7 +56,7 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>OCR script</Text>
           <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-            {AVAILABLE_SCRIPTS.map((script) => (
+            {READY_SCRIPTS.map((script) => (
               <LanguageRow
                 key={script.id}
                 name={script.label}
