@@ -60,7 +60,18 @@ limit takes **3 taps** (Review "Next", "Submit", choosing the app in the share s
 ## Steps
 
 ### S1 · Student profile *(S)*
-Status: todo
+Status: done (commit c4f8f75)
+
+As built:
+- `StudentProfile` lives in `types/models.ts`; `submit/profile.ts` also has `EMPTY_PROFILE` and
+  `normalizeProfile` (old settings without a profile, non-string fields → `''`).
+- The Helvetica check is `pdf/winAnsi.isWinAnsiSafe(text)`, a synchronous copy of the WinAnsi
+  set, because `toWinAnsiSafe` needs an embedded font. A test checks it against Helvetica's
+  `getCharacterSet()` and against `toWinAnsiSafe`.
+- `ProfileSection` reuses `NameField` itself for the 4 fields. There is no warning colour in the
+  theme, so the hint uses `ink` with an info icon.
+- Tests are in `submit/__tests__/profile.test.ts`, `pdf/__tests__/winAnsi.test.ts` and
+  `store/__tests__/useSettingsPersistence.test.tsx` (patch + restart round trip).
 
 - `settingsSlice` and `persistence/settingsStorage.ts`:
   `profile: { name: string; roll: string; section: string; institution: string }` (all

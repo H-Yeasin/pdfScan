@@ -17,8 +17,8 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   only that step**, open only the files it names, then update its `Status:` line and tick it
   in `docs/PLAN.md`.
 - **Progress:** `docs/plan/README.md` lists every step's status and commit and what comes next.
-  Read it before starting. §0, §1, §2 (except E7's benchmark run) and §3 K1–K5 are done in code.
-  **Next: §3 K6, then §4 Submit (`docs/plan/04-submit.md`, S1 first).** Device checks are in each file's Verification section and are still open.
+  Read it before starting. §0, §1, §2 (except E7's benchmark run), §3 K1–K5 and §4 S1 are done
+  in code. **Next: §3 K6 and §4 S2 (`docs/plan/04-submit.md`).** Device checks are in each file's Verification section and are still open.
 
 ## Commands
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),

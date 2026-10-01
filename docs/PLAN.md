@@ -138,7 +138,7 @@ Goal: an assignment ready to upload, in one screen.
 
 **Detailed steps:** [`docs/plan/04-submit.md`](plan/04-submit.md)
 
-- [ ] S1 Student profile (name, roll, section, institution; stored only on the phone)
+- [x] S1 Student profile (name, roll, section, institution; stored only on the phone)
 - [ ] S2 Naming template (`{roll}_{name}_{course}_{type}{n}`) and shared files named after the document (today they arrive as `document.pdf`)
 - [ ] S3 Exact size target (Under 1 / 2 / 5 / 10 MB / custom), OCR text kept
 - [ ] S4 Cover page templates (Simple, Assignment, Lab report) filled from profile and course
