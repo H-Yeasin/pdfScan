@@ -88,14 +88,15 @@ text in every supported script is searchable in an external PDF viewer.
 ### §1 Capture
 Goal: the best camera experience for school material.
 
-- [ ] Capture modes: **Notes** (handwriting), **Document** (printed), **Board** (whiteboard or
-      blackboard, slides on a screen), **Book** (two-page spread, auto split), **ID card**. (L)
-- [ ] Mode-specific defaults: filter, crop behaviour, glare handling. (M)
-- [ ] Batch import from the gallery (for example 20 photos of an assignment from WhatsApp), with
-      auto edge detection on each one. (M)
-- [ ] Fallback capture pipeline for devices without Google Play Services and for iOS parity
-      (`expo-camera` plus our own quad detection). (L)
-- [ ] Haptic and visual feedback per page captured; page counter. (S)
+**Detailed steps:** [`docs/plan/01-capture.md`](plan/01-capture.md)
+
+- [ ] C1 Capture modes (Notes, Document, Board, Book, ID card) and mode picker
+- [ ] C2 Scanner plugin options patch (page limit per mode, gallery import in Google's scanner)
+- [ ] C3 Book mode: split two-page spreads at the gutter
+- [ ] C4 ID card mode: front and back at true size on one A4 page
+- [ ] C5 Batch gallery import with automatic cropping (OpenCV spike first)
+- [ ] C6 Haptics, per-page progress, "Scan more" loop, cancel
+- [ ] C7 Fallback when Google's scanner is unavailable (custom live camera stays in P3)
 
 **Done when:** a student can capture a 10-page handwritten assignment in under 60 seconds with no
 manual cropping on most pages.
@@ -251,4 +252,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. Next to plan: §1 Capture (`docs/plan/01-capture.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. Next to plan: §2 Review and enhance (`docs/plan/02-review-enhance.md`).
