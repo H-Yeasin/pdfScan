@@ -14,7 +14,10 @@ export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' 
 // in-image "Find" highlight feature.
 export type OcrScript = 'latin' | 'chinese' | 'devanagari' | 'japanese' | 'korean';
 export type OcrBounding = { left: number; top: number; width: number; height: number };
-export type OcrLine = { text: string; bounding: OcrBounding };
+// One recognised word (ML Kit "element"), in master pixels. §5 T1: kept for word-level
+// selection and highlights; pages OCR'd before T1 have none (features fall back to the line).
+export type OcrWord = { text: string; bounding: OcrBounding };
+export type OcrLine = { text: string; bounding: OcrBounding; words?: OcrWord[] };
 export type OcrBlock = { text: string; lines: OcrLine[]; bounding: OcrBounding };
 export type PageOcr = { text: string; blocks: OcrBlock[] };
 
@@ -151,6 +154,11 @@ export type LibraryDocument = {
   // (see promoteExternalToLibrary in libraryOperations.ts) — its `pages` array is a single
   // synthetic entry, not one real image per PDF page, so page-count/Sign/etc. must branch on this.
   sourceKind?: 'scanned' | 'imported_pdf';
+  // §5 T1: how document.pdf was laid out, written by every build, so a library page can be
+  // mapped to its PDF page and rectangle (documents/pageMap.ts). Undefined: not known yet (built
+  // before T1; filled in by the backfill), read as standard A4.
+  pdfLayout?: 'standard' | '2_in_1';
+  pdfPageSize?: 'A4' | 'Letter';
   // §3 K6: put away. Hidden from lists (behind "Show archived") but still found by search; it
   // stays in its course. Undefined = not archived.
   archived?: boolean;

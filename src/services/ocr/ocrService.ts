@@ -16,6 +16,12 @@ export async function runOcr(uri: string, script: OcrScript): Promise<PageOcr | 
       lines: block.lines.map((line) => ({
         text: line.text,
         bounding: { left: line.frame.x, top: line.frame.y, width: line.frame.width, height: line.frame.height },
+        // Word boxes (§5 T1), for selecting and highlighting single words. A wrapper version
+        // without `elements` just gives none.
+        words: (line.elements ?? []).map((word) => ({
+          text: word.text,
+          bounding: { left: word.frame.x, top: word.frame.y, width: word.frame.width, height: word.frame.height },
+        })),
       })),
     }));
 

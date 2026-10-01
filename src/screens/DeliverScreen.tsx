@@ -306,6 +306,9 @@ export function DeliverScreen() {
           // Only set when a cover page actually made it into libraryPages[0] - mirrors
           // coverPage's own condition, not just whether academicConfig exists.
           coverKind: coverPage ? academicConfig?.coverPage?.mode : undefined,
+          // §5 T1: how document.pdf was laid out, for mapping library pages onto it.
+          pdfLayout: layoutMode === '2_in_1' ? '2_in_1' : 'standard',
+          pdfPageSize: pageSize,
         };
 
         dispatch({ type: 'library/ADD_FILE', file: doc });

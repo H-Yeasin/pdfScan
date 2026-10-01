@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { backfillPdfInfo } from '../services/documents/pdfInfoBackfill';
 import { getDb } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
 import { useAppState } from './AppStateContext';
@@ -45,6 +46,14 @@ export function useLibraryPersistence(): boolean {
         dispatch({ type: 'library/SET_SUBMISSIONS', submissions: [...unsavedSubmissions, ...(stored.submissions ?? [])] });
         dispatch({ type: 'library/SET_DEADLINES', deadlines: stored.deadlines ?? [] });
         dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' });
+        // §5 T1: record the PDF layout of documents built before it was stored. In the
+        // background, one document at a time; each result is saved like any other change.
+        backfillPdfInfo(stored.documents)
+          .then((patches) => {
+            if (cancelled) return;
+            for (const { id, patch } of patches) dispatch({ type: 'library/UPDATE_FILE', id, patch });
+          })
+          .catch((error) => console.warn('PDF layout backfill failed', error));
       })
       .catch((error) => {
         if (cancelled) return;

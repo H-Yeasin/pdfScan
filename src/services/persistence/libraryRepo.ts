@@ -37,6 +37,8 @@ type DocumentRow = {
   course_id: string | null;
   doc_type: string | null;
   archived: number;
+  pdf_layout: string | null;
+  pdf_page_size: string | null;
 };
 
 type PageRow = {
@@ -213,6 +215,8 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       coverKind: (row.cover_kind ?? undefined) as LibraryDocument['coverKind'],
       sourceKind: (row.source_kind ?? undefined) as LibraryDocument['sourceKind'],
       archived: row.archived ? true : undefined,
+      pdfLayout: row.pdf_layout === '2_in_1' || row.pdf_layout === 'standard' ? row.pdf_layout : undefined,
+      pdfPageSize: row.pdf_page_size === 'Letter' || row.pdf_page_size === 'A4' ? row.pdf_page_size : undefined,
     };
   });
 
@@ -348,10 +352,12 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
     doc.courseId ?? null,
     doc.docType ?? null,
     doc.archived ? 1 : 0,
+    doc.pdfLayout ?? null,
+    doc.pdfPageSize ?? null,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
-       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -362,7 +368,7 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
          size_bytes = excluded.size_bytes, updated_at = excluded.updated_at, star = excluded.star,
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
-         archived = excluded.archived`,
+         archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size`,
       params
     );
     await db.runAsync('DELETE FROM pages WHERE document_id = ?', [doc.id]);

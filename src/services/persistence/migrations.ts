@@ -195,6 +195,18 @@ export const MIGRATIONS: Migration[] = [
       await db.execAsync('ALTER TABLE documents ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;');
     },
   },
+  {
+    // v9 (§5 T1): how document.pdf is laid out ('standard' | '2_in_1') and its paper ('A4' |
+    // 'Letter'), so library pages map to PDF pages. NULL for documents built before: filled in
+    // after load by documents/pdfInfoBackfill.ts, which reads the PDF (not possible in SQL).
+    version: 9,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE documents ADD COLUMN pdf_layout TEXT;
+        ALTER TABLE documents ADD COLUMN pdf_page_size TEXT;
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

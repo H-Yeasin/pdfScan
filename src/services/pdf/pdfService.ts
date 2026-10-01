@@ -4,7 +4,7 @@ import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage,
 import { renderPage } from '../enhance/skiaEnhance';
 import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
 import { getDocumentDir } from '../persistence/libraryFiles';
-import { fitBox } from '../../utils/fitBox';
+import { fitBox, type BoxFit } from '../../utils/fitBox';
 import type { LibraryDocument, PageLayout, PageOcr } from '../../types/models';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
 import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
@@ -33,23 +33,33 @@ const CONTENT_MARGIN_PT = 24; // matches LAYOUT_2IN1_MARGIN_PT's existing conven
 const LAYOUT_2IN1_GUTTER_PT = 15; // dividing gap between the two half-columns
 const LAYOUT_2IN1_MARGIN_PT = 24; // outer margin - most printers can't print edge-to-edge anyway
 
+// A built PDF's page count and paper (from its last page, in either orientation), for the §5 T1
+// backfill. null when it can't be read.
+export async function inspectPdf(pdfUri: string | undefined): Promise<{ pageCount: number; pageSize: PageSizeId; landscape: boolean } | null> {
+  if (!pdfUri) return null;
+  try {
+    const file = new File(pdfUri);
+    if (!file.exists) return null;
+    const pdfDoc = await PDFDocument.load(await file.bytes(), { updateMetadata: false });
+    const pages = pdfDoc.getPages();
+    const last = pages[pages.length - 1];
+    if (!last) return null;
+    const shortSide = Math.min(last.getWidth(), last.getHeight());
+    return {
+      pageCount: pages.length,
+      pageSize: Math.abs(shortSide - PageSizes.Letter[0]) < 1 ? 'Letter' : 'A4',
+      landscape: last.getWidth() > last.getHeight(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // The paper size a built PDF uses, read from its last page (never the cover, which is first), in
 // either orientation, so a library rebuild (merge, split, compress, sign) keeps it. Anything that
 // isn't Letter, or can't be read, is A4.
 export async function pageSizeOfPdf(pdfUri: string | undefined): Promise<PageSizeId> {
-  if (!pdfUri) return 'A4';
-  try {
-    const file = new File(pdfUri);
-    if (!file.exists) return 'A4';
-    const pdfDoc = await PDFDocument.load(await file.bytes(), { updateMetadata: false });
-    const pages = pdfDoc.getPages();
-    const last = pages[pages.length - 1];
-    if (!last) return 'A4';
-    const shortSide = Math.min(last.getWidth(), last.getHeight());
-    return Math.abs(shortSide - PageSizes.Letter[0]) < 1 ? 'Letter' : 'A4';
-  } catch {
-    return 'A4';
-  }
+  return (await inspectPdf(pdfUri))?.pageSize ?? 'A4';
 }
 
 // --- Academic export tuning ---
@@ -75,6 +85,23 @@ export type PdfSourcePage = {
 function contentBox(layout: PageLayout | undefined, page: PageDims): { x: number; y: number; width: number; height: number } {
   if (layout === 'fullPage') return { x: (page.width - A4.width) / 2, y: (page.height - A4.height) / 2, width: A4.width, height: A4.height };
   return marginBox(page);
+}
+
+// Where one library page's image goes on a PDF page, in points (bottom-left origin): the whole
+// page ('full', standard layout) or one column of a 2-in-1 sheet. `pageDims` is the portrait
+// paper; a 2-in-1 sheet is that paper turned landscape. The builder draws with this and
+// documents/pageMap.ts maps OCR boxes with it, so the two can't drift apart.
+export type PageSlot = 'full' | 'left' | 'right';
+export function imagePlacement(width: number, height: number, slot: PageSlot, pageDims: PageDims, layout?: PageLayout): BoxFit {
+  if (slot === 'full') {
+    const box = contentBox(layout, pageDims);
+    return fitBox(width, height, box.x, box.y, box.width, box.height);
+  }
+  const sheet = { width: pageDims.height, height: pageDims.width };
+  const columnWidthPt = (sheet.width - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
+  const columnHeightPt = sheet.height - LAYOUT_2IN1_MARGIN_PT * 2;
+  const columnX = slot === 'left' ? LAYOUT_2IN1_MARGIN_PT : LAYOUT_2IN1_MARGIN_PT + columnWidthPt + LAYOUT_2IN1_GUTTER_PT;
+  return fitBox(width, height, columnX, LAYOUT_2IN1_MARGIN_PT, columnWidthPt, columnHeightPt);
 }
 
 function marginBox(page: PageDims) {
@@ -308,8 +335,7 @@ async function buildStandardContentPages(
     contentPageNumber += 1;
     const jpgImage = await embedPageImage(pdfDoc, page.uri, encoding);
 
-    const box = contentBox(page.layout, pageDims);
-    const placement = fitBox(page.width, page.height, box.x, box.y, box.width, box.height);
+    const placement = imagePlacement(page.width, page.height, 'full', pageDims, page.layout);
 
     const pdfPage = pdfDoc.addPage([pageDims.width, pageDims.height]);
     pdfPage.drawImage(jpgImage, {
@@ -341,15 +367,12 @@ async function drawTwoUpColumn(
   pdfPage: PDFPage,
   page: PdfSourcePage,
   encoding: PageImageEncoding,
-  columnX: number,
+  slot: 'left' | 'right',
   ocrFont: PDFRef,
-  sheet: PageDims
+  pageDims: PageDims
 ): Promise<void> {
-  const columnWidthPt = (sheet.width - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
-  const columnHeightPt = sheet.height - LAYOUT_2IN1_MARGIN_PT * 2;
-
   const image = await embedPageImage(pdfDoc, page.uri, encoding);
-  const placement = fitBox(page.width, page.height, columnX, LAYOUT_2IN1_MARGIN_PT, columnWidthPt, columnHeightPt);
+  const placement = imagePlacement(page.width, page.height, slot, pageDims);
 
   pdfPage.drawImage(image, {
     x: placement.origin.x,
@@ -380,9 +403,6 @@ async function buildTwoUpContentPages(
 ): Promise<void> {
   // The chosen paper turned landscape.
   const sheet = { width: pageDims.height, height: pageDims.width };
-  const columnWidthPt = (sheet.width - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
-  const leftColumnX = LAYOUT_2IN1_MARGIN_PT;
-  const rightColumnX = LAYOUT_2IN1_MARGIN_PT + columnWidthPt + LAYOUT_2IN1_GUTTER_PT;
 
   const totalSheets = Math.ceil(pages.length / 2);
   let sheetNumber = 0;
@@ -391,11 +411,11 @@ async function buildTwoUpContentPages(
     sheetNumber += 1;
     const pdfPage = pdfDoc.addPage([sheet.width, sheet.height]);
 
-    await drawTwoUpColumn(pdfDoc, pdfPage, pages[i], encoding, leftColumnX, ocrFont, sheet);
+    await drawTwoUpColumn(pdfDoc, pdfPage, pages[i], encoding, 'left', ocrFont, pageDims);
 
     const pageB = pages[i + 1];
     if (pageB) {
-      await drawTwoUpColumn(pdfDoc, pdfPage, pageB, encoding, rightColumnX, ocrFont, sheet);
+      await drawTwoUpColumn(pdfDoc, pdfPage, pageB, encoding, 'right', ocrFont, pageDims);
     }
     onPage?.(Math.min(i + 2, pages.length), pages.length);
 
@@ -545,7 +565,7 @@ export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDo
     doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is'
   );
-  return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes };
+  return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes, pdfLayout: 'standard', pdfPageSize: 'A4' };
 }
 
 // Deliver's "≈ size" hint. Session pages are master-spec files, so their size scaled by the

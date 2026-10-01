@@ -45,13 +45,14 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
 
   // Rebuilds keep the paper size (A4 or Letter) the document was saved with; a merge takes the
   // first document's.
+  const pageSize = await pageSizeOfPdf(docs[0]?.pdfUri);
   const pdfResult = await buildPdfFromPages(
     documentId,
     mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is',
     undefined,
     'standard',
-    await pageSizeOfPdf(docs[0]?.pdfUri)
+    pageSize
   );
 
   const name = `Merged_${docs.length}_files`;
@@ -69,6 +70,8 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
     locked: false,
     searchHaystack: buildHaystack(name, mergedPages),
     courseId: docs.every((d) => d.courseId === docs[0].courseId) ? docs[0].courseId : undefined,
+    pdfLayout: 'standard',
+    pdfPageSize: pageSize,
   };
 }
 
@@ -111,6 +114,8 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
       locked: false,
       searchHaystack: buildHaystack(name, [page]),
       courseId: doc.courseId,
+      pdfLayout: 'standard',
+      pdfPageSize: pageSize,
     });
   }
 
@@ -121,6 +126,7 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
 // quality. Page images are never overwritten, so compressing is reversible: compress again at a
 // higher quality and the detail is still there.
 export async function compressDocument(doc: LibraryDocument, quality = 2): Promise<LibraryDocument> {
+  const pageSize = await pageSizeOfPdf(doc.pdfUri);
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
@@ -128,7 +134,7 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
     encodingForQuality(quality),
     undefined,
     'standard',
-    await pageSizeOfPdf(doc.pdfUri)
+    pageSize
   );
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
@@ -137,7 +143,7 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
   // buildCoverPage here, so page 0 becomes a plain fit-to-margin-box content page same as every
   // other page. coverKind must be cleared to match, or applySignatureToDocument would wrongly
   // treat a rebuilt PDF's page 0 as an unfit, full-page template cover.
-  return { ...doc, pdfUri: pdfResult.uri, sizeBytes, coverKind: undefined };
+  return { ...doc, pdfUri: pdfResult.uri, sizeBytes, coverKind: undefined, pdfLayout: 'standard', pdfPageSize: pageSize };
 }
 
 // Replaces one page's image with a signed (flattened) version, in place, and rebuilds the
@@ -164,6 +170,7 @@ export async function applySignedPage(
   const pages = doc.pages.map((page, i) =>
     i === pageIndex ? { ...page, fileUri: dest.uri, thumbUri: thumb.uri, displayUri: undefined } : page
   );
+  const pageSize = await pageSizeOfPdf(doc.pdfUri);
 
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
@@ -172,14 +179,14 @@ export async function applySignedPage(
     'as-is',
     undefined,
     'standard',
-    await pageSizeOfPdf(doc.pdfUri)
+    pageSize
   );
   const pdfUri: string = pdfResult.uri;
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
   // Same rebuild-demotes-the-cover reasoning as compressDocument above - clear coverKind so a
   // later applySignatureToDocument call doesn't misjudge page 0's placement.
-  return { ...doc, pages, pdfUri, sizeBytes, coverKind: undefined };
+  return { ...doc, pages, pdfUri, sizeBytes, coverKind: undefined, pdfLayout: 'standard', pdfPageSize: pageSize };
 }
 
 // Promotes an ephemerally-opened external file (§4 of the PDF-reader plan) into a real, permanent
