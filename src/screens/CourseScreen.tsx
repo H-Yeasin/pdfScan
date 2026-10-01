@@ -13,6 +13,7 @@ import { useDocumentListActions, useOpenDocument } from '../components/library/u
 import { SubmissionList } from '../components/submit/SubmissionList';
 import { DeadlineList } from '../components/deadlines/DeadlineList';
 import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
+import { SortUnsortedSheet } from '../components/courses/SortUnsortedSheet';
 import type { Deadline } from '../types/models';
 import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
@@ -56,10 +57,22 @@ export function CourseScreen() {
   const [deadlineEditor, setDeadlineEditor] = useState<{ deadline?: Deadline } | null>(null);
   const now = Date.now();
   const openDocument = useOpenDocument();
+  // K6: archived documents are listed only on request.
+  const [showArchived, setShowArchived] = useState(false);
+  const archivedCount = useMemo(() => docs.filter((d) => d.archived).length, [docs]);
+  const listedDocs = useMemo(() => (showArchived ? docs : docs.filter((d) => !d.archived)), [docs, showArchived]);
   const shownDocs = useMemo(
-    () => (typeFilter ? docs.filter((d) => docTypeOf(d) === typeFilter) : docs),
-    [docs, typeFilter]
+    () => (typeFilter ? listedDocs.filter((d) => docTypeOf(d) === typeFilter) : listedDocs),
+    [listedDocs, typeFilter]
   );
+  // Unsorted: a one-time "Sort them now?" banner, and a Sort button that's always there.
+  const [sorting, setSorting] = useState(false);
+  const toSort = useMemo(() => (isUnsorted ? docs.filter((d) => !d.archived) : []), [isUnsorted, docs]);
+  const showSortBanner = isUnsorted && toSort.length > 0 && !state.settings.unsortedPromptDone;
+  const startSorting = () => {
+    dispatch({ type: 'settings/SET_UNSORTED_PROMPT_DONE' });
+    setSorting(true);
+  };
 
   const goBack = () => {
     dispatch({ type: 'library/CLEAR_SELECTION' });
@@ -109,9 +122,29 @@ export function CourseScreen() {
             <Pressable style={styles.iconButton} onPress={() => setEditing(true)} accessibilityLabel="Edit course">
               <Ionicons name="create-outline" size={21} color={tokens.ink} />
             </Pressable>
+          ) : toSort.length > 0 && state.library.courses.some((c) => !c.archived) ? (
+            <Pressable style={styles.iconButton} onPress={startSorting} accessibilityLabel="Sort into courses">
+              <Ionicons name="git-pull-request-outline" size={21} color={tokens.ink} />
+            </Pressable>
           ) : null}
         </View>
       )}
+
+      {showSortBanner && !selMode && state.library.courses.some((c) => !c.archived) ? (
+        <View style={[styles.banner, { backgroundColor: tokens.accentSoft, borderColor: tokens.edge }]}>
+          <Text style={[styles.bannerText, { color: tokens.ink }]}>
+            {toSort.length} {toSort.length === 1 ? 'document has' : 'documents have'} no course. Sort them now?
+          </Text>
+          <View style={styles.bannerActions}>
+            <Pressable onPress={() => dispatch({ type: 'settings/SET_UNSORTED_PROMPT_DONE' })} accessibilityRole="button" hitSlop={8}>
+              <Text style={[styles.addLink, { color: tokens.muted }]}>Not now</Text>
+            </Pressable>
+            <Pressable onPress={startSorting} accessibilityRole="button" hitSlop={8}>
+              <Text style={[styles.addLink, { color: tokens.accentInk }]}>Sort now</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {course && !selMode ? (
         <View style={styles.deadlines}>
@@ -142,25 +175,34 @@ export function CourseScreen() {
         />
       ) : (
         <>
-          <DocTypeFilterChips docs={docs} value={typeFilter} onChange={setTypeFilter} />
+          <DocTypeFilterChips docs={listedDocs} value={typeFilter} onChange={setTypeFilter} />
           <FlatList
             data={shownDocs}
             keyExtractor={(doc) => doc.id}
             contentContainerStyle={[styles.listContent, { paddingBottom: 96 + insets.bottom }]}
             ListFooterComponent={
-              submissions.length > 0 ? (
-                <View style={styles.submitted}>
-                  <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Submitted</Text>
-                  <SubmissionList
-                    submissions={submissions}
-                    onShareAgain={shareSubmission}
-                    onOpen={(s) => {
-                      const doc = files.find((f) => f.id === s.documentId);
-                      if (doc) openDocument(doc);
-                    }}
-                  />
-                </View>
-              ) : null
+              <>
+                {archivedCount > 0 ? (
+                  <Pressable style={styles.archivedToggle} onPress={() => setShowArchived((v) => !v)} accessibilityRole="button">
+                    <Text style={[styles.addLink, { color: tokens.accentInk }]}>
+                      {showArchived ? 'Hide archived' : `Show ${archivedCount} archived`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {submissions.length > 0 ? (
+                  <View style={styles.submitted}>
+                    <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Submitted</Text>
+                    <SubmissionList
+                      submissions={submissions}
+                      onShareAgain={shareSubmission}
+                      onOpen={(s) => {
+                        const doc = files.find((f) => f.id === s.documentId);
+                        if (doc) openDocument(doc);
+                      }}
+                    />
+                  </View>
+                ) : null}
+              </>
             }
             renderItem={({ item }) => (
               <FileRow
@@ -191,6 +233,7 @@ export function CourseScreen() {
       ) : null}
 
       {course ? <CourseEditorSheet visible={editing} course={course} onClose={() => setEditing(false)} /> : null}
+      {isUnsorted ? <SortUnsortedSheet visible={sorting} docs={toSort} onClose={() => setSorting(false)} /> : null}
       {course ? (
         <DeadlineEditorSheet
           visible={deadlineEditor !== null}
@@ -279,5 +322,26 @@ const styles = StyleSheet.create({
   addLink: {
     fontSize: 13.5,
     fontWeight: '600',
+  },
+  banner: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  bannerText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bannerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
+  },
+  archivedToggle: {
+    alignSelf: 'center',
+    paddingVertical: spacing.md,
   },
 });

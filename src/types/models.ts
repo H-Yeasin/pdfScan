@@ -151,6 +151,9 @@ export type LibraryDocument = {
   // (see promoteExternalToLibrary in libraryOperations.ts) — its `pages` array is a single
   // synthetic entry, not one real image per PDF page, so page-count/Sign/etc. must branch on this.
   sourceKind?: 'scanned' | 'imported_pdf';
+  // §3 K6: put away. Hidden from lists (behind "Show archived") but still found by search; it
+  // stays in its course. Undefined = not archived.
+  archived?: boolean;
 };
 
 // A file opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —

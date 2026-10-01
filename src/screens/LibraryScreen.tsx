@@ -7,6 +7,9 @@ import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { CourseList } from '../components/courses/CourseList';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
+import { CourseFilterChips } from '../components/courses/CourseFilterChips';
+import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
+import { courseColorValue } from '../services/courses/palette';
 import { SubmittedFilterChips, type SubmittedFilter } from '../components/submit/SubmittedFilterChips';
 import { docTypeOf } from '../services/courses/docTypes';
 import type { DocType } from '../types/models';
@@ -37,6 +40,13 @@ export function LibraryScreen() {
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
   const [submittedFilter, setSubmittedFilter] = useState<SubmittedFilter>('all');
+  // K6: search results by course; archived documents are hidden from the lists (not from search).
+  const [courseFilter, setCourseFilter] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const searching = search.trim() !== '';
+  useEffect(() => {
+    if (!searching) setCourseFilter(null);
+  }, [searching]);
   const submittedIds = useMemo(() => new Set(state.library.submissions.map((s) => s.documentId)), [state.library.submissions]);
 
   useEffect(() => {
@@ -57,17 +67,33 @@ export function LibraryScreen() {
   const searchedFiles = useMemo(() => {
     // The Courses tab shows the course list; a course's documents are on its own page (CourseScreen).
     const tabbed = tab === 'starred' ? files.filter((f) => f.star) : files;
-    if (!search.trim()) return tabbed;
+    if (!search.trim()) return showArchived ? tabbed : tabbed.filter((f) => !f.archived);
     if (searchResultIds === null) return searchDocuments(tabbed, search);
     const idSet = new Set(searchResultIds);
     return tabbed.filter((f) => idSet.has(f.id));
-  }, [files, tab, search, searchResultIds]);
+  }, [files, tab, search, searchResultIds, showArchived]);
+
+  const archivedCount = useMemo(
+    () => (tab === 'starred' ? files.filter((f) => f.star) : files).filter((f) => f.archived).length,
+    [files, tab]
+  );
+  const courseColorOf = useCallback(
+    (courseId: string | undefined) => {
+      const course = courseId ? state.library.courses.find((c) => c.id === courseId) : undefined;
+      return course ? courseColorValue(course.color, tokens) : undefined;
+    },
+    [state.library.courses, tokens]
+  );
 
   const visibleFiles = useMemo(() => {
-    const typed = typeFilter ? searchedFiles.filter((f) => docTypeOf(f) === typeFilter) : searchedFiles;
+    const byCourse =
+      searching && courseFilter
+        ? searchedFiles.filter((f) => (courseFilter === UNSORTED_COURSE_ID ? !f.courseId : f.courseId === courseFilter))
+        : searchedFiles;
+    const typed = typeFilter ? byCourse.filter((f) => docTypeOf(f) === typeFilter) : byCourse;
     if (submittedFilter === 'all') return typed;
     return typed.filter((f) => submittedIds.has(f.id) === (submittedFilter === 'submitted'));
-  }, [searchedFiles, typeFilter, submittedFilter, submittedIds]);
+  }, [searchedFiles, searching, courseFilter, typeFilter, submittedFilter, submittedIds]);
 
   const courseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -173,18 +199,31 @@ export function LibraryScreen() {
         />
       ) : (
         <>
+          {searching ? (
+            <CourseFilterChips docs={searchedFiles} courses={state.library.courses} value={courseFilter} onChange={setCourseFilter} />
+          ) : null}
           <DocTypeFilterChips docs={searchedFiles} value={typeFilter} onChange={setTypeFilter} />
           {submittedIds.size > 0 ? <SubmittedFilterChips value={submittedFilter} onChange={setSubmittedFilter} /> : null}
           <FlatList
             data={visibleFiles}
             keyExtractor={(doc) => doc.id}
             contentContainerStyle={styles.listContent}
+            ListFooterComponent={
+              !searching && archivedCount > 0 ? (
+                <Pressable style={styles.archivedToggle} onPress={() => setShowArchived((v) => !v)} accessibilityRole="button">
+                  <Text style={[styles.archivedToggleLabel, { color: tokens.accentInk }]}>
+                    {showArchived ? 'Hide archived' : `Show ${archivedCount} archived`}
+                  </Text>
+                </Pressable>
+              ) : null
+            }
             renderItem={({ item }) => (
               <FileRow
                 doc={item}
                 selected={selection.includes(item.id)}
                 selectionMode={selMode}
                 matchSnippet={getMatchSnippet(item, search)}
+                courseColor={courseColorOf(item.courseId)}
                 onPress={() => handlePressRow(item)}
                 onLongPress={() => handleLongPress(item)}
                 onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
@@ -258,5 +297,14 @@ const styles = StyleSheet.create({
   listContent: {
     padding: spacing.lg,
     gap: spacing.sm,
+  },
+  archivedToggle: {
+    alignSelf: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  archivedToggleLabel: {
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

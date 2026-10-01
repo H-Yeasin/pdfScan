@@ -36,6 +36,7 @@ type DocumentRow = {
   source_kind: string | null;
   course_id: string | null;
   doc_type: string | null;
+  archived: number;
 };
 
 type PageRow = {
@@ -211,6 +212,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       docType: toDocType(row.doc_type),
       coverKind: (row.cover_kind ?? undefined) as LibraryDocument['coverKind'],
       sourceKind: (row.source_kind ?? undefined) as LibraryDocument['sourceKind'],
+      archived: row.archived ? true : undefined,
     };
   });
 
@@ -345,10 +347,11 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
     doc.sourceKind ?? null,
     doc.courseId ?? null,
     doc.docType ?? null,
+    doc.archived ? 1 : 0,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
-       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -358,7 +361,8 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
          mode = excluded.mode, pdf_path = excluded.pdf_path, content_path = excluded.content_path,
          size_bytes = excluded.size_bytes, updated_at = excluded.updated_at, star = excluded.star,
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
-         source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type`,
+         source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
+         archived = excluded.archived`,
       params
     );
     await db.runAsync('DELETE FROM pages WHERE document_id = ?', [doc.id]);

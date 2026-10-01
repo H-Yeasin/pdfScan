@@ -91,6 +91,7 @@ export type LibraryAction =
   | { type: 'library/SET_TIMETABLE'; timetable: TimetableSlot[] }
   | { type: 'library/SET_SUBMISSIONS'; submissions: Submission[] }
   | { type: 'library/ADD_SUBMISSION'; submission: Submission }
+  | { type: 'library/SET_ARCHIVED'; ids: string[]; archived: boolean }
   | { type: 'library/SET_DEADLINES'; deadlines: Deadline[] }
   | { type: 'library/ADD_DEADLINE'; deadline: Deadline }
   | { type: 'library/UPDATE_DEADLINE'; id: string; patch: Partial<Omit<Deadline, 'id'>> }
@@ -275,6 +276,11 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return { ...state, submissions: action.submissions };
     case 'library/ADD_SUBMISSION':
       return { ...state, submissions: [action.submission, ...state.submissions] };
+    case 'library/SET_ARCHIVED':
+      return {
+        ...state,
+        files: state.files.map((f) => (action.ids.includes(f.id) ? { ...f, archived: action.archived || undefined } : f)),
+      };
     case 'library/SET_DEADLINES':
       return { ...state, deadlines: byDueAt(action.deadlines) };
     case 'library/ADD_DEADLINE':

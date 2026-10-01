@@ -22,6 +22,8 @@ export type PersistedSettings = {
   nameTemplate?: string;
   // Optional: added in §4 S6.
   profilePrompted?: boolean;
+  // Optional: added in §3 K6.
+  unsortedPromptDone?: boolean;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

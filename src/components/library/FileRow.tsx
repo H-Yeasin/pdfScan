@@ -16,12 +16,15 @@ type FileRowProps = {
   selected: boolean;
   selectionMode: boolean;
   matchSnippet?: string;
+  // The course's colour, shown as a dot before the name where rows from several courses mix
+  // (Library, search results). Undefined: no dot.
+  courseColor?: string;
   onPress: () => void;
   onLongPress: () => void;
   onToggleStar: () => void;
 };
 
-export function FileRow({ doc, selected, selectionMode, matchSnippet, onPress, onLongPress, onToggleStar }: FileRowProps) {
+export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColor, onPress, onLongPress, onToggleStar }: FileRowProps) {
   const { tokens } = useTheme();
   const cover = doc.pages[0];
 
@@ -53,14 +56,18 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, onPress, o
       </View>
 
       <View style={styles.info}>
-        <Text style={[styles.name, { color: tokens.ink }]} numberOfLines={1}>
-          {doc.name}
-        </Text>
+        <View style={styles.nameRow}>
+          {courseColor ? <View style={[styles.courseDot, { backgroundColor: courseColor }]} /> : null}
+          <Text style={[styles.name, { color: tokens.ink }]} numberOfLines={1}>
+            {doc.name}
+          </Text>
+        </View>
         <Text style={[styles.meta, { color: tokens.muted }]}>
           {isPageRasterFormat(doc.format)
             ? `${doc.pages.length} ${doc.pages.length === 1 ? 'page' : 'pages'}`
             : doc.format}{' '}
           · {formatBytes(doc.sizeBytes)} · {formatRelativeDate(doc.createdAt)}
+          {doc.archived ? ' · Archived' : ''}
         </Text>
         {matchSnippet ? (
           <Text style={[styles.snippet, { color: tokens.accentInk }]} numberOfLines={1}>
@@ -116,7 +123,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 3,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  courseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   name: {
+    flexShrink: 1,
     fontSize: 15.5,
     fontWeight: '500',
   },

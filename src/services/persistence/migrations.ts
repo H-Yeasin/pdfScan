@@ -188,6 +188,13 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v8 (§3 K6): documents can be archived (hidden from lists, still searchable).
+    version: 8,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE documents ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;');
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

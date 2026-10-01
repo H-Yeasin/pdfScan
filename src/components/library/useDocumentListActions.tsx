@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { DocTypePickerModal } from '../courses/DocTypeChips';
+import { FolderPickerModal } from '../deliver/FolderPickerModal';
+import { createId } from '../../utils/id';
 import { SignatureCaptureModal } from '../shared/SignatureCaptureModal';
 import { SignatureModal } from '../shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
@@ -37,7 +39,7 @@ export function useOpenDocument() {
 // What a document list does with its rows, shared by the Library and Course screens: tap opens
 // (or toggles, in selection mode), long-press starts selecting, and the SelectionBar's tools
 // (merge, split, compress, sign, set type). Selection lives in state.library, so it's one selection
-// app-wide. Render `overlays` once in the screen: it holds the signing overlays and the type picker.
+// app-wide. Render `overlays` once in the screen: it holds the signing overlays and the type and course pickers.
 export function useDocumentListActions() {
   const { state, dispatch } = useAppState();
   const { files, selection, selMode } = state.library;
@@ -46,6 +48,7 @@ export function useDocumentListActions() {
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [movePickerOpen, setMovePickerOpen] = useState(false);
   const submit = useSubmitDocument();
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
@@ -75,6 +78,26 @@ export function useDocumentListActions() {
 
       if (id === 'type') {
         setTypePickerOpen(true);
+        return;
+      }
+
+      if (id === 'move') {
+        setMovePickerOpen(true);
+        return;
+      }
+
+      // Archive (or bring back, when all of them are archived). Only a flag: nothing moves.
+      if (id === 'archive') {
+        const ids = selectedDocs.map((d) => d.id);
+        const archived = !selectedDocs.every((d) => d.archived);
+        dispatch({ type: 'library/SET_ARCHIVED', ids, archived });
+        dispatch({ type: 'library/CLEAR_SELECTION' });
+        dispatch({
+          type: 'ui/SHOW_SNACK',
+          msg: `${ids.length} ${ids.length === 1 ? 'document' : 'documents'} ${archived ? 'archived' : 'back from the archive'}`,
+          action: 'Undo',
+          onAction: () => dispatch({ type: 'library/SET_ARCHIVED', ids, archived: !archived }),
+        });
         return;
       }
 
@@ -166,6 +189,10 @@ export function useDocumentListActions() {
   const firstType = selectedDocs.length > 0 ? docTypeOf(selectedDocs[0]) : null;
   const sharedType = firstType && selectedDocs.every((d) => docTypeOf(d) === firstType) ? firstType : null;
 
+  // The course every selected document is in, if they share one (marked in the picker).
+  const sharedCourseId =
+    selectedDocs.length > 0 && selectedDocs.every((d) => d.courseId === selectedDocs[0].courseId) ? (selectedDocs[0].courseId ?? null) : null;
+
   const overlays = (
     <>
       <DocTypePickerModal
@@ -177,6 +204,27 @@ export function useDocumentListActions() {
           dispatch({ type: 'library/CLEAR_SELECTION' });
         }}
         onClose={() => setTypePickerOpen(false)}
+      />
+
+      {/* "Move" (K6): files a whole selection under one course, or Unsorted. Only the course id
+          changes, never the files, so it's one quick write however many are moved. */}
+      <FolderPickerModal
+        visible={movePickerOpen}
+        courses={state.library.courses}
+        selectedCourseId={sharedCourseId}
+        onSelect={(courseId) => {
+          const ids = selectedDocs.map((d) => d.id);
+          dispatch({ type: 'library/ASSIGN_COURSE', ids, courseId });
+          dispatch({ type: 'library/CLEAR_SELECTION' });
+          const name = courseId ? state.library.courses.find((c) => c.id === courseId)?.name : 'Unsorted';
+          dispatch({ type: 'ui/SHOW_SNACK', msg: `Moved ${ids.length} to ${name ?? 'course'}` });
+        }}
+        onCreate={(name) => {
+          const id = createId('course');
+          dispatch({ type: 'library/CREATE_COURSE', id, name });
+          return id;
+        }}
+        onClose={() => setMovePickerOpen(false)}
       />
 
       {signTarget && signTarget.format === 'JPG' && (

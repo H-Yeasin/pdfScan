@@ -41,6 +41,7 @@ export function useSettingsPersistence() {
         }
         dispatch({ type: 'settings/SET_PROFILE', profile: normalizeProfile(settings.profile) });
         if (settings.profilePrompted === true) dispatch({ type: 'settings/SET_PROFILE_PROMPTED' });
+        if (settings.unsortedPromptDone === true) dispatch({ type: 'settings/SET_UNSORTED_PROMPT_DONE' });
         // An emptied template would name nothing; the default is the better reading of it.
         if (typeof settings.nameTemplate === 'string' && settings.nameTemplate.trim()) {
           dispatch({ type: 'settings/SET_NAME_TEMPLATE', template: settings.nameTemplate });
@@ -71,6 +72,7 @@ export function useSettingsPersistence() {
       profile: state.settings.profile,
       nameTemplate: state.settings.nameTemplate,
       profilePrompted: state.settings.profilePrompted,
+      unsortedPromptDone: state.settings.unsortedPromptDone,
     });
   }, [
     loaded,
@@ -87,5 +89,6 @@ export function useSettingsPersistence() {
     state.settings.profile,
     state.settings.nameTemplate,
     state.settings.profilePrompted,
+    state.settings.unsortedPromptDone,
   ]);
 }

@@ -29,7 +29,7 @@ function pluralFiles(n: number): string {
 export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListProps) {
   const { tokens } = useTheme();
   const { state, dispatch } = useAppState();
-  const { courses } = state.library;
+  const { courses, files } = state.library;
 
   const [editing, setEditing] = useState<{ course?: Course } | null>(null);
   const [quickSetup, setQuickSetup] = useState(false);
@@ -49,11 +49,26 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () =>
-          Alert.alert('Delete course?', 'Files inside stay in your library, moved to Unsorted.', [
+        onPress: () => {
+          // K6: say what happens to its documents, and offer archiving, which keeps them together.
+          const count = files.filter((f) => f.courseId === course.id).length;
+          const body =
+            count === 0
+              ? 'It has no documents.'
+              : `Its ${count} ${count === 1 ? 'document moves' : 'documents move'} to Unsorted; nothing is deleted. Archiving keeps them together under the course instead.`;
+          Alert.alert(`Delete ${course.name}?`, body, [
             { text: 'Cancel', style: 'cancel' },
+            ...(course.archived || count === 0
+              ? []
+              : [
+                  {
+                    text: 'Archive instead',
+                    onPress: () => dispatch({ type: 'library/UPDATE_COURSE', id: course.id, patch: { archived: true } }),
+                  },
+                ]),
             { text: 'Delete', style: 'destructive', onPress: () => dispatch({ type: 'library/DELETE_COURSE', id: course.id }) },
-          ]),
+          ]);
+        },
       },
       { text: 'Cancel', style: 'cancel' },
     ]);

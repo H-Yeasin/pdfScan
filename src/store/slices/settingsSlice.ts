@@ -34,6 +34,9 @@ export type SettingsState = {
   // True once the first Submit has asked for the name and roll (answered or skipped), so it
   // never asks again; Settings > Profile is always there.
   profilePrompted: boolean;
+  // §3 K6: the Unsorted page's "n documents have no course. Sort them now?" banner was answered
+  // or dismissed, so it isn't shown again.
+  unsortedPromptDone: boolean;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -50,6 +53,7 @@ export const initialSettingsState: SettingsState = {
   profile: EMPTY_PROFILE,
   nameTemplate: DEFAULT_NAME_TEMPLATE,
   profilePrompted: false,
+  unsortedPromptDone: false,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -77,7 +81,8 @@ export type SettingsAction =
   // A partial patch, so each profile field can be edited on its own.
   | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> }
   | { type: 'settings/SET_NAME_TEMPLATE'; template: string }
-  | { type: 'settings/SET_PROFILE_PROMPTED' };
+  | { type: 'settings/SET_PROFILE_PROMPTED' }
+  | { type: 'settings/SET_UNSORTED_PROMPT_DONE' };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -103,6 +108,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, lastOpened: action.lastOpened };
     case 'settings/SET_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.profile } };
+    case 'settings/SET_UNSORTED_PROMPT_DONE':
+      return { ...state, unsortedPromptDone: true };
     case 'settings/SET_PROFILE_PROMPTED':
       return { ...state, profilePrompted: true };
     case 'settings/SET_NAME_TEMPLATE':
