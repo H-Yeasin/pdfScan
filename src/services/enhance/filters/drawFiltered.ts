@@ -34,7 +34,13 @@ export function drawFiltered(
   // changed (crop, rotate) and haven't been re-measured yet. It's two small read-backs, so cheap.
   const stats = page.stats ?? analyzeImage(image);
   const source = spec.lightCorrect
-    ? makeLightCorrectedShader(image, width, height, stats.light, lightParamsFrom(params))
+    ? makeLightCorrectedShader(
+        image,
+        width,
+        height,
+        spec.lightStats ? spec.lightStats(stats, page.filterOptions ?? {}) : stats.light,
+        lightParamsFrom(params)
+      )
     : image.makeShaderOptions(TileMode.Clamp, TileMode.Clamp, FilterMode.Linear, MipmapMode.Linear);
   const output = spec.build({
     image,

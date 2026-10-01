@@ -3,6 +3,8 @@ import type { SkColorFilter, SkImage, SkShader } from '@shopify/react-native-ski
 import type { Ionicons } from '@expo/vector-icons';
 import { autoMatrices, COLOR_MIN_SPAN, COLOR_SATURATION_BOOST, colorMatrices, grayMatrices, LUMA_MIN_SPAN } from './filterMath';
 import type { ColorMatrix } from './filterMath';
+import { makeBoardShader } from './board';
+import { chalkLevel, GLARE_CHROMA, GLARE_LUMA, isDarkBoard, MARKER_GAMMA, SAT_BOOST, WHITE_POINT } from './boardMath';
 import { kneesFromStats, makeInkShader } from './ink';
 import { DEFAULT_FADE_LINES, DEFAULT_KEEP_INK_COLOR, INK_CEIL, INK_GAMMA, LINE_FRAC, LINE_SAT_MAX } from './inkMath';
 import { LIGHT_RADIUS, LIGHT_SIGMA, PAPER_WHITE } from './lightCorrect';
@@ -43,10 +45,12 @@ export type FilterSpec = {
   // shadows and lamp tints are divided out before levels. Its stats are measured on the corrected
   // page too (stats.ts), so this is only meaningful for filters built on `source` or a colour filter.
   lightCorrect: boolean;
-  // False hides the filter from the Review picker. Board (E5) has a registry entry so every
-  // EnhanceMode has a spec, but its real pipeline doesn't exist yet.
+  // False hides a filter from the Review picker (for one whose pipeline isn't built yet).
   available: boolean;
   params: FilterParam[];
+  // Overrides which light correction runs (light or dark page) when the filter knows better than
+  // the detection - Board's forced board type. Defaults to stats.light.
+  lightStats?: (stats: ImageStats, options: FilterOptions) => ImageStats['light'];
   build: (ctx: FilterContext) => FilterOutput;
 };
 
@@ -157,15 +161,45 @@ export const FILTERS: FilterSpec[] = [
     }),
   },
   {
-    // Placeholder until E5: renders as Auto.
+    // Whiteboards, blackboards and slides. See boardMath.ts.
     id: 'board',
     label: 'Board',
     icon: 'easel-outline',
     adjustable: true,
     lightCorrect: true,
-    available: false,
-    params: LIGHT_PARAMS,
-    build: ({ stats }) => ({ colorFilter: matrixChainFilter(autoMatrices(stats)) }),
+    available: true,
+    params: [
+      { key: 'whitePoint', label: 'White point', min: 0.6, max: 1, default: WHITE_POINT },
+      { key: 'satBoost', label: 'Marker saturation boost', min: 0, max: 1.5, default: SAT_BOOST },
+      { key: 'markerGamma', label: 'Marker darkening (gamma)', min: 0.5, max: 3, default: MARKER_GAMMA },
+      { key: 'glareLuma', label: 'Glare luma', min: 0.8, max: 1, default: GLARE_LUMA },
+      { key: 'glareChroma', label: 'Glare max chroma', min: 0, max: 0.4, default: GLARE_CHROMA },
+      ...LIGHT_PARAMS,
+    ],
+    // A forced board type also switches the correction, so a blackboard the detection called light
+    // is still estimated with erode and kept at its own colour. Its bgMean was measured with the
+    // other morphology then - close enough for a page near the detection threshold.
+    lightStats: (stats, options) => {
+      const dark = isDarkBoard(options.boardStyle, stats);
+      return { dark, bgMean: stats.light?.bgMean ?? [1, 1, 1] };
+    },
+    build: ({ source, stats, options, params }) => {
+      const dark = isDarkBoard(options.boardStyle, stats);
+      const board = stats.light?.bgMean ?? [0.2, 0.2, 0.2];
+      return {
+        shader: makeBoardShader(
+          source,
+          dark ? { board, chalk: chalkLevel(board, stats.tone?.bright), keepDark: !!options.keepDarkBoard } : null,
+          {
+            whitePoint: params.whitePoint,
+            satBoost: params.satBoost,
+            markerGamma: params.markerGamma,
+            glareLuma: params.glareLuma,
+            glareChroma: params.glareChroma,
+          }
+        ),
+      };
+    },
   },
   {
     // A binarized page has no continuous tone for the sliders to act on.

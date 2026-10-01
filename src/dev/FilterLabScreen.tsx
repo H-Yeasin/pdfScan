@@ -8,7 +8,7 @@ import { FontStyle, ImageFormat, Skia } from '@shopify/react-native-skia';
 import type { SkImage, SkPicture } from '@shopify/react-native-skia';
 import { AdjustSlider } from '../components/review/AdjustSlider';
 import { FilteredPreview } from '../components/review/FilteredPreview';
-import { InkOptions } from '../components/review/InkOptions';
+import { FilterOptionsPanel } from '../components/review/FilterOptionsPanel';
 import { useRouter } from '../navigation/router';
 import { drawFiltered } from '../services/enhance/filters/drawFiltered';
 import { FILTERS, resolveFilterParams } from '../services/enhance/filters/registry';
@@ -101,7 +101,7 @@ export function FilterLabScreen() {
   const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<EnhanceMode>('auto');
   const [overrides, setOverrides] = useState<OverridesByFilter>({});
-  // Shared by every cell (only Ink reads them today), like a page's FilterOptions.
+  // Shared by every cell (Ink and Board read them), like a page's FilterOptions.
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({});
 
   const handlePick = useCallback(async () => {
@@ -205,9 +205,11 @@ export function FilterLabScreen() {
         {lab && (
           <View style={[styles.params, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
             <Text style={[styles.paramsTitle, { color: tokens.ink }]}>{selectedSpec.label} parameters</Text>
-            {selectedSpec.id === 'ink' && (
-              <InkOptions value={filterOptions} onChange={(next) => setFilterOptions((prev) => ({ ...prev, ...next }))} />
-            )}
+            <FilterOptionsPanel
+              mode={selectedSpec.id}
+              value={filterOptions}
+              onChange={(next) => setFilterOptions((prev) => ({ ...prev, ...next }))}
+            />
             {selectedSpec.params.length === 0 && (
               <Text style={{ color: tokens.muted }}>This filter has no tunable parameters yet.</Text>
             )}

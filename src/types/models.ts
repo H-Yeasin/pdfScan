@@ -29,8 +29,9 @@ export type ImageStats = {
   b: ChannelStats;
   luma: ChannelStats;
   light?: { dark: boolean; bgMean: [number, number, number] };
-  // Corrected-page paper (median) and ink (2nd percentile) luma, for the Ink filter's knees.
-  tone?: { paper: number; ink: number };
+  // Corrected-page luma: median (paper/board), 2nd percentile (ink, for the Ink knees) and 98th
+  // percentile (chalk, for the dark-board stretch).
+  tone?: { paper: number; ink: number; bright: number };
 };
 
 // Per-page options for the Ink (E4) and Board (E5) filters. Ignored by every other filter.
@@ -38,6 +39,8 @@ export type FilterOptions = {
   keepInkColor?: boolean;
   fadeLines?: boolean;
   boardStyle?: 'auto' | 'light' | 'dark';
+  // Board filter, dark boards only: keep the board dark instead of inverting to chalk-on-white.
+  keepDarkBoard?: boolean;
 };
 
 export type SessionPage = {

@@ -7,7 +7,7 @@ import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { EnhanceSegmented } from '../components/review/EnhanceSegmented';
 import { FilteredPreview } from '../components/review/FilteredPreview';
-import { InkOptions } from '../components/review/InkOptions';
+import { FilterOptionsPanel } from '../components/review/FilterOptionsPanel';
 import { GridPagesModal } from '../components/review/GridPagesModal';
 import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
@@ -473,9 +473,11 @@ export function ReviewScreen() {
           <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} onLive={setLiveAdjust} />
         )}
         <EnhanceSegmented value={selectedPage.enhance} onChange={handleEnhanceChange} />
-        {selectedPage.enhance === 'ink' && (
-          <InkOptions value={selectedPage.filterOptions} onChange={handleFilterOptionsChange} />
-        )}
+        <FilterOptionsPanel
+          mode={selectedPage.enhance}
+          value={selectedPage.filterOptions}
+          onChange={handleFilterOptionsChange}
+        />
       </View>
 
       <ContextBar onPress={handleContextBarPress} ocrRunning={ocrRunning} />

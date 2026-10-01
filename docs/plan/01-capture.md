@@ -73,7 +73,7 @@ Status: todo
   |---|---|---|---|
   | **Notes** | `ink` | 50 | none |
   | **Document** | `auto` | 50 | none |
-  | **Board** | `color` | 20 | none |
+  | **Board** | `board` | 20 | none |
   | **Book** | `auto` | 50 | `splitSpread` |
   | **ID card** | `color` | 2 | `idCard` |
 

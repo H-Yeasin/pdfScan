@@ -2,6 +2,7 @@ import { AlphaType, ColorType, FilterMode, MipmapMode, Skia } from '@shopify/rea
 import type { SkImage } from '@shopify/react-native-skia';
 import { channelStatsFromHistogram, LUMA_B, LUMA_G, LUMA_R } from './filterMath';
 import { makeBackgroundImage } from './lightCorrect';
+import { CHALK_PERCENTILE } from './boardMath';
 import { INK_PERCENTILE, percentileFromHistogram } from './inkMath';
 import { correctionTarget, DARK_PAGE_MEDIAN, divideByBackground, medianFromHistogram } from './lightCorrectMath';
 import type { LightStats } from './lightCorrectMath';
@@ -98,9 +99,9 @@ export function analyzeImage(image: SkImage): ImageStats {
   };
 }
 
-// Paper and ink luma of the corrected page at TONE_ANALYSIS_SIZE, for the Ink filter's knees
-// (inkMath.inkKnees). Same divide as above; luma only.
-function analyzeTone(image: SkImage, background: SkImage, target: [number, number, number]): { paper: number; ink: number } {
+// Paper, ink and chalk luma of the corrected page at TONE_ANALYSIS_SIZE, for the Ink filter's
+// knees (inkMath.inkKnees) and the Board filter's chalk level. Same divide as above; luma only.
+function analyzeTone(image: SkImage, background: SkImage, target: [number, number, number]): NonNullable<ImageStats['tone']> {
   const pixels = readSmall(image, TONE_ANALYSIS_SIZE);
   const bgPixels = readSmall(background, TONE_ANALYSIS_SIZE);
   const counts = new Uint32Array(256);
@@ -111,7 +112,11 @@ function analyzeTone(image: SkImage, background: SkImage, target: [number, numbe
     counts[Math.round((LUMA_R * r + LUMA_G * g + LUMA_B * b) * 255)]++;
   }
   const total = TONE_ANALYSIS_SIZE * TONE_ANALYSIS_SIZE;
-  return { paper: medianFromHistogram(counts, total), ink: percentileFromHistogram(counts, total, INK_PERCENTILE) };
+  return {
+    paper: medianFromHistogram(counts, total),
+    ink: percentileFromHistogram(counts, total, INK_PERCENTILE),
+    bright: percentileFromHistogram(counts, total, CHALK_PERCENTILE),
+  };
 }
 
 // Decode + analyze for callers that only hold a file URI (page ingest). Best-effort like OCR: a

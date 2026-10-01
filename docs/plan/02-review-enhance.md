@@ -220,7 +220,29 @@ plastic sleeve), the paper is white, the lines are faded, and pencil is clearly 
 least as good as `bw` (Sauvola) on every page.
 
 ### E5 · Board filter for whiteboards, blackboards and slides *(M)*
-Status: todo
+Status: done (see git log); the Filter Lab check (3 whiteboards, 2 blackboards) on a device is still open. As built:
+- `filters/boardMath.ts` holds the pure formulas and `filters/board.ts` mirrors them in SkSL.
+  `boardStyle: 'auto'` reuses E3's dark-page flag (`stats.light.dark`, the same median < 0.35
+  rule), so the board type and the light correction always agree. A forced style also switches
+  the correction, through the new `FilterSpec.lightStats` hook.
+- Whiteboard: white point (0.9), 1.5× marker saturation, marker gamma 1.3, and glare (luma
+  > 0.96 with chroma < 0.12) fades to white.
+- Dark board: each pixel is split into luma plus a zero-luma colour offset, and the luma is
+  remapped from board → chalk. The chalk level comes from the new `stats.tone.bright` (98th
+  percentile). Inverted, chalk goes to 0.15 rather than 0, so coloured chalk keeps a visible hue.
+  The offset is *scaled* to fit 0..1 rather than clamped, which keeps the hue exact. The board's
+  colour cast is removed in proportion to (1 - t), so the board turns neutral but white chalk
+  doesn't turn magenta (a bug the scratch check caught). "Keep dark background" is the new
+  `FilterOptions.keepDarkBoard`.
+- UI: `components/review/FilterOptionsPanel.tsx` replaces `InkOptions` and shows the Ink or Board
+  options. For Board that's Auto / Whiteboard / Blackboard plus the dark-background toggle.
+- Board mode: C1's table in `01-capture.md` now defaults to `board`.
+- The picker now has 7 segments, which is likely cramped on narrow phones. E6's thumbnail strip
+  replaces it.
+- Scratch check (turn it into a jest test in F1): detection for auto/forced styles; hue kept
+  through inversion on neutral and green boards (about 19k random colours, exact to 1e-15); green
+  board → white; white chalk → neutral 0.15; yellow chalk → dark yellow; whiteboard surface and
+  glare → white; markers darker and more saturated.
 
 - `filters/board.ts`, after light correction:
   - **Board type:** `boardStyle: 'auto' | 'light' | 'dark'`. `auto` is decided from the
