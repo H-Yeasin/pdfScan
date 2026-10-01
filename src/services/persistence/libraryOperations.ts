@@ -25,7 +25,7 @@ export async function mergeDocuments(docs: LibraryDocument[], ocrScript: OcrScri
     for (const page of doc.pages) {
       pageIndex += 1;
       const dest = new File(dir, `page_${pageIndex}.jpg`);
-      new File(page.fileUri).copy(dest);
+      new File(page.fileUri).copySync(dest);
       mergedPages.push({ id: createId('page'), fileUri: dest.uri, width: page.width, height: page.height, ocr: page.ocr });
     }
   }
@@ -64,7 +64,7 @@ export async function splitDocument(doc: LibraryDocument, ocrScript: OcrScript):
     const documentId = createId('doc');
     const dir = getDocumentDir(documentId);
     const dest = new File(dir, 'page_1.jpg');
-    new File(source.fileUri).copy(dest);
+    new File(source.fileUri).copySync(dest);
 
     const page: LibraryPage = { id: createId('page'), fileUri: dest.uri, width: source.width, height: source.height, ocr: source.ocr };
     const name = `${doc.name}_p${i + 1}`;
@@ -113,7 +113,7 @@ export async function compressDocument(doc: LibraryDocument, ocrScript: OcrScrip
     const compressed = await compressPage(doc.pages[i].fileUri, compressQuality);
     const dest = new File(dir, `page_${i + 1}.jpg`);
     if (dest.exists) dest.delete();
-    new File(compressed.uri).move(dest);
+    new File(compressed.uri).moveSync(dest);
     sizeBytes += dest.size ?? 0;
     pages.push({ ...doc.pages[i], fileUri: dest.uri });
   }
@@ -157,7 +157,7 @@ export async function applySignedPage(
   const dir = getDocumentDir(doc.id, doc.courseFolder);
   const dest = new File(dir, `page_${pageIndex + 1}.jpg`);
   if (dest.exists) dest.delete();
-  new File(flattenedUri).move(dest);
+  new File(flattenedUri).moveSync(dest);
 
   const pages = doc.pages.map((page, i) => (i === pageIndex ? { ...page, fileUri: dest.uri } : page));
 
@@ -197,7 +197,7 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
 
   if (ext.format === 'PDF') {
     const dest = new File(dir, 'document.pdf');
-    new File(ext.uri).copy(dest);
+    new File(ext.uri).copySync(dest);
 
     const pageCount = ext.pageCount && ext.pageCount > 0 ? ext.pageCount : 1;
     const pages: LibraryPage[] = Array.from({ length: pageCount }, () => ({
@@ -225,7 +225,7 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
   }
 
   const dest = new File(dir, `document${EXTENSION_BY_FORMAT[ext.format]}`);
-  new File(ext.uri).copy(dest);
+  new File(ext.uri).copySync(dest);
 
   if (ext.format === 'CSV' || ext.format === 'TXT') {
     const { text } = await readTextWithEncodingFallback(dest.uri);

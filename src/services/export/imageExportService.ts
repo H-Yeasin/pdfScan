@@ -20,7 +20,7 @@ export async function saveImagesToLibrary(
     const compressed = await compressPage(pages[i].uri, compressQuality);
     const dest = new File(dir, `page_${i + 1}.jpg`);
     if (dest.exists) dest.delete();
-    new File(compressed.uri).move(dest);
+    new File(compressed.uri).moveSync(dest);
     uris.push(dest.uri);
     sizeBytes += dest.size ?? 0;
   }

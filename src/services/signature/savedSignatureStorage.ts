@@ -18,7 +18,7 @@ function getSignatureDir(): Directory {
 export async function saveSignatureForReuse(tempUri: string, aspectRatio: number): Promise<SavedSignature> {
   const dest = new File(getSignatureDir(), SIGNATURE_FILENAME);
   if (dest.exists) dest.delete();
-  new File(tempUri).copy(dest);
+  new File(tempUri).copySync(dest);
   await AsyncStorage.setItem(META_KEY, JSON.stringify({ aspectRatio }));
   return { uri: dest.uri, aspectRatio };
 }

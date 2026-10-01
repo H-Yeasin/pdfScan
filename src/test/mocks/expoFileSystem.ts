@@ -46,7 +46,10 @@ export class Directory {
       return fs.statSync(full).isDirectory() ? new Directory(full) : new File(full);
     });
   }
-  move(dest: Directory): void {
+  async move(dest: Directory): Promise<void> {
+    this.moveSync(dest);
+  }
+  moveSync(dest: Directory): void {
     const to = toPath(dest.uri);
     fs.mkdirSync(path.dirname(to.replace(/\/$/, '')), { recursive: true });
     fs.renameSync(toPath(this.uri), to);
@@ -89,12 +92,18 @@ export class File {
   delete(): void {
     fs.rmSync(toPath(this.uri), { force: true });
   }
-  copy(dest: File | Directory): void {
+  async copy(dest: File | Directory): Promise<void> {
+    this.copySync(dest);
+  }
+  copySync(dest: File | Directory): void {
     const to = dest instanceof Directory ? path.join(toPath(dest.uri), this.name) : toPath(dest.uri);
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(toPath(this.uri), to);
   }
-  move(dest: File | Directory): void {
+  async move(dest: File | Directory): Promise<void> {
+    this.moveSync(dest);
+  }
+  moveSync(dest: File | Directory): void {
     const to = dest instanceof Directory ? path.join(toPath(dest.uri), this.name) : toPath(dest.uri);
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.renameSync(toPath(this.uri), to);
