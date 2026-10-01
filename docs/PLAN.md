@@ -120,13 +120,14 @@ CamScanner's free output on most of them.
 ### §3 Courses and organization
 Goal: everything is filed by course without the student thinking about it.
 
-- [ ] `Course` entity: name, code, colour or emoji, semester, teacher (optional), archived flag. (M)
-- [ ] Semesters: group courses; archive a whole semester at once. (S)
-- [ ] Remember the "last course used" and suggest a course from the time of day (optional
-      timetable). (M)
-- [ ] Document types inside a course: Assignment, Notes, Handout, Exam, Other (filters plus
-      naming). (S)
-- [ ] Migration from the existing folders and `courseFolder` data, with no data loss. (M)
+**Detailed steps:** [`docs/plan/03-courses.md`](plan/03-courses.md) (builds on §0 F4's Course model)
+
+- [ ] K1 Course and semester data model (archive a whole semester at once)
+- [ ] K2 Home tab: course hub with Continue card, course grid and course page
+- [ ] K3 Course setup and editing (quick "Add your courses" sheet, reused by onboarding)
+- [ ] K4 Document types (Assignment, Notes, Handout, Exam, Lab, Other)
+- [ ] K5 Automatic filing: course suggestions and an optional timetable
+- [ ] K6 Organising existing documents (move, set type, sort Unsorted, search filters)
 
 **Done when:** a new user creates 4 courses during onboarding and every later scan lands in the
 right one with zero or one tap.
@@ -254,4 +255,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. Next to plan: §3 Courses and organization (`docs/plan/03-courses.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. Next to plan: §4 Submit (`docs/plan/04-submit.md`).
