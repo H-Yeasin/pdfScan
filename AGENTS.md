@@ -16,7 +16,8 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 - `docs/plan/NN-*.md`: step-by-step plans per section. **Implement one step per session. Read
   only that step**, open only the files it names, then update its `Status:` line and tick it
   in `docs/PLAN.md`.
-- Current phase: **§1 Capture** (`docs/plan/01-capture.md`). §0 is done in code; its device checks are listed in `docs/plan/00-foundation.md` → Verification.
+- §0 and §1 are done in code; their device checks are in the Verification sections of
+  `docs/plan/00-foundation.md` and `docs/plan/01-capture.md`. Next to plan: §2 Review and enhance.
 
 ## Commands
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),

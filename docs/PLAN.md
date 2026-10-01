@@ -105,7 +105,7 @@ Goal: the best camera experience for school material.
 - [x] C4 ID card mode: front and back at true size on one A4 page
 - [x] C5 Batch gallery import with automatic cropping (OpenCV spike first)
 - [x] C6 Haptics, per-page progress, "Scan more" loop, cancel
-- [ ] C7 Fallback when Google's scanner is unavailable (custom live camera stays in P3)
+- [x] C7 Fallback when Google's scanner is unavailable (custom live camera stays in P3)
 
 **Done when:** a student can capture a 10-page handwritten assignment in under 60 seconds with no
 manual cropping on most pages.

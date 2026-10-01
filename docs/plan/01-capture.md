@@ -235,7 +235,7 @@ handwritten pages, from tapping Scan to Review being ready, takes under 60 s on 
 phone (the §1 "done when").
 
 ### C7 · Fallback when Google's scanner is unavailable *(M)*
-Status: todo
+Status: done (commit fbfe02b). Also added: a Settings row to retry Google's scanner after a Play services update. Device check pending: emulator image without Play services. The P3 custom-camera plan (`docs/plan/xx-custom-camera.md`) is not written yet.
 
 Some phones have no Google Play services, or an outdated version (Huawei, some Chinese ROMs,
 emulators).
