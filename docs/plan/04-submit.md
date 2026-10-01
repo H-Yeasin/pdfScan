@@ -137,7 +137,29 @@ As built:
 and a new Assignment in CSE 101 is named `2021331045_Rahim_CSE101_HW3` automatically.
 
 ### S3 · Exact size target *(M)*
-Status: todo
+Status: done in code (commit 6b6c94f). The "Done when" check (10 handwritten pages, Under 2 MB,
+1.5–2.0 MB in at most 2 builds) needs a device.
+
+As built:
+- `SIZE_LADDER` (in `imageSpec.ts`) reuses the slider presets where they match (levels 0, 1, 2,
+  4, 6), so level 0 is `MASTER_PRESET` and is embedded as is.
+- Sampling uses a binary search (`findLevel`) instead of encoding the samples at all 9 levels:
+  at most 4 levels are measured. `predictLevel` is the plain version over a full table; a test
+  checks both agree. Samples are the first, middle and largest master, without repeats.
+- `skiaEnhance.encodedBytes(uri, edits, target)` returns the byte count of the same render as
+  `renderPage` without writing a file (shared `renderToBytes`).
+- Overhead measured: about 4 KB per document (fonts, template cover, footer) plus 0.3–1.1 KB per
+  page (0–60 OCR lines). Stored as 8 KB + 2 KB per page (`PDF_OVERHEAD_*`), well under the
+  plan's 25 KB + 3 KB; a test builds real PDFs and checks they stay under it. An imported cover
+  image adds its file size.
+- `buildPdfUnderLimit(documentId, pages, limitBytes, academicConfig, layoutMode)` does the
+  sampling and the builds, for reuse by S6. Deliver calls it with the masters; the page loop then
+  skips the export render.
+- Deliver: a "File size" row (`SizeTargetRow`) for PDF only. Custom asks for 0.1–100 MB
+  (`TextPromptModal` gained `keyboardType`). State: `deliver.sizeLimitBytes`, reset with the rest
+  of Deliver (S6 makes it per course). `formatLimit` rounds up, so 2,000,001 bytes reads
+  "2.01 MB". If the lowest level was not reached after 3 builds, the message says "Couldn't get
+  this scan under 1 MB (…)" rather than "even at the lowest quality".
 
 - `src/services/submit/sizeTarget.ts`:
   - `SIZE_LADDER: ExportPreset[]`, about 9 levels from the master down:
