@@ -8,6 +8,9 @@ import { FileRow } from '../components/library/FileRow';
 import { CourseList } from '../components/courses/CourseList';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
 import { CourseFilterChips } from '../components/courses/CourseFilterChips';
+import { PageResults } from '../components/library/PageResults';
+import { useOpenDocument } from '../components/library/useDocumentListActions';
+import { searchPages, type PageHit } from '../services/persistence/dbService';
 import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { courseColorValue } from '../services/courses/palette';
 import { SubmittedFilterChips, type SubmittedFilter } from '../components/submit/SubmittedFilterChips';
@@ -47,6 +50,35 @@ export function LibraryScreen() {
   useEffect(() => {
     if (!searching) setCourseFilter(null);
   }, [searching]);
+
+  // §5 T2: the pages that match, under the documents. Same debounce as the document search.
+  const [pageHits, setPageHits] = useState<PageHit[]>([]);
+  const openDocument = useOpenDocument();
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) {
+      setPageHits([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchPages(query, {
+        courseId: courseFilter === null ? undefined : courseFilter === UNSORTED_COURSE_ID ? null : courseFilter,
+        type: typeFilter ?? undefined,
+      })
+        .then((hits) => {
+          if (!cancelled) setPageHits(hits);
+        })
+        .catch((e) => {
+          console.warn('dbService.searchPages failed', e);
+          if (!cancelled) setPageHits([]);
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, courseFilter, typeFilter]);
   const submittedIds = useMemo(() => new Set(state.library.submissions.map((s) => s.documentId)), [state.library.submissions]);
 
   useEffect(() => {
@@ -209,7 +241,16 @@ export function LibraryScreen() {
             keyExtractor={(doc) => doc.id}
             contentContainerStyle={styles.listContent}
             ListFooterComponent={
-              !searching && archivedCount > 0 ? (
+              searching ? (
+                <PageResults
+                  hits={pageHits}
+                  docs={files}
+                  onOpen={(doc, hit) => {
+                    openDocument(doc);
+                    dispatch({ type: 'reader/SET_TARGET', target: { pageId: hit.pageId, query: search.trim() } });
+                  }}
+                />
+              ) : archivedCount > 0 ? (
                 <Pressable style={styles.archivedToggle} onPress={() => setShowArchived((v) => !v)} accessibilityRole="button">
                   <Text style={[styles.archivedToggleLabel, { color: tokens.accentInk }]}>
                     {showArchived ? 'Hide archived' : `Show ${archivedCount} archived`}

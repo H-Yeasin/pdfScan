@@ -28,6 +28,7 @@ import { useShareSubmission, useSubmitDocument } from '../store/useSubmitDocumen
 import { SubmissionsSheet } from '../components/submit/SubmissionsSheet';
 import { submittedSummary } from '../services/submit/history';
 import { formatShortDate } from '../utils/format';
+import { pdfPageFor } from '../services/documents/pageMap';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
@@ -72,6 +73,9 @@ export function ReaderScreen() {
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
   const [localMatchCount, setLocalMatchCount] = useState(0);
+  // §5 T2: the PDF page a page search result opened on. While set, Find searches only that page
+  // (fast) and stays there; typing a new query searches the whole document again.
+  const [targetPage, setTargetPage] = useState<number | null>(null);
   const pdfRef = useRef<PdfPageViewHandle>(null);
 
   // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
@@ -117,7 +121,23 @@ export function ReaderScreen() {
     setPasswordDraft('');
     setNeedsPassword(false);
     setReloadKey(0);
+    setTargetPage(null);
   }, [contentKey]);
+
+  // A page search result: once the PDF has loaded, jump to that library page's PDF page and
+  // highlight the query there.
+  const target = state.reader.target;
+  useEffect(() => {
+    if (!target || !doc || pageCount === 0) return;
+    dispatch({ type: 'reader/SET_TARGET', target: null });
+    const idx = doc.pages.findIndex((p) => p.id === target.pageId);
+    if (idx < 0) return;
+    const { page } = pdfPageFor(doc, idx);
+    setTargetPage(page);
+    pdfRef.current?.goToPage(page);
+    setFindOpen(true);
+    setFindQuery(target.query);
+  }, [target, doc, pageCount, dispatch]);
 
   useEffect(() => {
     const query = findQuery.trim();
@@ -127,16 +147,18 @@ export function ReaderScreen() {
     }
     const timer = setTimeout(async () => {
       try {
-        const results = await searchTextDirect(pdfId, query, 1, Math.max(pageCount, 1));
+        const [from, to] = targetPage ? [targetPage, targetPage] : [1, Math.max(pageCount, 1)];
+        const results = await searchTextDirect(pdfId, query, from, to);
         setSearchResults(results);
-        if (results[0]) pdfRef.current?.goToPage(results[0].page);
+        if (targetPage) pdfRef.current?.goToPage(targetPage);
+        else if (results[0]) pdfRef.current?.goToPage(results[0].page);
       } catch (e) {
         console.warn('ReaderScreen: searchTextDirect failed', e);
         setSearchResults([]);
       }
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [findQuery, pdfUri, pdfId, pageCount]);
+  }, [findQuery, pdfUri, pdfId, pageCount, targetPage]);
 
   const highlightRects = useMemo(
     () => searchResults.map((r) => ({ page: r.page, rect: r.rect })),
@@ -365,7 +387,10 @@ export function ReaderScreen() {
         onOverflow={() => setOverflowOpen(true)}
         findOpen={findOpen}
         findQuery={findQuery}
-        onChangeFindQuery={setFindQuery}
+        onChangeFindQuery={(value) => {
+          setTargetPage(null);
+          setFindQuery(value);
+        }}
         matchCount={matchCount}
         subtitle={submittedSummary(docSubmissions, formatShortDate)}
         onSubtitlePress={() => setSubmissionsOpen(true)}

@@ -8,25 +8,32 @@ export type ReaderState = {
   // regression-safe without needing to remember to clear the other field itself.
   external: ExternalFileDocument | null;
   night: boolean;
+  // §5 T2: a page search result being opened: the Reader jumps to that library page and finds
+  // `query` on it, then clears this. Any other open (SET_READER_ID) clears it too.
+  target: { pageId: string; query: string } | null;
 };
 
 export const initialReaderState: ReaderState = {
   readerId: null,
   external: null,
   night: false,
+  target: null,
 };
 
 export type ReaderAction =
   | { type: 'reader/SET_READER_ID'; id: string }
   | { type: 'reader/SET_EXTERNAL'; doc: ExternalFileDocument | null }
-  | { type: 'reader/TOGGLE_NIGHT' };
+  | { type: 'reader/TOGGLE_NIGHT' }
+  | { type: 'reader/SET_TARGET'; target: { pageId: string; query: string } | null };
 
 export function readerReducer(state: ReaderState, action: ReaderAction): ReaderState {
   switch (action.type) {
     case 'reader/SET_READER_ID':
-      return { ...state, readerId: action.id, external: null };
+      return { ...state, readerId: action.id, external: null, target: null };
     case 'reader/SET_EXTERNAL':
       return { ...state, external: action.doc, readerId: action.doc ? null : state.readerId };
+    case 'reader/SET_TARGET':
+      return { ...state, target: action.target };
     case 'reader/TOGGLE_NIGHT':
       return { ...state, night: !state.night };
     default:

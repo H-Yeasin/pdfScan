@@ -57,3 +57,47 @@ export async function searchDocumentsByText(query: string): Promise<string[]> {
   );
   return rows.map((row) => row.id);
 }
+
+export type PageHit = {
+  documentId: string;
+  pageId: string;
+  // 0-based library page index.
+  idx: number;
+  // OCR text around the match, with the matched terms in [brackets].
+  snippet: string;
+  // bm25: lower is a better match.
+  rank: number;
+};
+
+// §5 T2: pages (not documents) whose OCR text matches, best match first (FTS5 bm25), newest
+// document first on a tie. Optional course (null = Unsorted) and type filters, as in the Library.
+export async function searchPages(
+  query: string,
+  options: { courseId?: string | null; type?: string; limit?: number } = {}
+): Promise<PageHit[]> {
+  const match = buildFtsMatchQuery(query.trim());
+  if (!match) return [];
+  const where = ['pages_fts MATCH ?'];
+  const params: (string | number | null)[] = [match];
+  if (options.courseId !== undefined) {
+    where.push('d.course_id IS ?');
+    params.push(options.courseId);
+  }
+  if (options.type !== undefined) {
+    where.push("COALESCE(d.doc_type, 'other') = ?");
+    params.push(options.type);
+  }
+  params.push(options.limit ?? 50);
+  const db = await getDb();
+  return db.getAllAsync<PageHit>(
+    `SELECT p.document_id AS documentId, p.id AS pageId, p.idx AS idx,
+            snippet(pages_fts, 0, '[', ']', '…', 12) AS snippet, bm25(pages_fts) AS rank
+     FROM pages_fts
+     JOIN pages p ON p.rowid = pages_fts.rowid
+     JOIN documents d ON d.id = p.document_id
+     WHERE ${where.join(' AND ')}
+     ORDER BY rank, d.created_at DESC, p.idx
+     LIMIT ?`,
+    params
+  );
+}
