@@ -2,7 +2,8 @@ import { File, Paths } from 'expo-file-system';
 import { FontStyle, ImageFormat, PaintStyle, Skia } from '@shopify/react-native-skia';
 import type { SkCanvas } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
-import type { AcademicConfig, CoverPageConfig } from './pdfService';
+import { layoutCover, type CoverPageConfig } from './coverTemplates';
+import type { AcademicConfig } from './pdfService';
 
 // ReaderScreen now renders the real compiled PDF (via PdfPageView), so this module's cover/
 // border/header-footer visuals are no longer needed to make the in-app reader match the export.
@@ -24,20 +25,11 @@ const FOOTER_Y_RATIO = 30 / 792; // distance from the BOTTOM edge
 const STAMP_FONT_SIZE_RATIO = 9 / 792;
 const STAMP_TEXT_COLOR = '#1a1a1a';
 
-// A4-ratio pixel canvas (1200 matches scannerPipeline.ts's MAX_DIMENSION convention for a normal
-// scanned page's long side), matching pdfService.ts's real A4 cover page's proportions.
-const COVER_RASTER_WIDTH_PX = 849;
+// A4 in points (pdf-lib's PageSizes.A4), the page the cover is laid out on, and the pixel canvas
+// it is drawn on here: 1200 px on the long side, like a normal scanned page's display copy.
+const COVER_PAGE_PT = { width: 595.28, height: 841.89 };
 const COVER_RASTER_HEIGHT_PX = 1200;
-// Ratios (of COVER_RASTER_HEIGHT_PX) rather than absolute pixel sizes, unlike pdfService.ts's own
-// COVER_TITLE_FONT_SIZE/etc (which are absolute PDF points - a real physical unit, independent of
-// page size). This raster canvas's pixel grid has no such fixed physical meaning, so its text size
-// must scale with the canvas or it renders cramped/tiny relative to the page - same reasoning as
-// STAMP_FONT_SIZE_RATIO just above.
-const COVER_TITLE_FONT_SIZE_RATIO = 24 / 792;
-const COVER_SUBTITLE_FONT_SIZE_RATIO = 14 / 792;
-const COVER_META_FONT_SIZE_RATIO = 12 / 792;
-const COVER_SUBTITLE_Y_OFFSET_RATIO = 40 / 792;
-const COVER_META_Y_OFFSET_RATIO = 64 / 792;
+const COVER_RASTER_WIDTH_PX = Math.round((COVER_RASTER_HEIGHT_PX * COVER_PAGE_PT.width) / COVER_PAGE_PT.height);
 
 // No bundled font file / fontkit exists in this project (see pdfService.ts's own StandardFonts-
 // only convention), so text is drawn with the platform's default system font via FontMgr.System()
@@ -84,22 +76,29 @@ export async function renderCoverPageImage(
     const canvas = surface.getCanvas();
     canvas.drawColor(Skia.Color('#ffffff'));
 
+    // The same items pdfService draws, scaled from points to pixels. Text uses the system font
+    // (no font files are bundled), centred with its own metrics; line breaks come from the layout.
+    const scale = width / COVER_PAGE_PT.width;
     const textPaint = Skia.Paint();
     textPaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
     textPaint.setAntiAlias(true);
+    const strokePaint = Skia.Paint();
+    strokePaint.setStyle(PaintStyle.Stroke);
+    strokePaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
+    strokePaint.setAntiAlias(true);
 
-    const drawCentered = (text: string, y: number, size: number, bold: boolean) => {
-      const font = systemFont(size, bold);
-      const textWidth = font.measureText(text, textPaint).width;
-      canvas.drawText(text, (width - textWidth) / 2, y, textPaint, font);
-    };
-
-    if (cover.title) drawCentered(cover.title, height * 0.4, COVER_TITLE_FONT_SIZE_RATIO * height, true);
-    if (cover.studentName) {
-      drawCentered(cover.studentName, height * 0.4 + COVER_SUBTITLE_Y_OFFSET_RATIO * height, COVER_SUBTITLE_FONT_SIZE_RATIO * height, false);
-    }
-    if (cover.courseCode) {
-      drawCentered(cover.courseCode, height * 0.4 + COVER_META_Y_OFFSET_RATIO * height, COVER_META_FONT_SIZE_RATIO * height, false);
+    for (const item of layoutCover(cover.templateId, cover.values, COVER_PAGE_PT)) {
+      if (item.kind === 'text') {
+        const font = systemFont(item.size * scale, item.bold);
+        const x = item.align === 'center' ? item.x * scale - font.measureText(item.text, textPaint).width / 2 : item.x * scale;
+        canvas.drawText(item.text, x, item.y * scale, textPaint, font);
+      } else if (item.kind === 'line') {
+        strokePaint.setStrokeWidth(item.width * scale);
+        canvas.drawLine(item.x1 * scale, item.y1 * scale, item.x2 * scale, item.y2 * scale, strokePaint);
+      } else {
+        strokePaint.setStrokeWidth(item.borderWidth * scale);
+        canvas.drawRect(Skia.XYWHRect(item.x * scale, item.y * scale, item.width * scale, item.height * scale), strokePaint);
+      }
     }
 
     const uri = await writeJpeg(surface, 'cover');

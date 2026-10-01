@@ -132,7 +132,11 @@ describe('PDF overhead', () => {
       const { sizeBytes } = await buildPdfFromPages(`doc_overhead_${pageCount}`, pages, 'as-is', {
         enableBorder: true,
         footerText: 'Page {X} of {Y}',
-        coverPage: { mode: 'template', title: 'Assignment 3', studentName: 'Rahim Uddin', courseCode: 'CSE 101' },
+        coverPage: {
+          mode: 'template',
+          templateId: 'assignment',
+          values: { institution: 'SUST', docLabel: 'Assignment 3', name: 'Rahim Uddin', roll: '2021331045', courseCode: 'CSE 101', teacher: 'Dr. Karim', date: '2 October 2026' },
+        },
       });
       expect(sizeBytes - imageBytes).toBeLessThan(pdfOverheadBytes(pageCount));
     }

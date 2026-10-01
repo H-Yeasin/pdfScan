@@ -7,6 +7,9 @@ import { getDocumentDir } from '../persistence/libraryFiles';
 import { fitBox } from '../../utils/fitBox';
 import type { LibraryDocument, PageLayout, PageOcr } from '../../types/models';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
+import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
+
+export type { CoverPageConfig } from './coverTemplates';
 
 // Standard-mode pages and the cover page are both fixed at true ISO A4 size, with each image
 // uniformly scaled to fit inside CONTENT_MARGIN_PT on every side (never stretched, never
@@ -39,9 +42,6 @@ const HEADER_Y_FROM_TOP_PT = 40;
 const FOOTER_Y_PT = 30;
 const HEADER_FONT_SIZE = 9;
 const FOOTER_FONT_SIZE = 9;
-const COVER_TITLE_FONT_SIZE = 24;
-const COVER_SUBTITLE_FONT_SIZE = 14;
-const COVER_META_FONT_SIZE = 12;
 
 export type PdfSourcePage = {
   uri: string;
@@ -67,14 +67,6 @@ function contentBox(layout: PageLayout | undefined): { x: number; y: number; wid
 // behavior). '2_in_1': two source pages side-by-side per landscape sheet - see the
 // LAYOUT_2IN1_* constants below for why that's a fixed physical size rather than content-shaped.
 export type LayoutMode = 'standard' | '2_in_1';
-
-export type CoverPageConfig = {
-  mode: 'template' | 'imported_image';
-  title?: string;
-  studentName?: string;
-  courseCode?: string;
-  importedUri?: string; // local URI of a gallery-imported image (imported_image mode only)
-};
 
 export type AcademicConfig = {
   enableBorder: boolean;
@@ -186,26 +178,40 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Prom
     return;
   }
 
-  // mode === 'template'
+  // mode === 'template': coverTemplates.layoutCover places everything; this only draws it.
   const page = pdfDoc.addPage(PageSizes.A4);
-  const titleFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-  const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  drawCoverItems(page, layoutCover(cover.templateId, cover.values, { width: A4_WIDTH_PT, height: A4_HEIGHT_PT }), regular, bold);
+}
 
-  const drawCentered = (raw: string, y: number, font: PDFFont, size: number) => {
-    const text = toWinAnsiSafe(raw, font);
-    const width = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: (A4_WIDTH_PT - width) / 2, y, size, font });
-  };
-
-  // Fields are optional and drawn independently, so an all-empty config degrades to a blank A4
-  // page rather than an error. Vertical anchors are relative to page height so the layout holds
-  // regardless of the exact page size constant in play.
-  if (cover.title) drawCentered(cover.title, A4_HEIGHT_PT * 0.4, titleFont, COVER_TITLE_FONT_SIZE);
-  if (cover.studentName) {
-    drawCentered(cover.studentName, A4_HEIGHT_PT * 0.4 - 40, bodyFont, COVER_SUBTITLE_FONT_SIZE);
-  }
-  if (cover.courseCode) {
-    drawCentered(cover.courseCode, A4_HEIGHT_PT * 0.4 - 64, bodyFont, COVER_META_FONT_SIZE);
+// layoutCover's items are top-down; pdf-lib's y axis points up.
+function drawCoverItems(page: PDFPage, items: CoverItem[], regular: PDFFont, bold: PDFFont): void {
+  const pageHeight = page.getHeight();
+  const ink = rgb(0.1, 0.1, 0.1);
+  for (const item of items) {
+    if (item.kind === 'text') {
+      const font = item.bold ? bold : regular;
+      const text = toWinAnsiSafe(item.text, font);
+      const x = item.align === 'center' ? item.x - font.widthOfTextAtSize(text, item.size) / 2 : item.x;
+      page.drawText(text, { x, y: pageHeight - item.y, size: item.size, font, color: ink });
+    } else if (item.kind === 'line') {
+      page.drawLine({
+        start: { x: item.x1, y: pageHeight - item.y1 },
+        end: { x: item.x2, y: pageHeight - item.y2 },
+        thickness: item.width,
+        color: ink,
+      });
+    } else {
+      page.drawRectangle({
+        x: item.x,
+        y: pageHeight - item.y - item.height,
+        width: item.width,
+        height: item.height,
+        borderWidth: item.borderWidth,
+        borderColor: ink,
+      });
+    }
   }
 }
 

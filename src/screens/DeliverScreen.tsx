@@ -28,9 +28,11 @@ import { CourseChips } from '../components/courses/CourseChips';
 import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
 import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes';
+import { withCoverDefaults } from '../services/pdf/coverTemplates';
 import { suggestName } from '../services/submit/naming';
 import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppState } from '../store/AppStateContext';
+import { useCoverDefaults } from '../store/useCoverDefaults';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
@@ -68,7 +70,18 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, layoutMode } = state.deliver;
+  // A template cover's fields are stored as the student's edits only; the rest come from the
+  // profile, course and type (useCoverDefaults), filled in here so everything below draws them.
+  const coverDefaults = useCoverDefaults();
+  const storedAcademicConfig = state.deliver.academicConfig;
+  const academicConfig = useMemo(
+    () =>
+      storedAcademicConfig?.coverPage
+        ? { ...storedAcademicConfig, coverPage: withCoverDefaults(storedAcademicConfig.coverPage, coverDefaults) }
+        : storedAcademicConfig,
+    [storedAcademicConfig, coverDefaults]
+  );
   // The size target is for the PDF; a JPG export saves each page as its own image.
   const sizeLimit = format === 'PDF' ? sizeLimitBytes : null;
   // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
@@ -185,7 +198,7 @@ export function DeliverScreen() {
                 width: rendered.width,
                 height: rendered.height,
                 // An imported cover is the user's own picked file - copy it, don't move it.
-                keepSource: rendered.uri === academicConfig.coverPage.importedUri,
+                keepSource: academicConfig.coverPage.mode === 'imported_image' && rendered.uri === academicConfig.coverPage.importedUri,
               };
             }
           }

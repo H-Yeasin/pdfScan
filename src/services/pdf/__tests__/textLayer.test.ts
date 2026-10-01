@@ -111,7 +111,7 @@ describe('toWinAnsiSafe', () => {
         enableBorder: true,
         headerText: 'রসায়ন ল্যাব',
         footerText: 'পৃষ্ঠা {X} / {Y}',
-        coverPage: { mode: 'template', title: '化学', studentName: 'Rahim' },
+        coverPage: { mode: 'template', templateId: 'simple', values: { title: '化学', name: 'Rahim' } },
       })
     ).resolves.toBeDefined();
   });

@@ -556,7 +556,7 @@ export function ReviewScreen() {
           go('capture');
         }}
         onDelete={handleDeletePage}
-        cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.importedUri } : null}
+        cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.mode === 'imported_image' ? coverConfig.importedUri : undefined } : null}
         onPressCover={() => go('academicOptions')}
       />
 

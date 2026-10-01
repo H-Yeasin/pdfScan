@@ -4,6 +4,7 @@ import * as Print from 'expo-print';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CoverThumbnail } from '../components/deliver/CoverThumbnail';
 import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { useRouter } from '../navigation/router';
@@ -11,7 +12,18 @@ import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { renderPage } from '../services/enhance/skiaEnhance';
 import { exportPreset } from '../services/capture/imageSpec';
 import { buildPdfFromPages } from '../services/pdf/pdfService';
-import type { AcademicConfig, CoverPageConfig } from '../services/pdf/pdfService';
+import type { AcademicConfig } from '../services/pdf/pdfService';
+import {
+  COVER_FIELD_LABELS,
+  COVER_TEMPLATES,
+  getCoverTemplate,
+  resolveCoverValues,
+  withCoverDefaults,
+  type CoverPageConfig,
+  type CoverTemplateId,
+  type CoverValues,
+} from '../services/pdf/coverTemplates';
+import { useCoverDefaults } from '../store/useCoverDefaults';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
@@ -39,9 +51,9 @@ type FieldState = {
   headerText: string;
   footerText: string;
   coverMode: CoverMode;
-  title: string;
-  studentName: string;
-  courseCode: string;
+  templateId: CoverTemplateId;
+  // Only the fields the student changed; the rest come from useCoverDefaults.
+  coverValues: CoverValues;
   importedUri?: string;
 };
 
@@ -53,12 +65,7 @@ function buildConfig(next: FieldState): AcademicConfig | null {
     next.coverMode === 'none'
       ? undefined
       : next.coverMode === 'template'
-        ? {
-            mode: 'template',
-            title: next.title.trim() || undefined,
-            studentName: next.studentName.trim() || undefined,
-            courseCode: next.courseCode.trim() || undefined,
-          }
+        ? { mode: 'template', templateId: next.templateId, values: next.coverValues }
         : { mode: 'imported_image', importedUri: next.importedUri };
 
   const headerText = next.headerText.trim() || undefined;
@@ -79,10 +86,19 @@ export function AcademicOptionsScreen() {
   const headerText = cfg?.headerText ?? '';
   const footerText = cfg?.footerText ?? '';
   const coverMode: CoverMode = cfg?.coverPage?.mode ?? 'none';
-  const title = cfg?.coverPage?.title ?? '';
-  const studentName = cfg?.coverPage?.studentName ?? '';
-  const courseCode = cfg?.coverPage?.courseCode ?? '';
-  const importedUri = cfg?.coverPage?.importedUri;
+  const cover = cfg?.coverPage;
+  // Kept while switching to Photo and back, so edits to the template fields aren't lost.
+  const [lastTemplate, setLastTemplate] = useState<{ templateId: CoverTemplateId; coverValues: CoverValues }>({
+    templateId: 'assignment',
+    coverValues: {},
+  });
+  const templateId = cover?.mode === 'template' ? cover.templateId : lastTemplate.templateId;
+  const coverValues = cover?.mode === 'template' ? cover.values : lastTemplate.coverValues;
+  const importedUri = cover?.mode === 'imported_image' ? cover.importedUri : undefined;
+  const coverDefaults = useCoverDefaults();
+  const shownValues = resolveCoverValues(coverDefaults, coverValues);
+  // What gets drawn: the stored edits on top of the defaults (Deliver does the same).
+  const resolvedCfg = cfg?.coverPage ? { ...cfg, coverPage: withCoverDefaults(cfg.coverPage, coverDefaults) } : cfg;
 
   const commit = useCallback(
     (patch: Partial<FieldState>) => {
@@ -91,15 +107,17 @@ export function AcademicOptionsScreen() {
         headerText,
         footerText,
         coverMode,
-        title,
-        studentName,
-        courseCode,
+        templateId,
+        coverValues,
         importedUri,
         ...patch,
       });
+      if (patch.templateId || patch.coverValues) {
+        setLastTemplate({ templateId: patch.templateId ?? templateId, coverValues: patch.coverValues ?? coverValues });
+      }
       dispatch({ type: 'deliver/SET_ACADEMIC_CONFIG', config });
     },
-    [enableBorder, headerText, footerText, coverMode, title, studentName, courseCode, importedUri, dispatch]
+    [enableBorder, headerText, footerText, coverMode, templateId, coverValues, importedUri, dispatch]
   );
 
   const handlePickCoverImage = useCallback(async () => {
@@ -154,7 +172,7 @@ export function AcademicOptionsScreen() {
         previewId,
         bakedPages,
         'as-is',
-        cfg ?? undefined
+        resolvedCfg ?? undefined
       );
       await Print.printAsync({ uri: result.uri });
       lastPreviewIdRef.current = previewId;
@@ -166,7 +184,7 @@ export function AcademicOptionsScreen() {
     } finally {
       setPreviewing(false);
     }
-  }, [pages, previewing, state.deliver.quality, cfg]);
+  }, [pages, previewing, state.deliver.quality, resolvedCfg]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -218,19 +236,39 @@ export function AcademicOptionsScreen() {
 
         {coverMode === 'template' && (
           <>
-            <NameField label="Title" value={title} onChange={(value) => commit({ title: value })} placeholder="Assignment title" />
-            <NameField
-              label="Student name"
-              value={studentName}
-              onChange={(value) => commit({ studentName: value })}
-              placeholder="Your name"
-            />
-            <NameField
-              label="Course code"
-              value={courseCode}
-              onChange={(value) => commit({ courseCode: value })}
-              placeholder="e.g. CS 101"
-            />
+            <View style={styles.templateRow}>
+              {COVER_TEMPLATES.map((template) => {
+                const selected = template.id === templateId;
+                return (
+                  <Pressable
+                    key={template.id}
+                    style={styles.templateOption}
+                    onPress={() => commit({ templateId: template.id })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${template.label} cover`}
+                  >
+                    <View style={[styles.templateFrame, { borderColor: selected ? tokens.accent : 'transparent' }]}>
+                      <CoverThumbnail templateId={template.id} values={shownValues} width={92} />
+                    </View>
+                    <Text style={[styles.templateLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{template.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>
+              Filled in from your profile, the course and the document type. Changes here apply to this cover only;
+              an empty field is left off.
+            </Text>
+            {getCoverTemplate(templateId).fields.map((key) => (
+              <NameField
+                key={key}
+                label={COVER_FIELD_LABELS[key]}
+                value={shownValues[key] ?? ''}
+                onChange={(value) => commit({ coverValues: { ...coverValues, [key]: value } })}
+                placeholder={COVER_FIELD_LABELS[key]}
+              />
+            ))}
           </>
         )}
 
@@ -327,6 +365,23 @@ const styles = StyleSheet.create({
   disclosure: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  templateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  templateOption: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  templateFrame: {
+    padding: 3,
+    borderWidth: 2,
+    borderRadius: radii.chip,
+  },
+  templateLabel: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   coverImageSection: {
     gap: spacing.md,
