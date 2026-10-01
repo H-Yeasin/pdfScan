@@ -3,7 +3,18 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 
-export type OverflowItemId = 'share' | 'sign' | 'export' | 'print' | 'delete' | 'addToLibrary' | 'changeType' | 'submit';
+export type OverflowItemId =
+  | 'share'
+  | 'sign'
+  | 'export'
+  | 'print'
+  | 'delete'
+  | 'addToLibrary'
+  | 'changeType'
+  | 'submit'
+  | 'selectText'
+  | 'copyText'
+  | 'extractText';
 
 type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
@@ -13,6 +24,12 @@ const DELETE_ITEM: Item = { id: 'delete', label: 'Delete', icon: 'trash-outline'
 const CHANGE_TYPE_ITEM: Item = { id: 'changeType', label: 'Change type', icon: 'pricetag-outline' };
 // §4 S6: rebuild and share the teacher's copy with the course's preset.
 const SUBMIT_ITEM: Item = { id: 'submit', label: 'Submit', icon: 'paper-plane-outline' };
+// §5 T3: the OCR text of scanned pages.
+const TEXT_ITEMS: Item[] = [
+  { id: 'selectText', label: 'Select text', icon: 'text-outline' },
+  { id: 'copyText', label: 'Copy page text', icon: 'copy-outline' },
+  { id: 'extractText', label: 'Extract text (.txt)', icon: 'document-text-outline' },
+];
 const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', label: 'Add to Library', icon: 'add-circle-outline' };
 
 type OverflowSheetProps = {
@@ -24,6 +41,7 @@ type OverflowSheetProps = {
   showDelete?: boolean;
   showAddToLibrary?: boolean;
   showSubmit?: boolean;
+  showText?: boolean;
 };
 
 export function OverflowSheet({
@@ -33,12 +51,14 @@ export function OverflowSheet({
   showDelete = true,
   showAddToLibrary = false,
   showSubmit = false,
+  showText = false,
 }: OverflowSheetProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
   const items: Item[] = [
     ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
     ...(showSubmit ? [SUBMIT_ITEM] : []),
+    ...(showText ? TEXT_ITEMS : []),
     // Library documents only, like Delete: an external file has no type until it's added.
     ...(showDelete ? [CHANGE_TYPE_ITEM, DELETE_ITEM] : []),
   ];

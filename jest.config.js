@@ -13,6 +13,7 @@ module.exports = {
     '^rn-mlkit-ocr$': '<rootDir>/src/test/mocks/rnMlkitOcr.ts',
     '^expo-haptics$': '<rootDir>/src/test/mocks/expoHaptics.ts',
     '^expo-notifications$': '<rootDir>/src/test/mocks/expoNotifications.ts',
+    '^expo-clipboard$': '<rootDir>/src/test/mocks/expoClipboard.ts',
     '^@shopify/react-native-skia$': '<rootDir>/src/test/mocks/skia.ts',
     '^react-native-document-scanner-plugin$': '<rootDir>/src/test/mocks/documentScanner.ts',
     '^@react-native-async-storage/async-storage$':

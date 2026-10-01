@@ -28,7 +28,11 @@ import { useShareSubmission, useSubmitDocument } from '../store/useSubmitDocumen
 import { SubmissionsSheet } from '../components/submit/SubmissionsSheet';
 import { submittedSummary } from '../services/submit/history';
 import { formatShortDate } from '../utils/format';
-import { pdfPageFor } from '../services/documents/pageMap';
+import { libraryIdxFor, pdfPageFor } from '../services/documents/pageMap';
+import * as Clipboard from 'expo-clipboard';
+import { SelectTextSheet } from '../components/reader/SelectTextSheet';
+import { writeDocumentText } from '../services/study/textExport';
+import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
@@ -76,6 +80,8 @@ export function ReaderScreen() {
   // §5 T2: the PDF page a page search result opened on. While set, Find searches only that page
   // (fast) and stays there; typing a new query searches the whole document again.
   const [targetPage, setTargetPage] = useState<number | null>(null);
+  // §5 T3: the library page open in "Select text", or null.
+  const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
   const pdfRef = useRef<PdfPageViewHandle>(null);
 
   // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
@@ -225,6 +231,33 @@ export function ReaderScreen() {
         if (doc) setTypePickerOpen(true);
       } else if (id === 'submit') {
         if (doc) await submit(doc);
+      } else if (id === 'selectText' || id === 'copyText' || id === 'extractText') {
+        if (!doc) return;
+        // The library page on screen (on a 2-up sheet, its left page).
+        const idx = libraryIdxFor(doc, activeIndex + 1);
+        if (id === 'selectText') {
+          setSelectTextIdx(idx);
+        } else if (id === 'copyText') {
+          const text = doc.pages[idx]?.ocr?.text.trim() ?? '';
+          if (!text) {
+            dispatch({ type: 'ui/SHOW_SNACK', msg: 'No text found on this page' });
+            return;
+          }
+          await Clipboard.setStringAsync(text);
+          dispatch({ type: 'ui/SHOW_SNACK', msg: `Copied the text of page ${idx + 1}` });
+        } else {
+          Alert.alert('Extract text', 'All pages\' text, with a line marking each page.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Copy',
+              onPress: async () => {
+                await Clipboard.setStringAsync(extractDocumentText(doc));
+                dispatch({ type: 'ui/SHOW_SNACK', msg: 'Copied the text of every page' });
+              },
+            },
+            { text: 'Share .txt', onPress: () => shareAs(writeDocumentText(doc), shareFileName(doc.name, 'txt'), 'text/plain') },
+          ]);
+        }
       } else if (id === 'delete') {
         if (!doc) return;
         Alert.alert(
@@ -245,7 +278,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex]
   );
 
   const handleSignConfirm = useCallback(
@@ -443,7 +476,12 @@ export function ReaderScreen() {
         showDelete={!external}
         showAddToLibrary={!!external}
         showSubmit={!external && !!doc && canSubmit(doc)}
+        showText={!external && !!doc && canSubmit(doc)}
       />
+
+      {doc && selectTextIdx !== null ? (
+        <SelectTextSheet visible doc={doc} pageIdx={selectTextIdx} onClose={() => setSelectTextIdx(null)} />
+      ) : null}
 
       {signing && doc && doc.pages[activeIndex] && (
         <SignatureModal
