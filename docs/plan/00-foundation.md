@@ -1,12 +1,16 @@
-# §0 Foundation: detailed step-by-step plan
+# §0 Foundation: step-by-step plan
+
+## How to use this file
+- Implement **one step per session**: "Implement F3 from docs/plan/00-foundation.md".
+- Read `AGENTS.md` (auto-loaded) and the step you are implementing. Open only the files that
+  step names unless something unexpected comes up.
+- Steps are ordered. F1 comes first so every later step ships with tests.
+- When you finish a step, update its `Status:` line (`done (commit <sha>)`) and tick it in
+  `docs/PLAN.md`. If the code no longer matches what a step describes, fix the step text too.
 
 ## Context
-`docs/PLAN.md` makes §0 Foundation the first phase: no student features are built until the
-existing app is trustworthy and store-ready. The user asked for the detailed plan for §0 only.
-After approval, this plan is saved to the repo as `docs/plan/00-foundation.md`, the §0 checklist
-in `docs/PLAN.md` is updated to match, and both are committed and pushed to
-`claude/zen-gauss-7xh4cp`. No app code changes in this turn; each step below is implemented
-later as its own commit or PR.
+§0 is the first phase in `docs/PLAN.md`: the existing app must be trustworthy and store-ready
+before any student features are built.
 
 Decisions already made: app ID **`com.yeasin.pdfscan`**; crash reporting **Sentry, opt-in**
 (off by default).
@@ -43,6 +47,8 @@ Decisions already made: app ID **`com.yeasin.pdfscan`**; crash reporting **Sentr
 ## Steps (in order; each one is a separate commit)
 
 ### F1 · Test harness and CI *(first, so every later step ships with tests)*
+Status: done (commit bb99d51). Device checks: see Verification.
+
 - Add dev dependencies: `jest-expo@~57.0.5` (matches SDK 57), `jest`, `@types/jest`, and
   `pdfjs-dist` (used in tests only, to extract text from generated PDFs).
 - `jest.config.js` with `preset: 'jest-expo'`. Add scripts `"test": "jest"` and
@@ -58,6 +64,8 @@ Decisions already made: app ID **`com.yeasin.pdfscan`**; crash reporting **Sentr
 **Done when:** CI is green on the branch and the test count is above 0.
 
 ### F2 · Store hygiene *(small)*
+Status: done (commit 009cccb). Device checks: see Verification.
+
 - `app.json`:
   - `ios.bundleIdentifier` and `android.package` set to `com.yeasin.pdfscan`.
   - Remove `RECORD_AUDIO` from `android.permissions`.
@@ -82,6 +90,8 @@ Decisions already made: app ID **`com.yeasin.pdfscan`**; crash reporting **Sentr
 `RECORD_AUDIO`, and the app launches with no spike or Pro or Protect UI.
 
 ### F3 · Library storage moves to SQLite as the single source of truth *(critical)*
+Status: done (commit 3a39203) (with F4). Device checks: see Verification.
+
 - **Data-loss guard first** (a one-line fix that ships even before the rest):
   - In `useLibraryPersistence`, set `loaded` only on a *successful* load.
   - Make `loadLibraryIndex` throw instead of returning `[]` on a parse or read error.
@@ -117,6 +127,8 @@ Android phone, toggling a star writes one row, and killing the app mid-save neve
 documents.
 
 ### F4 · Folders + `courseFolder` become one **Course** model
+Status: done (commit 3a39203) (with F3). Device checks: see Verification.
+
 - `courses` table: id, name, code, color, semester (nullable), archived, created_at.
   `documents.course_id` is nullable (null means "Unsorted").
 - Migration:
@@ -141,6 +153,8 @@ documents.
 pre-existing document still opens.
 
 ### F5 · Image pipeline: high-resolution master, edits that don't re-save, one encode per export
+Status: done (commit 4345a55). Device checks: see Verification.
+
 - `src/services/capture/imageSpec.ts` with these constants:
   - `MASTER_MAX_DIM = 2400`, `MASTER_JPEG_Q = 0.92`, `THUMB_MAX_DIM = 400`.
   - `EXPORT_PRESETS`, quality 1–5 mapped to `{maxDim, q}`: 1000/0.55, 1400/0.65,
@@ -181,6 +195,8 @@ rotate-and-enhance cycle encodes the JPEG once at export; library page files kee
 after Compress.
 
 ### F6 · OCR text layer for every script: a "glyphless font"
+Status: done (commit f84a669, 97ee2a6). Device checks: see Verification.
+
 Use the same technique as Tesseract's PDF output, instead of embedding one font per script
 (CJK fonts are 10+ MB each).
 - Ship one tiny TrueType font, about 1 KB, in which every code point maps to a single empty
@@ -214,6 +230,8 @@ Use the same technique as Tesseract's PDF output, instead of embedding one font 
 in Google Drive's PDF viewer is searchable.
 
 ### F7 · Small correctness fixes
+Status: done (commit c1a1d66) (LIKE escaping landed in F3, ocrFailed in F5). Device checks: see Verification.
+
 - `searchDocumentsByText`: escape `%`, `_` and `\` in the LIKE parameter and add `ESCAPE '\'`.
   Add a test.
 - `runOcr` keeps returning `undefined` on failure, but the save path now records a per-page
@@ -223,6 +241,8 @@ in Google Drive's PDF viewer is searchable.
   otherwise remount).
 
 ### F8 · Opt-in crash reporting (Sentry)
+Status: done (commit e502f9b). Device checks: see Verification.
+
 - Install `@sentry/react-native` in the version whose Expo plugin supports SDK 57 (check its
   compatibility table when implementing; docs.expo.dev is blocked from this environment, so
   verify locally). Add the plugin in `app.json` with the org and project; the DSN comes from an
@@ -282,4 +302,3 @@ triggers in `dbService`.
 ## Out of scope for §0 (belongs to later sections)
 Exact size target (§4), new filters (§2), the full Course experience with semesters and colours
 (§3), Bengali OCR engine (§6), real PDF encryption (§7).
-
