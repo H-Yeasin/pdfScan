@@ -188,7 +188,35 @@ As built:
 app, and share the whole document as a .txt.
 
 ### T4 · Annotations: highlighter, pen, notes *(L)*
-Status: todo
+Status: done in code (commit 5c60573).
+
+As built:
+- Migration **v10** `annotations` as planned, but **without a foreign key on `page_id`**:
+  `libraryRepo.writeDocument` deletes and re-inserts a document's page rows on every save, so a
+  page cascade would wipe annotations. They cascade with the document; the store drops a page's
+  annotations when an `UPDATE_FILE` takes the page away (and on `REMOVE_FILES`/`REPLACE_FILES`).
+  Loaded and synced with the library (`LoadedLibrary.annotations`, optional).
+- `Annotation` / `AnnotationData` in `models.ts`; colours are keys of `annotations/palette.ts`
+  (fixed paper colours, not theme tokens, so a highlight looks the same everywhere).
+- `annotations/snap.ts` `snapHighlight(stroke, ocr, thickness)` (stroke sampled along its
+  segments; uses T3's reading-order tokens, so pre-T1 pages snap to whole lines);
+  `annotations/hitTest.ts` `annotationAt` for the eraser and note editing.
+- `annotations/pdfAnnotations.ts`: `writeAnnotations(pdfDoc, mappedDoc, items)` via T1's
+  `pdfRectFor`; `/Highlight` (QuadPoints, multiply appearance), `/Ink` (InkList, BS), `/Text`
+  (Comment icon); `/NM pdfscan:<id>`; ASCII `Contents` as a plain string, other scripts UTF-16.
+  `removeOurAnnotations`, `updatePdfAnnotations(doc, items)` (in place).
+- Builds call it through a new `BuildPdfOptions.beforeSave(pdfDoc)` hook (avoids an import cycle
+  `pdfService` ↔ `pageMap`). Wired: `compressDocument(doc, quality, annotations)`,
+  `applySignedPage(doc, idx, uri, annotations)`, `submitDocument({ annotations })` when the
+  preset has `includeAnnotations` (Deliver switch "Include my annotations", saved with the course
+  preset; the submission's cover offset is accounted for). **Not carried:** merge and split make
+  new documents without the annotations; the in-place signature (`applySignatureToPdf`) keeps
+  them since it edits the existing file.
+- UI: `components/reader/AnnotateSheet.tsx` (Reader menu "Annotate"), `react-native-svg` overlay
+  in master pixels; page arrows (no two-finger page swipe: two fingers zoom). Done →
+  `updatePdfAnnotations` → the Reader reloads the PDF.
+- Tests: `annotations/__tests__/annotations.test.ts` (read back with pdf.js `getAnnotations`),
+  plus a submission test (left out by default; on page 3 behind a cover when included).
 
 - Migration: `annotations` (id, document_id, page_id, kind `'highlight' | 'ink' | 'note'`,
   color, data JSON, text (for highlights: the covered words; for notes: the note), created_at,
