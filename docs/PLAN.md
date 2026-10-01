@@ -128,7 +128,7 @@ Goal: everything is filed by course without the student thinking about it.
 - [x] K3 Course setup and editing (quick "Add your courses" sheet, reused by onboarding)
 - [x] K4 Document types (Assignment, Notes, Handout, Exam, Lab, Other)
 - [x] K5 Automatic filing: course suggestions and an optional timetable
-- [ ] K6 Organising existing documents (move, set type, sort Unsorted, search filters)
+- [x] K6 Organising existing documents (move, set type, sort Unsorted, search filters)
 
 **Done when:** a new user creates 4 courses during onboarding and every later scan lands in the
 right one with zero or one tap.

@@ -235,7 +235,27 @@ the right course with no taps, and without a timetable the suggestion matches th
 used for that mode.
 
 ### K6 · Organising existing documents *(S)*
-Status: todo. What's already there for it (from K1–K5):
+Status: done in code (commit 18c9ed4). The "20 documents in under 2 minutes" check needs a device.
+
+As built:
+- "Archive" needed a document flag that didn't exist: migration v8 adds `documents.archived`
+  (`LibraryDocument.archived`, `library/SET_ARCHIVED`). Archived documents stay in their course,
+  are hidden from the Library and course lists behind a "Show n archived" footer, and are still
+  found by search (marked "Archived" on the row).
+- `SelectionBar` now scrolls sideways (8 tools): Submit, Move, Set type, Archive (Unarchive when
+  all selected are archived), Merge, Split, Compress, Sign. Move uses `FolderPickerModal` and
+  `library/ASSIGN_COURSE` (one diff, one transaction).
+- Unsorted: `SortUnsortedSheet` steps through the unsorted, unarchived documents: first page,
+  name, type, date, and every active course ranked by `suggestCourses` as of when the document
+  was made; a tap files it, Skip/Stop. The one-time banner (`settings.unsortedPromptDone`,
+  persisted) and a header "Sort" button open it.
+- Course delete (`CourseList`): the alert gives the document count and offers "Archive instead".
+- Search: `CourseFilterChips` (All courses + each course in the results, with counts and
+  colour) above the type chips while searching; `FileRow` takes `courseColor` and shows a dot
+  (Library rows).
+- Tests: `persistence/__tests__/organise.test.ts`.
+
+What was there before K6 (from K1–K5):
 - Actions: `library/ASSIGN_COURSE` (move), `library/SET_DOC_TYPE` (set type). Multi-select
   already has "Set type" (`SelectionBar` + `useDocumentListActions`). It needs a "Move" tool.
 - Pickers: `FolderPickerModal` (course; hides archived ones) and `DocTypePickerModal`.

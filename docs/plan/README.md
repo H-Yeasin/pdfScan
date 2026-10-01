@@ -12,8 +12,8 @@ code **when the section was planned**, and are kept as history.
 | §0 Foundation | [00-foundation.md](00-foundation.md) | F1–F8 | All done in code. Device checks open (see its Verification). |
 | §1 Capture | [01-capture.md](01-capture.md) | C1–C7 | All done in code. Device checks open. C5 used the no-native-dependency detector; the OpenCV spike is still pending. |
 | §2 Review and enhance | [02-review-enhance.md](02-review-enhance.md) | E1–E7 | E1–E6 done. **E7 in progress:** the tooling is done; the benchmark needs real pages and raters. |
-| §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | K1–K5 done. **Next: K6** (organising existing documents). |
-| §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). §3 K6 is still open too. |
+| §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | All done in code. Device checks open. |
+| §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | Planned (2026-10-02). T1 first; T7 (flashcards) is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | Planned (2026-10-02). L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader tools and later | — | — | Not planned yet. Next to plan: `docs/plan/07-reader-tools.md` (see `docs/PLAN.md` §7). |
@@ -51,6 +51,7 @@ lines here.
 | K2 Home hub, course pages | f98b0d8 | Home is the start screen once a course exists |
 | K4 Document types | 080c5b7 | |
 | K5 Course suggestions, class times | 10286d8 | migration v4 |
+| K6 Organising existing documents | 18c9ed4 | migration v8 (`documents.archived`) |
 | S1 Student profile | c4f8f75 | `settings.profile`, `submit/profile.ts`, `pdf/winAnsi.ts` |
 | S2 Naming template, named shares | 5f81a98 | `submit/naming.ts`, `shareService.shareAs`, `sanitizeFileName` |
 | S3 Size target | 6b6c94f | `submit/sizeTarget.ts`, `SIZE_LADDER`, `encodedBytes`; device check open |
