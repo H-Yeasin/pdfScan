@@ -117,7 +117,7 @@ Status: done (commit ab4d8be). Patch applies on `npm ci`; device check pending (
 from gallery" button, and ID card mode stops after 2 pages.
 
 ### C3 · Book mode: split two-page spreads *(M)*
-Status: todo
+Status: done (commit 15d95c9). Pure maths in `enhance/gutter.ts`, Skia in `enhance/splitSpread.ts`, pipeline hook `ingestBatch.ingestOne`; Undo split keeps the spread on both halves (`SessionPage.splitFrom`). Progress counts captures (spreads), not output pages. Device check pending: 5 spreads → 10 pages, gutter hit ≥ 9/10.
 
 - New `src/services/enhance/splitSpread.ts`: `splitSpread(uri) → [left, right]`.
   - Find the gutter with Skia: draw the page into a small offscreen surface about 256 px wide,

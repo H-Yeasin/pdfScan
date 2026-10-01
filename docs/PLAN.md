@@ -101,7 +101,7 @@ Goal: the best camera experience for school material.
 
 - [x] C1 Capture modes (Notes, Document, Board, Book, ID card) and mode picker
 - [x] C2 Scanner plugin options patch (page limit per mode, gallery import in Google's scanner)
-- [ ] C3 Book mode: split two-page spreads at the gutter
+- [x] C3 Book mode: split two-page spreads at the gutter
 - [ ] C4 ID card mode: front and back at true size on one A4 page
 - [ ] C5 Batch gallery import with automatic cropping (OpenCV spike first)
 - [x] C6 Haptics, per-page progress, "Scan more" loop, cancel
