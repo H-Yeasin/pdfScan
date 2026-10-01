@@ -15,7 +15,8 @@ code **when the section was planned**, and are kept as history.
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | K1–K5 done. **Next: K6** (organising existing documents). |
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). §3 K6 is still open too. |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | Planned (2026-10-02). T1 first; T7 (flashcards) is for later (P4). |
-| §6 Languages and later | — | — | Not planned yet. Next to plan: `docs/plan/06-languages.md` (see `docs/PLAN.md` §6). |
+| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | Planned (2026-10-02). L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
+| §7 Reader tools and later | — | — | Not planned yet. Next to plan: `docs/plan/07-reader-tools.md` (see `docs/PLAN.md` §7). |
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
 lines here.

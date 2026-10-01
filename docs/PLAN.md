@@ -169,15 +169,16 @@ in a library of 500 pages.
 ### §6 Languages and scripts *(designed now, Bengali later)*
 Goal: adding a new script or UI language is a configuration change, not a refactor.
 
-- [ ] `OcrEngine` interface (`recognize(uri, script) -> PageOcr`); ML Kit is the first
-      implementation. Tesseract (needed for Bengali) can be added later as a second engine. (M)
-- [ ] Script registry: `{ id, label, engine, pdfFont, sampleText }`, used by Settings, OCR and the
-      PDF text layer. Bengali is listed as "coming soon" or omitted, never broken. (S)
-- [ ] UI strings extracted to an i18n layer (`expo-localization` plus a translation catalog);
-      English only for now. (M)
-- [ ] Downloadable language packs (keeps the APK small when Tesseract models arrive). (L, later)
+**Detailed steps:** [`docs/plan/06-languages.md`](plan/06-languages.md)
 
-**Done when:** a branch that adds a fake script touches only the registry plus one font file.
+- [ ] L1 Script registry v2 (Bangla listed as "coming soon") and per-course recognition language
+- [ ] L2 `OcrEngine` interface; ML Kit becomes the first engine; fake-script test
+- [ ] L3 Visible PDF text (covers, footers) in any script via Skia shaping + searchable text layer
+- [ ] L4 UI translation layer (`t()`, typed English catalog, pseudo-locale), English only
+- [ ] L5 *(Later, P4)* Tesseract engine for Bangla
+- [ ] L6 *(Later, P4)* Downloadable language packs
+
+**Done when:** a branch that adds a fake script touches only the registry plus one engine or model file.
 
 ### §7 Reader and PDF tools *(already strong: maintain, don't expand)*
 - [ ] Keep merge, split, compress, sign and the universal reader.
@@ -256,4 +257,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. Next to plan: §6 Languages and scripts (`docs/plan/06-languages.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. Next to plan: §7 Reader and PDF tools (`docs/plan/07-reader-tools.md`).
