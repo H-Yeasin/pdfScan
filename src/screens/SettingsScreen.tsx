@@ -23,7 +23,8 @@ export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
-  const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled } = state.settings;
+  const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
+    state.settings;
 
   const handlePickExportFolder = useCallback(async () => {
     const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -95,6 +96,20 @@ export function SettingsScreen() {
                 Turn on "Also save a copy" in Deliver to write exports here too.
               </Text>
             ) : null}
+          </View>
+        )}
+
+        {scannerUnavailable && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Scanner</Text>
+            <SettingRow
+              title="Basic camera mode"
+              subtitle="Google's scanner wasn't available on this phone. Tap to try it again (e.g. after updating Google Play services)."
+              onPress={() => {
+                dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: false });
+                dispatch({ type: 'ui/SHOW_SNACK', msg: "The next scan will try Google's scanner" });
+              }}
+            />
           </View>
         )}
 

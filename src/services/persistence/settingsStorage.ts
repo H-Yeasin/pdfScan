@@ -12,6 +12,7 @@ export type PersistedSettings = {
   androidExportFolderLabel?: string | null;
   crashReportsEnabled?: boolean;
   lastCaptureMode?: CaptureMode;
+  scannerUnavailable?: boolean;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

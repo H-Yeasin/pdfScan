@@ -3,6 +3,7 @@ import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react
 import type { AppAction } from '../../store/appReducer';
 import type { CaptureModeSpec } from './captureModes';
 import { ingestBatch } from './ingestBatch';
+import { SCANNER_UNAVAILABLE_MESSAGE, isScannerUnavailableError, runCameraFallback } from './scannerFallback';
 import { hapticPagesReceived, hapticWarning } from '../feedback/haptics';
 import type { OcrScript } from '../../types/models';
 
@@ -15,9 +16,20 @@ function errorMessage(error: unknown): string {
 export async function runNativeScannerPipeline(
   dispatch: Dispatch<AppAction>,
   script: OcrScript,
-  spec: CaptureModeSpec
+  spec: CaptureModeSpec,
+  // settings.scannerUnavailable: skip straight to the basic camera (scannerFallback.ts).
+  options: { scannerUnavailable?: boolean } = {}
 ): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'scanning' });
+  // "Scan more" relaunches in the same mode; BULK_ADD_PAGES appends.
+  const scanMore = () => {
+    void runNativeScannerPipeline(dispatch, script, spec, options);
+  };
+
+  if (options.scannerUnavailable) {
+    await runCameraFallback(dispatch, script, spec, scanMore);
+    return;
+  }
 
   dispatch({
     type: 'ui/SHOW_SNACK',
@@ -46,6 +58,16 @@ export async function runNativeScannerPipeline(
     }
     scannedImages = result.scannedImages;
   } catch (error) {
+    if (isScannerUnavailableError(error)) {
+      // Remembered (persisted), so later scans skip the doomed attempt; the explanation shows
+      // only this once.
+      dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: true });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: SCANNER_UNAVAILABLE_MESSAGE });
+      await runCameraFallback(dispatch, script, spec, () => {
+        void runNativeScannerPipeline(dispatch, script, spec, { scannerUnavailable: true });
+      });
+      return;
+    }
     hapticWarning();
     dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'error', errorMessage: errorMessage(error) });
     return;
@@ -54,13 +76,5 @@ export async function runNativeScannerPipeline(
   hapticPagesReceived();
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'processing' });
 
-  // "Scan more" relaunches the scanner in the same mode; BULK_ADD_PAGES appends.
-  await ingestBatch(dispatch, scannedImages, {
-    script,
-    spec,
-    ownsInputs: true,
-    onScanMore: () => {
-      void runNativeScannerPipeline(dispatch, script, spec);
-    },
-  });
+  await ingestBatch(dispatch, scannedImages, { script, spec, ownsInputs: true, onScanMore: scanMore });
 }

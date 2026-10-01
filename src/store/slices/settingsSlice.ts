@@ -14,6 +14,9 @@ export type SettingsState = {
   androidExportFolderLabel: string | null;
   // Opt-in, off by default: see services/telemetry/crash.ts.
   crashReportsEnabled: boolean;
+  // Google's document scanner failed in a way that means it can't run on this phone (no or
+  // outdated Play services); scans go straight to the basic camera fallback (scannerFallback.ts).
+  scannerUnavailable: boolean;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -24,6 +27,7 @@ export const initialSettingsState: SettingsState = {
   androidExportFolderUri: null,
   androidExportFolderLabel: null,
   crashReportsEnabled: false,
+  scannerUnavailable: false,
 };
 
 export type SettingsAction =
@@ -32,7 +36,8 @@ export type SettingsAction =
   | { type: 'settings/SET_LAST_CAPTURE_MODE'; mode: CaptureMode }
   | { type: 'settings/SET_OCR_SCRIPT'; script: OcrScript }
   | { type: 'settings/SET_ANDROID_EXPORT_FOLDER'; uri: string | null; label: string | null }
-  | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean };
+  | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean }
+  | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -48,6 +53,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, androidExportFolderUri: action.uri, androidExportFolderLabel: action.label };
     case 'settings/SET_CRASH_REPORTS':
       return { ...state, crashReportsEnabled: action.enabled };
+    case 'settings/SET_SCANNER_UNAVAILABLE':
+      return { ...state, scannerUnavailable: action.unavailable };
     default:
       return state;
   }

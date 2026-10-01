@@ -43,8 +43,10 @@ src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, do
 1. **Capture**: `services/capture/scannerPipeline.ts` `runNativeScannerPipeline` uses the Google
    ML Kit doc scanner (`react-native-document-scanner-plugin`), then `capture/ingest.ingestPage`
    per page (master 2400 px q0.92, 400 px thumbnail, OCR), then `capture/BULK_ADD_PAGES`.
-   Gallery import (`CaptureScreen.addPagesFromAssets`) uses the same `ingestPage`. All sizes and
-   qualities live in `capture/imageSpec.ts`.
+   Per-page work runs through `capture/ingestBatch.ts` (progress, cancel, mode post-processing:
+   Book split, ID card compose). Gallery import (`ingestGalleryBatch`) and the no-Play-services
+   camera fallback (`capture/scannerFallback.ts`) also auto-crop with `capture/quadDetector.ts`.
+   Capture modes: `capture/captureModes.ts`. All sizes and qualities live in `capture/imageSpec.ts`.
 2. **Review**: `ReviewScreen`. Rotation is a setting (`capture/ROTATE_PAGE`), never re-encoded;
    crop is `enhance/perspectiveCrop.warpPerspectiveCrop`; half-page merge is
    `compositeHalfPages`. Filter/adjust/rotation are stored per page and previewed with

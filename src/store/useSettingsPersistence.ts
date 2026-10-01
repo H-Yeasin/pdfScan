@@ -21,6 +21,7 @@ export function useSettingsPersistence() {
           label: settings.androidExportFolderLabel ?? null,
         });
         dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled: settings.crashReportsEnabled === true });
+        dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: settings.scannerUnavailable === true });
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -40,6 +41,7 @@ export function useSettingsPersistence() {
       androidExportFolderUri: state.settings.androidExportFolderUri,
       androidExportFolderLabel: state.settings.androidExportFolderLabel,
       crashReportsEnabled: state.settings.crashReportsEnabled,
+      scannerUnavailable: state.settings.scannerUnavailable,
       lastCaptureMode: state.settings.lastCaptureMode,
     });
   }, [
@@ -50,6 +52,7 @@ export function useSettingsPersistence() {
     state.settings.androidExportFolderUri,
     state.settings.androidExportFolderLabel,
     state.settings.crashReportsEnabled,
+    state.settings.scannerUnavailable,
     state.settings.lastCaptureMode,
   ]);
 }

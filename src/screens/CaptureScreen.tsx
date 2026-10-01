@@ -20,7 +20,7 @@ export function CaptureScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages, processingStatus, mode } = state.capture;
-  const { ocrScript, loaded: settingsLoaded, firstRun, lastCaptureMode } = state.settings;
+  const { ocrScript, loaded: settingsLoaded, firstRun, lastCaptureMode, scannerUnavailable } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
   const spec = getCaptureModeSpec(mode);
   const hasAutoLaunched = useRef(false);
@@ -81,8 +81,8 @@ export function CaptureScreen() {
   const handleScan = useCallback(() => {
     if (busyScanning) return;
     markPickerSeen();
-    runNativeScannerPipeline(dispatch, ocrScript, spec);
-  }, [busyScanning, dispatch, ocrScript, spec, markPickerSeen]);
+    runNativeScannerPipeline(dispatch, ocrScript, spec, { scannerUnavailable });
+  }, [busyScanning, dispatch, ocrScript, spec, markPickerSeen, scannerUnavailable]);
 
   // Opens the scanner straight away on entering this tab - but only once the user has picked a
   // mode at least once (firstRun false). On a first visit the picker must stay visible instead
@@ -94,7 +94,7 @@ export function CaptureScreen() {
     hasAutoLaunched.current = true;
     if (firstRun || busyScanning) return;
     const launchMode = pages.length === 0 ? lastCaptureMode : mode;
-    runNativeScannerPipeline(dispatch, ocrScript, getCaptureModeSpec(launchMode));
+    runNativeScannerPipeline(dispatch, ocrScript, getCaptureModeSpec(launchMode), { scannerUnavailable });
     // Once per mount (i.e. once per visit to this tab).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsLoaded]);
