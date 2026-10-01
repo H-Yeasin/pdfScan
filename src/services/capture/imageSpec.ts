@@ -37,6 +37,22 @@ export const EXPORT_PRESETS: Record<1 | 2 | 3 | 4 | 5, ExportPreset> = {
 
 export const MASTER_PRESET: ExportPreset = EXPORT_PRESETS[5];
 
+// §4's size target steps through these, best first, until the predicted PDF fits the limit
+// (services/submit/sizeTarget.ts). Finer than the slider, and further down, because an upload
+// limit is often 1 or 2 MB for 10+ pages. Level 0 is the master spec (embedded as-is); the
+// levels the slider also has reuse its presets.
+export const SIZE_LADDER: readonly ExportPreset[] = [
+  MASTER_PRESET,
+  EXPORT_PRESETS[4],
+  EXPORT_PRESETS[3],
+  { maxDim: 1600, q: 0.7, sizeFactor: 0.24 },
+  EXPORT_PRESETS[2],
+  { maxDim: 1200, q: 0.6, sizeFactor: 0.11 },
+  EXPORT_PRESETS[1],
+  { maxDim: 850, q: 0.5, sizeFactor: 0.05 },
+  { maxDim: 700, q: 0.45, sizeFactor: 0.035 },
+];
+
 export function exportPreset(quality: number): ExportPreset {
   const level = Math.min(5, Math.max(1, Math.round(quality))) as 1 | 2 | 3 | 4 | 5;
   return EXPORT_PRESETS[level];

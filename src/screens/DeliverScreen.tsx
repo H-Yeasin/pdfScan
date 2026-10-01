@@ -8,6 +8,7 @@ import { LayoutModeSegmented } from '../components/deliver/LayoutModeSegmented';
 import { MoreOptionsPanel } from '../components/deliver/MoreOptionsPanel';
 import { NameField } from '../components/deliver/NameField';
 import { QualitySlider } from '../components/deliver/QualitySlider';
+import { SizeTargetRow } from '../components/deliver/SizeTargetRow';
 import { StickyActions } from '../components/deliver/StickyActions';
 import { useRouter } from '../navigation/router';
 import { summarizeAcademicConfig } from './AcademicOptionsScreen';
@@ -28,6 +29,7 @@ import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
 import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes';
 import { suggestName } from '../services/submit/naming';
+import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppState } from '../store/AppStateContext';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
@@ -66,7 +68,9 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, nameEdited, format, quality, more, exportCopy, academicConfig, layoutMode } = state.deliver;
+  const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, academicConfig, layoutMode } = state.deliver;
+  // The size target is for the PDF; a JPG export saves each page as its own image.
+  const sizeLimit = format === 'PDF' ? sizeLimitBytes : null;
   // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
   const { courseId, suggestions, automatic } = useFilingCourse();
   // Every saved document gets a type: the student's pick, or the capture mode's default.
@@ -122,7 +126,9 @@ export function DeliverScreen() {
       setSaving(true);
       try {
         const documentId = createId('doc');
-        const encoding = encodingForQuality(quality);
+        // With a size target the level isn't known until every master exists, so the loop renders
+        // masters only and buildPdfUnderLimit encodes the PDF's pages itself.
+        const encoding = sizeLimit !== null ? 'as-is' : encodingForQuality(quality);
         const total = pages.length;
         const transientUris = new Set<string>();
 
@@ -188,14 +194,18 @@ export function DeliverScreen() {
         // Always build a document.pdf, regardless of the chosen export `format` - the unified
         // reader renders every library doc through the real PDF engine, so a JPG-format doc needs
         // a real PDF behind it too. Pages are already encoded for export, so they go in as-is.
-        setProgress('Building PDF…');
-        const pdfResult = await buildPdfFromPages(
-          documentId,
-          contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
-          'as-is',
-          academicConfig ?? undefined,
-          layoutMode
-        );
+        const pdfPages = contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout }));
+        let pdfResult: { uri: string; sizeBytes: number };
+        let sizeWarning: string | null = null;
+        if (sizeLimit !== null) {
+          setProgress(`Fitting under ${formatLimit(sizeLimit)}…`);
+          const sized = await buildPdfUnderLimit(documentId, pdfPages, sizeLimit, academicConfig ?? undefined, layoutMode);
+          if (!sized.fits) sizeWarning = tooLargeMessage(sized, sizeLimit);
+          pdfResult = sized;
+        } else {
+          setProgress('Building PDF…');
+          pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academicConfig ?? undefined, layoutMode);
+        }
         const pdfUri: string = pdfResult.uri;
 
         const libraryInputPages: LibraryInputPage[] = coverPage ? [coverPage, ...contentPages] : contentPages;
@@ -274,9 +284,11 @@ export function DeliverScreen() {
         // The device-folder copy runs after the in-app save has already succeeded and never
         // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.
         let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${courseName}`;
+        // Saved all the same; the student decides whether to drop pages or pick a bigger limit.
+        if (sizeWarning) snackMsg = sizeWarning;
         if (!shareAfter && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
           const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
-          snackMsg =
+          if (!sizeWarning) snackMsg =
             result.failed === 0
               ? `Saved · ${courseName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
               : `Saved · ${courseName} · copy to device folder failed`;
@@ -305,6 +317,7 @@ export function DeliverScreen() {
       pages,
       saving,
       quality,
+      sizeLimit,
       format,
       name,
       suggestedName,
@@ -358,13 +371,27 @@ export function DeliverScreen() {
           </Text>
         </View>
 
-        <View>
-          <View style={styles.qualityHeader}>
-            <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Quality</Text>
-            <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>≈ {formatBytes(sizeEstimate)}</Text>
+        {format === 'PDF' ? (
+          <View>
+            <View style={styles.qualityHeader}>
+              <Text style={[styles.sectionLabel, { color: tokens.ink }]}>File size</Text>
+              {sizeLimit !== null ? (
+                <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>Will be ≤ {formatLimit(sizeLimit)}</Text>
+              ) : null}
+            </View>
+            <SizeTargetRow value={sizeLimitBytes} onChange={(bytes) => dispatch({ type: 'deliver/SET_SIZE_LIMIT', bytes })} />
           </View>
-          <QualitySlider value={quality} onChange={(value) => dispatch({ type: 'deliver/SET_QUALITY', quality: value })} />
-        </View>
+        ) : null}
+
+        {sizeLimit === null ? (
+          <View>
+            <View style={styles.qualityHeader}>
+              <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Quality</Text>
+              <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>≈ {formatBytes(sizeEstimate)}</Text>
+            </View>
+            <QualitySlider value={quality} onChange={(value) => dispatch({ type: 'deliver/SET_QUALITY', quality: value })} />
+          </View>
+        ) : null}
 
         <MoreOptionsPanel
           open={more}

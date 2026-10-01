@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 
 type TextPromptModalProps = {
@@ -8,6 +8,7 @@ type TextPromptModalProps = {
   initialValue?: string;
   placeholder?: string;
   submitLabel?: string;
+  keyboardType?: KeyboardTypeOptions;
   onCancel: () => void;
   onSubmit: (value: string) => void;
 };
@@ -18,6 +19,7 @@ export function TextPromptModal({
   initialValue = '',
   placeholder,
   submitLabel = 'Save',
+  keyboardType,
   onCancel,
   onSubmit,
 }: TextPromptModalProps) {
@@ -41,6 +43,7 @@ export function TextPromptModal({
             placeholder={placeholder}
             placeholderTextColor={tokens.muted}
             autoFocus
+            keyboardType={keyboardType}
             style={[styles.input, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
           />
           <View style={styles.actions}>

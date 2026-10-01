@@ -8,6 +8,9 @@ export type DeliverState = {
   nameEdited: boolean;
   format: DocFormat;
   quality: number; // 1-5
+  // §4 size target: the PDF is built to fit under this many bytes (services/submit/sizeTarget.ts)
+  // and the quality slider is hidden. null = "Original", the slider decides.
+  sizeLimitBytes: number | null;
   more: boolean;
   // Course the saved document is filed under; null means Unsorted. Only used once the student has
   // chosen (coursePicked): until then the course is automatic, the top suggestion
@@ -33,6 +36,7 @@ export const initialDeliverState: DeliverState = {
   nameEdited: false,
   format: 'PDF',
   quality: 3,
+  sizeLimitBytes: null,
   more: false,
   courseId: null,
   coursePicked: false,
@@ -49,6 +53,7 @@ export type DeliverAction =
   | { type: 'deliver/SET_AUTO_NAME'; name: string }
   | { type: 'deliver/SET_FORMAT'; format: DocFormat }
   | { type: 'deliver/SET_QUALITY'; quality: number }
+  | { type: 'deliver/SET_SIZE_LIMIT'; bytes: number | null }
   | { type: 'deliver/TOGGLE_MORE' }
   | { type: 'deliver/SET_COURSE'; courseId: string | null }
   // Back to the automatic (suggested) course.
@@ -69,6 +74,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, format: action.format };
     case 'deliver/SET_QUALITY':
       return { ...state, quality: action.quality };
+    case 'deliver/SET_SIZE_LIMIT':
+      return { ...state, sizeLimitBytes: action.bytes };
     case 'deliver/TOGGLE_MORE':
       return { ...state, more: !state.more };
     case 'deliver/SET_COURSE':

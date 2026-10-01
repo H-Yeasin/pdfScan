@@ -23,6 +23,19 @@ export type RenderedPage = { uri: string; width: number; height: number };
 // library or an export, so quality never compounds across steps. Never touches the source file.
 // No `enhance` means no filter ('original'): a plain resize/re-encode, e.g. exporting a master.
 export async function renderPage(uri: string, edits: PageEdits, target: RenderTarget): Promise<RenderedPage> {
+  const { bytes, width, height } = await renderToBytes(uri, edits, target);
+  const dest = new File(Paths.cache, `${createId('render')}.jpg`);
+  dest.write(bytes);
+  return { uri: dest.uri, width, height };
+}
+
+// The JPEG size renderPage would write, without writing it: the size target samples a few pages
+// at several levels (services/submit/sizeTarget.ts) and only needs the byte count.
+export async function encodedBytes(uri: string, edits: PageEdits, target: RenderTarget): Promise<number> {
+  return (await renderToBytes(uri, edits, target)).bytes.length;
+}
+
+async function renderToBytes(uri: string, edits: PageEdits, target: RenderTarget) {
   const data = await Skia.Data.fromURI(uri);
   const image = Skia.Image.MakeImageFromEncoded(data);
   if (!image) throw new Error(`Skia failed to decode image at ${uri}`);
@@ -48,7 +61,5 @@ export async function renderPage(uri: string, edits: PageEdits, target: RenderTa
   surface.flush();
 
   const bytes = surface.makeImageSnapshot().encodeToBytes(ImageFormat.JPEG, Math.round(target.q * 100));
-  const dest = new File(Paths.cache, `${createId('render')}.jpg`);
-  dest.write(bytes);
-  return { uri: dest.uri, width: out.width, height: out.height };
+  return { bytes, width: out.width, height: out.height };
 }
