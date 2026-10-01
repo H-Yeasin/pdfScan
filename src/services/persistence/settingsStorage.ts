@@ -15,6 +15,7 @@ export type PersistedSettings = {
   crashReportsEnabled?: boolean;
   lastCaptureMode?: CaptureMode;
   scannerUnavailable?: boolean;
+  lastOpened?: { id: string; at: number } | null;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

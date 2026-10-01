@@ -235,7 +235,13 @@ export function DeliverScreen() {
         dispatch({ type: 'capture/CLEAR_PAGES' });
         dispatch({ type: 'review/RESET' });
         dispatch({ type: 'deliver/RESET' });
-        go('library');
+        // Land where the new document is: its course page, or the Library for an unsorted one.
+        if (doc.courseId) {
+          dispatch({ type: 'library/SET_ACTIVE_COURSE', id: doc.courseId });
+          go('course');
+        } else {
+          go('library');
+        }
 
         // The device-folder copy runs after the in-app save has already succeeded and never
         // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.

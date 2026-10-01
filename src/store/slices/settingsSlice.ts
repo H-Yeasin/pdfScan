@@ -22,6 +22,9 @@ export type SettingsState = {
   // Google's document scanner failed in a way that means it can't run on this phone (no or
   // outdated Play services); scans go straight to the basic camera fallback (scannerFallback.ts).
   scannerUnavailable: boolean;
+  // The library document last opened in the Reader, for Home's "Continue" card
+  // (homeSelectors.continueDocument).
+  lastOpened: { id: string; at: number } | null;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -34,6 +37,7 @@ export const initialSettingsState: SettingsState = {
   defaultEnhanceByMode: {},
   crashReportsEnabled: false,
   scannerUnavailable: false,
+  lastOpened: null,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -56,7 +60,8 @@ export type SettingsAction =
   | { type: 'settings/SET_DEFAULT_ENHANCE'; mode: CaptureMode; enhance: EnhanceMode }
   | { type: 'settings/LOAD_DEFAULT_ENHANCE'; byMode: Partial<Record<CaptureMode, EnhanceMode>> }
   | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean }
-  | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean };
+  | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
+  | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -78,6 +83,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, crashReportsEnabled: action.enabled };
     case 'settings/SET_SCANNER_UNAVAILABLE':
       return { ...state, scannerUnavailable: action.unavailable };
+    case 'settings/SET_LAST_OPENED':
+      return { ...state, lastOpened: action.lastOpened };
     default:
       return state;
   }

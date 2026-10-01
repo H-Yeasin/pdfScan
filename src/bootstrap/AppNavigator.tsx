@@ -3,6 +3,8 @@ import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useRouter } from '../navigation/router';
 import { runSlide, slideTransform } from '../navigation/transitions';
 import type { NavDir, ScreenName } from '../types/navigation';
+import { HomeScreen } from '../screens/HomeScreen';
+import { CourseScreen } from '../screens/CourseScreen';
 import { CaptureScreen } from '../screens/CaptureScreen';
 import { ReviewScreen } from '../screens/ReviewScreen';
 import { DeliverScreen } from '../screens/DeliverScreen';
@@ -20,8 +22,11 @@ import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useAppState } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
 import { initCrashReporting } from '../services/telemetry/crash';
+import { useTheme } from '../theme';
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
+  home: HomeScreen,
+  course: CourseScreen,
   capture: CaptureScreen,
   review: ReviewScreen,
   deliver: DeliverScreen,
@@ -40,7 +45,8 @@ export function AppNavigator() {
   useSettingsPersistence();
   useSignaturePersistence();
   useExternalFileLinking(libraryLoaded);
-  const { screen, navDir, navTick, go } = useRouter();
+  const { screen, navDir, navTick, go, replace } = useRouter();
+  const { tokens } = useTheme();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(1)).current;
   const [outgoing, setOutgoing] = useState<{ screen: ScreenName; navDir: NavDir } | null>(null);
@@ -52,6 +58,19 @@ export function AppNavigator() {
   useEffect(() => initCrashReporting(crashReportsEnabled), [crashReportsEnabled]);
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
+
+  // Start screen: Home once the student has at least one course, otherwise Capture as before.
+  // Nothing renders until the library and settings are in, because Capture opens the scanner as
+  // soon as it mounts - it mustn't flash up (or launch) on the way to Home. A failed library load
+  // falls through to Capture; anything that already navigated (e.g. "Open with") wins.
+  const [booting, setBooting] = useState(true);
+  const libraryStatus = state.library.loadStatus;
+  const hasActiveCourse = state.library.courses.some((c) => !c.archived);
+  useEffect(() => {
+    if (!booting || libraryStatus === 'loading' || !state.settings.loaded) return;
+    if (hasActiveCourse && screen === 'capture' && navTick === 0) replace('home');
+    setBooting(false);
+  }, [booting, libraryStatus, hasActiveCourse, state.settings.loaded, screen, navTick, replace]);
 
   // Lives here (always mounted) rather than on CaptureScreen/ReviewScreen, because both of those
   // unmount/remount as the user navigates between tabs. Navigating to Review as soon as the raw
@@ -75,13 +94,19 @@ export function AppNavigator() {
   }, [processingStatus, errorMessage, dispatch, go]);
 
   useEffect(() => {
-    if (navTick === prevTick.current) return;
+    // replace() changes screen without a tick: no transition, but the next one slides out from here.
+    if (navTick === prevTick.current) {
+      prevScreen.current = screen;
+      return;
+    }
     const from = prevScreen.current;
     prevTick.current = navTick;
     prevScreen.current = screen;
     setOutgoing({ screen: from, navDir });
     runSlide(progress, () => setOutgoing(null));
   }, [navTick, screen, navDir, progress]);
+
+  if (booting) return <View style={[styles.container, { backgroundColor: tokens.bg }]} />;
 
   const Incoming = SCREENS[screen];
   const Outgoing = outgoing ? SCREENS[outgoing.screen] : null;

@@ -30,7 +30,8 @@ const SEARCH_DEBOUNCE_MS = 200;
 
 export function ReaderScreen() {
   const { tokens } = useTheme();
-  const { go } = useRouter();
+  // Back returns to wherever the document was opened from: Home, Library or a course page.
+  const { go, hub } = useRouter();
   const { state, dispatch } = useAppState();
 
   const external = state.reader.external;
@@ -194,7 +195,7 @@ export function ReaderScreen() {
               onPress: () => {
                 dispatch({ type: 'library/REMOVE_FILES', ids: [doc.id] });
                 deleteDocumentFiles(doc.id);
-                go('library', 'back');
+                go(hub, 'back');
               },
             },
           ]
@@ -325,7 +326,7 @@ export function ReaderScreen() {
               onSubmitEditing={handleSubmitPassword}
             />
             <View style={styles.passwordActions}>
-              <Pressable onPress={() => go('library', 'back')}>
+              <Pressable onPress={() => go(hub, 'back')}>
                 <Text style={{ color: tokens.muted }}>Cancel</Text>
               </Pressable>
               <Pressable onPress={handleSubmitPassword}>
@@ -339,7 +340,7 @@ export function ReaderScreen() {
       <ReaderTopChrome
         visible={chromeVisible}
         name={title}
-        onBack={() => go('library', 'back')}
+        onBack={() => go(hub, 'back')}
         onOverflow={() => setOverflowOpen(true)}
         findOpen={findOpen}
         findQuery={findQuery}

@@ -18,6 +18,8 @@ export type LibraryState = {
   courses: Course[];
   // Newest start date first, as loaded.
   semesters: Semester[];
+  // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
+  homeSemesterId: string | null;
   // UI-only drill-in state for the Courses tab: null = showing the course list,
   // a course id = showing that course's contents. Not persisted, same category as `tab`.
   activeCourseId: string | null;
@@ -36,6 +38,7 @@ export const initialLibraryState: LibraryState = {
   files: [],
   courses: [],
   semesters: [],
+  homeSemesterId: null,
   activeCourseId: null,
   selection: [],
   selMode: false,
@@ -72,6 +75,7 @@ export type LibraryAction =
   | { type: 'library/UPDATE_SEMESTER'; id: string; patch: Partial<Omit<Semester, 'id' | 'createdAt'>> }
   | { type: 'library/ARCHIVE_SEMESTER'; id: string }
   | { type: 'library/DELETE_SEMESTER'; id: string }
+  | { type: 'library/SET_HOME_SEMESTER'; id: string | null }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_ACTIVE_COURSE'; id: string | null };
 
@@ -222,6 +226,8 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         semesters: state.semesters.filter((s) => s.id !== action.id),
         courses: state.courses.map((c) => (c.semesterId === action.id ? { ...c, semesterId: undefined } : c)),
       };
+    case 'library/SET_HOME_SEMESTER':
+      return { ...state, homeSemesterId: action.id };
     case 'library/SET_ACTIVE_COURSE':
       return { ...state, activeCourseId: action.id };
     default:

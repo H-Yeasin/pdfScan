@@ -21,7 +21,7 @@ const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
 
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
-  const { go } = useRouter();
+  const { go, hub } = useRouter();
   const { state, dispatch } = useAppState();
   const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
     state.settings;
@@ -42,7 +42,7 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('library', 'back')}>
+        <Pressable style={styles.headerButton} onPress={() => go(hub, 'back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>Settings</Text>

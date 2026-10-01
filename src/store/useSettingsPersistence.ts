@@ -34,6 +34,10 @@ export function useSettingsPersistence() {
         dispatch({ type: 'settings/LOAD_DEFAULT_ENHANCE', byMode: sanitizeDefaultEnhance(settings.defaultEnhanceByMode) });
         dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled: settings.crashReportsEnabled === true });
         dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: settings.scannerUnavailable === true });
+        const opened = settings.lastOpened;
+        if (opened && typeof opened.id === 'string' && typeof opened.at === 'number') {
+          dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: opened });
+        }
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -56,6 +60,7 @@ export function useSettingsPersistence() {
       crashReportsEnabled: state.settings.crashReportsEnabled,
       scannerUnavailable: state.settings.scannerUnavailable,
       lastCaptureMode: state.settings.lastCaptureMode,
+      lastOpened: state.settings.lastOpened,
     });
   }, [
     loaded,
@@ -68,5 +73,6 @@ export function useSettingsPersistence() {
     state.settings.crashReportsEnabled,
     state.settings.scannerUnavailable,
     state.settings.lastCaptureMode,
+    state.settings.lastOpened,
   ]);
 }
