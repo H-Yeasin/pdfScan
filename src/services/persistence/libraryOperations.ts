@@ -1,5 +1,5 @@
 import { Directory, File } from 'expo-file-system';
-import { applySignatureToPdf, buildPdfFromPages, encodingForQuality } from '../pdf/pdfService';
+import { applySignatureToPdf, buildPdfFromPages, encodingForQuality, pageSizeOfPdf } from '../pdf/pdfService';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { getDocumentDir } from './libraryFiles';
@@ -43,11 +43,15 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
     for (const page of doc.pages) mergedPages.push(copyPageInto(page, dir, mergedPages.length + 1));
   }
 
+  // Rebuilds keep the paper size (A4 or Letter) the document was saved with; a merge takes the
+  // first document's.
   const pdfResult = await buildPdfFromPages(
     documentId,
     mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is',
-    undefined
+    undefined,
+    'standard',
+    await pageSizeOfPdf(docs[0]?.pdfUri)
   );
 
   const name = `Merged_${docs.length}_files`;
@@ -71,6 +75,7 @@ export async function mergeDocuments(docs: LibraryDocument[]): Promise<LibraryDo
 // Split output stays in the source document's course.
 export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocument[]> {
   const results: LibraryDocument[] = [];
+  const pageSize = await pageSizeOfPdf(doc.pdfUri);
 
   for (let i = 0; i < doc.pages.length; i++) {
     const source = doc.pages[i];
@@ -85,7 +90,9 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
       documentId,
       [{ uri: page.fileUri, width: page.width, height: page.height, ocr: page.ocr, layout: page.layout }],
       'as-is',
-      undefined
+      undefined,
+      'standard',
+      pageSize
     );
     const pdfUri: string = pdfResult.uri;
     const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : new File(page.fileUri).size ?? 0;
@@ -119,7 +126,9 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
     doc.id,
     doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     encodingForQuality(quality),
-    undefined
+    undefined,
+    'standard',
+    await pageSizeOfPdf(doc.pdfUri)
   );
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
@@ -161,7 +170,9 @@ export async function applySignedPage(
     doc.id,
     pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is',
-    undefined
+    undefined,
+    'standard',
+    await pageSizeOfPdf(doc.pdfUri)
   );
   const pdfUri: string = pdfResult.uri;
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;

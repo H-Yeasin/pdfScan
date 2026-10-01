@@ -27,12 +27,11 @@ import { historyUris } from '../store/pageHistory';
 import { CourseChips } from '../components/courses/CourseChips';
 import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
-import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes';
-import { withCoverDefaults } from '../services/pdf/coverTemplates';
+import { defaultDocTypeFor } from '../services/courses/docTypes';
 import { suggestName } from '../services/submit/naming';
 import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppState } from '../store/AppStateContext';
-import { useCoverDefaults } from '../store/useCoverDefaults';
+import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
@@ -43,12 +42,6 @@ function defaultName(): string {
   const now = new Date();
   const iso = now.toISOString().slice(0, 10);
   return `Scan_${iso}`;
-}
-
-function firstOcrLine(text?: string): string | undefined {
-  if (!text) return undefined;
-  const line = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0);
-  return line;
 }
 
 // One page on its way into the library: its rendered master (+ optional stamped display copy).
@@ -70,18 +63,10 @@ export function DeliverScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
-  const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, layoutMode } = state.deliver;
-  // A template cover's fields are stored as the student's edits only; the rest come from the
-  // profile, course and type (useCoverDefaults), filled in here so everything below draws them.
-  const coverDefaults = useCoverDefaults();
-  const storedAcademicConfig = state.deliver.academicConfig;
-  const academicConfig = useMemo(
-    () =>
-      storedAcademicConfig?.coverPage
-        ? { ...storedAcademicConfig, coverPage: withCoverDefaults(storedAcademicConfig.coverPage, coverDefaults) }
-        : storedAcademicConfig,
-    [storedAcademicConfig, coverDefaults]
-  );
+  const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, layoutMode, pageSize } = state.deliver;
+  // The academic options as they will be drawn: cover defaults and header/footer tokens filled in.
+  const academicConfig = useResolvedAcademicConfig();
+  const namingContext = useNamingContext();
   // The size target is for the PDF; a JPG export saves each page as its own image.
   const sizeLimit = format === 'PDF' ? sizeLimitBytes : null;
   // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
@@ -89,7 +74,7 @@ export function DeliverScreen() {
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel, ocrScript, profile, nameTemplate } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, ocrScript, nameTemplate } = state.settings;
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
@@ -110,21 +95,7 @@ export function DeliverScreen() {
 
   // The name from the naming template (e.g. 2021331045_Rahim_CSE101_HW3). It follows the course
   // and type, since `{n}` counts per course and type, until the student types a name of their own.
-  const files = state.library.files;
-  const course = useMemo(() => courses.find((c) => c.id === courseId), [courses, courseId]);
-  const firstPageText = pages[0]?.ocr?.text;
-  const suggestedName = useMemo(
-    () =>
-      suggestName(nameTemplate, {
-        profile,
-        course,
-        docType,
-        n: nextTypeNumber(files, courseId ?? undefined, docType),
-        date: new Date(),
-        title: firstOcrLine(firstPageText),
-      }) || defaultName(),
-    [nameTemplate, profile, course, courseId, docType, files, firstPageText]
-  );
+  const suggestedName = useMemo(() => suggestName(nameTemplate, namingContext) || defaultName(), [nameTemplate, namingContext]);
 
   useEffect(() => {
     if (nameEdited || pages.length === 0 || name === suggestedName) return;
@@ -190,7 +161,7 @@ export function DeliverScreen() {
             }
           }
           if (academicConfig.coverPage) {
-            const rendered = await renderCoverPageImage(academicConfig.coverPage);
+            const rendered = await renderCoverPageImage(academicConfig.coverPage, pageSize);
             if (rendered) {
               coverPage = {
                 id: createId('page'),
@@ -212,12 +183,12 @@ export function DeliverScreen() {
         let sizeWarning: string | null = null;
         if (sizeLimit !== null) {
           setProgress(`Fitting under ${formatLimit(sizeLimit)}…`);
-          const sized = await buildPdfUnderLimit(documentId, pdfPages, sizeLimit, academicConfig ?? undefined, layoutMode);
+          const sized = await buildPdfUnderLimit(documentId, pdfPages, sizeLimit, academicConfig ?? undefined, layoutMode, pageSize);
           if (!sized.fits) sizeWarning = tooLargeMessage(sized, sizeLimit);
           pdfResult = sized;
         } else {
           setProgress('Building PDF…');
-          pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academicConfig ?? undefined, layoutMode);
+          pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academicConfig ?? undefined, layoutMode, pageSize);
         }
         const pdfUri: string = pdfResult.uri;
 
@@ -341,6 +312,7 @@ export function DeliverScreen() {
       exportCopy,
       academicConfig,
       layoutMode,
+      pageSize,
       androidExportFolderUri,
       androidExportFolderLabel,
       state.capture.mode,
@@ -409,6 +381,7 @@ export function DeliverScreen() {
         <MoreOptionsPanel
           open={more}
           onToggleOpen={() => dispatch({ type: 'deliver/TOGGLE_MORE' })}
+          pageSize={format === 'PDF' ? { value: pageSize, onChange: (value) => dispatch({ type: 'deliver/SET_PAGE_SIZE', pageSize: value }) } : undefined}
           exportCopy={
             Platform.OS === 'android'
               ? {

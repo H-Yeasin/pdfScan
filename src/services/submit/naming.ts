@@ -58,13 +58,22 @@ function tokenValue(token: NameToken, ctx: NamingContext): string {
 }
 
 const isNameToken = (value: string): value is NameToken => (NAME_TOKENS as readonly string[]).includes(value);
-const SEPARATOR = /[_-]/;
 
-// Fills in a naming template. Unknown tokens (`{foo}`) are left as typed, so a typo shows up in
-// the live example instead of vanishing. An empty token takes one neighbouring `_` or `-` with
-// it (the one after it if there is one, otherwise the one before), so `{roll}_{name}` without a
-// roll gives `Rahim`, not `_Rahim`. The result is a safe file name (sanitizeFileName), possibly ''.
-export function renderTemplate(template: string, ctx: NamingContext): string {
+// How an empty token takes a neighbouring separator with it: `lead` matches one at the start of
+// the literal after the token, `trail` one at the end of the text before it.
+type SeparatorRule = { lead: RegExp; trail: RegExp; edges: RegExp };
+
+const FILE_SEPARATORS: SeparatorRule = { lead: /^[_-]/, trail: /[_-]$/, edges: /^[_-]+|[_-]+$/g };
+// Footers read `{name} · {roll} · {X}/{Y}`: a separator there is a mark with optional spaces.
+// `/` counts too, but `{X}` and `{Y}` are filled in later (pdfService.fillPageNumbers), so a
+// `{X}/{Y}` is never touched here.
+const TEXT_SEPARATORS: SeparatorRule = {
+  lead: /^\s*[_\-·|,/]\s*/,
+  trail: /\s*[_\-·|,/]\s*$/,
+  edges: /^\s*[_\-·|,/]\s*|\s*[_\-·|,/]\s*$/g,
+};
+
+function fillTokens(template: string, ctx: NamingContext, rule: SeparatorRule): string {
   const parts = template.split(/(\{[a-z]+\})/);
   let out = '';
   // Set when an empty token has to take the separator that starts the next literal.
@@ -79,15 +88,36 @@ export function renderTemplate(template: string, ctx: NamingContext): string {
         dropNextSeparator = false;
         continue;
       }
-      if (SEPARATOR.test(parts[i + 1]?.[0] ?? '')) dropNextSeparator = true;
-      else if (SEPARATOR.test(out.slice(-1))) out = out.slice(0, -1);
+      if (rule.lead.test(parts[i + 1] ?? '')) dropNextSeparator = true;
+      else out = out.replace(rule.trail, '');
       continue;
     }
-    if (dropNextSeparator && SEPARATOR.test(part[0] ?? '')) part = part.slice(1);
+    if (dropNextSeparator) part = part.replace(rule.lead, '');
     dropNextSeparator = false;
     out += part;
   }
-  return sanitizeFileName(out.replace(/^[_-]+|[_-]+$/g, ''));
+  return out.replace(rule.edges, '');
+}
+
+// Fills in a naming template. Unknown tokens (`{foo}`) are left as typed, so a typo shows up in
+// the live example instead of vanishing. An empty token takes one neighbouring `_` or `-` with
+// it (the one after it if there is one, otherwise the one before), so `{roll}_{name}` without a
+// roll gives `Rahim`, not `_Rahim`. The result is a safe file name (sanitizeFileName), possibly ''.
+export function renderTemplate(template: string, ctx: NamingContext): string {
+  return sanitizeFileName(fillTokens(template, ctx, FILE_SEPARATORS));
+}
+
+// The same tokens in header and footer text, which is drawn rather than used as a file name: no
+// file-name cleaning, and an empty token also takes a `·`, `|`, `,` or `/` separator with it, so
+// `{name} · {roll} · {X}/{Y}` without a roll reads `Rahim · {X}/{Y}`. Uppercase `{X}` and `{Y}`
+// are not tokens here; the PDF builder fills them in per page.
+export function renderText(template: string, ctx: NamingContext): string {
+  return fillTokens(template, ctx, TEXT_SEPARATORS).replace(/\s+/g, ' ').trim();
+}
+
+// The first non-empty line of OCR text: `{title}`.
+export function firstLine(text: string | undefined): string | undefined {
+  return text?.split('\n').map((line) => line.trim()).find((line) => line.length > 0);
 }
 
 // The name Deliver suggests: the student's template, or the fallback while the default

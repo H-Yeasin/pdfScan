@@ -8,32 +8,49 @@ import { fitBox } from '../../utils/fitBox';
 import type { LibraryDocument, PageLayout, PageOcr } from '../../types/models';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
 import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
+import type { PageSizeId } from './pageSize';
 
 export type { CoverPageConfig } from './coverTemplates';
 
-// Standard-mode pages and the cover page are both fixed at true ISO A4 size, with each image
-// uniformly scaled to fit inside CONTENT_MARGIN_PT on every side (never stretched, never
-// cropped) - see fitBox. This is what MoreOptionsPanel.tsx's "Page size: A4 · fit to content" /
-// "Margin: Small" copy already promises; every page in a document now shares the same physical
-// size instead of being shaped around its own source image.
-const [A4_WIDTH_PT, A4_HEIGHT_PT] = PageSizes.A4;
+// Every page of a document is one paper size, A4 or US Letter (§4 S5), with each image uniformly
+// scaled to fit inside CONTENT_MARGIN_PT on every side (never stretched, never cropped) - see
+// fitBox. The 2-in-1 layout uses the same paper turned landscape. Default A4; Deliver picks
+// Letter for US/Canada (defaultPageSize).
+export type { PageSizeId } from './pageSize';
+export type PageDims = { width: number; height: number };
+
+// Portrait size in points.
+export function pageDimensions(size: PageSizeId): PageDims {
+  const [width, height] = size === 'Letter' ? PageSizes.Letter : PageSizes.A4;
+  return { width, height };
+}
+
+const A4 = pageDimensions('A4');
 const CONTENT_MARGIN_PT = 24; // matches LAYOUT_2IN1_MARGIN_PT's existing convention below
 
-// Long side of a 2-in-1 ("Eco-Save") landscape sheet - that layout is a deliberately separate,
-// fixed physical print size (see LAYOUT_2IN1_* below), unrelated to standard/cover pages' own A4
-// sizing above.
-const PDF_LONG_SIDE_PT = 792;
-
 // --- 2-in-1 ("Eco-Save") layout tuning ---
-// A 2-in-1 sheet is a fixed physical page meant to be printed - its whole point is a consistent,
-// plannable paper size rather than one shaped around whatever a given pair of scans happens to
-// be. This is deliberately kept at US Letter, landscape (792x612, i.e. LAYOUT_2IN1_WIDTH_PT reuses
-// PDF_LONG_SIDE_PT), independent of standard/cover pages' own A4 sizing above - it's a distinct,
-// opt-in print layout, not part of the "every page is the same size" standard-mode guarantee.
-const LAYOUT_2IN1_WIDTH_PT = PDF_LONG_SIDE_PT;
-const LAYOUT_2IN1_HEIGHT_PT = 612;
+// A 2-in-1 sheet is the chosen paper size in landscape: two source pages side by side.
 const LAYOUT_2IN1_GUTTER_PT = 15; // dividing gap between the two half-columns
 const LAYOUT_2IN1_MARGIN_PT = 24; // outer margin - most printers can't print edge-to-edge anyway
+
+// The paper size a built PDF uses, read from its last page (never the cover, which is first), in
+// either orientation, so a library rebuild (merge, split, compress, sign) keeps it. Anything that
+// isn't Letter, or can't be read, is A4.
+export async function pageSizeOfPdf(pdfUri: string | undefined): Promise<PageSizeId> {
+  if (!pdfUri) return 'A4';
+  try {
+    const file = new File(pdfUri);
+    if (!file.exists) return 'A4';
+    const pdfDoc = await PDFDocument.load(await file.bytes(), { updateMetadata: false });
+    const pages = pdfDoc.getPages();
+    const last = pages[pages.length - 1];
+    if (!last) return 'A4';
+    const shortSide = Math.min(last.getWidth(), last.getHeight());
+    return Math.abs(shortSide - PageSizes.Letter[0]) < 1 ? 'Letter' : 'A4';
+  } catch {
+    return 'A4';
+  }
+}
 
 // --- Academic export tuning ---
 const STAMP_INSET_PT = 25;
@@ -51,15 +68,21 @@ export type PdfSourcePage = {
   layout?: PageLayout;
 };
 
-// The box a standard-layout page image is fit into: the margin box, or the whole A4 sheet for a
-// 'fullPage' image (an A4-ratio canvas then fills it exactly, at true size).
-function contentBox(layout: PageLayout | undefined): { x: number; y: number; width: number; height: number } {
-  if (layout === 'fullPage') return { x: 0, y: 0, width: A4_WIDTH_PT, height: A4_HEIGHT_PT };
+// The box a standard-layout page image is fit into: the margin box, or for a 'fullPage' image (an
+// A4 canvas at a fixed dpi, e.g. an ID card page) an A4-sized box centred on the sheet, so it
+// prints at true size on any paper: it fills A4 exactly, and on Letter loses about 9 mm at the
+// top and bottom edges (where the ID layout has nothing) and gains 3 mm of white at the sides.
+function contentBox(layout: PageLayout | undefined, page: PageDims): { x: number; y: number; width: number; height: number } {
+  if (layout === 'fullPage') return { x: (page.width - A4.width) / 2, y: (page.height - A4.height) / 2, width: A4.width, height: A4.height };
+  return marginBox(page);
+}
+
+function marginBox(page: PageDims) {
   return {
     x: CONTENT_MARGIN_PT,
     y: CONTENT_MARGIN_PT,
-    width: A4_WIDTH_PT - CONTENT_MARGIN_PT * 2,
-    height: A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2,
+    width: page.width - CONTENT_MARGIN_PT * 2,
+    height: page.height - CONTENT_MARGIN_PT * 2,
   };
 }
 
@@ -141,7 +164,7 @@ export function toWinAnsiSafe(text: string, font: PDFFont): string {
 // index 0. Must be called BEFORE the per-content-page loop in buildPdfFromPages runs - see the
 // invariant comment above that loop for why prepending a page here is guaranteed not to affect
 // any content page's OCR text coordinates.
-async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Promise<void> {
+async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig, pageDims: PageDims): Promise<void> {
   if (cover.mode === 'imported_image') {
     if (!cover.importedUri) {
       console.warn('pdfService: cover mode "imported_image" with no importedUri, skipping cover page');
@@ -152,18 +175,12 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Prom
       const kind = sniffImageKind(bytes);
       const image = kind === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
 
-      // Same fixed-A4-box, fit-to-content placement as standard content pages, so a photographed
+      // Same margin box, fit-to-content placement as standard content pages, so a photographed
       // cover sheet shares the exact same page size as the rest of the deck.
-      const placement = fitBox(
-        image.width,
-        image.height,
-        CONTENT_MARGIN_PT,
-        CONTENT_MARGIN_PT,
-        A4_WIDTH_PT - CONTENT_MARGIN_PT * 2,
-        A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2
-      );
+      const box = marginBox(pageDims);
+      const placement = fitBox(image.width, image.height, box.x, box.y, box.width, box.height);
 
-      const page = pdfDoc.addPage(PageSizes.A4);
+      const page = pdfDoc.addPage([pageDims.width, pageDims.height]);
       page.drawImage(image, {
         x: placement.origin.x,
         y: placement.origin.y,
@@ -179,10 +196,10 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig): Prom
   }
 
   // mode === 'template': coverTemplates.layoutCover places everything; this only draws it.
-  const page = pdfDoc.addPage(PageSizes.A4);
+  const page = pdfDoc.addPage([pageDims.width, pageDims.height]);
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  drawCoverItems(page, layoutCover(cover.templateId, cover.values, { width: A4_WIDTH_PT, height: A4_HEIGHT_PT }), regular, bold);
+  drawCoverItems(page, layoutCover(cover.templateId, cover.values, pageDims), regular, bold);
 }
 
 // layoutCover's items are top-down; pdf-lib's y axis points up.
@@ -215,6 +232,12 @@ function drawCoverItems(page: PDFPage, items: CoverItem[], regular: PDFFont, bol
   }
 }
 
+// `{X}` and `{Y}` (every occurrence) become this page's number and the page count. Other tokens
+// ({name}, {roll}, ...) were filled in before the build (submit/naming.renderText).
+export function fillPageNumbers(text: string, pageNumber: number, totalPages: number): string {
+  return text.split('{X}').join(String(pageNumber)).split('{Y}').join(String(totalPages));
+}
+
 // Draws the optional border/header/footer onto one CONTENT page (never the cover page - the
 // cover is built separately by buildCoverPage and excluded from this stamping and from the
 // "Page X of Y" count entirely). Takes this call's own pageWidthPt/pageHeightPt rather than a
@@ -241,7 +264,7 @@ function stampAcademicPage(
   }
 
   if (config.headerText) {
-    pdfPage.drawText(toWinAnsiSafe(config.headerText, font), {
+    pdfPage.drawText(toWinAnsiSafe(fillPageNumbers(config.headerText, contentPageNumber, totalContentPages), font), {
       x: STAMP_INSET_PT,
       y: pageHeightPt - HEADER_Y_FROM_TOP_PT,
       size: HEADER_FONT_SIZE,
@@ -251,7 +274,7 @@ function stampAcademicPage(
 
   if (config.footerText) {
     const text = toWinAnsiSafe(
-      config.footerText.replace('{X}', String(contentPageNumber)).replace('{Y}', String(totalContentPages)),
+      fillPageNumbers(config.footerText, contentPageNumber, totalContentPages),
       font
     );
     const width = font.widthOfTextAtSize(text, FOOTER_FONT_SIZE);
@@ -264,7 +287,7 @@ function stampAcademicPage(
   }
 }
 
-// Standard layout: one source page per PDF page, every page fixed at A4 size with its image fit
+// Standard layout: one source page per PDF page, every page the chosen paper size with its image fit
 // (uniformly scaled, centered, never stretched/cropped) inside CONTENT_MARGIN_PT - so every page
 // in the document shares the same physical size regardless of its source image's own aspect
 // ratio. Sequential loop on purpose - a Promise.all here would hold every page's raw JPEG bytes in
@@ -275,7 +298,8 @@ async function buildStandardContentPages(
   encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
-  ocrFont: PDFRef
+  ocrFont: PDFRef,
+  pageDims: PageDims
 ): Promise<void> {
   let contentPageNumber = 0;
   const totalContentPages = pages.length;
@@ -283,10 +307,10 @@ async function buildStandardContentPages(
     contentPageNumber += 1;
     const jpgImage = await embedPageImage(pdfDoc, page.uri, encoding);
 
-    const box = contentBox(page.layout);
+    const box = contentBox(page.layout, pageDims);
     const placement = fitBox(page.width, page.height, box.x, box.y, box.width, box.height);
 
-    const pdfPage = pdfDoc.addPage(PageSizes.A4);
+    const pdfPage = pdfDoc.addPage([pageDims.width, pageDims.height]);
     pdfPage.drawImage(jpgImage, {
       x: placement.origin.x,
       y: placement.origin.y,
@@ -301,7 +325,7 @@ async function buildStandardContentPages(
     // Cover page (if any) is intentionally excluded from this stamping and from the X/Y count -
     // it's not part of `pages`, and this block only ever runs for entries of that array.
     if (academicConfig) {
-      stampAcademicPage(pdfPage, A4_WIDTH_PT, A4_HEIGHT_PT, stampFont, academicConfig, contentPageNumber, totalContentPages);
+      stampAcademicPage(pdfPage, pageDims.width, pageDims.height, stampFont, academicConfig, contentPageNumber, totalContentPages);
     }
   }
 }
@@ -316,10 +340,11 @@ async function drawTwoUpColumn(
   page: PdfSourcePage,
   encoding: PageImageEncoding,
   columnX: number,
-  ocrFont: PDFRef
+  ocrFont: PDFRef,
+  sheet: PageDims
 ): Promise<void> {
-  const columnWidthPt = (LAYOUT_2IN1_WIDTH_PT - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
-  const columnHeightPt = LAYOUT_2IN1_HEIGHT_PT - LAYOUT_2IN1_MARGIN_PT * 2;
+  const columnWidthPt = (sheet.width - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
+  const columnHeightPt = sheet.height - LAYOUT_2IN1_MARGIN_PT * 2;
 
   const image = await embedPageImage(pdfDoc, page.uri, encoding);
   const placement = fitBox(page.width, page.height, columnX, LAYOUT_2IN1_MARGIN_PT, columnWidthPt, columnHeightPt);
@@ -347,9 +372,12 @@ async function buildTwoUpContentPages(
   encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
   stampFont: PDFFont,
-  ocrFont: PDFRef
+  ocrFont: PDFRef,
+  pageDims: PageDims
 ): Promise<void> {
-  const columnWidthPt = (LAYOUT_2IN1_WIDTH_PT - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
+  // The chosen paper turned landscape.
+  const sheet = { width: pageDims.height, height: pageDims.width };
+  const columnWidthPt = (sheet.width - LAYOUT_2IN1_MARGIN_PT * 2 - LAYOUT_2IN1_GUTTER_PT) / 2;
   const leftColumnX = LAYOUT_2IN1_MARGIN_PT;
   const rightColumnX = LAYOUT_2IN1_MARGIN_PT + columnWidthPt + LAYOUT_2IN1_GUTTER_PT;
 
@@ -358,17 +386,17 @@ async function buildTwoUpContentPages(
 
   for (let i = 0; i < pages.length; i += 2) {
     sheetNumber += 1;
-    const pdfPage = pdfDoc.addPage([LAYOUT_2IN1_WIDTH_PT, LAYOUT_2IN1_HEIGHT_PT]);
+    const pdfPage = pdfDoc.addPage([sheet.width, sheet.height]);
 
-    await drawTwoUpColumn(pdfDoc, pdfPage, pages[i], encoding, leftColumnX, ocrFont);
+    await drawTwoUpColumn(pdfDoc, pdfPage, pages[i], encoding, leftColumnX, ocrFont, sheet);
 
     const pageB = pages[i + 1];
     if (pageB) {
-      await drawTwoUpColumn(pdfDoc, pdfPage, pageB, encoding, rightColumnX, ocrFont);
+      await drawTwoUpColumn(pdfDoc, pdfPage, pageB, encoding, rightColumnX, ocrFont, sheet);
     }
 
     if (academicConfig) {
-      stampAcademicPage(pdfPage, LAYOUT_2IN1_WIDTH_PT, LAYOUT_2IN1_HEIGHT_PT, stampFont, academicConfig, sheetNumber, totalSheets);
+      stampAcademicPage(pdfPage, sheet.width, sheet.height, stampFont, academicConfig, sheetNumber, totalSheets);
     }
   }
 }
@@ -378,8 +406,10 @@ export async function buildPdfFromPages(
   pages: PdfSourcePage[],
   encoding: PageImageEncoding,
   academicConfig?: AcademicConfig,
-  layoutMode: LayoutMode = 'standard'
+  layoutMode: LayoutMode = 'standard',
+  pageSize: PageSizeId = 'A4'
 ): Promise<{ uri: string; sizeBytes: number }> {
+  const pageDims = pageDimensions(pageSize);
 
   const pdfDoc = await PDFDocument.create();
   // stampFont draws the visible header/footer/cover text (WinAnsi only - see toWinAnsiSafe);
@@ -404,13 +434,13 @@ export async function buildPdfFromPages(
   // page's own freshly-created PDFPage) - never of pdfDoc's page count or ordering. Adding an
   // unrelated page anywhere else in the document is provably a no-op for this math.
   if (academicConfig?.coverPage) {
-    await buildCoverPage(pdfDoc, academicConfig.coverPage);
+    await buildCoverPage(pdfDoc, academicConfig.coverPage, pageDims);
   }
 
   if (layoutMode === '2_in_1') {
-    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont);
+    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims);
   } else {
-    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont);
+    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims);
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -461,18 +491,12 @@ export async function applySignatureToPdf(
   let heightPt: number;
   if (fitToMarginBox) {
     // Reproduces the exact same fitBox placement the image itself was drawn with at build time
-    // (purely a function of the page's own natural dimensions + the fixed A4/margin box, so it's
-    // safe to recompute here rather than needing to store it), then maps `placement` through that
-    // box the same way drawOcrLine maps an OCR line's box - generalized here from a text line to
-    // an arbitrary signature rect.
-    const box = fitBox(
-      pageNaturalWidth,
-      pageNaturalHeight,
-      CONTENT_MARGIN_PT,
-      CONTENT_MARGIN_PT,
-      A4_WIDTH_PT - CONTENT_MARGIN_PT * 2,
-      A4_HEIGHT_PT - CONTENT_MARGIN_PT * 2
-    );
+    // (purely a function of the page's own natural dimensions + this page's margin box - its real
+    // size, A4 or Letter, read back from the PDF - so it's safe to recompute here rather than
+    // needing to store it), then maps `placement` through that box the same way drawOcrLine maps
+    // an OCR line's box - generalized here from a text line to an arbitrary signature rect.
+    const margin = marginBox({ width: pdfPage.getWidth(), height: pdfPage.getHeight() });
+    const box = fitBox(pageNaturalWidth, pageNaturalHeight, margin.x, margin.y, margin.width, margin.height);
     widthPt = placement.width * box.scale;
     heightPt = placement.height * box.scale;
     xPt = box.origin.x + placement.originX * box.scale;

@@ -1,5 +1,6 @@
 import type { DocFormat, DocType } from '../../types/models';
 import type { AcademicConfig, LayoutMode } from '../../services/pdf/pdfService';
+import { defaultPageSize, type PageSizeId } from '../../services/pdf/pageSize';
 
 export type DeliverState = {
   name: string;
@@ -29,6 +30,9 @@ export type DeliverState = {
   // PDF-only page layout ("Eco-Save" 2-in-1 vs one page per sheet). Only affects buildPdfFromPages;
   // format === 'JPG' export ignores it since JPG saves each page as its own separate image file.
   layoutMode: LayoutMode;
+  // Paper size of every PDF page (the 2-in-1 layout turns it landscape). Starts at the region's
+  // usual paper; S6 makes it part of the course's preset.
+  pageSize: PageSizeId;
 };
 
 export const initialDeliverState: DeliverState = {
@@ -44,6 +48,7 @@ export const initialDeliverState: DeliverState = {
   exportCopy: false,
   academicConfig: null,
   layoutMode: 'standard',
+  pageSize: defaultPageSize(),
 };
 
 export type DeliverAction =
@@ -62,6 +67,7 @@ export type DeliverAction =
   | { type: 'deliver/TOGGLE_EXPORT_COPY' }
   | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/SET_LAYOUT_MODE'; layoutMode: LayoutMode }
+  | { type: 'deliver/SET_PAGE_SIZE'; pageSize: PageSizeId }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -90,6 +96,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, academicConfig: action.config };
     case 'deliver/SET_LAYOUT_MODE':
       return { ...state, layoutMode: action.layoutMode };
+    case 'deliver/SET_PAGE_SIZE':
+      return { ...state, pageSize: action.pageSize };
     case 'deliver/RESET':
       return initialDeliverState;
     default:

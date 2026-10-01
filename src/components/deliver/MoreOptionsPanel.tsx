@@ -1,6 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { SegmentedControl } from '../shared/SegmentedControl';
+import type { PageSizeId } from '../../services/pdf/pageSize';
 import { spacing, useTheme } from '../../theme';
+
+const PAGE_SIZE_SEGMENTS: { id: PageSizeId; label: string }[] = [
+  { id: 'A4', label: 'A4' },
+  { id: 'Letter', label: 'Letter' },
+];
 
 type ExportCopyProps = {
   enabled: boolean;
@@ -14,12 +21,15 @@ type MoreOptionsPanelProps = {
   onToggleOpen: () => void;
   // Android-only: omitted entirely on iOS, which has no SAF equivalent.
   exportCopy?: ExportCopyProps;
+  // PDF only: a JPG export has no page size.
+  pageSize?: { value: PageSizeId; onChange: (value: PageSizeId) => void };
 };
 
 export function MoreOptionsPanel({
   open,
   onToggleOpen,
   exportCopy,
+  pageSize,
 }: MoreOptionsPanelProps) {
   const { tokens } = useTheme();
 
@@ -37,10 +47,15 @@ export function MoreOptionsPanel({
 
       {open && (
         <View style={styles.body}>
-          <View style={styles.row}>
-            <Text style={[styles.rowLabel, { color: tokens.ink }]}>Page size</Text>
-            <Text style={{ color: tokens.muted }}>A4 · fit to content</Text>
-          </View>
+          {pageSize && (
+            <View style={styles.pageSize}>
+              <Text style={[styles.rowLabel, { color: tokens.ink }]}>Page size</Text>
+              <SegmentedControl segments={PAGE_SIZE_SEGMENTS} value={pageSize.value} onChange={pageSize.onChange} />
+              <Text style={[styles.disclosure, { color: tokens.muted }]}>
+                Each scan is fit to the page. Letter is the US and Canada size; Eco-Save turns it sideways.
+              </Text>
+            </View>
+          )}
           <View style={styles.row}>
             <Text style={[styles.rowLabel, { color: tokens.ink }]}>Margin</Text>
             <Text style={{ color: tokens.muted }}>Small</Text>
@@ -108,5 +123,8 @@ const styles = StyleSheet.create({
   disclosure: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  pageSize: {
+    gap: spacing.sm,
   },
 });

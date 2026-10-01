@@ -11,25 +11,33 @@ import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { renderPage } from '../services/enhance/skiaEnhance';
 import { exportPreset } from '../services/capture/imageSpec';
-import { buildPdfFromPages } from '../services/pdf/pdfService';
+import { buildPdfFromPages, fillPageNumbers } from '../services/pdf/pdfService';
 import type { AcademicConfig } from '../services/pdf/pdfService';
 import {
   COVER_FIELD_LABELS,
   COVER_TEMPLATES,
   getCoverTemplate,
   resolveCoverValues,
-  withCoverDefaults,
   type CoverPageConfig,
   type CoverTemplateId,
   type CoverValues,
 } from '../services/pdf/coverTemplates';
-import { useCoverDefaults } from '../store/useCoverDefaults';
+import { useCoverDefaults, useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
+import { FOOTER_PRESET_TEXT, footerPresetOf, type FooterPreset } from '../services/submit/footerPresets';
+import { renderText } from '../services/submit/naming';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
 
 type CoverMode = CoverPageConfig['mode'] | 'none';
+
+const FOOTER_SEGMENTS: { id: FooterPreset; label: string }[] = [
+  { id: 'none', label: 'None' },
+  { id: 'pages', label: 'Pages' },
+  { id: 'namePages', label: 'Name + pages' },
+  { id: 'custom', label: 'Custom' },
+];
 
 const COVER_SEGMENTS: { id: CoverMode; label: string }[] = [
   { id: 'none', label: 'None' },
@@ -98,7 +106,13 @@ export function AcademicOptionsScreen() {
   const coverDefaults = useCoverDefaults();
   const shownValues = resolveCoverValues(coverDefaults, coverValues);
   // What gets drawn: the stored edits on top of the defaults (Deliver does the same).
-  const resolvedCfg = cfg?.coverPage ? { ...cfg, coverPage: withCoverDefaults(cfg.coverPage, coverDefaults) } : cfg;
+  const resolvedCfg = useResolvedAcademicConfig();
+  const namingContext = useNamingContext();
+  // Custom stays selected while its text happens to match a preset (e.g. right after choosing it).
+  const [footerMode, setFooterMode] = useState<FooterPreset>(() => footerPresetOf(footerText));
+  const pageCount = state.capture.pages.length;
+  // The footer on the first content page, tokens and page numbers filled in.
+  const footerSample = footerText ? fillPageNumbers(renderText(footerText, namingContext), 1, Math.max(1, pageCount)) : '';
 
   const commit = useCallback(
     (patch: Partial<FieldState>) => {
@@ -172,7 +186,9 @@ export function AcademicOptionsScreen() {
         previewId,
         bakedPages,
         'as-is',
-        resolvedCfg ?? undefined
+        resolvedCfg ?? undefined,
+        state.deliver.layoutMode,
+        state.deliver.pageSize
       );
       await Print.printAsync({ uri: result.uri });
       lastPreviewIdRef.current = previewId;
@@ -184,7 +200,7 @@ export function AcademicOptionsScreen() {
     } finally {
       setPreviewing(false);
     }
-  }, [pages, previewing, state.deliver.quality, resolvedCfg]);
+  }, [pages, previewing, state.deliver.quality, state.deliver.layoutMode, state.deliver.pageSize, resolvedCfg]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -215,15 +231,34 @@ export function AcademicOptionsScreen() {
           label="Header text"
           value={headerText}
           onChange={(value) => commit({ headerText: value })}
-          placeholder="e.g. CS 101 — Assignment 3"
+          placeholder="e.g. {course} — {type}{n}"
+          helperText="Can use {name}, {roll}, {section}, {course}, {type}, {n}, {date}, {X} and {Y}."
         />
-        <NameField
-          label="Footer text"
-          value={footerText}
-          onChange={(value) => commit({ footerText: value })}
-          placeholder="e.g. Page {X} of {Y}"
-          helperText='Use {X} and {Y} for the current and total content-page numbers (the cover page is not counted).'
-        />
+
+        <View style={styles.footerSection}>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Footer</Text>
+          <SegmentedControl
+            segments={FOOTER_SEGMENTS}
+            value={footerMode}
+            onChange={(mode) => {
+              setFooterMode(mode);
+              if (mode === 'none') commit({ footerText: '' });
+              else if (mode !== 'custom') commit({ footerText: FOOTER_PRESET_TEXT[mode] });
+            }}
+          />
+          {footerMode === 'custom' && (
+            <NameField
+              label="Footer text"
+              value={footerText}
+              onChange={(value) => commit({ footerText: value })}
+              placeholder="e.g. {name} · Page {X} of {Y}"
+              helperText="{X} and {Y} are the page number and page count (the cover page is not counted); {name}, {roll}, {course}, … come from your profile and the course."
+            />
+          )}
+          {footerSample ? (
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>Page 1 shows: {footerSample}</Text>
+          ) : null}
+        </View>
 
         <View>
           <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Cover page</Text>
@@ -382,6 +417,9 @@ const styles = StyleSheet.create({
   templateLabel: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  footerSection: {
+    gap: spacing.sm,
   },
   coverImageSection: {
     gap: spacing.md,

@@ -34,6 +34,7 @@ import { saveSignatureForReuse } from '../services/signature/savedSignatureStora
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
+import { useResolvedAcademicConfig } from '../store/useDeliverContext';
 import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage, SourceImage } from '../types/models';
 
 const OCR_SPARSE_THRESHOLD = 6;
@@ -53,7 +54,8 @@ export function ReviewScreen() {
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
   const scanProcessing = processingStatus === 'scanning' || processingStatus === 'processing';
-  const { academicConfig } = state.deliver;
+  // As Deliver will draw it: `{name}` etc. in the header/footer filled in.
+  const academicConfig = useResolvedAcademicConfig();
   const [cropTarget, setCropTarget] = useState<string | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);

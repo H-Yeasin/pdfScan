@@ -3,7 +3,7 @@ import { FontStyle, ImageFormat, PaintStyle, Skia } from '@shopify/react-native-
 import type { SkCanvas } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
 import { layoutCover, type CoverPageConfig } from './coverTemplates';
-import type { AcademicConfig } from './pdfService';
+import { fillPageNumbers, pageDimensions, type AcademicConfig, type PageSizeId } from './pdfService';
 
 // ReaderScreen now renders the real compiled PDF (via PdfPageView), so this module's cover/
 // border/header-footer visuals are no longer needed to make the in-app reader match the export.
@@ -25,11 +25,9 @@ const FOOTER_Y_RATIO = 30 / 792; // distance from the BOTTOM edge
 const STAMP_FONT_SIZE_RATIO = 9 / 792;
 const STAMP_TEXT_COLOR = '#1a1a1a';
 
-// A4 in points (pdf-lib's PageSizes.A4), the page the cover is laid out on, and the pixel canvas
-// it is drawn on here: 1200 px on the long side, like a normal scanned page's display copy.
-const COVER_PAGE_PT = { width: 595.28, height: 841.89 };
+// The cover is laid out on the document's paper size (in points) and drawn here on a canvas of
+// the same shape, 1200 px on the long side, like a normal scanned page's display copy.
 const COVER_RASTER_HEIGHT_PX = 1200;
-const COVER_RASTER_WIDTH_PX = Math.round((COVER_RASTER_HEIGHT_PX * COVER_PAGE_PT.width) / COVER_PAGE_PT.height);
 
 // No bundled font file / fontkit exists in this project (see pdfService.ts's own StandardFonts-
 // only convention), so text is drawn with the platform's default system font via FontMgr.System()
@@ -52,7 +50,8 @@ async function writeJpeg(surface: NonNullable<ReturnType<typeof Skia.Surface.Mak
 // LibraryDocument's own `pages` array like any other page. Returns null (never throws) on any
 // failure - a bad/missing cover image must not block the rest of the save.
 export async function renderCoverPageImage(
-  cover: CoverPageConfig
+  cover: CoverPageConfig,
+  pageSize: PageSizeId = 'A4'
 ): Promise<{ uri: string; width: number; height: number } | null> {
   if (cover.mode === 'imported_image') {
     if (!cover.importedUri) return null;
@@ -69,8 +68,9 @@ export async function renderCoverPageImage(
 
   // mode === 'template'
   try {
-    const width = COVER_RASTER_WIDTH_PX;
+    const pagePt = pageDimensions(pageSize);
     const height = COVER_RASTER_HEIGHT_PX;
+    const width = Math.round((height * pagePt.width) / pagePt.height);
     const surface = Skia.Surface.MakeOffscreen(width, height);
     if (!surface) throw new Error('Skia failed to create an offscreen surface for the cover page');
     const canvas = surface.getCanvas();
@@ -78,7 +78,7 @@ export async function renderCoverPageImage(
 
     // The same items pdfService draws, scaled from points to pixels. Text uses the system font
     // (no font files are bundled), centred with its own metrics; line breaks come from the layout.
-    const scale = width / COVER_PAGE_PT.width;
+    const scale = width / pagePt.width;
     const textPaint = Skia.Paint();
     textPaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
     textPaint.setAntiAlias(true);
@@ -87,7 +87,7 @@ export async function renderCoverPageImage(
     strokePaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
     strokePaint.setAntiAlias(true);
 
-    for (const item of layoutCover(cover.templateId, cover.values, COVER_PAGE_PT)) {
+    for (const item of layoutCover(cover.templateId, cover.values, pagePt)) {
       if (item.kind === 'text') {
         const font = systemFont(item.size * scale, item.bold);
         const x = item.align === 'center' ? item.x * scale - font.measureText(item.text, textPaint).width / 2 : item.x * scale;
@@ -143,11 +143,11 @@ export function drawAcademicStamp(
     const font = systemFont(STAMP_FONT_SIZE_RATIO * longSide, false);
 
     if (config.headerText) {
-      canvas.drawText(config.headerText, STAMP_INSET_RATIO * longSide, HEADER_Y_RATIO * longSide, textPaint, font);
+      canvas.drawText(fillPageNumbers(config.headerText, pageNumber, totalPages), STAMP_INSET_RATIO * longSide, HEADER_Y_RATIO * longSide, textPaint, font);
     }
 
     if (config.footerText) {
-      const text = config.footerText.replace('{X}', String(pageNumber)).replace('{Y}', String(totalPages));
+      const text = fillPageNumbers(config.footerText, pageNumber, totalPages);
       const textWidth = font.measureText(text, textPaint).width;
       canvas.drawText(text, (width - textWidth) / 2, height - FOOTER_Y_RATIO * longSide, textPaint, font);
     }
