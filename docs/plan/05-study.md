@@ -68,7 +68,25 @@ highlighted page within 2 seconds in a library of 500 pages.
 ## Steps
 
 ### T1 · Page mapping and word-level OCR *(M)*
-Status: todo
+Status: done in code (commit 0cfbddd).
+
+As built:
+- Migration **v9** (v8 went to §3 K6's `documents.archived`): `documents.pdf_layout` and also
+  `documents.pdf_page_size` ('A4' | 'Letter'), because mapping to a PDF rectangle needs the
+  paper too. `LibraryDocument.pdfLayout` / `pdfPageSize`, written by Deliver and every library
+  rebuild (merge, split, compress, sign rebuild to standard; `ensureDocumentPdf` to standard A4).
+- Backfill: `documents/pdfInfoBackfill.backfillPdfInfo`, run by `useLibraryPersistence` after a
+  successful load, one PDF at a time (`pdfService.inspectPdf`). It decides by orientation
+  (2-in-1 sheets are landscape, standard pages never are), not by page count, so a one-page
+  2-up document is caught too. Imported PDFs and non-raster formats are skipped.
+- `pdfService.imagePlacement(width, height, slot, pageDims, layout?)` is the one placement
+  helper; the standard and 2-up builders use it. `pageSizeOfPdf` now uses `inspectPdf`.
+- `documents/pageMap.ts`: `pdfPageFor`, `pdfPageCount`, `libraryIdxFor(doc, pdfPage,
+  xFraction)`, `pdfRectFor(doc, idx, masterRect)` (PDF points, bottom-left origin; a template
+  cover scales to the whole page).
+- `OcrLine.words?: OcrWord[]` from ML Kit `elements`.
+- Tests: `documents/__tests__/pageMap.test.ts` (pdfRectFor is checked against where pdf.js finds
+  the builder's text for standard/2-up × A4/Letter, including an ID-card full page).
 
 - Migration (next free version):
   - `documents.pdf_layout TEXT` (`'standard'` | `'2_in_1'`, null = standard), written by every

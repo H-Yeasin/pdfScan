@@ -155,7 +155,7 @@ Goal: scans become study material, not dead files.
 
 **Detailed steps:** [`docs/plan/05-study.md`](plan/05-study.md)
 
-- [ ] T1 Page mapping (library page ↔ PDF page) and word-level OCR boxes
+- [x] T1 Page mapping (library page ↔ PDF page) and word-level OCR boxes
 - [ ] T2 Search results by page, with jump and highlight
 - [ ] T3 Copy page text, extract to .txt, select text on a page
 - [ ] T4 Annotations (highlighter snapped to words, pen, notes) kept through every PDF rebuild
