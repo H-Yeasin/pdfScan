@@ -324,7 +324,19 @@ Status: done (see git log); not yet tried on a device. As built (built before F5
 choice to a 10-page scan with one tap and one undo.
 
 ### E7 · Benchmark against CamScanner and tune *(M)*
-Status: todo
+Status: in progress. The tooling is done; the benchmark itself needs real pages, raters and a
+phone. Done so far:
+- `docs/qa/filter-benchmark.md` has the protocol: groups and file names, the folder layout
+  outside the repo, how to make both apps' outputs from the same photo, rating, scoring, the
+  tuning loop, a table of every constant with its current default and file, and results and
+  performance tables to fill in.
+- `docs/qa/blind-compare.html` is the standalone blind A/B rater: random order and sides per
+  rater, keyboard voting, votes in localStorage, CSV export, per-page verdicts and the 14/20 total.
+- Filter Lab → "Time 2400 px export" times `bakeEnhance` for every filter on a 2400 px copy, plus
+  the ingest analysis, and deletes its files.
+Open: take the 20 pages, run round 1 with 3+ raters, tune the losing groups in the Filter Lab
+(record the values in the doc and in the code comments), and measure export time in a release
+build. Tick E7 once ours is preferred on at least 14/20.
 
 - `docs/qa/filter-benchmark.md`: the test protocol.
   - 20 real student pages in 6 groups: pencil on lined paper, blue pen on grid paper, a

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blind Filter Compare</title>
+<!--
+  Blind A/B tool for the §2 E7 filter benchmark (see filter-benchmark.md).
+  Open this file in a desktop browser (Chrome or Edge; folder picking needs webkitdirectory).
+  Images are read from the folders you pick and never leave the machine. Votes are kept in this
+  browser's localStorage and exported as CSV.
+-->
+<style>
+  :root {
+    --bg: #f5ead8; --surface: #fffdf8; --ink: #201e1d; --muted: #645c50; --edge: rgba(32,30,29,.15);
+    --accent: #0e6655; --accent-ink: #fff; --danger: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171513; --surface: #221f1c; --ink: #f1ebe1; --muted: #a79d8f; --edge: rgba(241,235,225,.15);
+      --accent: #7fe3cd; --accent-ink: #10201c; --danger: #f2b8b5; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 0 0 12px; }
+  .card { background: var(--surface); border: 1px solid var(--edge); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 13px; }
+  input[type=text] { width: 100%; max-width: 320px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--edge);
+    background: var(--bg); color: var(--ink); font: inherit; }
+  button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--edge); background: var(--bg);
+    color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .muted { color: var(--muted); }
+  .warn { color: var(--danger); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .side { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .side img { width: 100%; height: min(70vh, 900px); object-fit: contain; background: #888; border-radius: 8px; }
+  .progress { font-variant-numeric: tabular-nums; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--edge); }
+  .hidden { display: none; }
+  @media (max-width: 700px) { .pair { grid-template-columns: 1fr; } .side img { height: 45vh; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Blind filter compare</h1>
+
+  <section class="card" id="setup">
+    <label for="rater">Rater name (each rater does the whole set once)</label>
+    <input type="text" id="rater" placeholder="e.g. rater-a" autocomplete="off">
+    <label for="ours">Folder with OUR outputs</label>
+    <input type="file" id="ours" webkitdirectory multiple>
+    <label for="theirs">Folder with CAMSCANNER outputs</label>
+    <input type="file" id="theirs" webkitdirectory multiple>
+    <p id="matchInfo" class="muted">Pick both folders. Files are paired by name without extension (pencil-01.jpg ↔ pencil-01.png).</p>
+    <div class="row">
+      <button class="primary" id="start" disabled>Start rating</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="rate">
+    <div class="row" style="justify-content: space-between; margin-bottom: 8px">
+      <strong>Which page is easier to read and looks cleaner?</strong>
+      <span class="progress muted" id="progress"></span>
+    </div>
+    <div class="pair">
+      <div class="side"><img id="imgL" alt="Left option"><button class="primary" data-pick="L">Left is better (←)</button></div>
+      <div class="side"><img id="imgR" alt="Right option"><button class="primary" data-pick="R">Right is better (→)</button></div>
+    </div>
+    <div class="row" style="justify-content: center; margin-top: 12px">
+      <button data-pick="T">No preference (↓)</button>
+    </div>
+  </section>
+
+  <section class="card" id="results">
+    <div class="row" style="justify-content: space-between">
+      <strong>Results (all raters in this browser)</strong>
+      <div class="row">
+        <button id="export">Export CSV</button>
+        <button id="clear">Clear all votes</button>
+      </div>
+    </div>
+    <p id="summary" class="muted"></p>
+    <table>
+      <thead><tr><th>Page</th><th>Ours</th><th>CamScanner</th><th>No pref.</th><th>Preferred</th></tr></thead>
+      <tbody id="table"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+const STORE_KEY = 'pdfscan-blind-compare-votes';
+const TARGET = 14; // pages out of 20 where ours must be preferred (§2 done-when)
+const $ = (id) => document.getElementById(id);
+
+function loadVotes() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
+}
+function saveVotes(votes) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(votes)); } catch { /* private window: votes live until reload */ }
+}
+let votes = loadVotes();
+
+const stem = (name) => name.replace(/\.[^.]+$/, '');
+const isImage = (f) => /^image\//.test(f.type);
+function byStem(input) {
+  const map = new Map();
+  for (const f of input.files || []) if (isImage(f)) map.set(stem(f.name), f);
+  return map;
+}
+
+let pairs = [];
+function updateMatches() {
+  const ours = byStem($('ours'));
+  const theirs = byStem($('theirs'));
+  pairs = [...ours.keys()].filter((k) => theirs.has(k)).sort().map((page) => ({ page, ours: ours.get(page), theirs: theirs.get(page) }));
+  const onlyOurs = [...ours.keys()].filter((k) => !theirs.has(k));
+  const onlyTheirs = [...theirs.keys()].filter((k) => !ours.has(k));
+  let msg = `${pairs.length} matched pairs.`;
+  if (onlyOurs.length || onlyTheirs.length) {
+    msg += ` <span class="warn">Unmatched: ${[...onlyOurs.map((k) => 'ours/' + k), ...onlyTheirs.map((k) => 'camscanner/' + k)].join(', ')}</span>`;
+  }
+  $('matchInfo').innerHTML = msg;
+  $('start').disabled = pairs.length === 0 || !$('rater').value.trim();
+}
+$('ours').addEventListener('change', updateMatches);
+$('theirs').addEventListener('change', updateMatches);
+$('rater').addEventListener('input', updateMatches);
+
+// Fisher-Yates; order and sides are random per session so position can't bias a rater.
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+let queue = [];
+let current = null;
+let urls = [];
+function showNext() {
+  urls.forEach((u) => URL.revokeObjectURL(u));
+  urls = [];
+  current = queue.shift() || null;
+  if (!current) {
+    $('rate').classList.add('hidden');
+    $('setup').classList.remove('hidden');
+    render();
+    return;
+  }
+  const left = current.oursLeft ? current.ours : current.theirs;
+  const right = current.oursLeft ? current.theirs : current.ours;
+  urls = [URL.createObjectURL(left), URL.createObjectURL(right)];
+  $('imgL').src = urls[0];
+  $('imgR').src = urls[1];
+  $('progress').textContent = `${current.n} / ${current.total}`;
+}
+
+$('start').addEventListener('click', () => {
+  const rater = $('rater').value.trim();
+  const done = new Set(votes.filter((v) => v.rater === rater).map((v) => v.page));
+  const todo = shuffle(pairs.filter((p) => !done.has(p.page)));
+  if (!todo.length) { alert(`${rater} has already rated every matched page.`); return; }
+  queue = todo.map((p, i) => ({ ...p, oursLeft: Math.random() < 0.5, n: i + 1, total: todo.length, rater }));
+  $('setup').classList.add('hidden');
+  $('rate').classList.remove('hidden');
+  showNext();
+});
+
+function pick(side) {
+  if (!current) return;
+  const winner = side === 'T' ? 'tie' : (side === 'L') === current.oursLeft ? 'ours' : 'camscanner';
+  votes.push({ rater: current.rater, page: current.page, oursSide: current.oursLeft ? 'L' : 'R', pick: side, winner, at: new Date().toISOString() });
+  saveVotes(votes);
+  showNext();
+}
+document.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => pick(b.dataset.pick)));
+document.addEventListener('keydown', (e) => {
+  if ($('rate').classList.contains('hidden')) return;
+  if (e.key === 'ArrowLeft') pick('L');
+  else if (e.key === 'ArrowRight') pick('R');
+  else if (e.key === 'ArrowDown') pick('T');
+});
+
+function render() {
+  const pages = new Map();
+  for (const v of votes) {
+    const row = pages.get(v.page) || { ours: 0, camscanner: 0, tie: 0 };
+    row[v.winner]++;
+    pages.set(v.page, row);
+  }
+  const rows = [...pages.entries()].sort(([a], [b]) => a.localeCompare(b));
+  let preferred = 0;
+  $('table').innerHTML = rows.map(([page, r]) => {
+    const verdict = r.ours > r.camscanner ? 'Ours' : r.camscanner > r.ours ? 'CamScanner' : 'Tie';
+    if (verdict === 'Ours') preferred++;
+    return `<tr><td>${page}</td><td>${r.ours}</td><td>${r.camscanner}</td><td>${r.tie}</td><td>${verdict}</td></tr>`;
+  }).join('');
+  const raters = new Set(votes.map((v) => v.rater));
+  $('summary').innerHTML = rows.length
+    ? `${raters.size} rater(s), ${rows.length} page(s). Ours preferred on <strong>${preferred}</strong> of ${rows.length} (target: ${TARGET} of 20).`
+    : 'No votes yet.';
+}
+
+$('export').addEventListener('click', () => {
+  const header = 'rater,page,ours_side,pick,winner,at';
+  const lines = votes.map((v) => [v.rater, v.page, v.oursSide, v.pick, v.winner, v.at].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(','));
+  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `blind-compare-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('clear').addEventListener('click', () => {
+  if (!confirm('Delete every vote stored in this browser?')) return;
+  votes = [];
+  saveVotes(votes);
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

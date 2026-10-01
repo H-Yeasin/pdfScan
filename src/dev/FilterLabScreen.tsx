@@ -13,7 +13,8 @@ import { useRouter } from '../navigation/router';
 import { drawFiltered } from '../services/enhance/filters/drawFiltered';
 import { FILTERS, resolveFilterParams } from '../services/enhance/filters/registry';
 import type { FilterParam, FilterParamOverrides, FilterSpec } from '../services/enhance/filters/registry';
-import { analyzeImage } from '../services/enhance/filters/stats';
+import { analyzeImage, analyzeImageUri } from '../services/enhance/filters/stats';
+import { bakeEnhance } from '../services/enhance/skiaEnhance';
 import { loadPreviewImage } from '../services/enhance/previewImageCache';
 import { shareFileUri } from '../services/sharing/shareService';
 import { useAppState } from '../store/AppStateContext';
@@ -31,7 +32,37 @@ const SHEET_CELL_WIDTH = 600;
 const SHEET_LABEL_HEIGHT = 64;
 const SHEET_GAP = 16;
 
-type LabImage = { image: SkImage; stats: ImageStats; width: number; height: number };
+type LabImage = { uri: string; image: SkImage; stats: ImageStats; width: number; height: number };
+type Timing = { label: string; ms: number };
+
+// F5's master size. The §2 budget is under 400 ms per exported page at this size, on a
+// mid-range phone, in a release-like build (dev builds run JS much slower).
+const TIMING_MASTER_SIZE = 2400;
+
+// Times the real export path (bakeEnhance: decode, drawFiltered at full size, JPEG encode, write)
+// once per filter on a 2400 px copy of the picked image, plus the one-off page analysis that
+// ingest does. Every file it writes is deleted again.
+async function timeExports(uri: string, filterOptions: FilterOptions): Promise<Timing[]> {
+  const master = await loadPreviewImage(uri, TIMING_MASTER_SIZE);
+  const masterFile = new File(Paths.cache, `filter-lab-master-${Date.now()}.jpg`);
+  masterFile.write(master.encodeToBytes(ImageFormat.JPEG, 95));
+  const timings: Timing[] = [{ label: `Master ${master.width()}×${master.height()}`, ms: 0 }];
+  try {
+    let t0 = performance.now();
+    const stats = await analyzeImageUri(masterFile.uri);
+    timings.push({ label: 'Analysis (once per page, at ingest)', ms: performance.now() - t0 });
+    for (const spec of FILTERS) {
+      t0 = performance.now();
+      const baked = await bakeEnhance(masterFile.uri, { enhance: spec.id, stats, filterOptions });
+      timings.push({ label: `Export · ${spec.label}`, ms: performance.now() - t0 });
+      const out = new File(baked.uri);
+      if (out.exists) out.delete();
+    }
+  } finally {
+    if (masterFile.exists) masterFile.delete();
+  }
+  return timings;
+}
 type OverridesByFilter = Partial<Record<EnhanceMode, FilterParamOverrides>>;
 
 function recordFilter(
@@ -99,6 +130,8 @@ export function FilterLabScreen() {
   const [lab, setLab] = useState<LabImage | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [timing, setTiming] = useState(false);
+  const [timings, setTimings] = useState<Timing[] | null>(null);
   const [selected, setSelected] = useState<EnhanceMode>('auto');
   const [overrides, setOverrides] = useState<OverridesByFilter>({});
   // Shared by every cell (Ink and Board read them), like a page's FilterOptions.
@@ -112,7 +145,8 @@ export function FilterLabScreen() {
     setLoading(true);
     try {
       const image = await loadPreviewImage(result.assets[0].uri, LAB_IMAGE_SIZE);
-      setLab({ image, stats: analyzeImage(image), width: image.width(), height: image.height() });
+      setLab({ uri: result.assets[0].uri, image, stats: analyzeImage(image), width: image.width(), height: image.height() });
+      setTimings(null);
     } catch (error) {
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Couldn't open image: ${String(error)}` });
     } finally {
@@ -144,6 +178,18 @@ export function FilterLabScreen() {
     }
   }, [lab, overrides, filterOptions, dispatch]);
 
+  const handleTime = useCallback(async () => {
+    if (!lab) return;
+    setTiming(true);
+    try {
+      setTimings(await timeExports(lab.uri, filterOptions));
+    } catch (error) {
+      dispatch({ type: 'ui/SHOW_SNACK', msg: `Timing failed: ${String(error)}` });
+    } finally {
+      setTiming(false);
+    }
+  }, [lab, filterOptions, dispatch]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
@@ -173,7 +219,42 @@ export function FilterLabScreen() {
               <Text style={[styles.buttonLabel, { color: tokens.ink }]}>Export contact sheet</Text>
             </Pressable>
           )}
+          {lab && (
+            <Pressable
+              style={[styles.button, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
+              onPress={handleTime}
+              disabled={timing}
+            >
+              {timing ? (
+                <ActivityIndicator size="small" color={tokens.ink} />
+              ) : (
+                <Ionicons name="stopwatch-outline" size={16} color={tokens.ink} />
+              )}
+              <Text style={[styles.buttonLabel, { color: tokens.ink }]}>Time 2400 px export</Text>
+            </Pressable>
+          )}
         </View>
+
+        {timings && (
+          <View style={[styles.params, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
+            <Text style={[styles.paramsTitle, { color: tokens.ink }]}>Export timing (budget: 400 ms per page)</Text>
+            {timings.map((t) => (
+              <View key={t.label} style={styles.timingRow}>
+                <Text style={{ color: tokens.ink, flex: 1 }}>{t.label}</Text>
+                {t.ms > 0 && (
+                  <Text style={{ color: t.ms > 400 && t.label.startsWith('Export') ? tokens.danger : tokens.ink, fontWeight: '600' }}>
+                    {Math.round(t.ms)} ms
+                  </Text>
+                )}
+              </View>
+            ))}
+            {__DEV__ && (
+              <Text style={{ color: tokens.muted, fontSize: 12 }}>
+                Dev build: JS is unoptimized, so treat these as upper bounds. The budget is for a release build.
+              </Text>
+            )}
+          </View>
+        )}
 
         {loading && <ActivityIndicator color={tokens.accent} />}
 
@@ -311,6 +392,10 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.heading,
     fontSize: 16,
     marginBottom: spacing.xs,
+  },
+  timingRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   reset: {
     flexDirection: 'row',
