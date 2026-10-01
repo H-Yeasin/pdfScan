@@ -431,6 +431,9 @@ export type BuildPdfOptions = {
   dest?: File;
   // Called after each source page is drawn (1-based), for progress text.
   onPage?: (done: number, total: number) => void;
+  // Last changes before the file is written, e.g. annotations/pdfAnnotations.writeAnnotations
+  // (§5 T4). A hook rather than an import, so this module doesn't depend on the page map.
+  beforeSave?: (pdfDoc: PDFDocument) => void;
 };
 
 export async function buildPdfFromPages(
@@ -476,6 +479,7 @@ export async function buildPdfFromPages(
     await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims, options.onPage);
   }
 
+  options.beforeSave?.(pdfDoc);
   const pdfBytes = await pdfDoc.save();
 
   const dest = options.dest ?? new File(getDocumentDir(documentId), 'document.pdf');

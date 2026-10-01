@@ -2,9 +2,10 @@ import { Directory, File } from 'expo-file-system';
 import { docTypeOf } from '../courses/docTypes';
 import { coverDefaults, withCoverDefaults, type CoverValues } from '../pdf/coverTemplates';
 import { buildPdfFromPages, encodingForQuality, type AcademicConfig, type PdfSourcePage } from '../pdf/pdfService';
+import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { sanitizeFileName } from '../../utils/sanitize';
-import type { Course, LibraryDocument, StudentProfile } from '../../types/models';
+import type { Annotation, Course, LibraryDocument, LibraryPage, StudentProfile } from '../../types/models';
 import { firstLine, renderText, type NamingContext } from './naming';
 import { presetAcademicConfig, presetFooterText, type SubmitPreset } from './preset';
 import { buildPdfUnderLimit, formatLimit } from './sizeTarget';
@@ -29,6 +30,8 @@ export type SubmitInput = {
   fileName?: string;
   date?: Date;
   onProgress?: (text: string) => void;
+  // The document's annotations; written only when the preset says includeAnnotations.
+  annotations?: readonly Annotation[];
 };
 
 export type SubmitResult = {
@@ -97,18 +100,40 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
   if (!dir.exists) dir.create({ intermediates: true });
   const dest = new File(dir, fileName);
   const onPage = (done: number, total: number) => onProgress?.(`Building PDF… page ${done} of ${total}`);
+  // §5 T4: the submission's own layout for mapping annotations - its content pages, after the
+  // preset's cover if it has one (a stand-in page, so the offset is right). An annotation on the
+  // document's old cover page has no place here and is left out.
+  const contentPages: LibraryPage[] = doc.coverKind ? doc.pages.slice(1) : doc.pages;
+  const hasCover = !!academicConfig?.coverPage;
+  const coverStandIn: LibraryPage = { id: '__submission_cover__', fileUri: '', width: 1, height: 1 };
+  const beforeSave =
+    preset.includeAnnotations && input.annotations?.length
+      ? (pdf: Parameters<typeof writeAnnotations>[0]) =>
+          writeAnnotations(
+            pdf,
+            {
+              pages: hasCover ? [coverStandIn, ...contentPages] : contentPages,
+              coverKind: hasCover ? 'imported_image' : undefined,
+              pdfLayout: preset.layout === '2_in_1' ? '2_in_1' : 'standard',
+              pdfPageSize: preset.pageSize,
+            },
+            input.annotations!
+          )
+      : undefined;
 
   if (preset.sizeLimitBytes !== null) {
     onProgress?.(`Fitting under ${formatLimit(preset.sizeLimitBytes)}…`);
     const sized = await buildPdfUnderLimit(doc.id, pages, preset.sizeLimitBytes, academicConfig, preset.layout, preset.pageSize, {
       dest,
       onPage,
+      beforeSave,
     });
     return { uri: sized.uri, fileName, sizeBytes: sized.sizeBytes, fits: sized.fits, level: sized.level };
   }
   const built = await buildPdfFromPages(doc.id, pages, encodingForQuality(input.quality ?? 3), academicConfig, preset.layout, preset.pageSize, {
     dest,
     onPage,
+    beforeSave,
   });
   return { uri: built.uri, fileName, sizeBytes: built.sizeBytes, fits: true, level: 0 };
 }

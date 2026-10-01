@@ -207,6 +207,28 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v10 (§5 T4): annotations. They go with their document. Not tied to pages by a foreign key:
+    // a document's page rows are deleted and re-inserted on every save (libraryRepo.writeDocument),
+    // which would cascade them away; the store drops a page's annotations when the page leaves.
+    version: 10,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE annotations (
+          id TEXT PRIMARY KEY NOT NULL,
+          document_id TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+          page_id TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          color TEXT NOT NULL,
+          data TEXT NOT NULL,
+          text TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_annotations_document_id ON annotations (document_id);
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

@@ -15,7 +15,7 @@ import { useAppState } from './AppStateContext';
 // document can't be submitted (no page images, e.g. an imported PDF or a DOCX).
 export function useSubmitDocument() {
   const { state, dispatch } = useAppState();
-  const { files, courses, deadlines } = state.library;
+  const { files, courses, deadlines, annotations } = state.library;
   const { profile } = state.settings;
 
   return useCallback(
@@ -29,7 +29,14 @@ export function useSubmitDocument() {
       dispatch({ type: 'ui/SHOW_SNACK', msg: preset.sizeLimitBytes ? `Fitting under ${formatLimit(preset.sizeLimitBytes)}…` : 'Building PDF…' });
       try {
         const n = typeNumberOf(doc, files);
-        const result = await submitDocument({ doc, preset, profile, course, n });
+        const result = await submitDocument({
+          doc,
+          preset,
+          profile,
+          course,
+          n,
+          annotations: annotations.filter((a) => a.documentId === doc.id),
+        });
         const record = submissionRecord(doc, result, preset, n);
         dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
         const msg = result.fits
@@ -54,7 +61,7 @@ export function useSubmitDocument() {
         return false;
       }
     },
-    [files, courses, deadlines, profile, dispatch]
+    [files, courses, deadlines, annotations, profile, dispatch]
   );
 }
 
@@ -62,7 +69,7 @@ export function useSubmitDocument() {
 // gone (history.ensureSubmissionFile).
 export function useShareSubmission() {
   const { state, dispatch } = useAppState();
-  const { files, courses } = state.library;
+  const { files, courses, annotations } = state.library;
   const { profile } = state.settings;
 
   return useCallback(
@@ -71,7 +78,7 @@ export function useShareSubmission() {
       if (!doc) return;
       try {
         const course = courses.find((c) => c.id === doc.courseId);
-        const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files });
+        const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files, annotations });
         if (rebuilt) dispatch({ type: 'ui/SHOW_SNACK', msg: `Rebuilt ${submission.fileName}` });
         await shareAs(uri, submission.fileName, 'application/pdf');
       } catch (error) {
@@ -79,6 +86,6 @@ export function useShareSubmission() {
         dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't share the submission" });
       }
     },
-    [files, courses, profile, dispatch]
+    [files, courses, annotations, profile, dispatch]
   );
 }

@@ -17,6 +17,9 @@ export type SubmitPreset = {
   layout: LayoutMode;
   // Overrides settings.nameTemplate for this course. Undefined: the Settings template.
   nameTemplate?: string;
+  // §5 T4: put the student's highlights, ink and notes in the submitted file. Off (undefined) by
+  // default: teachers usually want a clean copy.
+  includeAnnotations?: boolean;
 };
 
 // A course without a preset yet: no limit, no cover, page numbers, the region's paper, one page
@@ -61,6 +64,7 @@ export function parseSubmitPreset(json: string | null | undefined): SubmitPreset
   };
   if (typeof raw.footerText === 'string' && preset.footerPreset === 'custom') preset.footerText = raw.footerText;
   if (typeof raw.nameTemplate === 'string' && raw.nameTemplate.trim()) preset.nameTemplate = raw.nameTemplate;
+  if (raw.includeAnnotations === true) preset.includeAnnotations = true;
   return preset;
 }
 
@@ -89,6 +93,7 @@ export type DeliverPresetFields = {
   pageSize: PageSizeId;
   layoutMode: LayoutMode;
   nameTemplate?: string;
+  includeAnnotations?: boolean;
 };
 
 // The preset that Deliver's current options amount to. A photo cover isn't remembered (it's this
@@ -109,6 +114,7 @@ export function presetFromDeliver(deliver: DeliverPresetFields, previous?: Submi
   };
   if (footerPreset === 'custom') preset.footerText = footerText;
   if (deliver.nameTemplate?.trim()) preset.nameTemplate = deliver.nameTemplate;
+  if (deliver.includeAnnotations) preset.includeAnnotations = true;
   return preset;
 }
 
@@ -128,6 +134,7 @@ function normalizeKeys(p: SubmitPreset): SubmitPreset {
   };
   if (p.footerPreset === 'custom' && p.footerText !== undefined) out.footerText = p.footerText;
   if (p.nameTemplate) out.nameTemplate = p.nameTemplate;
+  if (p.includeAnnotations) out.includeAnnotations = true;
   return out;
 }
 
@@ -146,6 +153,7 @@ export function summarizePreset(preset: SubmitPreset): string {
     FOOTER_SUMMARY[preset.footerPreset],
     preset.border ? 'Border' : null,
     preset.layout === '2_in_1' ? '2 per sheet' : null,
+    preset.includeAnnotations ? 'With annotations' : null,
     preset.pageSize,
   ];
   return parts.filter(Boolean).join(' · ');

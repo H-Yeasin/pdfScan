@@ -1,11 +1,12 @@
 import { Directory, File } from 'expo-file-system';
 import { applySignatureToPdf, buildPdfFromPages, encodingForQuality, pageSizeOfPdf } from '../pdf/pdfService';
+import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { getDocumentDir } from './libraryFiles';
 import { buildSearchHaystack } from '../search/searchService';
 import { readTextWithEncodingFallback } from '../documents/txtService';
-import type { ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
+import type { Annotation, ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
 
@@ -125,8 +126,11 @@ export async function splitDocument(doc: LibraryDocument): Promise<LibraryDocume
 // Rebuilds only document.pdf, from the untouched library masters, at the requested export
 // quality. Page images are never overwritten, so compressing is reversible: compress again at a
 // higher quality and the detail is still there.
-export async function compressDocument(doc: LibraryDocument, quality = 2): Promise<LibraryDocument> {
+export async function compressDocument(doc: LibraryDocument, quality = 2, annotations: readonly Annotation[] = []): Promise<LibraryDocument> {
   const pageSize = await pageSizeOfPdf(doc.pdfUri);
+  // §5 T4: the rebuilt PDF gets the document's annotations again (laid out as rebuilt: standard,
+  // no separate cover).
+  const mapped = { pages: doc.pages, coverKind: undefined, pdfLayout: 'standard' as const, pdfPageSize: pageSize };
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
@@ -134,7 +138,8 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
     encodingForQuality(quality),
     undefined,
     'standard',
-    pageSize
+    pageSize,
+    { beforeSave: (pdf) => writeAnnotations(pdf, mapped, annotations) }
   );
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
@@ -151,7 +156,8 @@ export async function compressDocument(doc: LibraryDocument, quality = 2): Promi
 export async function applySignedPage(
   doc: LibraryDocument,
   pageIndex: number,
-  flattenedUri: string
+  flattenedUri: string,
+  annotations: readonly Annotation[] = []
 ): Promise<LibraryDocument> {
   const dir = getDocumentDir(doc.id);
   const dest = new File(dir, `page_${pageIndex + 1}.jpg`);
@@ -179,7 +185,11 @@ export async function applySignedPage(
     'as-is',
     undefined,
     'standard',
-    pageSize
+    pageSize,
+    {
+      beforeSave: (pdf) =>
+        writeAnnotations(pdf, { pages, coverKind: undefined, pdfLayout: 'standard', pdfPageSize: pageSize }, annotations),
+    }
   );
   const pdfUri: string = pdfResult.uri;
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;

@@ -280,3 +280,27 @@ export type Deadline = {
   doneSubmissionId?: string;
   createdAt: number;
 };
+
+// §5 T4: a mark on a library page, stored as data in master pixels (like OCR boxes) and written
+// into document.pdf as a real PDF annotation by every build (annotations/pdfAnnotations.ts).
+export type AnnotationKind = 'highlight' | 'ink' | 'note';
+export type AnnotationData =
+  // Highlighter: one rect per line it covers, snapped to word boxes (or one free rect).
+  | { rects: OcrBounding[] }
+  // Pen: strokes of [x, y] points, and the pen width in master pixels.
+  | { strokes: [number, number][][]; width: number }
+  // Note: where its icon sits.
+  | { x: number; y: number };
+export type Annotation = {
+  id: string;
+  documentId: string;
+  pageId: string;
+  kind: AnnotationKind;
+  // A key of annotations/palette.ts.
+  color: string;
+  data: AnnotationData;
+  // Highlight: the words it covers. Note: the note itself.
+  text?: string;
+  createdAt: number;
+  updatedAt: number;
+};

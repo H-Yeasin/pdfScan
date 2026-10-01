@@ -41,6 +41,8 @@ export type DeliverState = {
   rememberPreset: boolean;
   // The course preset's file-name template, if it has its own (else settings.nameTemplate).
   nameTemplate?: string;
+  // The course preset's "Include my annotations" (§5 T4).
+  includeAnnotations?: boolean;
 };
 
 export const initialDeliverState: DeliverState = {
@@ -81,6 +83,7 @@ export type DeliverAction =
   | { type: 'deliver/APPLY_PRESET'; courseId: string | null; preset: SubmitPreset }
   | { type: 'deliver/SET_REMEMBER_PRESET'; remember: boolean }
   | { type: 'deliver/SET_NAME_TEMPLATE'; template: string | undefined }
+  | { type: 'deliver/SET_INCLUDE_ANNOTATIONS'; include: boolean }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -130,11 +133,14 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
         pageSize: action.preset.pageSize,
         layoutMode: action.preset.layout,
         nameTemplate: action.preset.nameTemplate,
+        includeAnnotations: action.preset.includeAnnotations,
         academicConfig,
       };
     }
     case 'deliver/SET_REMEMBER_PRESET':
       return { ...state, rememberPreset: action.remember };
+    case 'deliver/SET_INCLUDE_ANNOTATIONS':
+      return { ...state, includeAnnotations: action.include || undefined };
     case 'deliver/SET_NAME_TEMPLATE':
       return { ...state, nameTemplate: action.template?.trim() ? action.template : undefined };
     case 'deliver/SET_PAGE_SIZE':

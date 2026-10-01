@@ -2,7 +2,7 @@ import { File } from 'expo-file-system';
 import { typeNumberOf } from '../courses/docTypes';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { createId } from '../../utils/id';
-import type { Course, LibraryDocument, StudentProfile, Submission } from '../../types/models';
+import type { Annotation, Course, LibraryDocument, StudentProfile, Submission } from '../../types/models';
 import { defaultSubmitPreset, type SubmitPreset } from './preset';
 import { submissionPages, submitDocument, type SubmitResult } from './submitDocument';
 
@@ -40,7 +40,7 @@ const PDF_EXTENSION = /\.pdf$/i;
 export async function ensureSubmissionFile(
   submission: Submission,
   doc: LibraryDocument,
-  ctx: { profile: StudentProfile; course?: Course; docs: readonly LibraryDocument[] }
+  ctx: { profile: StudentProfile; course?: Course; docs: readonly LibraryDocument[]; annotations?: readonly Annotation[] }
 ): Promise<{ uri: string; rebuilt: boolean }> {
   const file = submissionFile(submission);
   if (file.exists) return { uri: file.uri, rebuilt: false };
@@ -52,6 +52,7 @@ export async function ensureSubmissionFile(
     n: submission.typeNumber ?? typeNumberOf(doc, ctx.docs),
     fileName: submission.fileName.replace(PDF_EXTENSION, ''),
     date: new Date(submission.createdAt),
+    annotations: ctx.annotations?.filter((a) => a.documentId === doc.id),
   });
   return { uri: result.uri, rebuilt: true };
 }

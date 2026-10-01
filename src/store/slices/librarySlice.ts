@@ -1,4 +1,4 @@
-import type { Course, Deadline, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
+import type { Annotation, Course, Deadline, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
@@ -26,6 +26,8 @@ export type LibraryState = {
   deadlines: Deadline[];
   // UI-only: the deadline a tapped reminder points at, highlighted on its course page.
   highlightDeadlineId: string | null;
+  // §5 T4: highlights, ink and notes on library pages, oldest first.
+  annotations: Annotation[];
   // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
   homeSemesterId: string | null;
   // UI-only drill-in state for the Courses tab: null = showing the course list,
@@ -50,6 +52,7 @@ export const initialLibraryState: LibraryState = {
   submissions: [],
   deadlines: [],
   highlightDeadlineId: null,
+  annotations: [],
   homeSemesterId: null,
   activeCourseId: null,
   selection: [],
@@ -97,6 +100,10 @@ export type LibraryAction =
   | { type: 'library/UPDATE_DEADLINE'; id: string; patch: Partial<Omit<Deadline, 'id'>> }
   | { type: 'library/DELETE_DEADLINE'; id: string }
   | { type: 'library/SET_HIGHLIGHT_DEADLINE'; id: string | null }
+  | { type: 'library/SET_ANNOTATIONS'; annotations: Annotation[] }
+  | { type: 'library/ADD_ANNOTATION'; annotation: Annotation }
+  | { type: 'library/DELETE_ANNOTATIONS'; ids: string[] }
+  | { type: 'library/UPDATE_ANNOTATION'; id: string; patch: Partial<Omit<Annotation, 'id'>> }
   | { type: 'library/ADD_SLOT'; slot: TimetableSlot }
   | { type: 'library/UPDATE_SLOT'; id: string; patch: Partial<Omit<TimetableSlot, 'id'>> }
   | { type: 'library/REMOVE_SLOT'; id: string }
@@ -145,6 +152,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         selection: state.selection.filter((id) => !action.ids.includes(id)),
         // Their submissions go too (ON DELETE CASCADE on disk; the files are in the document folder).
         submissions: state.submissions.filter((s) => !action.ids.includes(s.documentId)),
+        annotations: state.annotations.filter((a) => !action.ids.includes(a.documentId)),
       };
     case 'library/TOGGLE_STAR':
       return {
@@ -154,6 +162,12 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/UPDATE_FILE':
       return {
         ...state,
+        // A page that left the document takes its annotations with it.
+        annotations: action.patch.pages
+          ? state.annotations.filter(
+              (a) => a.documentId !== action.id || action.patch.pages!.some((p) => p.id === a.pageId)
+            )
+          : state.annotations,
         files: state.files.map((f) => {
           if (f.id !== action.id) return f;
           const next = { ...f, ...action.patch };
@@ -172,6 +186,9 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         // A document replaced by others (merge, split) takes its submissions with it.
         submissions: state.submissions.filter(
           (s) => !action.ids.includes(s.documentId) || action.files.some((f) => f.id === s.documentId)
+        ),
+        annotations: state.annotations.filter(
+          (a) => !action.ids.includes(a.documentId) || action.files.some((f) => f.id === a.documentId)
         ),
       };
     case 'library/TOGGLE_SELECTION': {
@@ -293,6 +310,14 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         deadlines: state.deadlines.filter((d) => d.id !== action.id),
         highlightDeadlineId: state.highlightDeadlineId === action.id ? null : state.highlightDeadlineId,
       };
+    case 'library/SET_ANNOTATIONS':
+      return { ...state, annotations: action.annotations };
+    case 'library/ADD_ANNOTATION':
+      return { ...state, annotations: [...state.annotations, action.annotation] };
+    case 'library/UPDATE_ANNOTATION':
+      return { ...state, annotations: state.annotations.map((a) => (a.id === action.id ? { ...a, ...action.patch } : a)) };
+    case 'library/DELETE_ANNOTATIONS':
+      return { ...state, annotations: state.annotations.filter((a) => !action.ids.includes(a.id)) };
     case 'library/SET_HIGHLIGHT_DEADLINE':
       return { ...state, highlightDeadlineId: action.id };
     case 'library/ADD_SLOT':

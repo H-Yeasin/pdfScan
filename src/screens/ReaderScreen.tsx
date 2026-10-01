@@ -31,6 +31,7 @@ import { formatShortDate } from '../utils/format';
 import { libraryIdxFor, pdfPageFor } from '../services/documents/pageMap';
 import * as Clipboard from 'expo-clipboard';
 import { SelectTextSheet } from '../components/reader/SelectTextSheet';
+import { AnnotateSheet } from '../components/reader/AnnotateSheet';
 import { writeDocumentText } from '../services/study/textExport';
 import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
@@ -82,6 +83,8 @@ export function ReaderScreen() {
   const [targetPage, setTargetPage] = useState<number | null>(null);
   // §5 T3: the library page open in "Select text", or null.
   const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
+  // §5 T4: the library page "Annotate" opened on, or null.
+  const [annotateIdx, setAnnotateIdx] = useState<number | null>(null);
   const pdfRef = useRef<PdfPageViewHandle>(null);
 
   // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
@@ -231,6 +234,8 @@ export function ReaderScreen() {
         if (doc) setTypePickerOpen(true);
       } else if (id === 'submit') {
         if (doc) await submit(doc);
+      } else if (id === 'annotate') {
+        if (doc) setAnnotateIdx(libraryIdxFor(doc, activeIndex + 1));
       } else if (id === 'selectText' || id === 'copyText' || id === 'extractText') {
         if (!doc) return;
         // The library page on screen (on a 2-up sheet, its left page).
@@ -284,7 +289,12 @@ export function ReaderScreen() {
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!doc) return;
-      const updated = await applySignedPage(doc, activeIndex, flattenedUri);
+      const updated = await applySignedPage(
+        doc,
+        activeIndex,
+        flattenedUri,
+        state.library.annotations.filter((a) => a.documentId === doc.id)
+      );
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
       dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
@@ -478,6 +488,18 @@ export function ReaderScreen() {
         showSubmit={!external && !!doc && canSubmit(doc)}
         showText={!external && !!doc && canSubmit(doc)}
       />
+
+      {doc && annotateIdx !== null ? (
+        <AnnotateSheet
+          doc={doc}
+          startIdx={annotateIdx}
+          onClose={(changed) => {
+            setAnnotateIdx(null);
+            // The PDF view caches the file; reload it to show the new annotations.
+            if (changed) setReloadKey((k) => k + 1);
+          }}
+        />
+      ) : null}
 
       {doc && selectTextIdx !== null ? (
         <SelectTextSheet visible doc={doc} pageIdx={selectTextIdx} onClose={() => setSelectTextIdx(null)} />

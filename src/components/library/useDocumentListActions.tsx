@@ -122,7 +122,7 @@ export function useDocumentListActions() {
         dispatch({ type: 'ui/SHOW_SNACK', msg: `Split into ${split.length} files` });
       } else if (id === 'compress') {
         for (const doc of selectedDocs) {
-          const compressed = await compressDocument(doc);
+          const compressed = await compressDocument(doc, undefined, state.library.annotations.filter((a) => a.documentId === doc.id));
           dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
         }
         dispatch({ type: 'library/CLEAR_SELECTION' });
@@ -140,19 +140,24 @@ export function useDocumentListActions() {
         }
       }
     },
-    [selectedDocs, selection, dispatch, state.signature.saved, submit]
+    [selectedDocs, selection, dispatch, state.signature.saved, state.library.annotations, submit]
   );
 
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!signTarget) return;
-      const updated = await applySignedPage(signTarget, 0, flattenedUri);
+      const updated = await applySignedPage(
+        signTarget,
+        0,
+        flattenedUri,
+        state.library.annotations.filter((a) => a.documentId === signTarget.id)
+      );
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
     },
-    [signTarget, dispatch]
+    [signTarget, dispatch, state.library.annotations]
   );
 
   const handleSignatureCaptured = useCallback(

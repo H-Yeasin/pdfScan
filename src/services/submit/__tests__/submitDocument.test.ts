@@ -138,3 +138,32 @@ describe('typeNumberOf', () => {
     expect(typeNumberOf({ id: 'new', courseId: 'c', docType: 'assignment', createdAt: 9 }, docs)).toBe(4);
   });
 });
+
+describe('annotations in a submission', () => {
+  it('are left out by default, and placed after the cover when included', async () => {
+    const d = doc();
+    const note = {
+      id: 'n1',
+      documentId: d.id,
+      pageId: d.pages[1].id,
+      kind: 'note' as const,
+      color: 'note',
+      data: { x: 100, y: 100 },
+      text: 'check',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const annotPages = async (uri: string) => {
+      const pdf = await pdfjs.getDocument({ data: await new File(uri).bytes(), verbosity: 0, disableFontFace: true }).promise;
+      const out: number[] = [];
+      for (let i = 1; i <= pdf.numPages; i++) if ((await (await pdf.getPage(i)).getAnnotations()).length) out.push(i);
+      return out;
+    };
+    const base: SubmitPreset = { ...defaultSubmitPreset('c'), coverTemplateId: 'simple' };
+    const without = await submitDocument({ doc: d, preset: base, profile, course, n: 1, annotations: [note], fileName: 'without' });
+    expect(await annotPages(without.uri)).toEqual([]);
+    const withThem = await submitDocument({ doc: d, preset: { ...base, includeAnnotations: true }, profile, course, n: 1, annotations: [note], fileName: 'with' });
+    // Cover on page 1, so the second content page is PDF page 3.
+    expect(await annotPages(withThem.uri)).toEqual([3]);
+  });
+});

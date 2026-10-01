@@ -119,8 +119,9 @@ export function DeliverScreen() {
         pageSize,
         layoutMode,
         nameTemplate: state.deliver.nameTemplate,
+        includeAnnotations: state.deliver.includeAnnotations,
       }, coursePreset),
-    [sizeLimitBytes, state.deliver.academicConfig, pageSize, layoutMode, state.deliver.nameTemplate, coursePreset]
+    [sizeLimitBytes, state.deliver.academicConfig, pageSize, layoutMode, state.deliver.nameTemplate, state.deliver.includeAnnotations, coursePreset]
   );
   useEffect(() => {
     if (!rememberPreset || !course || presetCourseId !== course.id) return;
@@ -590,6 +591,20 @@ export function DeliverScreen() {
                   {summarizeAcademicConfig(academicConfig)}
                 </Text>
               </Pressable>
+
+              <View style={styles.rememberRow}>
+                <View style={styles.optionsHeaderText}>
+                  <Text style={{ color: tokens.ink, fontSize: 15 }}>Include my annotations</Text>
+                  <Text style={{ color: tokens.muted, fontSize: 12.5 }}>
+                    Highlights, pen and notes in the submitted file. Off gives the teacher a clean copy.
+                  </Text>
+                </View>
+                <Switch
+                  value={!!state.deliver.includeAnnotations}
+                  onValueChange={(include) => dispatch({ type: 'deliver/SET_INCLUDE_ANNOTATIONS', include })}
+                  trackColor={{ true: tokens.accent, false: tokens.surface2 }}
+                />
+              </View>
 
               {course ? (
                 <>
