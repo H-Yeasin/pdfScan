@@ -49,7 +49,21 @@ Home screen with the courses, document types, and automatic course suggestions.
 ## Steps
 
 ### K1 · Course and semester data model *(M)*
-Status: todo
+Status: done (commit 9574adb). As built:
+- Migration **v3**. Each old semester string (trimmed, case-insensitive) becomes one
+  `semesters` row starting on its earliest course's day; then `courses.semester` is dropped.
+  Every course gets `sort_order` (creation order) and a palette colour.
+- `Course.color` is a **palette id** (`CourseColor`, e.g. `'blue'`), resolved by
+  `tokens.courseColors` / `courseColorValue`. `Course` and `Semester` also keep `createdAt`.
+  Semester dates are local days `'YYYY-MM-DD'` (`utils/localDate.ts`).
+- Slice actions: `CREATE_COURSE` (with optional `fields`; assigns the colour and puts the
+  course last), `UPDATE_COURSE` (replaces `RENAME_COURSE`), `REORDER_COURSES`,
+  `CREATE/UPDATE/ARCHIVE/DELETE_SEMESTER`. No folder actions were left after F4.
+  `ARCHIVE_SEMESTER` reaches disk in one `syncLibrary` transaction. Un-archiving goes through
+  `UPDATE_*`, one course or semester at a time.
+- Archived courses are still in `state.library.courses`; K2/K3 hide them in Home and the pickers.
+- Done before K1 in the same session: §0/§1 (branch `ccr-ae22e8ac-tnkzk5`) merged into the §2
+  branch (`505563c`), and the malicious `metro.config.js` payload removed (`a907d20`).
 
 - Migration N+1 in `services/persistence/migrations.ts` (from F3):
   - a `semesters` table (id, name, starts_on, ends_on nullable, archived, created_at);

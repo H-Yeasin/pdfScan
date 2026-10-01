@@ -36,7 +36,7 @@ src/components/<area>/  UI split by screen area (capture, review, deliver, libra
 src/store/              AppStateContext (useAppState → {state, dispatch}), appReducer, slices/*, use*Persistence hooks
 src/services/           all logic, no UI (see pipeline below)
 src/theme/              tokens, useTheme(), spacing/radii, fontFamily/typeScale — never hard-code colors
-src/types/models.ts     SessionPage, LibraryDocument, LibraryPage, Course, PageOcr, OcrScript, DocFormat
+src/types/models.ts     SessionPage, LibraryDocument, LibraryPage, Course, Semester, DocType, PageOcr, OcrScript, DocFormat
 src/config/features.ts  FEATURES flags (pro: false)
 src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, docFormat
 ```
@@ -81,6 +81,8 @@ src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, do
 - Settings: AsyncStorage `app:settings` (`persistence/settingsStorage.ts`,
   `store/useSettingsPersistence.ts`).
 - Courses (`Course`, `doc.courseId`; undefined = Unsorted) replaced folders + courseFolder.
+  Since K1: `Semester` (archiving one archives its courses), `Course.sortOrder`, `Course.color`
+  as a palette id (`services/courses/palette.ts` → `tokens.courseColors`), `doc.docType`.
 
 ## Conventions
 - Process pages **one at a time** (memory on mid-range Android); avoid `Promise.all` over
