@@ -1,4 +1,4 @@
-import type { Annotation, Course, Deadline, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
+import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { buildSearchHaystack } from '../../services/search/searchService';
 
@@ -28,6 +28,8 @@ export type LibraryState = {
   highlightDeadlineId: string | null;
   // §5 T4: highlights, ink and notes on library pages, oldest first.
   annotations: Annotation[];
+  // §5 T5: bookmarked pages, oldest first.
+  bookmarks: Bookmark[];
   // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
   homeSemesterId: string | null;
   // UI-only drill-in state for the Courses tab: null = showing the course list,
@@ -53,6 +55,7 @@ export const initialLibraryState: LibraryState = {
   deadlines: [],
   highlightDeadlineId: null,
   annotations: [],
+  bookmarks: [],
   homeSemesterId: null,
   activeCourseId: null,
   selection: [],
@@ -104,6 +107,10 @@ export type LibraryAction =
   | { type: 'library/ADD_ANNOTATION'; annotation: Annotation }
   | { type: 'library/DELETE_ANNOTATIONS'; ids: string[] }
   | { type: 'library/UPDATE_ANNOTATION'; id: string; patch: Partial<Omit<Annotation, 'id'>> }
+  | { type: 'library/SET_BOOKMARKS'; bookmarks: Bookmark[] }
+  | { type: 'library/ADD_BOOKMARK'; bookmark: Bookmark }
+  | { type: 'library/UPDATE_BOOKMARK'; id: string; label: string | undefined }
+  | { type: 'library/REMOVE_BOOKMARK'; id: string }
   | { type: 'library/ADD_SLOT'; slot: TimetableSlot }
   | { type: 'library/UPDATE_SLOT'; id: string; patch: Partial<Omit<TimetableSlot, 'id'>> }
   | { type: 'library/REMOVE_SLOT'; id: string }
@@ -153,6 +160,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         // Their submissions go too (ON DELETE CASCADE on disk; the files are in the document folder).
         submissions: state.submissions.filter((s) => !action.ids.includes(s.documentId)),
         annotations: state.annotations.filter((a) => !action.ids.includes(a.documentId)),
+        bookmarks: state.bookmarks.filter((b) => !action.ids.includes(b.documentId)),
       };
     case 'library/TOGGLE_STAR':
       return {
@@ -168,6 +176,9 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
               (a) => a.documentId !== action.id || action.patch.pages!.some((p) => p.id === a.pageId)
             )
           : state.annotations,
+        bookmarks: action.patch.pages
+          ? state.bookmarks.filter((b) => b.documentId !== action.id || action.patch.pages!.some((p) => p.id === b.pageId))
+          : state.bookmarks,
         files: state.files.map((f) => {
           if (f.id !== action.id) return f;
           const next = { ...f, ...action.patch };
@@ -189,6 +200,9 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         ),
         annotations: state.annotations.filter(
           (a) => !action.ids.includes(a.documentId) || action.files.some((f) => f.id === a.documentId)
+        ),
+        bookmarks: state.bookmarks.filter(
+          (b) => !action.ids.includes(b.documentId) || action.files.some((f) => f.id === b.documentId)
         ),
       };
     case 'library/TOGGLE_SELECTION': {
@@ -314,6 +328,17 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return { ...state, annotations: action.annotations };
     case 'library/ADD_ANNOTATION':
       return { ...state, annotations: [...state.annotations, action.annotation] };
+    case 'library/SET_BOOKMARKS':
+      return { ...state, bookmarks: action.bookmarks };
+    case 'library/ADD_BOOKMARK':
+      // One bookmark per page.
+      return state.bookmarks.some((b) => b.documentId === action.bookmark.documentId && b.pageId === action.bookmark.pageId)
+        ? state
+        : { ...state, bookmarks: [...state.bookmarks, action.bookmark] };
+    case 'library/UPDATE_BOOKMARK':
+      return { ...state, bookmarks: state.bookmarks.map((b) => (b.id === action.id ? { ...b, label: action.label?.trim() || undefined } : b)) };
+    case 'library/REMOVE_BOOKMARK':
+      return { ...state, bookmarks: state.bookmarks.filter((b) => b.id !== action.id) };
     case 'library/UPDATE_ANNOTATION':
       return { ...state, annotations: state.annotations.map((a) => (a.id === action.id ? { ...a, ...action.patch } : a)) };
     case 'library/DELETE_ANNOTATIONS':

@@ -1,20 +1,35 @@
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 
-export type SubmittedFilter = 'all' | 'submitted' | 'notSubmitted';
+export type SubmittedFilter = 'all' | 'submitted' | 'notSubmitted' | 'bookmarked';
 
-const OPTIONS: { id: SubmittedFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
+const SUBMITTED_OPTIONS: { id: SubmittedFilter; label: string }[] = [
   { id: 'submitted', label: 'Submitted' },
   { id: 'notSubmitted', label: 'Not submitted' },
 ];
 
-// Library filter (§4 S7). The caller shows it only once something has been submitted.
-export function SubmittedFilterChips({ value, onChange }: { value: SubmittedFilter; onChange: (value: SubmittedFilter) => void }) {
+// Library filters: Submitted / Not submitted (§4 S7) once something has been submitted, and
+// Bookmarked (§5 T5) once a page has been bookmarked.
+export function SubmittedFilterChips({
+  value,
+  onChange,
+  showSubmitted = true,
+  showBookmarked = false,
+}: {
+  value: SubmittedFilter;
+  onChange: (value: SubmittedFilter) => void;
+  showSubmitted?: boolean;
+  showBookmarked?: boolean;
+}) {
   const { tokens } = useTheme();
+  const options = [
+    { id: 'all' as const, label: 'All' },
+    ...(showSubmitted ? SUBMITTED_OPTIONS : []),
+    ...(showBookmarked ? [{ id: 'bookmarked' as const, label: 'Bookmarked' }] : []),
+  ];
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
-      {OPTIONS.map((option) => {
+      {options.map((option) => {
         const selected = option.id === value;
         return (
           <Pressable

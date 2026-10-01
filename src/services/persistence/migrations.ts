@@ -229,6 +229,23 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v11 (§5 T5): bookmarks. Like annotations, they go with their document; no foreign key on
+    // the page row, which is rewritten on every save.
+    version: 11,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE bookmarks (
+          id TEXT PRIMARY KEY NOT NULL,
+          document_id TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+          page_id TEXT NOT NULL,
+          label TEXT,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_bookmarks_document_id ON bookmarks (document_id);
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

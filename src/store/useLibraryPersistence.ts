@@ -15,15 +15,15 @@ import { useAppState } from './AppStateContext';
 // their own boot-time work after it.
 export function useLibraryPersistence(): boolean {
   const { state, dispatch } = useAppState();
-  const { files, courses, semesters, timetable, submissions, deadlines, annotations, loadStatus, loadAttempt } = state.library;
+  const { files, courses, semesters, timetable, submissions, deadlines, annotations, bookmarks, loadStatus, loadAttempt } = state.library;
   const loaded = loadStatus === 'ready';
 
   // `committed` is the last snapshot known to be on disk; `latest` is the newest in-memory one.
   // Writes run one at a time, each diffing committed -> latest, so a failed write is retried by
   // the next one instead of being silently dropped.
   const committed = useRef<LoadedLibrary | null>(null);
-  const latest = useRef<LoadedLibrary>({ documents: files, courses, semesters, timetable, submissions, deadlines, annotations });
-  latest.current = { documents: files, courses, semesters, timetable, submissions, deadlines, annotations };
+  const latest = useRef<LoadedLibrary>({ documents: files, courses, semesters, timetable, submissions, deadlines, annotations, bookmarks });
+  latest.current = { documents: files, courses, semesters, timetable, submissions, deadlines, annotations, bookmarks };
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -46,6 +46,7 @@ export function useLibraryPersistence(): boolean {
         dispatch({ type: 'library/SET_SUBMISSIONS', submissions: [...unsavedSubmissions, ...(stored.submissions ?? [])] });
         dispatch({ type: 'library/SET_DEADLINES', deadlines: stored.deadlines ?? [] });
         dispatch({ type: 'library/SET_ANNOTATIONS', annotations: stored.annotations ?? [] });
+        dispatch({ type: 'library/SET_BOOKMARKS', bookmarks: stored.bookmarks ?? [] });
         dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' });
         // §5 T1: record the PDF layout of documents built before it was stored. In the
         // background, one document at a time; each result is saved like any other change.
@@ -80,7 +81,7 @@ export function useLibraryPersistence(): boolean {
         console.warn('Failed to save library changes', error);
       }
     });
-  }, [loaded, files, courses, semesters, timetable, submissions, deadlines, annotations]);
+  }, [loaded, files, courses, semesters, timetable, submissions, deadlines, annotations, bookmarks]);
 
   return loaded;
 }

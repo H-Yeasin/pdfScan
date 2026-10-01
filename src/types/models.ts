@@ -304,3 +304,12 @@ export type Annotation = {
   createdAt: number;
   updatedAt: number;
 };
+
+// §5 T5: a bookmarked library page, optionally labelled.
+export type Bookmark = {
+  id: string;
+  documentId: string;
+  pageId: string;
+  label?: string;
+  createdAt: number;
+};

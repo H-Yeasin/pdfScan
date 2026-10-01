@@ -14,6 +14,8 @@ import { SubmissionList } from '../components/submit/SubmissionList';
 import { DeadlineList } from '../components/deadlines/DeadlineList';
 import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
 import { SortUnsortedSheet } from '../components/courses/SortUnsortedSheet';
+import { BookmarkList } from '../components/bookmarks/BookmarkList';
+import { courseBookmarks } from '../services/study/bookmarks';
 import type { Deadline } from '../types/models';
 import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
@@ -65,6 +67,13 @@ export function CourseScreen() {
     () => (typeFilter ? listedDocs.filter((d) => docTypeOf(d) === typeFilter) : listedDocs),
     [listedDocs, typeFilter]
   );
+  // §5 T5: bookmarked pages across this course's documents (3 shown until "Show all").
+  const bookmarked = useMemo(
+    () => courseBookmarks(state.library.bookmarks, files, isUnsorted ? null : (activeCourseId ?? null)),
+    [state.library.bookmarks, files, isUnsorted, activeCourseId]
+  );
+  const [allBookmarks, setAllBookmarks] = useState(false);
+
   // Unsorted: a one-time "Sort them now?" banner, and a Sort button that's always there.
   const [sorting, setSorting] = useState(false);
   const toSort = useMemo(() => (isUnsorted ? docs.filter((d) => !d.archived) : []), [isUnsorted, docs]);
@@ -163,6 +172,26 @@ export function CourseScreen() {
               onScanNow={handleScan}
             />
           ) : null}
+        </View>
+      ) : null}
+
+      {bookmarked.length > 0 && !selMode ? (
+        <View style={styles.deadlines}>
+          <View style={styles.deadlinesHeader}>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Bookmarked</Text>
+            {bookmarked.length > 3 ? (
+              <Pressable onPress={() => setAllBookmarks((v) => !v)} accessibilityRole="button" hitSlop={8}>
+                <Text style={[styles.addLink, { color: tokens.accentInk }]}>{allBookmarks ? 'Show less' : `Show all ${bookmarked.length}`}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <BookmarkList
+            items={allBookmarks ? bookmarked : bookmarked.slice(0, 3)}
+            onOpen={(item) => {
+              openDocument(item.doc);
+              dispatch({ type: 'reader/SET_TARGET', target: { pageId: item.bookmark.pageId } });
+            }}
+          />
         </View>
       ) : null}
 

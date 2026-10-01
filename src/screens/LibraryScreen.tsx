@@ -80,6 +80,7 @@ export function LibraryScreen() {
     };
   }, [search, courseFilter, typeFilter]);
   const submittedIds = useMemo(() => new Set(state.library.submissions.map((s) => s.documentId)), [state.library.submissions]);
+  const bookmarkedIds = useMemo(() => new Set(state.library.bookmarks.map((b) => b.documentId)), [state.library.bookmarks]);
 
   useEffect(() => {
     const query = search.trim();
@@ -124,8 +125,9 @@ export function LibraryScreen() {
         : searchedFiles;
     const typed = typeFilter ? byCourse.filter((f) => docTypeOf(f) === typeFilter) : byCourse;
     if (submittedFilter === 'all') return typed;
+    if (submittedFilter === 'bookmarked') return typed.filter((f) => bookmarkedIds.has(f.id));
     return typed.filter((f) => submittedIds.has(f.id) === (submittedFilter === 'submitted'));
-  }, [searchedFiles, searching, courseFilter, typeFilter, submittedFilter, submittedIds]);
+  }, [searchedFiles, searching, courseFilter, typeFilter, submittedFilter, submittedIds, bookmarkedIds]);
 
   const courseCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -235,7 +237,14 @@ export function LibraryScreen() {
             <CourseFilterChips docs={searchedFiles} courses={state.library.courses} value={courseFilter} onChange={setCourseFilter} />
           ) : null}
           <DocTypeFilterChips docs={searchedFiles} value={typeFilter} onChange={setTypeFilter} />
-          {submittedIds.size > 0 ? <SubmittedFilterChips value={submittedFilter} onChange={setSubmittedFilter} /> : null}
+          {submittedIds.size > 0 || bookmarkedIds.size > 0 ? (
+            <SubmittedFilterChips
+              value={submittedFilter}
+              onChange={setSubmittedFilter}
+              showSubmitted={submittedIds.size > 0}
+              showBookmarked={bookmarkedIds.size > 0}
+            />
+          ) : null}
           <FlatList
             data={visibleFiles}
             keyExtractor={(doc) => doc.id}

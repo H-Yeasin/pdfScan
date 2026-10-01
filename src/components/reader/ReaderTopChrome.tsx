@@ -15,6 +15,11 @@ type ReaderTopChromeProps = {
   // A line under the name (e.g. "Submitted 2× · last on 3 Oct"); tappable when onSubtitlePress.
   subtitle?: string | null;
   onSubtitlePress?: () => void;
+  // §5 T5: the current page's bookmark (filled when bookmarked); long-press to label it.
+  // Undefined: no bookmark button (external files).
+  bookmarked?: boolean;
+  onBookmark?: () => void;
+  onBookmarkLongPress?: () => void;
 };
 
 export function ReaderTopChrome({
@@ -28,6 +33,9 @@ export function ReaderTopChrome({
   matchCount,
   subtitle,
   onSubtitlePress,
+  bookmarked,
+  onBookmark,
+  onBookmarkLongPress,
 }: ReaderTopChromeProps) {
   const { tokens } = useTheme();
   const insets = useSafeAreaInsets();
@@ -76,9 +84,23 @@ export function ReaderTopChrome({
         {findOpen ? (
           <Text style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
         ) : (
-          <Pressable style={styles.iconButton} onPress={onOverflow}>
-            <Ionicons name="ellipsis-vertical" size={18} color={tokens.ink} />
-          </Pressable>
+          <>
+            {bookmarked !== undefined && onBookmark ? (
+              <Pressable
+                style={styles.iconButton}
+                onPress={onBookmark}
+                onLongPress={onBookmarkLongPress}
+                accessibilityRole="button"
+                accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                accessibilityHint="Long-press to add a label"
+              >
+                <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={19} color={bookmarked ? tokens.accentInk : tokens.ink} />
+              </Pressable>
+            ) : null}
+            <Pressable style={styles.iconButton} onPress={onOverflow}>
+              <Ionicons name="ellipsis-vertical" size={18} color={tokens.ink} />
+            </Pressable>
+          </>
         )}
       </View>
     </Animated.View>

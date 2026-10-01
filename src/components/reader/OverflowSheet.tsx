@@ -15,7 +15,8 @@ export type OverflowItemId =
   | 'selectText'
   | 'copyText'
   | 'extractText'
-  | 'annotate';
+  | 'annotate'
+  | 'bookmarks';
 
 type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
@@ -29,6 +30,8 @@ const SUBMIT_ITEM: Item = { id: 'submit', label: 'Submit', icon: 'paper-plane-ou
 const TEXT_ITEMS: Item[] = [
   // §5 T4.
   { id: 'annotate', label: 'Annotate', icon: 'color-fill-outline' },
+  // §5 T5.
+  { id: 'bookmarks', label: 'Bookmarks', icon: 'bookmarks-outline' },
   { id: 'selectText', label: 'Select text', icon: 'text-outline' },
   { id: 'copyText', label: 'Copy page text', icon: 'copy-outline' },
   { id: 'extractText', label: 'Extract text (.txt)', icon: 'document-text-outline' },

@@ -32,6 +32,10 @@ import { libraryIdxFor, pdfPageFor } from '../services/documents/pageMap';
 import * as Clipboard from 'expo-clipboard';
 import { SelectTextSheet } from '../components/reader/SelectTextSheet';
 import { AnnotateSheet } from '../components/reader/AnnotateSheet';
+import { BookmarksSheet } from '../components/bookmarks/BookmarkList';
+import { documentBookmarks } from '../services/study/bookmarks';
+import { TextPromptModal } from '../components/shared/TextPromptModal';
+import { createId } from '../utils/id';
 import { writeDocumentText } from '../services/study/textExport';
 import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
@@ -85,6 +89,19 @@ export function ReaderScreen() {
   const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
   // §5 T4: the library page "Annotate" opened on, or null.
   const [annotateIdx, setAnnotateIdx] = useState<number | null>(null);
+  // §5 T5: bookmarks of this document, and the one on the page on screen.
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [labelling, setLabelling] = useState(false);
+  const docBookmarks = useMemo(() => (doc ? documentBookmarks(state.library.bookmarks, doc) : []), [doc, state.library.bookmarks]);
+  const currentIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
+  const currentBookmark = doc ? state.library.bookmarks.find((b) => b.documentId === doc.id && b.pageId === doc.pages[currentIdx]?.id) : undefined;
+  const addBookmark = (label?: string) => {
+    if (!doc?.pages[currentIdx]) return;
+    dispatch({
+      type: 'library/ADD_BOOKMARK',
+      bookmark: { id: createId('bookmark'), documentId: doc.id, pageId: doc.pages[currentIdx].id, label: label?.trim() || undefined, createdAt: Date.now() },
+    });
+  };
   const pdfRef = useRef<PdfPageViewHandle>(null);
 
   // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
@@ -144,8 +161,10 @@ export function ReaderScreen() {
     const { page } = pdfPageFor(doc, idx);
     setTargetPage(page);
     pdfRef.current?.goToPage(page);
-    setFindOpen(true);
-    setFindQuery(target.query);
+    if (target.query) {
+      setFindOpen(true);
+      setFindQuery(target.query);
+    }
   }, [target, doc, pageCount, dispatch]);
 
   useEffect(() => {
@@ -234,6 +253,8 @@ export function ReaderScreen() {
         if (doc) setTypePickerOpen(true);
       } else if (id === 'submit') {
         if (doc) await submit(doc);
+      } else if (id === 'bookmarks') {
+        setBookmarksOpen(true);
       } else if (id === 'annotate') {
         if (doc) setAnnotateIdx(libraryIdxFor(doc, activeIndex + 1));
       } else if (id === 'selectText' || id === 'copyText' || id === 'extractText') {
@@ -437,6 +458,12 @@ export function ReaderScreen() {
         matchCount={matchCount}
         subtitle={submittedSummary(docSubmissions, formatShortDate)}
         onSubtitlePress={() => setSubmissionsOpen(true)}
+        bookmarked={doc && !external && isPageRaster ? !!currentBookmark : undefined}
+        onBookmark={() => {
+          if (currentBookmark) dispatch({ type: 'library/REMOVE_BOOKMARK', id: currentBookmark.id });
+          else addBookmark();
+        }}
+        onBookmarkLongPress={() => setLabelling(true)}
       />
 
       <ReaderBottomChrome
@@ -487,6 +514,31 @@ export function ReaderScreen() {
         showAddToLibrary={!!external}
         showSubmit={!external && !!doc && canSubmit(doc)}
         showText={!external && !!doc && canSubmit(doc)}
+      />
+
+      <BookmarksSheet
+        visible={bookmarksOpen}
+        items={docBookmarks}
+        onOpen={(item) => {
+          setBookmarksOpen(false);
+          if (doc) pdfRef.current?.goToPage(pdfPageFor(doc, item.idx).page);
+        }}
+        onRemove={(item) => dispatch({ type: 'library/REMOVE_BOOKMARK', id: item.bookmark.id })}
+        onClose={() => setBookmarksOpen(false)}
+      />
+
+      <TextPromptModal
+        visible={labelling}
+        title={currentBookmark ? 'Bookmark label' : 'Bookmark this page'}
+        initialValue={currentBookmark?.label ?? ''}
+        placeholder="e.g. Formula sheet"
+        submitLabel="Save"
+        onCancel={() => setLabelling(false)}
+        onSubmit={(label) => {
+          setLabelling(false);
+          if (currentBookmark) dispatch({ type: 'library/UPDATE_BOOKMARK', id: currentBookmark.id, label });
+          else addBookmark(label);
+        }}
       />
 
       {doc && annotateIdx !== null ? (
