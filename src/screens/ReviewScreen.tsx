@@ -39,6 +39,10 @@ import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
 import { useResolvedAcademicConfig } from '../store/useDeliverContext';
 import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage, SourceImage } from '../types/models';
+import { EmptyState } from '../components/shared/EmptyState';
+import { Hint } from '../components/shared/Hint';
+import { useHint } from '../components/shared/useHint';
+import { useGalleryImport } from '../store/useGalleryImport';
 
 const OCR_SPARSE_THRESHOLD = 6;
 
@@ -292,6 +296,12 @@ export function ReviewScreen() {
   const [checkingCrops, setCheckingCrops] = useState(false);
   const cropCheckPages = pages.filter((p) => p.needsCropReview);
   const cropCheckPage = checkingCrops ? cropCheckPages[0] : undefined;
+  // §9 O3: "Swipe to try filters", once, when nothing covers the strip.
+  const filterHint = useHint(
+    'reviewFilters',
+    !!selectedPage && !adjustOpen && !cropTarget && !gridOpen && signStep === null && !mergeCrop && !checkingCrops
+  );
+  const importFromGallery = useGalleryImport();
   useEffect(() => {
     if (checkingCrops && cropCheckPages.length === 0) setCheckingCrops(false);
   }, [checkingCrops, cropCheckPages.length]);
@@ -470,18 +480,19 @@ export function ReviewScreen() {
           </>
         ) : (
           <>
-            <Text style={{ color: tokens.muted }}>{t('review.empty')}</Text>
-            <Pressable
-              style={[styles.startButton, { backgroundColor: tokens.accent }]}
-              onPress={() => {
-                dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
-                dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
-                go('capture');
+            <EmptyState
+              title={t('review.empty')}
+              body={t('review.emptyBody')}
+              action={{
+                label: t('review.startCapture'),
+                onPress: () => {
+                  dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+                  dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
+                  go('capture');
+                },
               }}
-            >
-              <Ionicons name="camera" size={18} color="#fff" />
-              <Text style={styles.startButtonLabel}>{t('review.startCapture')}</Text>
-            </Pressable>
+              secondaryAction={{ label: t('capture.gallery'), onPress: () => void importFromGallery() }}
+            />
           </>
         )}
       </View>
@@ -674,6 +685,9 @@ export function ReviewScreen() {
         {adjustOpen && adjustable && (
           <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} onLive={setLiveAdjust} />
         )}
+        {filterHint.visible ? (
+          <Hint text={t('shared.hint.reviewFilters')} onDismiss={filterHint.dismiss} arrow="down" style={styles.filterHint} />
+        ) : null}
         <FilterStrip page={selectedPage} value={selectedPage.enhance} onChange={handleEnhanceChange} />
         <FilterOptionsPanel
           mode={selectedPage.enhance}
@@ -758,19 +772,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    height: 48,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 999,
-    marginTop: spacing.lg,
-  },
-  startButtonLabel: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+  filterHint: {
+    alignSelf: 'center',
+    marginBottom: spacing.md,
   },
   header: {
     flexDirection: 'row',

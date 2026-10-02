@@ -50,6 +50,8 @@ export type PersistedSettings = {
   autoBackupUris?: string[];
   // Optional: added in §9 O2.
   onboardingDone?: boolean;
+  // Optional: added in §9 O3.
+  hintsSeen?: string[];
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

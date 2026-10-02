@@ -62,6 +62,8 @@ export type SettingsState = {
   autoBackupUris: string[];
   // §9 O2: the introduction was finished or skipped (or never needed: an existing library).
   onboardingDone: boolean;
+  // §9 O3: the one-time hints already shown (services/hints/hints.ts ids).
+  hintsSeen: string[];
 };
 
 export const initialSettingsState: SettingsState = {
@@ -90,6 +92,7 @@ export const initialSettingsState: SettingsState = {
   lastAutoBackupAt: null,
   autoBackupUris: [],
   onboardingDone: false,
+  hintsSeen: [],
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -127,7 +130,9 @@ export type SettingsAction =
   | { type: 'settings/SET_AUTO_BACKUP'; frequency: AutoBackupFrequency }
   | { type: 'settings/AUTO_BACKUP_DONE'; at: number; bytes: number; uris: string[] }
   | { type: 'settings/LOAD_AUTO_BACKUP_STATE'; lastAt: number | null; uris: string[] }
-  | { type: 'settings/SET_ONBOARDING_DONE'; done: boolean };
+  | { type: 'settings/SET_ONBOARDING_DONE'; done: boolean }
+  | { type: 'settings/MARK_HINT_SEEN'; id: string }
+  | { type: 'settings/LOAD_HINTS_SEEN'; ids: string[] };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -143,6 +148,11 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, lastBackupAt: action.at, lastBackupBytes: action.bytes };
     case 'settings/SET_BACKUP_FOLDER':
       return { ...state, backupFolderUri: action.uri, backupFolderLabel: action.label };
+    case 'settings/MARK_HINT_SEEN':
+      return state.hintsSeen.includes(action.id) ? state : { ...state, hintsSeen: [...state.hintsSeen, action.id] };
+    case 'settings/LOAD_HINTS_SEEN':
+      // Merged, not replaced: a hint shown before the stored list loaded stays seen.
+      return { ...state, hintsSeen: [...new Set([...action.ids, ...state.hintsSeen])] };
     case 'settings/SET_ONBOARDING_DONE':
       return { ...state, onboardingDone: action.done };
     case 'settings/SNOOZE_BACKUP_REMINDER':

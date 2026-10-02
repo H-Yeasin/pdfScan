@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 import { rotationStyle } from '../utils/rotation';
+import { EmptyState } from '../components/shared/EmptyState';
 
 // §5 T6: the exam-pack tray: the picked pages in order (move up/down, remove), "Add pages" from
 // the course's documents, a title and options, and Build, which makes a new searchable,
@@ -116,9 +117,12 @@ export function ExamPackScreen() {
             </Pressable>
           </View>
           {rows.length === 0 ? (
-            <Text style={[styles.meta, { color: tokens.muted }]}>
-              {t('study.pack.emptyHint')}
-            </Text>
+            <EmptyState
+              variant="inline"
+              title={t('study.pack.emptyTitle')}
+              body={t('study.pack.emptyHint')}
+              action={{ label: t('study.addPages'), onPress: () => setPickerOpen(true) }}
+            />
           ) : null}
           {rows.map((row, i) => (
             <View key={`${row.item.documentId}:${row.item.pageId}`} style={[styles.row, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>

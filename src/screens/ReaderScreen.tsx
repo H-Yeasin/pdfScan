@@ -49,6 +49,9 @@ import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
+import { Hint } from '../components/shared/Hint';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHint } from '../components/shared/useHint';
 
 const SEARCH_DEBOUNCE_MS = 200;
 // §7 R4: how long the page must stay on screen before it's saved as "where I left off".
@@ -122,6 +125,16 @@ export function ReaderScreen() {
   const docBookmarks = useMemo(() => (doc ? documentBookmarks(state.library.bookmarks, doc) : []), [doc, state.library.bookmarks]);
   const currentIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
   const currentBookmark = doc ? state.library.bookmarks.find((b) => b.documentId === doc.id && b.pageId === doc.pages[currentIdx]?.id) : undefined;
+  // §9 O3: one-time hints. The bookmark hint waits until nothing covers the top bar; the Submit
+  // hint shows inside the overflow sheet, next to Submit, the first time it's there.
+  const sheetOpen =
+    overflowOpen || typePickerOpen || jumpOpen || scrubberOpen || submissionsOpen || bookmarksOpen || labelling ||
+    signing || signStep !== null || selectTextIdx !== null || annotateIdx !== null || needsPassword;
+  const canBookmark = !!doc && !external && isPageRaster;
+  const bookmarkHint = useHint('readerBookmark', canBookmark && chrome && !findOpen && !sheetOpen);
+  const showSubmit = !external && !!doc && canSubmit(doc);
+  const insets = useSafeAreaInsets();
+  const submitHint = useHint('submit', overflowOpen && showSubmit);
   const addBookmark = (label?: string) => {
     if (!doc?.pages[currentIdx]) return;
     dispatch({
@@ -580,13 +593,24 @@ export function ReaderScreen() {
         matchCount={matchCount}
         subtitle={submittedSummary(docSubmissions, formatShortDate)}
         onSubtitlePress={() => setSubmissionsOpen(true)}
-        bookmarked={doc && !external && isPageRaster ? !!currentBookmark : undefined}
+        bookmarked={canBookmark ? !!currentBookmark : undefined}
         onBookmark={() => {
           if (currentBookmark) dispatch({ type: 'library/REMOVE_BOOKMARK', id: currentBookmark.id });
           else addBookmark();
         }}
         onBookmarkLongPress={() => setLabelling(true)}
       />
+
+      {bookmarkHint.visible ? (
+        <Hint
+          text={t('shared.hint.readerBookmark')}
+          onDismiss={bookmarkHint.dismiss}
+          arrow="up"
+          arrowAlign="right"
+          // Under the top bar's bookmark button (44 pt bar; the overflow button is to its right).
+          style={[styles.bookmarkHint, { top: insets.top + 44 + spacing.sm }]}
+        />
+      ) : null}
 
       <ReaderBottomChrome
         visible={chromeVisible}
@@ -666,7 +690,8 @@ export function ReaderScreen() {
         onSelect={handleOverflowSelect}
         showDelete={!external}
         showAddToLibrary={!!external}
-        showSubmit={!external && !!doc && canSubmit(doc)}
+        showSubmit={showSubmit}
+        submitHint={submitHint.visible ? { text: t('shared.hint.submit'), onDismiss: submitHint.dismiss } : undefined}
         showText={!external && !!doc && hasPageMasters(doc)}
         showEditPages={!external && !!doc && canUsePageTools(doc)}
       />
@@ -746,6 +771,12 @@ export function ReaderScreen() {
 }
 
 const styles = StyleSheet.create({
+  // The top bar's buttons are 44 pt with a 6 pt gap and an 8 pt edge; the bookmark button is the
+  // second from the right. The Hint's right-aligned arrow is centred 24 pt from its edge.
+  bookmarkHint: {
+    position: 'absolute',
+    right: spacing.sm + 44 + 6 + 22 - 24,
+  },
   unsupported: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   unsupportedText: { textAlign: 'center' },
   container: {

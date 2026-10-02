@@ -5,6 +5,7 @@ import type { BookmarkedPage } from '../../services/study/bookmarks';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import { rotationStyle } from '../../utils/rotation';
+import { EmptyState } from '../shared/EmptyState';
 
 // §5 T5: bookmarked pages as rows: the page's thumbnail, "<document> · p. 4", and its label.
 export function BookmarkList({
@@ -85,7 +86,7 @@ export function BookmarksSheet({
           {items.length ? (
             <BookmarkList items={items} onOpen={onOpen} onRemove={onRemove} showDocument={false} />
           ) : (
-            <Text style={[styles.label, { color: tokens.muted }]}>{t('study.noBookmarks')}</Text>
+            <EmptyState variant="inline" title={t('study.noBookmarksTitle')} body={t('study.noBookmarks')} />
           )}
         </ScrollView>
       </View>

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
-import { EmptyState } from '../components/library/EmptyState';
+import { EmptyState } from '../components/shared/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { CourseList } from '../components/courses/CourseList';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
@@ -173,6 +173,7 @@ export function LibraryScreen() {
 
   const isEmptyLibrary = files.length === 0;
   const isNoResults = !isEmptyLibrary && visibleFiles.length === 0 && search.trim().length > 0;
+  const isNoStarred = !isEmptyLibrary && tab === 'starred' && !searching && searchedFiles.length === 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -220,8 +221,7 @@ export function LibraryScreen() {
         <EmptyState
           title={t('library.loadFailed')}
           body={t('library.loadFailedBody')}
-          actionLabel={t('library.tryAgain')}
-          onAction={() => dispatch({ type: 'library/RETRY_LOAD' })}
+          action={{ label: t('library.tryAgain'), onPress: () => dispatch({ type: 'library/RETRY_LOAD' }) }}
         />
       ) : tab === 'courses' ? (
         <ScrollView>
@@ -237,17 +237,29 @@ export function LibraryScreen() {
       ) : isEmptyLibrary ? (
         <EmptyState
           title={t('library.empty')}
-          actionLabel={t('library.scanNow')}
-          onAction={() => {
-            startScan(store.getState(), dispatch, null, { launch: true });
-            go('capture');
+          body={t('library.emptyBody')}
+          action={{
+            label: t('library.scanNow'),
+            onPress: () => {
+              startScan(store.getState(), dispatch, null, { launch: true });
+              go('capture');
+            },
           }}
+          secondaryAction={{ label: t('library.openFile'), onPress: handleOpenFile }}
         />
       ) : isNoResults ? (
-        <EmptyState
-          title={t('library.noMatch', { query: search })}
-          body={t('library.noMatchBody')}
-        />
+        // A course filter narrowing to nothing offers to widen the search (§9 O3).
+        courseFilter ? (
+          <EmptyState
+            title={t('library.noMatch', { query: search })}
+            body={t('library.noMatchCourse', { query: search })}
+            action={{ label: t('library.searchAllCourses'), onPress: () => setCourseFilter(null) }}
+          />
+        ) : (
+          <EmptyState title={t('library.noMatch', { query: search })} body={t('library.noMatchBody')} />
+        )
+      ) : isNoStarred ? (
+        <EmptyState title={t('library.noStarred')} body={t('library.noStarredBody')} />
       ) : (
         <>
           {searching ? (

@@ -6,7 +6,7 @@ import { CourseBadge } from '../components/courses/CourseBadge';
 import { CourseEditorSheet } from '../components/courses/CourseEditorSheet';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
 import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
-import { EmptyState } from '../components/library/EmptyState';
+import { EmptyState } from '../components/shared/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
@@ -222,7 +222,13 @@ export function CourseScreen() {
               onPress={(deadline) => setDeadlineEditor({ deadline })}
               onScanNow={handleScan}
             />
-          ) : null}
+          ) : (
+            <EmptyState
+              variant="inline"
+              title={t('courses.page.noDeadlines')}
+              body={t('courses.page.noDeadlinesBody')}
+            />
+          )}
         </View>
       ) : null}
 
@@ -252,9 +258,8 @@ export function CourseScreen() {
       {docs.length === 0 ? (
         <EmptyState
           title={course ? t('courses.page.emptyCourse', { name: course.name }) : t('courses.page.emptyUnsorted')}
-          body={course ? t('courses.page.emptyBody') : undefined}
-          actionLabel={course ? t('courses.page.scanInto') : undefined}
-          onAction={course ? handleScan : undefined}
+          body={course ? t('courses.page.emptyBody', { course: course.code || course.name }) : t('courses.page.emptyUnsortedBody')}
+          action={course ? { label: t('courses.page.scanInto'), onPress: handleScan } : undefined}
         />
       ) : (
         <>

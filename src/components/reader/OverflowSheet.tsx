@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Fragment } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { Hint } from '../shared/Hint';
 
 export type OverflowItemId =
   | 'share'
@@ -53,6 +55,8 @@ type OverflowSheetProps = {
   showSubmit?: boolean;
   showText?: boolean;
   showEditPages?: boolean;
+  // §9 O3: the one-time hint shown under Submit (inside this sheet, never over it).
+  submitHint?: { text: string; onDismiss: () => void };
 };
 
 export function OverflowSheet({
@@ -64,6 +68,7 @@ export function OverflowSheet({
   showSubmit = false,
   showText = false,
   showEditPages = false,
+  submitHint,
 }: OverflowSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -85,19 +90,23 @@ export function OverflowSheet({
         >
           <View style={[styles.handle, { backgroundColor: tokens.edge }]} />
           {items.map((item) => (
-            <Pressable
-              key={item.id}
-              style={styles.item}
-              onPress={() => {
-                onClose();
-                onSelect(item.id);
-              }}
-            >
-              <Ionicons name={item.icon} size={20} color={item.destructive ? tokens.danger : tokens.ink} />
-              <Text style={[styles.itemLabel, { color: item.destructive ? tokens.danger : tokens.ink }]}>
-                {t(`reader.actions.${item.id}`)}
-              </Text>
-            </Pressable>
+            <Fragment key={item.id}>
+              <Pressable
+                style={styles.item}
+                onPress={() => {
+                  onClose();
+                  onSelect(item.id);
+                }}
+              >
+                <Ionicons name={item.icon} size={20} color={item.destructive ? tokens.danger : tokens.ink} />
+                <Text style={[styles.itemLabel, { color: item.destructive ? tokens.danger : tokens.ink }]}>
+                  {t(`reader.actions.${item.id}`)}
+                </Text>
+              </Pressable>
+              {item.id === 'submit' && submitHint ? (
+                <Hint text={submitHint.text} onDismiss={submitHint.onDismiss} arrow="up" arrowAlign="left" style={styles.hint} />
+              ) : null}
+            </Fragment>
           ))}
         </View>
       </Pressable>
@@ -116,6 +125,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radii.card * 2,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.sm,
+  },
+  hint: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
   handle: {
     width: 44,

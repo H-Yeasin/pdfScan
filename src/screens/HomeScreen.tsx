@@ -31,6 +31,9 @@ import type { Course } from '../types/models';
 import { toLocalDateString } from '../utils/localDate';
 import { formatShortDate } from '../utils/format';
 import { useBackupReminder } from '../store/useBackupReminder';
+import { EmptyState } from '../components/shared/EmptyState';
+import { Hint } from '../components/shared/Hint';
+import { useHint } from '../components/shared/useHint';
 
 // The course hub (docs/PLAN.md §3): the shown semester with a switcher, "Continue" for the last
 // opened or saved document, a grid of the semester's courses, Unsorted, and a big Scan button.
@@ -51,6 +54,8 @@ export function HomeScreen() {
   const [quickSetup, setQuickSetup] = useState(false);
   const [editing, setEditing] = useState<{ course?: Course } | null>(null);
   const [addingDeadline, setAddingDeadline] = useState(false);
+  // §9 O3: points at Scan once (after onboarding, or on Capture if that comes first).
+  const scanHint = useHint('scan', !switcherOpen && !quickSetup && editing === null && !addingDeadline);
 
   const now = Date.now();
   const today = toLocalDateString(now);
@@ -182,18 +187,19 @@ export function HomeScreen() {
                 }}
               />
             ) : (
-              <Text style={[styles.meta, { color: tokens.muted }]}>{t('home.nothingDue')}</Text>
+              <EmptyState variant="inline" title={t('home.nothingDue')} body={t('home.nothingDueBody')} />
             )}
           </View>
         ) : null}
 
         {!hasActiveCourse ? (
           <View style={[styles.emptyCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-            <Text style={[styles.emptyTitle, { color: tokens.ink }]}>{t('home.emptyTitle')}</Text>
-            <Text style={[styles.meta, styles.center, { color: tokens.muted }]}>{t('home.emptyBody')}</Text>
-            <Pressable style={[styles.pill, { backgroundColor: tokens.accent }]} onPress={() => setQuickSetup(true)}>
-              <Text style={styles.pillLabel}>{t('home.emptyButton')}</Text>
-            </Pressable>
+            <EmptyState
+              variant="inline"
+              title={t('home.emptyTitle')}
+              body={t('home.emptyBody')}
+              action={{ label: t('home.emptyButton'), onPress: () => setQuickSetup(true) }}
+            />
           </View>
         ) : (
           <View style={styles.grid}>
@@ -251,6 +257,9 @@ export function HomeScreen() {
 
       <DeadlineEditorSheet visible={addingDeadline} onClose={() => setAddingDeadline(false)} />
 
+      {scanHint.visible ? (
+        <Hint text={t('shared.hint.scan')} onDismiss={scanHint.dismiss} arrow="down" style={styles.scanHint} />
+      ) : null}
       <Pressable
         style={[styles.scanButton, { backgroundColor: tokens.accent }]}
         onPress={handleScan}
@@ -277,9 +286,6 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     minWidth: 0,
-  },
-  center: {
-    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -388,26 +394,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   emptyCard: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.xl,
+    padding: spacing.sm,
     borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  emptyTitle: {
-    fontFamily: fontFamily.heading,
-    fontSize: 22,
-  },
-  pill: {
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radii.full,
-  },
-  pillLabel: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+  scanHint: {
+    alignSelf: 'center',
+    marginBottom: spacing.md,
   },
   scanButton: {
     alignSelf: 'center',

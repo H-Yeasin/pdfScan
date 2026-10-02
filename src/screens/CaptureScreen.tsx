@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,17 +9,19 @@ import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { TabBar } from '../components/shared/TabBar';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
-import { ingestGalleryBatch } from '../services/capture/ingestBatch';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { resolveOcrScript } from '../services/scripts/registry';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { captureSpecFor } from '../store/slices/settingsSlice';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { useSpaceGuard } from '../store/useSpaceGuard';
+import { useGalleryImport } from '../store/useGalleryImport';
 import { createId } from '../utils/id';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
 import type { CaptureMode } from '../types/models';
+import { Hint } from '../components/shared/Hint';
+import { useHint } from '../components/shared/useHint';
 
 export function CaptureScreen() {
   const chrome = useCaptureChrome();
@@ -39,6 +40,8 @@ export function CaptureScreen() {
   const ocrScript = resolveOcrScript({ course: filingCourse, settings: state.settings });
   const hasCourses = state.library.courses.some((c) => !c.archived);
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
+  // §9 O3: points at the shutter once (shared with Home's Scan button).
+  const scanHint = useHint('scan', !coursePickerOpen);
   const restoredMode = useRef(false);
   const { beforeScan } = useSpaceGuard();
 
@@ -70,30 +73,7 @@ export function CaptureScreen() {
   // images (status flips to 'processing'), so it can no longer be the one reacting to the
   // eventual 'success'/'error' that lands after the slow downscale/OCR loop finishes.
 
-  const handleImport = useCallback(async () => {
-    if (!(await beforeScan())) return;
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      // Full quality: ingestPage does the one encode to the master spec.
-      quality: 1,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-
-    markPickerSeen();
-    go('review');
-    // Same ingest as scans (master, thumbnail, OCR, the mode's filter), one photo at a time with
-    // per-page progress in Review.
-    void ingestGalleryBatch(
-      dispatch,
-      result.assets.map((asset) => asset.uri),
-      ocrScript,
-      spec
-    );
-  }, [dispatch, go, markPickerSeen, ocrScript, spec, beforeScan]);
+  const handleImport = useGalleryImport(markPickerSeen);
 
   const handleScan = useCallback(async () => {
     if (busyScanning) return;
@@ -164,6 +144,9 @@ export function CaptureScreen() {
         </View>
 
         <View style={styles.controlsArea}>
+          {scanHint.visible ? (
+            <Hint text={t('shared.hint.scan')} onDismiss={scanHint.dismiss} arrow="down" style={styles.scanHint} />
+          ) : null}
           <CaptureControls
             onScanPress={handleScan}
             onGalleryPress={handleImport}
@@ -211,6 +194,10 @@ export function CaptureScreen() {
 }
 
 const styles = StyleSheet.create({
+  scanHint: {
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
   container: {
     flex: 1,
   },
