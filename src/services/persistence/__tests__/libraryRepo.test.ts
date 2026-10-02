@@ -1,7 +1,7 @@
 import { makeDoc, makePage } from '../../../test/fixtures';
 import { resetStorage } from '../../../test/db';
 import { getDb, searchDocumentsByText } from '../dbService';
-import { archiveSemester, deleteSemesters, diffById, loadAll, reorderCourses, syncLibrary, type LoadedLibrary } from '../libraryRepo';
+import { archiveSemester, deleteSemesters, diffById, documentEdited, loadAll, reorderCourses, syncLibrary, type LoadedLibrary } from '../libraryRepo';
 import type { Course, Semester } from '../../../types/models';
 
 beforeEach(resetStorage);
@@ -245,5 +245,38 @@ describe('timetable', () => {
     const prev = await seed({ documents: [], courses: [math], semesters: [], timetable: [monday] });
     await syncLibrary(await getDb(), prev, { ...prev, courses: [], timetable: [monday] });
     expect((await loadAll(await getDb())).timetable).toEqual([]);
+  });
+});
+
+// §8: reading a document (the page it's on) or the integrity check's flag isn't an edit; it must
+// not move updated_at, which backups and the backup reminder go by.
+describe('documents.updated_at', () => {
+  const updatedAt = async (id: string) =>
+    (await (await getDb()).getFirstAsync<{ updated_at: number }>('SELECT updated_at FROM documents WHERE id = ?', [id]))!.updated_at;
+
+  it('stays when only the last page or the missing-files flag changes, moves on an edit', async () => {
+    const doc = makeDoc({ id: 'd1' });
+    const empty: LoadedLibrary = { documents: [], courses: [], semesters: [], timetable: [] };
+    const saved: LoadedLibrary = { ...empty, documents: [doc] };
+    await syncLibrary(await getDb(), empty, saved);
+    await (await getDb()).runAsync("UPDATE documents SET updated_at = 1000 WHERE id = 'd1'");
+
+    const read: LoadedLibrary = { ...empty, documents: [{ ...doc, lastPage: 7, missingFiles: true }] };
+    await syncLibrary(await getDb(), saved, read);
+    expect(await updatedAt('d1')).toBe(1000);
+    const loaded = await loadAll(await getDb());
+    expect(loaded.documents[0]).toMatchObject({ lastPage: 7, missingFiles: true });
+
+    const renamed: LoadedLibrary = { ...empty, documents: [{ ...read.documents[0], name: 'Renamed' }] };
+    await syncLibrary(await getDb(), read, renamed);
+    expect(await updatedAt('d1')).toBeGreaterThan(1000);
+  });
+
+  it('documentEdited ignores bookkeeping only', () => {
+    const doc = makeDoc();
+    expect(documentEdited(doc, { ...doc, lastPage: 3, missingFiles: true, searchHaystack: 'x' })).toBe(false);
+    expect(documentEdited(doc, { ...doc })).toBe(false);
+    expect(documentEdited(doc, { ...doc, star: true })).toBe(true);
+    expect(documentEdited(doc, { ...doc, pages: [...doc.pages] })).toBe(true);
   });
 });

@@ -434,11 +434,14 @@ export async function listSubmissions(
 // §8 B1: disk_bytes (the measured folder size) survives only a write that can't have changed the
 // files - same pages, same PDF, same size; any save or edit clears it for the storage report to
 // measure again. It isn't part of LibraryDocument, so a spread `...doc` can't carry a stale value.
+// `edited` (§8): false when only bookkeeping changed (documentEdited below), which then keeps the
+// stored updated_at.
 async function writeDocument(
   db: SQLiteDatabase,
   doc: LibraryDocument,
   conflict: 'upsert' | 'ignore',
-  pagesUnchanged = false
+  pagesUnchanged = false,
+  edited = true
 ): Promise<void> {
   const params = [
     doc.id,
@@ -476,7 +479,7 @@ async function writeDocument(
     await db.runAsync(
       `${insert} ON CONFLICT (id) DO UPDATE SET name = excluded.name, format = excluded.format,
          mode = excluded.mode, pdf_path = excluded.pdf_path, content_path = excluded.content_path,
-         size_bytes = excluded.size_bytes, updated_at = excluded.updated_at, star = excluded.star,
+         size_bytes = excluded.size_bytes, updated_at = ${edited ? 'excluded.updated_at' : 'documents.updated_at'}, star = excluded.star,
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
          archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size,
@@ -673,6 +676,22 @@ export async function archiveSemester(db: SQLiteDatabase, id: string): Promise<v
   });
 }
 
+// §8: what isn't an edit of the document - the page the Reader is on (§7 R4), the integrity
+// check's missing-files flag (§8 B1) and the derived search text. A change to only these keeps
+// documents.updated_at, which backups compare (B2's importPlan: "already here" vs "changed since")
+// and which says when the library last changed (B5's reminder and automatic backups) - so reading
+// a document doesn't count as changing it.
+const NOT_EDITS: readonly (keyof LibraryDocument)[] = ['lastPage', 'missingFiles', 'searchHaystack'];
+
+export function documentEdited(before: LibraryDocument, after: LibraryDocument): boolean {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)] as (keyof LibraryDocument)[]);
+  for (const key of keys) {
+    if (NOT_EDITS.includes(key)) continue;
+    if (!Object.is(before[key], after[key])) return true;
+  }
+  return false;
+}
+
 export type Diff<T> = { changed: T[]; removedIds: string[] };
 
 // The reducer is immutable, so a document/course whose object reference is unchanged is unchanged.
@@ -710,7 +729,10 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
     for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
     const prevDocs = new Map(prev.documents.map((d) => [d.id, d]));
-    for (const doc of documents.changed) await writeDocument(db, doc, 'upsert', prevDocs.get(doc.id)?.pages === doc.pages);
+    for (const doc of documents.changed) {
+      const before = prevDocs.get(doc.id);
+      await writeDocument(db, doc, 'upsert', before?.pages === doc.pages, !before || documentEdited(before, doc));
+    }
     for (const slot of slots.changed) await writeSlot(db, slot);
     // After documents and courses, which they reference.
     for (const submission of submissions.changed) await writeSubmission(db, submission);

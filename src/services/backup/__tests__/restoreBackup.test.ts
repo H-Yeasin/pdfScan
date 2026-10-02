@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { dumpTables, libraryFiles, seedLibrary } from '../../../test/backupLibrary';
 import { resetStorage } from '../../../test/db';
 import { getDb } from '../../persistence/dbService';
+import { loadAll, syncLibrary } from '../../persistence/libraryRepo';
 import { createBackup } from '../createBackup';
 import { LIBRARY_ENTRY, MANIFEST_ENTRY } from '../format';
 import { applyRestore, previewRestore, readBackup } from '../restoreBackup';
@@ -86,6 +87,32 @@ describe('restore', () => {
     await applyRestore(readBackup(zip), again);
     expect(await dumpTables(await getDb())).toEqual(once);
     expect(libraryFiles()).toEqual(filesOnce);
+  });
+
+  it('still adds nothing after documents were only read (B2 leftover)', async () => {
+    const db = await getDb();
+    await seedLibrary(db);
+    const zip = await makeZip({ scope: { kind: 'all' }, include: 'everything' });
+    await freshPhone();
+    await applyRestore(readBackup(zip), await previewRestore(readBackup(zip), 'restore'));
+
+    // The library loads, the student reads two documents (the Reader saves the page) and the
+    // integrity check flags one; the app's sync writes those changes.
+    const fresh = await getDb();
+    const loaded = await loadAll(fresh);
+    const read = {
+      ...loaded,
+      documents: loaded.documents.map((d) => (d.id === 'd_lab' ? { ...d, lastPage: 2 } : d.id === 'd_math' ? { ...d, missingFiles: true } : d)),
+    };
+    await syncLibrary(fresh, loaded, read);
+
+    const again = await previewRestore(readBackup(zip), 'restore');
+    expect(again.plan.counts).toEqual({ insert: 0, skip: 5, keepBoth: 0 });
+
+    // A real edit still counts as "changed since": both copies are kept.
+    const renamed = { ...read, documents: read.documents.map((d) => (d.id === 'd_lab' ? { ...d, name: 'Lab 1 (mine)' } : d)) };
+    await syncLibrary(fresh, read, renamed);
+    expect((await previewRestore(readBackup(zip), 'restore')).plan.counts).toEqual({ insert: 0, skip: 4, keepBoth: 1 });
   });
 
   it("brings back the signature when this phone has none, but never replaces one", async () => {
