@@ -17,7 +17,8 @@ export type OverflowItemId =
   | 'copyText'
   | 'extractText'
   | 'annotate'
-  | 'bookmarks';
+  | 'bookmarks'
+  | 'editPages';
 
 type Item = { id: OverflowItemId; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
@@ -38,6 +39,8 @@ const TEXT_ITEMS: Item[] = [
   { id: 'extractText', icon: 'document-text-outline' },
 ];
 const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', icon: 'add-circle-outline' };
+// §7 R3: reorder, rotate, delete, extract and add pages of a saved document.
+const EDIT_PAGES_ITEM: Item = { id: 'editPages', icon: 'albums-outline' };
 
 type OverflowSheetProps = {
   visible: boolean;
@@ -49,6 +52,7 @@ type OverflowSheetProps = {
   showAddToLibrary?: boolean;
   showSubmit?: boolean;
   showText?: boolean;
+  showEditPages?: boolean;
 };
 
 export function OverflowSheet({
@@ -59,6 +63,7 @@ export function OverflowSheet({
   showAddToLibrary = false,
   showSubmit = false,
   showText = false,
+  showEditPages = false,
 }: OverflowSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -66,6 +71,7 @@ export function OverflowSheet({
   const items: Item[] = [
     ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
     ...(showSubmit ? [SUBMIT_ITEM] : []),
+    ...(showEditPages ? [EDIT_PAGES_ITEM] : []),
     ...(showText ? TEXT_ITEMS : []),
     // Library documents only, like Delete: an external file has no type until it's added.
     ...(showDelete ? [CHANGE_TYPE_ITEM, DELETE_ITEM] : []),

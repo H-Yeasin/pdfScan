@@ -12,6 +12,7 @@ import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
 import { usePageImage } from '../components/shared/usePageImage';
+import { useEditPages } from '../components/reader/useEditPages';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
@@ -25,7 +26,7 @@ import {
 import { ensureDocumentPdf } from '../services/pdf/pdfService';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { canFindInDoc, canSign, canSubmit, hasPageMasters, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { canFindInDoc, canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRasterFormat } from '../services/documents/formatCapabilities';
 import { useShareSubmission, useSubmitDocument } from '../store/useSubmitDocument';
 import { SubmissionsSheet } from '../components/submit/SubmissionsSheet';
 import { submittedSummary } from '../services/submit/history';
@@ -82,6 +83,11 @@ export function ReaderScreen() {
   const [passwordDraft, setPasswordDraft] = useState('');
   const [needsPassword, setNeedsPassword] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it.
+  const editPages = useEditPages(
+    doc && !external ? doc : undefined,
+    useCallback(() => setReloadKey((k) => k + 1), [])
+  );
   const [signing, setSigning] = useState(false);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
@@ -259,6 +265,8 @@ export function ReaderScreen() {
         if (doc) await submit(doc);
       } else if (id === 'bookmarks') {
         setBookmarksOpen(true);
+      } else if (id === 'editPages') {
+        editPages.open();
       } else if (id === 'annotate') {
         if (doc) setAnnotateIdx(libraryIdxFor(doc, activeIndex + 1));
       } else if (id === 'selectText' || id === 'copyText' || id === 'extractText') {
@@ -308,7 +316,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages]
   );
 
   const handleSignConfirm = useCallback(
@@ -528,6 +536,7 @@ export function ReaderScreen() {
         showAddToLibrary={!!external}
         showSubmit={!external && !!doc && canSubmit(doc)}
         showText={!external && !!doc && hasPageMasters(doc)}
+        showEditPages={!external && !!doc && canUsePageTools(doc)}
       />
 
       <BookmarksSheet
@@ -581,6 +590,8 @@ export function ReaderScreen() {
           onConfirm={handleSignConfirm}
         />
       )}
+
+      {editPages.overlays}
 
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />

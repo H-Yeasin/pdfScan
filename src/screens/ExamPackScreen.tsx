@@ -11,6 +11,7 @@ import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
+import { rotationStyle } from '../utils/rotation';
 
 // §5 T6: the exam-pack tray: the picked pages in order (move up/down, remove), "Add pages" from
 // the course's documents, a title and options, and Build, which makes a new searchable,
@@ -121,7 +122,7 @@ export function ExamPackScreen() {
           {rows.map((row, i) => (
             <View key={`${row.item.documentId}:${row.item.pageId}`} style={[styles.row, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
               <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-                {row.page ? <Image source={{ uri: row.page.thumbUri ?? row.page.fileUri }} style={styles.thumbImage} resizeMode="cover" /> : null}
+                {row.page ? <Image source={{ uri: row.page.thumbUri ?? row.page.fileUri }} style={[styles.thumbImage, rotationStyle(row.page.rotation)]} resizeMode="cover" /> : null}
               </View>
               <Text style={[styles.rowText, { color: row.doc ? tokens.ink : tokens.muted }]} numberOfLines={2}>
                 {row.doc && row.idx >= 0 ? t('study.pack.rowLabel', { name: row.doc.name, page: row.idx + 1 }) : t('study.pack.missing')}

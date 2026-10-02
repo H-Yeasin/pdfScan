@@ -8,6 +8,7 @@ import { FileTypeIcon } from './FileTypeIcon';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/AppStateContext';
 import { INDEX_MAX_PAGES } from '../../services/documents/importedPdfIndex';
+import { rotationStyle } from '../../utils/rotation';
 
 
 const LONG_PRESS_MS = 400;
@@ -43,7 +44,7 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
     >
       <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
         {cover?.thumbUri || cover?.fileUri ? (
-          <Image source={{ uri: cover.thumbUri || cover.fileUri }} style={styles.coverImage} resizeMode="cover" />
+          <Image source={{ uri: cover.thumbUri || cover.fileUri }} style={[styles.coverImage, rotationStyle(cover.rotation)]} resizeMode="cover" />
         ) : (
           <FileTypeIcon format={doc.format} size={18} />
         )}

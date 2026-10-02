@@ -26,6 +26,7 @@ import { buildSearchHaystack } from '../services/search/searchService';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { appendDocuments } from '../services/persistence/libraryOperations';
 import { shareAs, shareDocument } from '../services/sharing/shareService';
 import { historyUris } from '../store/pageHistory';
 import { CourseChips } from '../components/courses/CourseChips';
@@ -45,7 +46,7 @@ import { useAppState } from '../store/AppStateContext';
 import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { resolveOcrScript } from '../services/scripts/registry';
-import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { createId } from '../utils/id';
 
@@ -91,6 +92,11 @@ export function DeliverScreen() {
   const { courses } = state.library;
   const { androidExportFolderUri, androidExportFolderLabel, profile, profilePrompted } = state.settings;
   const { presetCourseId, rememberPreset } = state.deliver;
+  // §7 R3: the saved document these pages are being added to, if any.
+  const appendTarget = useMemo(
+    () => (state.deliver.appendTo ? state.library.files.find((f) => f.id === state.deliver.appendTo) : undefined),
+    [state.deliver.appendTo, state.library.files]
+  );
   // The course's own file-name template, if its preset has one, else the Settings one.
   const nameTemplate = state.deliver.nameTemplate ?? state.settings.nameTemplate;
   const [saving, setSaving] = useState(false);
@@ -156,15 +162,21 @@ export function DeliverScreen() {
   const sizeEstimate = useMemo(() => estimateSizeBytes(pages, quality), [pages, quality]);
 
   const handleSaveInternal = useCallback(
-    async (mode: SaveMode) => {
+    async (requestedMode: SaveMode) => {
       if (pages.length === 0 || saving) return;
+      // §7 R3: pages going to the end of a saved document are plain pages - no cover, stamps,
+      // 2-in-1 layout or size target (the document is rebuilt with its own pages) - and aren't
+      // submitted on their own.
+      const mode: SaveMode = appendTarget && requestedMode === 'submit' ? 'save' : requestedMode;
+      const academic = appendTarget ? null : academicConfig;
+      const layout = appendTarget ? 'standard' : layoutMode;
       const shareAfter = mode === 'share';
       setSaving(true);
       try {
         const documentId = createId('doc');
         // Submit fits the separate submission file to the limit, so the library copy is built at
         // the library quality instead of being fitted twice.
-        const librarySizeLimit = mode === 'submit' ? null : sizeLimit;
+        const librarySizeLimit = mode === 'submit' || appendTarget ? null : sizeLimit;
         // With a size target the level isn't known until every master exists, so the loop renders
         // masters only and buildPdfUnderLimit encodes the PDF's pages itself.
         const encoding = librarySizeLimit !== null ? 'as-is' : encodingForQuality(quality);
@@ -207,16 +219,16 @@ export function DeliverScreen() {
         // border/header-footer also needs to exist as pixels - on a separate display copy, so the
         // master stays clean for later rebuilds. The PDF itself gets the crisp vector version.
         let coverPage: LibraryInputPage | null = null;
-        if (format === 'PDF' && academicConfig) {
-          if (academicConfig.enableBorder || academicConfig.headerText || academicConfig.footerText) {
+        if (format === 'PDF' && academic) {
+          if (academic.enableBorder || academic.headerText || academic.footerText) {
             for (let i = 0; i < contentPages.length; i++) {
               setProgress(t('deliver.progress.stamping', { current: i + 1, total }));
-              const stamped = await stampContentPageImage(contentPages[i].masterUri, academicConfig, i + 1, total);
+              const stamped = await stampContentPageImage(contentPages[i].masterUri, academic, i + 1, total);
               contentPages[i].displayUri = stamped.uri;
             }
           }
-          if (academicConfig.coverPage) {
-            const rendered = await renderCoverPageImage(academicConfig.coverPage, pageSize);
+          if (academic.coverPage) {
+            const rendered = await renderCoverPageImage(academic.coverPage, pageSize);
             if (rendered) {
               coverPage = {
                 id: createId('page'),
@@ -224,7 +236,7 @@ export function DeliverScreen() {
                 width: rendered.width,
                 height: rendered.height,
                 // An imported cover is the user's own picked file - copy it, don't move it.
-                keepSource: academicConfig.coverPage.mode === 'imported_image' && rendered.uri === academicConfig.coverPage.importedUri,
+                keepSource: academic.coverPage.mode === 'imported_image' && rendered.uri === academic.coverPage.importedUri,
               };
             }
           }
@@ -238,12 +250,12 @@ export function DeliverScreen() {
         let sizeWarning: string | null = null;
         if (librarySizeLimit !== null) {
           setProgress(t('deliver.progress.fitting', { size: formatLimit(librarySizeLimit) }));
-          const sized = await buildPdfUnderLimit(documentId, pdfPages, librarySizeLimit, academicConfig ?? undefined, layoutMode, pageSize);
+          const sized = await buildPdfUnderLimit(documentId, pdfPages, librarySizeLimit, academic ?? undefined, layout, pageSize);
           if (!sized.fits) sizeWarning = tooLargeMessage(sized, librarySizeLimit);
           pdfResult = sized;
         } else {
           setProgress(t('deliver.progress.building'));
-          pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academicConfig ?? undefined, layoutMode, pageSize);
+          pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academic ?? undefined, layout, pageSize);
         }
         const pdfUri: string = pdfResult.uri;
 
@@ -307,11 +319,30 @@ export function DeliverScreen() {
           docType,
           // Only set when a cover page actually made it into libraryPages[0] - mirrors
           // coverPage's own condition, not just whether academicConfig exists.
-          coverKind: coverPage ? academicConfig?.coverPage?.mode : undefined,
+          coverKind: coverPage ? academic?.coverPage?.mode : undefined,
           // §5 T1: how document.pdf was laid out, for mapping library pages onto it.
-          pdfLayout: layoutMode === '2_in_1' ? '2_in_1' : 'standard',
+          pdfLayout: layout === '2_in_1' ? '2_in_1' : 'standard',
           pdfPageSize: pageSize,
         };
+
+        // §7 R3: the scanned pages join the end of the saved document; this new one was only the
+        // way to build them, and goes again.
+        if (appendTarget) {
+          const appended = await appendDocuments(
+            appendTarget,
+            [doc],
+            state.library.annotations.filter((a) => a.documentId === appendTarget.id)
+          );
+          deleteDocumentFiles(documentId);
+          dispatch({ type: 'library/UPDATE_FILE', id: appendTarget.id, patch: appended });
+          dispatch({ type: 'capture/CLEAR_PAGES' });
+          dispatch({ type: 'review/RESET' });
+          dispatch({ type: 'deliver/RESET' });
+          dispatch({ type: 'reader/SET_READER_ID', id: appendTarget.id });
+          go('reader');
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.edit.added', { count: doc.pages.length }) });
+          return;
+        }
 
         dispatch({ type: 'library/ADD_FILE', file: doc });
 
@@ -408,6 +439,7 @@ export function DeliverScreen() {
       }
     },
     [
+      appendTarget,
       pages,
       saving,
       quality,
@@ -422,6 +454,7 @@ export function DeliverScreen() {
       state.deliver.academicConfig,
       state.library.files,
       state.library.deadlines,
+      state.library.annotations,
       state.review.history,
       courseId,
       courseName,
@@ -466,6 +499,12 @@ export function DeliverScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {appendTarget ? (
+          <View style={[styles.appendBanner, { backgroundColor: tokens.surface2 }]}>
+            <Ionicons name="add-circle-outline" size={18} color={tokens.accentInk} />
+            <Text style={{ color: tokens.ink, flex: 1 }}>{t('reader.edit.appendingTo', { name: appendTarget.name })}</Text>
+          </View>
+        ) : null}
         <NameField
           value={name}
           onChange={(value) => dispatch({ type: 'deliver/SET_NAME', name: value })}
@@ -672,6 +711,7 @@ export function DeliverScreen() {
 }
 
 const styles = StyleSheet.create({
+  appendBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radii.card },
   container: {
     flex: 1,
   },

@@ -6,6 +6,7 @@ import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import type { PackItem } from '../../store/slices/packSlice';
 import { useT } from '../../i18n/useT';
+import { rotationStyle } from '../../utils/rotation';
 
 // §5 T6: pick pages from documents (a course's, for the exam pack), each document's pages as a
 // row of thumbnails; tap to select. Pages already in the pack are marked and can't be picked again.
@@ -73,7 +74,7 @@ export function PagePickerModal({
                       accessibilityLabel={t('study.pageA11y', { doc: doc.name, page: i + 1 })}
                       style={[styles.page, { borderColor: on ? tokens.accent : tokens.edge, opacity: inPack ? 0.4 : 1 }]}
                     >
-                      <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={styles.thumb} resizeMode="cover" />
+                      <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={[styles.thumb, rotationStyle(page.rotation)]} resizeMode="cover" />
                       <Text style={[styles.pageNo, { color: tokens.ink, backgroundColor: on ? tokens.accentSoft : tokens.surface }]}>{i + 1}</Text>
                     </Pressable>
                   );

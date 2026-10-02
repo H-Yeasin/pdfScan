@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BookmarkedPage } from '../../services/study/bookmarks';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { rotationStyle } from '../../utils/rotation';
 
 // §5 T5: bookmarked pages as rows: the page's thumbnail, "<document> · p. 4", and its label.
 export function BookmarkList({
@@ -32,7 +33,7 @@ export function BookmarkList({
             accessibilityLabel={`${item.doc.name}, page ${item.idx + 1}`}
           >
             <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-              {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={styles.thumbImage} resizeMode="cover" /> : null}
+              {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={[styles.thumbImage, rotationStyle(page.rotation)]} resizeMode="cover" /> : null}
             </View>
             <View style={styles.text}>
               <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>

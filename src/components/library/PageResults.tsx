@@ -4,6 +4,7 @@ import type { PageHit } from '../../services/persistence/dbService';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { useT } from '../../i18n/useT';
+import { rotationStyle } from '../../utils/rotation';
 
 const SHOWN_PER_DOCUMENT = 3;
 
@@ -81,7 +82,7 @@ export function PageResults({
                   accessibilityLabel={t('library.hitA11y', { doc: doc.name, page: hit.idx + 1 })}
                 >
                   <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-                    {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={styles.thumbImage} resizeMode="cover" /> : null}
+                    {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={[styles.thumbImage, rotationStyle(page.rotation)]} resizeMode="cover" /> : null}
                   </View>
                   <View style={styles.text}>
                     <Text style={[styles.name, { color: tokens.ink }]} numberOfLines={1}>

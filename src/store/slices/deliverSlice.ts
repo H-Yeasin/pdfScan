@@ -43,6 +43,9 @@ export type DeliverState = {
   nameTemplate?: string;
   // The course preset's "Include my annotations" (§5 T4).
   includeAnnotations?: boolean;
+  // §7 R3 "Add pages → From a new scan": the saved document the scanned pages go to the end of,
+  // instead of becoming a new document. null = a normal save. Set by startScan.
+  appendTo: string | null;
 };
 
 export const initialDeliverState: DeliverState = {
@@ -60,6 +63,7 @@ export const initialDeliverState: DeliverState = {
   layoutMode: 'standard',
   pageSize: defaultPageSize(),
   rememberPreset: true,
+  appendTo: null,
 };
 
 export type DeliverAction =
@@ -84,6 +88,7 @@ export type DeliverAction =
   | { type: 'deliver/SET_REMEMBER_PRESET'; remember: boolean }
   | { type: 'deliver/SET_NAME_TEMPLATE'; template: string | undefined }
   | { type: 'deliver/SET_INCLUDE_ANNOTATIONS'; include: boolean }
+  | { type: 'deliver/SET_APPEND_TARGET'; documentId: string | null }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -145,6 +150,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, nameTemplate: action.template?.trim() ? action.template : undefined };
     case 'deliver/SET_PAGE_SIZE':
       return { ...state, pageSize: action.pageSize };
+    case 'deliver/SET_APPEND_TARGET':
+      return { ...state, appendTo: action.documentId };
     case 'deliver/RESET':
       return initialDeliverState;
     default:
