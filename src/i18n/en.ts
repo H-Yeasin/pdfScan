@@ -497,6 +497,11 @@ export const en = {
   // Text that goes into documents, in the document language (tDoc), not the UI's.
   document: {
     scanName: 'Scan_{date}',
+    // §8 B2: folder names inside a backup zip, and a restored copy kept next to a changed original.
+    backupCourses: 'Courses',
+    backupUnsorted: 'Unsorted',
+    backupUntitled: 'Untitled',
+    restoredSuffix: ' (restored)',
     coverDate: '{day} {month} {year}',
     labReport: 'Lab Report',
     experimentNo: 'Experiment no. {n}',

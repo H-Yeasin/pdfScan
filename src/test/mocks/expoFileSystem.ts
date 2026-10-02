@@ -68,6 +68,40 @@ export class Directory {
   }
 }
 
+export enum FileMode {
+  ReadWrite = 'rw',
+  ReadOnly = 'r',
+  WriteOnly = 'w',
+  Append = 'wa',
+  Truncate = 'wt',
+}
+
+// expo-file-system's FileHandle over a Node file descriptor: reads and writes at `offset`, which
+// moves as they go and can be set (§8 B2 zip code).
+class FileHandle {
+  offset: number | null = 0;
+  constructor(private fd: number | null) {}
+  get size(): number | null {
+    return this.fd === null ? null : fs.fstatSync(this.fd).size;
+  }
+  readBytes(length: number): Uint8Array {
+    if (this.fd === null) throw new Error('FileHandle is closed');
+    const buffer = Buffer.alloc(length);
+    const read = fs.readSync(this.fd, buffer, 0, length, this.offset ?? 0);
+    this.offset = (this.offset ?? 0) + read;
+    return new Uint8Array(buffer.buffer, buffer.byteOffset, read);
+  }
+  writeBytes(bytes: Uint8Array): void {
+    if (this.fd === null) throw new Error('FileHandle is closed');
+    fs.writeSync(this.fd, bytes, 0, bytes.length, this.offset ?? 0);
+    this.offset = (this.offset ?? 0) + bytes.length;
+  }
+  close(): void {
+    if (this.fd !== null) fs.closeSync(this.fd);
+    this.fd = null;
+  }
+}
+
 export class File {
   readonly uri: string;
   constructor(...parts: PathLike[]) {
@@ -106,6 +140,13 @@ export class File {
   }
   create(): void {
     this.write('');
+  }
+  open(mode: FileMode = FileMode.ReadWrite): FileHandle {
+    if (!this.exists) throw new Error(`File does not exist: ${this.uri}`);
+    const flags = { rw: 'r+', r: 'r', w: 'r+', wa: 'a', wt: 'w' }[mode];
+    const handle = new FileHandle(fs.openSync(toPath(this.uri), flags));
+    if (mode === FileMode.Append) handle.offset = handle.size;
+    return handle;
   }
   delete(): void {
     fs.rmSync(toPath(this.uri), { force: true });
