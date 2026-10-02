@@ -211,10 +211,19 @@ Goal: students never lose a semester of notes.
 deadline, and the zip opens on a laptop with the PDFs under readable names.
 
 ### §9 Onboarding and UX polish
-- [ ] 3-screen onboarding: what it does, set up the profile, add courses (skippable). (M)
-- [ ] Empty states that teach (for example "Scan your first assignment"). (S)
-- [ ] Accessibility: dynamic type, TalkBack/VoiceOver labels, contrast. (M)
-- [ ] Performance budget: cold start under 2 s, library scroll at 60 fps with 500 documents. (M)
+Goal: a good first five minutes, and an app that is fast and usable for everyone.
+
+**Detailed steps:** [`docs/plan/09-onboarding.md`](plan/09-onboarding.md)
+
+- [ ] O1 Android back button, start screen without a flash, splash screen
+- [ ] O2 Onboarding: three skippable screens (what it does, profile, courses)
+- [ ] O3 Empty states that teach, and one-time hints
+- [ ] O4 Accessibility: labels and roles, large text, contrast, reduce motion, gesture alternatives
+- [ ] O5 Performance budget: selector-based store, deferred boot work, measured budgets
+- [ ] O6 Polish sweep and "first day" walkthrough before the beta
+
+**Done when:** cold start under 2 s, library scroll at 60 fps with 500 documents, a new user
+reaches their first scan in under 90 s, and a TalkBack user can scan and submit.
 
 ### §10 Monetization
 Free forever: scan, all filters, OCR, Submit, courses, search, no watermark, no ads.
@@ -275,4 +284,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. Next to plan: §9 Onboarding and UX polish (`docs/plan/09-onboarding.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. Next to plan: §10 Monetization (`docs/plan/10-monetization.md`).
