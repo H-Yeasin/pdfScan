@@ -6,6 +6,7 @@ import { resolveBack, type BackContext } from '../navigation/backHandling';
 import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
+import { loadRemoteConfig } from '../services/remote/remoteConfig';
 import { RESTING_STYLE, runSlide, transitionStyle } from '../navigation/transitions';
 import { useReducedMotion } from '../theme/useReducedMotion';
 import type { NavDir, ScreenName } from '../types/navigation';
@@ -110,6 +111,11 @@ export function AppNavigator() {
   useEffect(() => {
     if (afterBoot) initCrashReporting(crashReportsEnabled);
   }, [afterBoot, crashReportsEnabled]);
+  // §10 M2: the console's settings (ads switch, pass length, support contact); bundled defaults
+  // until then and whenever Firebase isn't there.
+  useEffect(() => {
+    if (afterBoot) void loadRemoteConfig();
+  }, [afterBoot]);
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 

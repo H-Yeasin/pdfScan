@@ -45,3 +45,7 @@ temp_interactive_push.bat
 
 # Gradle caches from local native builds
 **/android/.gradle/
+
+# Firebase config files come from EAS file environment variables (docs/firebase.md)
+google-services.json
+GoogleService-Info.plist
