@@ -102,7 +102,30 @@ As built:
 splash and then the right screen with no flash of another screen.
 
 ### O2 · Onboarding: three skippable screens *(M)*
-Status: todo
+Status: done (commit 84b2252). Device check open: the 90-second first scan.
+
+As built:
+- **Screen:** `screens/OnboardingScreen.tsx` is a horizontal paging `ScrollView` (one vertical
+  `ScrollView` per page, for the keyboard) with dots, Next/Start, and Skip on every page.
+  Page 1 has three icon tiles (scan → file → submit) on theme colours and the privacy line.
+- **What's kept:** the profile fields dispatch `SET_PROFILE` as they're typed, so leaving at any
+  point keeps them. Start and Skip both save the course rows that are valid on their own
+  (`courseSetup.savableQuickSetup`), so a half-typed row doesn't lose the good ones. A blank
+  semester takes the term's default.
+- **Shared course form:** `components/courses/CourseSetupForm.tsx`, made of
+  `useCourseSetupForm()` (state, validation, `save()` all-or-nothing for the sheet,
+  `saveValid()` for onboarding) and `CourseSetupFields`. `QuickSetupSheet` is now a thin
+  wrapper; its flow is still covered by `CourseList.test.tsx`.
+- **Who sees it:** `services/onboarding/onboarding.ts` has `onboardingDecision`, which returns
+  `show` (new user), `markDone` (has documents or courses: an update) or `none` (already done,
+  **or the library failed to load**, so a read error is never taken for a new user).
+  `chooseStartScreen({ showOnboarding })` picks `'onboarding'`. `AppNavigator` makes the
+  decision once, behind the splash.
+- **Back:** it steps back a page (`useBackHandler`). On the first page it exits on first run,
+  but when shown again from Settings → About → "Show the introduction again" it goes back to
+  Settings (`backHandling`, keyed on `previousScreen`).
+- **Start** goes to Home with courses, otherwise Capture. The one-time hint at the Scan button
+  is O3's.
 
 - `OnboardingScreen` (`ScreenName` `'onboarding'`), a horizontal pager with dots and "Skip" on
   every page:
