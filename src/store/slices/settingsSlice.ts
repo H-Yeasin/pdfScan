@@ -4,6 +4,7 @@ import type { CaptureModeSpec } from '../../services/capture/captureModes';
 import { DEFAULT_NAME_TEMPLATE } from '../../services/submit/naming';
 import { EMPTY_PROFILE } from '../../services/submit/profile';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
+import type { AutoBackupFrequency } from '../../services/backup/schedule';
 
 export type SettingsState = {
   // False until persisted settings have been read, so first-run-dependent behaviour (like the
@@ -52,6 +53,13 @@ export type SettingsState = {
   // so B5's automatic backups only ever rotate files in a folder chosen for them).
   backupFolderUri: string | null;
   backupFolderLabel: string | null;
+  // §8 B5: Home's "Back up now?" card was put off until then (Later: 14 days). null: not snoozed.
+  backupReminderSnoozedUntil: number | null;
+  // §8 B5, Android: automatic backups to the backup folder, and the zips they made there (oldest
+  // first; only these are ever deleted by the rotation).
+  autoBackup: AutoBackupFrequency;
+  lastAutoBackupAt: number | null;
+  autoBackupUris: string[];
 };
 
 export const initialSettingsState: SettingsState = {
@@ -75,6 +83,10 @@ export const initialSettingsState: SettingsState = {
   lastBackupBytes: null,
   backupFolderUri: null,
   backupFolderLabel: null,
+  backupReminderSnoozedUntil: null,
+  autoBackup: 'off',
+  lastAutoBackupAt: null,
+  autoBackupUris: [],
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -107,7 +119,11 @@ export type SettingsAction =
   | { type: 'settings/SET_UI_LANGUAGE'; language: UiLanguage }
   | { type: 'settings/SET_DOCUMENT_LANGUAGE'; language: DocumentLanguage }
   | { type: 'settings/SET_LAST_BACKUP'; at: number | null; bytes: number | null }
-  | { type: 'settings/SET_BACKUP_FOLDER'; uri: string | null; label: string | null };
+  | { type: 'settings/SET_BACKUP_FOLDER'; uri: string | null; label: string | null }
+  | { type: 'settings/SNOOZE_BACKUP_REMINDER'; until: number | null }
+  | { type: 'settings/SET_AUTO_BACKUP'; frequency: AutoBackupFrequency }
+  | { type: 'settings/AUTO_BACKUP_DONE'; at: number; bytes: number; uris: string[] }
+  | { type: 'settings/LOAD_AUTO_BACKUP_STATE'; lastAt: number | null; uris: string[] };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -123,6 +139,15 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, lastBackupAt: action.at, lastBackupBytes: action.bytes };
     case 'settings/SET_BACKUP_FOLDER':
       return { ...state, backupFolderUri: action.uri, backupFolderLabel: action.label };
+    case 'settings/SNOOZE_BACKUP_REMINDER':
+      return { ...state, backupReminderSnoozedUntil: action.until };
+    case 'settings/SET_AUTO_BACKUP':
+      return { ...state, autoBackup: action.frequency };
+    // An automatic backup is a full backup handed over too.
+    case 'settings/AUTO_BACKUP_DONE':
+      return { ...state, lastAutoBackupAt: action.at, autoBackupUris: action.uris, lastBackupAt: action.at, lastBackupBytes: action.bytes };
+    case 'settings/LOAD_AUTO_BACKUP_STATE':
+      return { ...state, lastAutoBackupAt: action.lastAt, autoBackupUris: action.uris };
     case 'settings/SET_ANDROID_EXPORT_FOLDER':
       return { ...state, androidExportFolderUri: action.uri, androidExportFolderLabel: action.label };
     case 'settings/SET_DEFAULT_ENHANCE':

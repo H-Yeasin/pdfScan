@@ -23,6 +23,8 @@ export type BackupRequest = {
   include: BackupInclude;
   // The course name for a course export's file name.
   courseName?: string;
+  // §8 B5: automatic backups get their own name, so they're told apart in the folder.
+  automatic?: boolean;
 };
 
 export type BackupProgress = {
@@ -50,6 +52,16 @@ export class BackupSpaceError extends Error {
   }
 }
 
+// One backup at a time: they share cache/backup/ (each empties it first). A second one - an
+// automatic backup starting while the student backs up by hand - is refused, not queued.
+export class BackupBusyError extends Error {
+  constructor() {
+    super('A backup is already running');
+    this.name = 'BackupBusyError';
+  }
+}
+let running = false;
+
 export function backupDir(): Directory {
   return new Directory(Paths.cache, 'backup');
 }
@@ -59,8 +71,9 @@ function kindOf(scope: BackupScope): BackupKind {
 }
 
 // "PDF Scan backup 2026-10-02.zip", "Chemistry 2026-10-02.zip", "PDF Scan documents 2026-10-02.zip".
-export function backupFileName(request: Pick<BackupRequest, 'scope' | 'courseName'>, now: number): string {
+export function backupFileName(request: Pick<BackupRequest, 'scope' | 'courseName' | 'automatic'>, now: number): string {
   const date = toLocalDateString(now);
+  if (request.automatic) return `${sanitizeFileName(tDoc('document.autoBackupFileName', { date }))}.zip`;
   const kind = kindOf(request.scope);
   const base =
     kind === 'full'
@@ -110,10 +123,19 @@ function signatureFiles(): { zipPath: string; file: File }[] {
 // Zip headers and the central directory: a little per file, on top of the files themselves.
 const ZIP_OVERHEAD_PER_FILE = 200;
 
-export async function createBackup(
-  request: BackupRequest,
-  options: { onProgress?: (progress: BackupProgress) => void; signal?: AbortSignal; now?: number } = {}
-): Promise<BackupResult> {
+type CreateBackupOptions = { onProgress?: (progress: BackupProgress) => void; signal?: AbortSignal; now?: number };
+
+export async function createBackup(request: BackupRequest, options: CreateBackupOptions = {}): Promise<BackupResult> {
+  if (running) throw new BackupBusyError();
+  running = true;
+  try {
+    return await writeBackup(request, options);
+  } finally {
+    running = false;
+  }
+}
+
+async function writeBackup(request: BackupRequest, options: CreateBackupOptions): Promise<BackupResult> {
   const now = options.now ?? Date.now();
   const db = await getDb();
   const exported = await exportRows(db, request.scope, await getSchemaVersion(db));

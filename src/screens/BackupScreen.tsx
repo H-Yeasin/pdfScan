@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBackupExport } from '../components/backup/useBackupExport';
 import { pickBackupZip } from '../store/backupIntake';
 import { SettingRow } from '../components/settings/SettingRow';
+import { SegmentedControl } from '../components/shared/SegmentedControl';
+import type { AutoBackupFrequency } from '../services/backup/schedule';
 import { formatBytes, formatDate } from '../i18n';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
@@ -24,16 +26,35 @@ export function BackupScreen() {
   const lastBackupAt = useAppSelector((s) => s.settings.lastBackupAt);
   const lastBackupBytes = useAppSelector((s) => s.settings.lastBackupBytes);
   const folderLabel = useAppSelector((s) => s.settings.backupFolderLabel);
+  const folderUri = useAppSelector((s) => s.settings.backupFolderUri);
+  const autoBackup = useAppSelector((s) => s.settings.autoBackup);
+  const lastAutoBackupAt = useAppSelector((s) => s.settings.lastAutoBackupAt);
   const { backUpEverything, busy, overlay } = useBackupExport();
 
-  const handlePickFolder = useCallback(async () => {
+  // Resolves whether a folder was chosen.
+  const handlePickFolder = useCallback(async (): Promise<boolean> => {
     const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!result.granted) {
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('backup.noFolder') });
-      return;
+      return false;
     }
     dispatch({ type: 'settings/SET_BACKUP_FOLDER', uri: result.directoryUri, label: deriveFolderLabel(result.directoryUri) });
-  }, [dispatch, t]);
+    // Another folder: the old automatic backups aren't in it, so there's nothing to rotate there.
+    dispatch({ type: 'settings/LOAD_AUTO_BACKUP_STATE', lastAt: lastAutoBackupAt, uris: [] });
+    return true;
+  }, [dispatch, t, lastAutoBackupAt]);
+
+  // §8 B5: automatic backups need a folder; choosing Weekly or Monthly without one asks for it.
+  const handleAutoBackup = useCallback(
+    async (frequency: AutoBackupFrequency) => {
+      if (frequency !== 'off' && !folderUri && !(await handlePickFolder())) {
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('backup.auto.needsFolder') });
+        return;
+      }
+      dispatch({ type: 'settings/SET_AUTO_BACKUP', frequency });
+    },
+    [folderUri, handlePickFolder, dispatch, t]
+  );
 
   const last =
     lastBackupAt === null
@@ -82,11 +103,28 @@ export function BackupScreen() {
 
         {Platform.OS === 'android' ? (
           <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: tokens.ink }]}>{t('backup.auto.title')}</Text>
+            <SegmentedControl
+              segments={[
+                { id: 'off' as AutoBackupFrequency, label: t('backup.auto.off') },
+                { id: 'weekly' as AutoBackupFrequency, label: t('backup.auto.weekly') },
+                { id: 'monthly' as AutoBackupFrequency, label: t('backup.auto.monthly') },
+              ]}
+              value={autoBackup}
+              onChange={handleAutoBackup}
+            />
+            <Text style={[styles.footnote, { color: tokens.muted }]}>{t('backup.auto.subtitle')}</Text>
+            {autoBackup !== 'off' ? (
+              <SettingRow
+                title={t('backup.auto.last')}
+                trailing={lastAutoBackupAt === null ? t('backup.screen.never') : formatDate(lastAutoBackupAt, { day: 'numeric', month: 'short', year: 'numeric' })}
+              />
+            ) : null}
             <SettingRow
               title={t('backup.screen.folder')}
               subtitle={t('backup.screen.folderSubtitle')}
               trailing={folderLabel ?? t('common.notSet')}
-              onPress={handlePickFolder}
+              onPress={() => void handlePickFolder()}
             />
           </View>
         ) : (
@@ -126,6 +164,10 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   footnote: {
     fontSize: 12.5,

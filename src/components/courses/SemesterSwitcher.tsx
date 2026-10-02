@@ -44,7 +44,21 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
           onPress: () => {
             dispatch({ type: 'library/ARCHIVE_SEMESTER', id: semester.id });
             dispatch({ type: 'library/SET_HOME_SEMESTER', id: null });
-            dispatch({ type: 'ui/SHOW_SNACK', msg: t('courses.semesterSwitcher.archived', { name: semester.name }) });
+            // §8 B5: the end of term is the moment to keep a copy; a quiet nudge with the action.
+            const courseIds = state.library.courses.filter((c) => c.semesterId === semester.id).map((c) => c.id);
+            const hasDocuments = state.library.files.some((f) => f.courseId !== undefined && courseIds.includes(f.courseId));
+            const archived = t('courses.semesterSwitcher.archived', { name: semester.name });
+            dispatch(
+              hasDocuments
+                ? {
+                    type: 'ui/SHOW_SNACK',
+                    msg: t('backup.reminder.semesterArchived', { name: semester.name }),
+                    action: t('backup.reminder.backUp'),
+                    onAction: () =>
+                      dispatch({ type: 'ui/REQUEST_EXPORT', request: { scope: { kind: 'courses', courseIds }, courseName: semester.name } }),
+                  }
+                : { type: 'ui/SHOW_SNACK', msg: archived }
+            );
             onClose();
           },
         },

@@ -4,6 +4,7 @@ import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { formatBytes, t } from '../../i18n';
 import { useRouter } from '../../navigation/router';
 import {
+  BackupBusyError,
   BackupSpaceError,
   createBackup,
   discardBackup,
@@ -56,6 +57,8 @@ export function useBackupExport() {
         setPhase({ kind: 'idle' });
         if (error instanceof ZipAbortedError) {
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('backup.cancelled') });
+        } else if (error instanceof BackupBusyError) {
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('backup.busy') });
         } else if (error instanceof BackupSpaceError) {
           dispatch({
             type: 'ui/SHOW_SNACK',

@@ -505,6 +505,7 @@ export const en = {
     restoredSuffix: ' (restored)',
     // §8 B3: backup and export zip names ({date}: YYYY-MM-DD).
     backupFileName: 'PDF Scan backup {date}',
+    autoBackupFileName: 'PDF Scan auto-backup {date}',
     courseExportFileName: '{course} {date}',
     documentsExportFileName: 'PDF Scan documents {date}',
     coverDate: '{day} {month} {year}',
@@ -912,6 +913,26 @@ export const en = {
     noFolder: 'No folder chosen',
     tooFull: 'Not enough space for the backup (needs {size}).',
     freeUp: 'Free up space',
+    busy: 'A backup is already running.',
+    // §8 B5.
+    auto: {
+      title: 'Back up automatically to a folder',
+      subtitle: 'When the app opens and a backup is due. The last 2 are kept; older ones it made are deleted.',
+      off: 'Off',
+      weekly: 'Weekly',
+      monthly: 'Monthly',
+      last: 'Last automatic backup',
+      running: 'Backing up… {percent}%',
+      done: 'Automatic backup saved · {size}',
+      needsFolder: 'Choose a folder for automatic backups first.',
+    },
+    reminder: {
+      never: 'Last backup: never. Back up now?',
+      old: 'Last backup: {date}. Back up now?',
+      backUp: 'Back up',
+      later: 'Later',
+      semesterArchived: '{name} archived. Back it up before you forget?',
+    },
     export: {
       title: 'Export',
       everything: 'Everything',

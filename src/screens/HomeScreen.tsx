@@ -29,6 +29,8 @@ import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateCont
 import { fontFamily, radii, spacing, useTheme } from '../theme';
 import type { Course } from '../types/models';
 import { toLocalDateString } from '../utils/localDate';
+import { formatShortDate } from '../utils/format';
+import { useBackupReminder } from '../store/useBackupReminder';
 
 // The course hub (docs/PLAN.md §3): the shown semester with a switcher, "Continue" for the last
 // opened or saved document, a grid of the semester's courses, Unsorted, and a big Scan button.
@@ -42,6 +44,8 @@ export function HomeScreen() {
   const store = useAppStore();
   const { files, courses, semesters, homeSemesterId } = state.library;
   const openDocument = useOpenDocument();
+  // §8 B5: "Last backup: never. Back up now?"
+  const reminder = useBackupReminder();
 
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [quickSetup, setQuickSetup] = useState(false);
@@ -114,6 +118,26 @@ export function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {reminder.due ? (
+          <View style={[styles.backupCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+            <Ionicons name="cloud-upload-outline" size={20} color={tokens.accentInk} />
+            <Text style={[styles.backupText, { color: tokens.ink }]} numberOfLines={2}>
+              {reminder.lastBackupAt === null
+                ? t('backup.reminder.never')
+                : t('backup.reminder.old', { date: formatShortDate(reminder.lastBackupAt) })}
+            </Text>
+            <Pressable onPress={reminder.snooze} hitSlop={8} accessibilityRole="button">
+              <Text style={[styles.backupAction, { color: tokens.muted }]}>{t('backup.reminder.later')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => dispatch({ type: 'ui/REQUEST_EXPORT', request: { scope: { kind: 'all' } } })}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.backupAction, { color: tokens.accent }]}>{t('backup.reminder.backUp')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {resume ? (
           <Pressable
             style={[styles.continueCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
@@ -286,6 +310,23 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  backupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.card,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  backupText: {
+    flex: 1,
+    fontSize: 13.5,
+  },
+  backupAction: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   continueCard: {
     flexDirection: 'row',

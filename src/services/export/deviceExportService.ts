@@ -89,7 +89,7 @@ export async function saveFileToFolder(
   mimeType: string,
   source: File,
   options: { signal?: AbortSignal; onProgress?: (bytesCopied: number) => void } = {}
-): Promise<void> {
+): Promise<string> {
   const destUri = await StorageAccessFramework.createFileAsync(treeUri, fileNameWithoutExtension, mimeType);
   const input = source.open(FileMode.ReadOnly);
   let output: ReturnType<File['open']> | null = null;
@@ -108,6 +108,8 @@ export async function saveFileToFolder(
     }
     output.close();
     output = null;
+    // The new file's URI, e.g. for B5's rotation of automatic backups.
+    return destUri;
   } catch (error) {
     output?.close();
     await StorageAccessFramework.deleteAsync(destUri, { idempotent: true }).catch(() => undefined);

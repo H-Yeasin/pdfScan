@@ -3,6 +3,7 @@ import { PSEUDO_LOCALE, isDocumentLanguage, isUiLanguage, setDocumentLanguage, s
 import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings, sanitizeDefaultEnhance } from '../services/persistence/settingsStorage';
 import { normalizeProfile } from '../services/submit/profile';
+import { isAutoBackupFrequency } from '../services/backup/schedule';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { useTheme } from '../theme';
 
@@ -51,6 +52,15 @@ export function useSettingsPersistence() {
             bytes: typeof settings.lastBackupBytes === 'number' ? settings.lastBackupBytes : null,
           });
         }
+        if (typeof settings.backupReminderSnoozedUntil === 'number') {
+          dispatch({ type: 'settings/SNOOZE_BACKUP_REMINDER', until: settings.backupReminderSnoozedUntil });
+        }
+        if (isAutoBackupFrequency(settings.autoBackup)) dispatch({ type: 'settings/SET_AUTO_BACKUP', frequency: settings.autoBackup });
+        dispatch({
+          type: 'settings/LOAD_AUTO_BACKUP_STATE',
+          lastAt: typeof settings.lastAutoBackupAt === 'number' ? settings.lastAutoBackupAt : null,
+          uris: Array.isArray(settings.autoBackupUris) ? settings.autoBackupUris.filter((u): u is string => typeof u === 'string') : [],
+        });
         if (typeof settings.backupFolderUri === 'string') {
           dispatch({ type: 'settings/SET_BACKUP_FOLDER', uri: settings.backupFolderUri, label: settings.backupFolderLabel ?? null });
         }
@@ -87,6 +97,10 @@ export function useSettingsPersistence() {
       lastBackupBytes: state.settings.lastBackupBytes,
       backupFolderUri: state.settings.backupFolderUri,
       backupFolderLabel: state.settings.backupFolderLabel,
+      backupReminderSnoozedUntil: state.settings.backupReminderSnoozedUntil,
+      autoBackup: state.settings.autoBackup,
+      lastAutoBackupAt: state.settings.lastAutoBackupAt,
+      autoBackupUris: state.settings.autoBackupUris,
     });
   }, [
     loaded,
@@ -110,6 +124,10 @@ export function useSettingsPersistence() {
     state.settings.lastBackupBytes,
     state.settings.backupFolderUri,
     state.settings.backupFolderLabel,
+    state.settings.backupReminderSnoozedUntil,
+    state.settings.autoBackup,
+    state.settings.lastAutoBackupAt,
+    state.settings.autoBackupUris,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.

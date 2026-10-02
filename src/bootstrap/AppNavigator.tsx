@@ -23,6 +23,9 @@ import { ExamPackScreen } from '../screens/ExamPackScreen';
 import { StorageScreen } from '../screens/StorageScreen';
 import { BackupScreen } from '../screens/BackupScreen';
 import { RestoreHost } from '../components/backup/RestoreHost';
+import { ExportHost } from '../components/backup/ExportHost';
+import { AutoBackupChip } from '../components/backup/AutoBackupChip';
+import { useAutoBackup } from '../store/useAutoBackup';
 import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
@@ -67,6 +70,7 @@ export function AppNavigator() {
   useDeadlineReminders(libraryLoaded, libraryAfterBoot);
   useImportedPdfIndexing(libraryAfterBoot);
   useStorageIntegrity(libraryAfterBoot);
+  useAutoBackup(libraryAfterBoot);
   const { screen, previousScreen, hub, tabHub, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();
@@ -227,6 +231,9 @@ export function AppNavigator() {
       </Animated.View>
       {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
       <RestoreHost />
+      {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
+      <ExportHost />
+      <AutoBackupChip />
     </View>
   );
 }

@@ -43,6 +43,11 @@ export type PersistedSettings = {
   lastBackupBytes?: number | null;
   backupFolderUri?: string | null;
   backupFolderLabel?: string | null;
+  // Optional: added in §8 B5.
+  backupReminderSnoozedUntil?: number | null;
+  autoBackup?: string;
+  lastAutoBackupAt?: number | null;
+  autoBackupUris?: string[];
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

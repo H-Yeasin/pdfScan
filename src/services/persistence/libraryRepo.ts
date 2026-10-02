@@ -593,6 +593,19 @@ export async function saveDiskBytes(db: SQLiteDatabase, id: string, bytes: numbe
   await db.runAsync('UPDATE documents SET disk_bytes = ? WHERE id = ?', [bytes, id]);
 }
 
+// §8 B5: when the library last changed - the newest document saved or edited, or course made -
+// for the backup reminder and automatic backups. null: nothing in it. (A document's updated_at
+// also moves when the Reader saves the page it's on, so reading counts as a change.)
+export async function libraryChangedAt(db: SQLiteDatabase): Promise<number | null> {
+  const row = await db.getFirstAsync<{ at: number | null }>(
+    `SELECT MAX(at) AS at FROM (
+       SELECT MAX(updated_at) AS at FROM documents
+       UNION ALL SELECT MAX(created_at) FROM courses
+     )`
+  );
+  return row?.at ?? null;
+}
+
 // §8 B1: ids that have a document row. The integrity check asks the database (not the in-memory
 // state) before treating a folder as left over, so a document saved a moment ago isn't moved.
 export async function documentIdsInDb(db: SQLiteDatabase): Promise<Set<string>> {
