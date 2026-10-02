@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
 import { readTextWithEncodingFallback } from '../../services/documents/txtService';
+import { useT } from '../../i18n/useT';
 
 const CHUNK_SIZE = 3000;
 
@@ -57,6 +58,7 @@ type TxtViewProps = {
 
 export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [chunks, setChunks] = useState<string[] | null>(null);
   const [fallbackUsed, setFallbackUsed] = useState(false);
   const [error, setError] = useState(false);
@@ -98,7 +100,7 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
   if (error) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>Couldn't open this file.</Text>
+        <Text style={{ color: tokens.muted }}>{t('reader.openFailed')}</Text>
       </View>
     );
   }
@@ -106,7 +108,7 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
   if (!chunks) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>Loading…</Text>
+        <Text style={{ color: tokens.muted }}>{t('reader.loading')}</Text>
       </View>
     );
   }
@@ -116,7 +118,7 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
       {fallbackUsed && (
         <View style={[styles.banner, { backgroundColor: tokens.accentSoft }]}>
           <Text style={[styles.bannerText, { color: tokens.accentInk }]}>
-            This file may not be UTF-8 — some characters may not display correctly.
+            {t('reader.notUtf8')}
           </Text>
         </View>
       )}

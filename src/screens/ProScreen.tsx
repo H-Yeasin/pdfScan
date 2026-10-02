@@ -4,30 +4,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeatureList } from '../components/pro/FeatureList';
 import { useRouter } from '../navigation/router';
 import { fontFamily, radii, spacing, useTheme } from '../theme';
+import { useT } from '../i18n/useT';
 
 export function ProScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go } = useRouter();
 
   const showUnavailable = (action: string) =>
     Alert.alert(
-      'Not available yet',
-      `${action} isn't wired up in this build — in-app purchases need store-side setup that hasn't happened yet. Everything you use today stays free either way.`
+      t('pro.unavailableTitle'),
+      t('pro.unavailableBody', { action })
     );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')}>
+        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={[styles.kicker, { color: tokens.accentInk }]}>One time, forever</Text>
+        <Text style={[styles.kicker, { color: tokens.accentInk }]}>{t('pro.kicker')}</Text>
         <Text style={[styles.price, { color: tokens.ink }]}>৳ 890</Text>
         <Text style={[styles.subtitle, { color: tokens.muted }]}>
-          Paid once. No subscription, no renewal, no account.
+          {t('pro.subtitle')}
         </Text>
 
         <View style={styles.featuresWrap}>
@@ -36,21 +38,21 @@ export function ProScreen() {
 
         <View style={[styles.reassuranceCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.reassuranceTitle, { color: tokens.ink }]}>
-            Everything you use today stays free.
+            {t('pro.freeTitle')}
           </Text>
           <Text style={[styles.reassuranceBody, { color: tokens.muted }]}>
-            Scanning, OCR, export and the reader are not part of this purchase and never will be.
+            {t('pro.freeBody')}
           </Text>
         </View>
 
         <Pressable
           style={[styles.primary, { backgroundColor: tokens.accent }]}
-          onPress={() => showUnavailable('Unlock Pro')}
+          onPress={() => showUnavailable(t('pro.unlock'))}
         >
-          <Text style={styles.primaryLabel}>Unlock Pro</Text>
+          <Text style={styles.primaryLabel}>{t('pro.unlock')}</Text>
         </Pressable>
-        <Pressable style={styles.ghost} onPress={() => showUnavailable('Restore purchase')}>
-          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>Restore purchase</Text>
+        <Pressable style={styles.ghost} onPress={() => showUnavailable(t('pro.restore'))}>
+          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('pro.restore')}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

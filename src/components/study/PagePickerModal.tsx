@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import type { PackItem } from '../../store/slices/packSlice';
+import { useT } from '../../i18n/useT';
 
 // §5 T6: pick pages from documents (a course's, for the exam pack), each document's pages as a
 // row of thumbnails; tap to select. Pages already in the pack are marked and can't be picked again.
@@ -22,6 +23,7 @@ export function PagePickerModal({
   onClose: () => void;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [picked, setPicked] = useState<PackItem[]>([]);
   useEffect(() => {
     if (visible) setPicked([]);
@@ -35,10 +37,10 @@ export function PagePickerModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel="Close">
+          <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
             <Ionicons name="close" size={22} color={tokens.ink} />
           </Pressable>
-          <Text style={[styles.title, { color: tokens.ink }]}>Add pages</Text>
+          <Text style={[styles.title, { color: tokens.ink }]}>{t('study.addPages')}</Text>
           <Pressable
             style={[styles.add, { backgroundColor: tokens.accent, opacity: picked.length ? 1 : 0.5 }]}
             onPress={() => {
@@ -48,7 +50,7 @@ export function PagePickerModal({
             disabled={!picked.length}
             accessibilityRole="button"
           >
-            <Text style={styles.addLabel}>Add {picked.length || ''}</Text>
+            <Text style={styles.addLabel}>{picked.length ? t('study.addCount', { count: picked.length }) : t('study.add')}</Text>
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.body}>
@@ -68,7 +70,7 @@ export function PagePickerModal({
                       disabled={inPack}
                       accessibilityRole="button"
                       accessibilityState={{ selected: on, disabled: inPack }}
-                      accessibilityLabel={`${doc.name}, page ${i + 1}`}
+                      accessibilityLabel={t('study.pageA11y', { doc: doc.name, page: i + 1 })}
                       style={[styles.page, { borderColor: on ? tokens.accent : tokens.edge, opacity: inPack ? 0.4 : 1 }]}
                     >
                       <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={styles.thumb} resizeMode="cover" />
@@ -79,7 +81,7 @@ export function PagePickerModal({
               </ScrollView>
             </View>
           ))}
-          {docs.length === 0 ? <Text style={{ color: tokens.muted }}>No scanned documents here yet.</Text> : null}
+          {docs.length === 0 ? <Text style={{ color: tokens.muted }}>{t('study.noDocs')}</Text> : null}
         </ScrollView>
       </SafeAreaView>
     </Modal>

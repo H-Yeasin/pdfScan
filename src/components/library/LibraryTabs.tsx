@@ -1,12 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
 import type { LibraryTab } from '../../store/slices/librarySlice';
+import { useT } from '../../i18n/useT';
 
-const TABS: { id: LibraryTab; label: string }[] = [
-  { id: 'starred', label: '★ Starred' },
-  { id: 'recent', label: 'Recent' },
-  { id: 'courses', label: 'Courses' },
-];
+const TABS: LibraryTab[] = ['starred', 'recent', 'courses'];
 
 type LibraryTabsProps = {
   value: LibraryTab;
@@ -15,14 +12,15 @@ type LibraryTabsProps = {
 
 export function LibraryTabs({ value, onChange }: LibraryTabsProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <View style={[styles.row, { borderBottomColor: tokens.edge }]}>
       {TABS.map((tab) => {
-        const active = tab.id === value;
+        const active = tab === value;
         return (
-          <Pressable key={tab.id} onPress={() => onChange(tab.id)} style={styles.tab}>
-            <Text style={[styles.label, { color: active ? tokens.accent : tokens.muted }]}>{tab.label}</Text>
+          <Pressable key={tab} onPress={() => onChange(tab)} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+            <Text style={[styles.label, { color: active ? tokens.accent : tokens.muted }]}>{t(`library.tabs.${tab}`)}</Text>
             {active && <View style={[styles.underline, { backgroundColor: tokens.accent }]} />}
           </Pressable>
         );

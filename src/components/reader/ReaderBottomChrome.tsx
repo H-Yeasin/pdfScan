@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type ReaderBottomChromeProps = {
   visible: Animated.Value;
@@ -30,6 +31,7 @@ export function ReaderBottomChrome({
   nightOn,
 }: ReaderBottomChromeProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
 
   return (
@@ -59,12 +61,12 @@ export function ReaderBottomChrome({
         {showFind && (
           <Pressable style={styles.actionButton} onPress={onFind}>
             <Ionicons name="search" size={17} color={findOpen ? tokens.accent : tokens.ink} />
-            <Text style={[styles.actionLabel, { color: findOpen ? tokens.accent : tokens.ink }]}>Find</Text>
+            <Text style={[styles.actionLabel, { color: findOpen ? tokens.accent : tokens.ink }]}>{t('reader.find')}</Text>
           </Pressable>
         )}
         <Pressable style={styles.actionButton} onPress={onNight}>
           <Ionicons name="moon-outline" size={17} color={nightOn ? tokens.accent : tokens.ink} />
-          <Text style={[styles.actionLabel, { color: nightOn ? tokens.accent : tokens.ink }]}>Night</Text>
+          <Text style={[styles.actionLabel, { color: nightOn ? tokens.accent : tokens.ink }]}>{t('reader.night')}</Text>
         </Pressable>
       </View>
     </Animated.View>

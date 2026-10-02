@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Course } from '../../types/models';
 import { CourseBadge } from './CourseBadge';
+import { useT } from '../../i18n/useT';
 
 const SHOWN = 3;
 
@@ -21,6 +22,7 @@ export function CourseChips({
   onMore: () => void;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const ids = suggestions.slice(0, SHOWN);
   if (selectedId && !ids.includes(selectedId)) ids.splice(SHOWN - 1, 1, selectedId);
   const shown = ids.map((id) => courses.find((c) => c.id === id)).filter((c): c is Course => !!c);
@@ -50,7 +52,7 @@ export function CourseChips({
         );
       })}
       <Pressable style={chipStyle(false)} onPress={onMore} accessibilityRole="button">
-        <Text style={[styles.label, { color: tokens.accentInk }]}>More…</Text>
+        <Text style={[styles.label, { color: tokens.accentInk }]}>{t('courses.more')}</Text>
       </Pressable>
     </View>
   );

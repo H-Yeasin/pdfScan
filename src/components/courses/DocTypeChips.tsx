@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DOC_TYPES, docTypeCounts, getDocType } from '../../services/courses/docTypes';
 import { radii, spacing, useTheme } from '../../theme';
 import type { DocType, LibraryDocument } from '../../types/models';
+import { useT } from '../../i18n/useT';
 
 function Chip({ label, icon, selected, onPress }: { label: string; icon?: keyof typeof Ionicons.glyphMap; selected: boolean; onPress: () => void }) {
   const { tokens } = useTheme();
@@ -34,15 +35,16 @@ export function DocTypeFilterChips({
   value: DocType | null;
   onChange: (type: DocType | null) => void;
 }) {
+  const { t } = useT();
   const counts = docTypeCounts(docs);
   if (counts.length < 2 && value === null) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
-      <Chip label={`All ${docs.length}`} selected={value === null} onPress={() => onChange(null)} />
+      <Chip label={t('courses.allCount', { count: docs.length })} selected={value === null} onPress={() => onChange(null)} />
       {counts.map(({ type, count }) => (
         <Chip
           key={type}
-          label={`${getDocType(type).plural} ${count}`}
+          label={t('courses.docTypeCount', { type: t(getDocType(type).pluralKey), count })}
           selected={value === type}
           onPress={() => onChange(value === type ? null : type)}
         />
@@ -53,10 +55,11 @@ export function DocTypeFilterChips({
 
 // Deliver's type choice: all six, one tap to change.
 export function DocTypeSelector({ value, onChange }: { value: DocType; onChange: (type: DocType) => void }) {
+  const { t } = useT();
   return (
     <View style={styles.wrap}>
       {DOC_TYPES.map((spec) => (
-        <Chip key={spec.id} label={spec.label} icon={spec.icon} selected={value === spec.id} onPress={() => onChange(spec.id)} />
+        <Chip key={spec.id} label={t(spec.labelKey)} icon={spec.icon} selected={value === spec.id} onPress={() => onChange(spec.id)} />
       ))}
     </View>
   );
@@ -77,6 +80,7 @@ export function DocTypePickerModal({
   onClose: () => void;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -95,7 +99,7 @@ export function DocTypePickerModal({
               }}
             >
               <Ionicons name={spec.icon} size={20} color={tokens.ink} />
-              <Text style={[styles.itemLabel, { color: tokens.ink }]}>{spec.label}</Text>
+              <Text style={[styles.itemLabel, { color: tokens.ink }]}>{t(spec.labelKey)}</Text>
               {value === spec.id ? <Ionicons name="checkmark" size={18} color={tokens.accent} /> : null}
             </Pressable>
           ))}

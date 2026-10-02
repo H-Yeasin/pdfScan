@@ -3,6 +3,7 @@ import { courseColorValue } from '../../services/courses/palette';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Course, LibraryDocument } from '../../types/models';
 import { UNSORTED_COURSE_ID } from './CourseList';
+import { useT } from '../../i18n/useT';
 
 // Search results by course (§3 K6): "All" plus each course the results come from, with counts.
 // `value` is a course id, UNSORTED_COURSE_ID, or null for all. Hidden when the results come from
@@ -19,6 +20,7 @@ export function CourseFilterChips({
   onChange: (courseId: string | null) => void;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const counts = new Map<string, number>();
   for (const doc of docs) {
     const key = doc.courseId ?? UNSORTED_COURSE_ID;
@@ -45,10 +47,10 @@ export function CourseFilterChips({
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
-      {chip(null, 'All courses', docs.length)}
+      {chip(null, t('courses.allCourses'), docs.length)}
       {entries.map(([key, count]) => {
         const course = courses.find((c) => c.id === key);
-        return chip(key, course ? course.code || course.name : 'Unsorted', count, course ? courseColorValue(course.color, tokens) : undefined);
+        return chip(key, course ? course.code || course.name : t('common.unsorted'), count, course ? courseColorValue(course.color, tokens) : undefined);
       })}
     </ScrollView>
   );

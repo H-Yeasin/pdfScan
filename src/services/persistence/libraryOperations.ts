@@ -9,6 +9,7 @@ import { readTextWithEncodingFallback } from '../documents/txtService';
 import type { Annotation, ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
+import { t } from '../../i18n';
 
 const buildHaystack = buildSearchHaystack;
 
@@ -214,7 +215,7 @@ export async function applySignedPage(
 export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const dir = getDocumentDir(documentId);
-  const name = ext.name.trim() || 'Imported file';
+  const name = ext.name.trim() || t('library.importedFile');
 
   if (ext.format === 'PDF') {
     const dest = new File(dir, 'document.pdf');

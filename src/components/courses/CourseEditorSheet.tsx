@@ -12,6 +12,7 @@ import { CourseBadge } from './CourseBadge';
 import { CourseSheet, SheetField, sheetInputStyle } from './CourseSheet';
 import { TimetableEditor } from './TimetableEditor';
 import { formatSlot } from '../../services/courses/timetable';
+import { useT } from '../../i18n/useT';
 
 type CourseEditorSheetProps = {
   visible: boolean;
@@ -27,6 +28,7 @@ type SemesterChoice = { kind: 'none' } | { kind: 'existing'; id: string } | { ki
 
 export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseEditorSheetProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { state, dispatch } = useAppState();
   const { courses, semesters } = state.library;
 
@@ -120,8 +122,8 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
   return (
     <CourseSheet
       visible={visible}
-      title={course ? 'Edit course' : 'New course'}
-      submitLabel={course ? 'Save' : 'Add course'}
+      title={course ? t('courses.editCourse') : t('courses.newCourse')}
+      submitLabel={course ? t('courses.save') : t('courses.addCourse')}
       submitDisabled={!!errors.code}
       onSubmit={handleSave}
       onClose={onClose}
@@ -129,11 +131,11 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
       <View style={styles.preview}>
         <CourseBadge course={{ name: name || '?', code, emoji, color }} size={48} />
         <View style={styles.previewText}>
-          <SheetField label="Name" error={shownErrors.name}>
+          <SheetField label={t('courses.name')} error={shownErrors.name}>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="e.g. Linear Algebra"
+              placeholder={t('courses.namePlaceholder')}
               placeholderTextColor={tokens.muted}
               autoFocus={!course}
               autoCapitalize="words"
@@ -145,11 +147,11 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
 
       <View style={styles.row}>
         <View style={styles.flex}>
-          <SheetField label="Code" error={shownErrors.code}>
+          <SheetField label={t('courses.code')} error={shownErrors.code}>
             <TextInput
               value={code}
               onChangeText={setCode}
-              placeholder="MATH 201"
+              placeholder={t('courses.codePlaceholder')}
               placeholderTextColor={tokens.muted}
               autoCapitalize="characters"
               style={[sheetInputStyle, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
@@ -157,11 +159,11 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
           </SheetField>
         </View>
         <View style={styles.flex}>
-          <SheetField label="Teacher">
+          <SheetField label={t('courses.teacher')}>
             <TextInput
               value={teacher}
               onChangeText={setTeacher}
-              placeholder="Optional"
+              placeholder={t('courses.optional')}
               placeholderTextColor={tokens.muted}
               autoCapitalize="words"
               style={[sheetInputStyle, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
@@ -170,7 +172,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
         </View>
       </View>
 
-      <SheetField label="Colour">
+      <SheetField label={t('courses.colour')}>
         <View style={styles.wrap}>
           {COURSE_COLORS.map((c) => (
             <Pressable
@@ -178,7 +180,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
               onPress={() => setColor(c)}
               accessibilityRole="radio"
               accessibilityState={{ selected: c === color }}
-              accessibilityLabel={c}
+              accessibilityLabel={t(`courses.colours.${c}`)}
               style={[
                 styles.swatch,
                 { backgroundColor: courseColorValue(c, tokens), borderColor: c === color ? tokens.ink : 'transparent' },
@@ -190,9 +192,9 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
         </View>
       </SheetField>
 
-      <SheetField label="Emoji">
+      <SheetField label={t('courses.emoji')}>
         <View style={styles.wrap}>
-          <Pressable style={[...chip(!emoji), styles.emojiChip]} onPress={() => setEmoji(undefined)} accessibilityLabel="No emoji">
+          <Pressable style={[...chip(!emoji), styles.emojiChip]} onPress={() => setEmoji(undefined)} accessibilityLabel={t('courses.noEmoji')}>
             <Ionicons name="close" size={16} color={tokens.muted} />
           </Pressable>
           {COURSE_EMOJIS.map((e) => (
@@ -203,10 +205,10 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
         </View>
       </SheetField>
 
-      <SheetField label="Semester">
+      <SheetField label={t('courses.semester')}>
         <View style={styles.wrap}>
           <Pressable style={chip(semester.kind === 'none')} onPress={() => setSemester({ kind: 'none' })}>
-            <Text style={[styles.chipLabel, { color: tokens.ink }]}>None</Text>
+            <Text style={[styles.chipLabel, { color: tokens.ink }]}>{t('courses.none')}</Text>
           </Pressable>
           {semesterChips.map((s) => (
             <Pressable
@@ -214,7 +216,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
               style={chip(semester.kind === 'existing' && semester.id === s.id)}
               onPress={() => setSemester({ kind: 'existing', id: s.id })}
             >
-              <Text style={[styles.chipLabel, { color: tokens.ink }]}>{s.archived ? `${s.name} (archived)` : s.name}</Text>
+              <Text style={[styles.chipLabel, { color: tokens.ink }]}>{s.archived ? t('courses.archivedSuffix', { name: s.name }) : s.name}</Text>
             </Pressable>
           ))}
           {!todaySemester ? (
@@ -222,13 +224,13 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
               style={chip(semester.kind === 'new')}
               onPress={() => setSemester({ kind: 'new', name: todayTerm.name })}
             >
-              <Text style={[styles.chipLabel, { color: tokens.ink }]}>+ {todayTerm.name}</Text>
+              <Text style={[styles.chipLabel, { color: tokens.ink }]}>{t('courses.newSemester', { name: todayTerm.name })}</Text>
             </Pressable>
           ) : null}
         </View>
       </SheetField>
 
-      <SheetField label="Recognition language">
+      <SheetField label={t('courses.recognition')}>
         <View style={styles.wrap}>
           <Pressable
             style={chip(ocrScript === undefined)}
@@ -236,7 +238,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
             accessibilityRole="radio"
             accessibilityState={{ selected: ocrScript === undefined }}
           >
-            <Text style={[styles.chipLabel, { color: tokens.ink }]}>App default ({appDefaultScript.nativeName})</Text>
+            <Text style={[styles.chipLabel, { color: tokens.ink }]}>{t('courses.appDefault', { name: appDefaultScript.nativeName })}</Text>
           </Pressable>
           {READY_SCRIPTS.map((script) => (
             <Pressable
@@ -245,24 +247,24 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
               onPress={() => setOcrScript(script.id)}
               accessibilityRole="radio"
               accessibilityState={{ selected: ocrScript === script.id }}
-              accessibilityLabel={script.label}
+              accessibilityLabel={t(script.labelKey)}
             >
               <Text style={[styles.chipLabel, { color: tokens.ink }]}>{script.nativeName}</Text>
             </Pressable>
           ))}
         </View>
-        <Text style={[styles.hint, { color: tokens.muted }]}>The script this course's scans are written in, so they can be searched.</Text>
+        <Text style={[styles.hint, { color: tokens.muted }]}>{t('courses.recognitionHint')}</Text>
       </SheetField>
 
       {course ? (
-        <SheetField label="Class times">
+        <SheetField label={t('courses.classTimes')}>
           <Pressable
             style={[styles.classTimes, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
             onPress={() => setClassTimesOpen(true)}
             accessibilityRole="button"
           >
             <Text style={[styles.classTimesText, { color: classTimes.length ? tokens.ink : tokens.muted }]} numberOfLines={2}>
-              {classTimes.length ? classTimes.map(formatSlot).join(', ') : 'Not set — scans in class get filed here'}
+              {classTimes.length ? classTimes.map(formatSlot).join(', ') : t('courses.classTimesNotSet')}
             </Text>
             <Ionicons name="chevron-forward" size={16} color={tokens.muted} />
           </Pressable>
@@ -273,8 +275,8 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
       {course ? (
         <View style={styles.switchRow}>
           <View style={styles.flex}>
-            <Text style={[styles.chipLabel, { color: tokens.ink }]}>Archived</Text>
-            <Text style={[styles.hint, { color: tokens.muted }]}>Hidden from course lists and pickers. Its files stay searchable.</Text>
+            <Text style={[styles.chipLabel, { color: tokens.ink }]}>{t('courses.archived')}</Text>
+            <Text style={[styles.hint, { color: tokens.muted }]}>{t('courses.archivedHint')}</Text>
           </View>
           <Switch value={archived} onValueChange={setArchived} trackColor={{ true: tokens.accent }} />
         </View>

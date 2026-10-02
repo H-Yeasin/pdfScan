@@ -12,6 +12,7 @@ import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { PageCanvas } from './PageCanvas';
+import { useT } from '../../i18n/useT';
 
 type SelectTextSheetProps = {
   visible: boolean;
@@ -25,6 +26,7 @@ type SelectTextSheetProps = {
 // the selection. A page without OCR text offers to run OCR again.
 export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSheetProps) {
   const { tokens: theme } = useTheme();
+  const { t } = useT();
   const { state, dispatch } = useAppState();
   const page = doc.pages[pageIdx];
   const tokens = useMemo(() => readingOrderTokens(page?.ocr), [page?.ocr]);
@@ -65,7 +67,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
 
   const copy = async () => {
     await Clipboard.setStringAsync(text);
-    dispatch({ type: 'ui/SHOW_SNACK', msg: `Copied ${selected.length} ${selected.length === 1 ? 'word' : 'words'}` });
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.select.copiedWords', { count: selected.length }) });
   };
 
   const rerunOcr = async () => {
@@ -77,7 +79,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
       const ocr = await runOcr(page.fileUri, resolveOcrScript({ course, settings: state.settings }));
       const pages = doc.pages.map((p, i) => (i === pageIdx ? { ...p, ocr, ocrFailed: ocr === undefined || undefined } : p));
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: { pages } });
-      if (!ocr?.text.trim()) dispatch({ type: 'ui/SHOW_SNACK', msg: 'Still no text found on this page' });
+      if (!ocr?.text.trim()) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.select.stillNoText') });
     } finally {
       setRerunning(false);
     }
@@ -90,10 +92,10 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]}>
           <View style={styles.header}>
-            <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel="Close">
+            <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={22} color={theme.ink} />
             </Pressable>
-            <Text style={[styles.title, { color: theme.ink }]}>Select text · p. {pageIdx + 1}</Text>
+            <Text style={[styles.title, { color: theme.ink }]}>{t('reader.select.title', { page: pageIdx + 1 })}</Text>
           </View>
 
           {page ? (
@@ -128,20 +130,20 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
           <View style={[styles.bar, { backgroundColor: theme.surface, borderTopColor: theme.edge }]}>
             {noText ? (
               <View style={styles.noText}>
-                <Text style={[styles.noTextLabel, { color: theme.ink }]}>No text found on this page. Run OCR again?</Text>
+                <Text style={[styles.noTextLabel, { color: theme.ink }]}>{t('reader.select.noText')}</Text>
                 <Pressable
                   style={[styles.button, { backgroundColor: theme.accent, opacity: rerunning ? 0.6 : 1 }]}
                   onPress={rerunOcr}
                   disabled={rerunning}
                   accessibilityRole="button"
                 >
-                  {rerunning ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>Run OCR</Text>}
+                  {rerunning ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>{t('reader.select.runOcr')}</Text>}
                 </Pressable>
               </View>
             ) : (
               <>
                 <Text style={[styles.hint, { color: theme.muted }]} numberOfLines={2}>
-                  {selected.length ? text : 'Drag across the words to select them. Two fingers zoom.'}
+                  {selected.length ? text : t('reader.select.hint')}
                 </Text>
                 <View style={styles.actions}>
                   <Pressable
@@ -152,10 +154,10 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                     }}
                     accessibilityRole="button"
                   >
-                    <Text style={[styles.ghostLabel, { color: theme.accentInk }]}>Select all</Text>
+                    <Text style={[styles.ghostLabel, { color: theme.accentInk }]}>{t('reader.select.selectAll')}</Text>
                   </Pressable>
                   <Pressable style={styles.ghost} onPress={() => text && Share.share({ message: text })} disabled={!text} accessibilityRole="button">
-                    <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>Share</Text>
+                    <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>{t('reader.select.share')}</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.button, { backgroundColor: theme.accent, opacity: text ? 1 : 0.5 }]}
@@ -163,7 +165,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                     disabled={!text}
                     accessibilityRole="button"
                   >
-                    <Text style={styles.buttonLabel}>Copy</Text>
+                    <Text style={styles.buttonLabel}>{t('reader.select.copy')}</Text>
                   </Pressable>
                 </View>
               </>

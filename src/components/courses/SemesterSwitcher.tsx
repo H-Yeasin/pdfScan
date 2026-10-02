@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Semester } from '../../types/models';
+import { useT } from '../../i18n/useT';
 
 type SemesterSwitcherProps = {
   visible: boolean;
@@ -18,6 +19,7 @@ type SemesterSwitcherProps = {
 // (it and all its courses at once - library/ARCHIVE_SEMESTER; documents stay searchable).
 export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterSwitcherProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useAppState();
   const active = state.library.semesters.filter((s) => !s.archived);
@@ -31,17 +33,17 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
   const archive = (semester: Semester) => {
     const count = state.library.courses.filter((c) => c.semesterId === semester.id && !c.archived).length;
     Alert.alert(
-      `Archive ${semester.name}?`,
-      `${count === 1 ? 'Its course' : `Its ${count} courses`} will be hidden from Home and pickers. Every document stays in your library and in search.`,
+      t('courses.semesterSwitcher.archiveTitle', { name: semester.name }),
+      t('courses.semesterSwitcher.archiveBody', { count }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Archive',
+          text: t('courses.archive'),
           style: 'destructive',
           onPress: () => {
             dispatch({ type: 'library/ARCHIVE_SEMESTER', id: semester.id });
             dispatch({ type: 'library/SET_HOME_SEMESTER', id: null });
-            dispatch({ type: 'ui/SHOW_SNACK', msg: `${semester.name} archived` });
+            dispatch({ type: 'ui/SHOW_SNACK', msg: t('courses.semesterSwitcher.archived', { name: semester.name }) });
             onClose();
           },
         },
@@ -58,13 +60,13 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
             { backgroundColor: tokens.surface, borderColor: tokens.edge, paddingBottom: spacing.md + insets.bottom },
           ]}
         >
-          <Text style={[styles.title, { color: tokens.ink }]}>Semester</Text>
+          <Text style={[styles.title, { color: tokens.ink }]}>{t('courses.semesterSwitcher.title')}</Text>
           <ScrollView style={styles.list}>
             {active.map((semester) => (
               <Pressable key={semester.id} style={styles.row} onPress={() => pick(semester)}>
                 <Text style={[styles.rowLabel, { color: tokens.ink }]} numberOfLines={1}>
                   {semester.name}
-                  {semester.id === current?.id ? <Text style={{ color: tokens.muted }}>  · Current</Text> : null}
+                  {semester.id === current?.id ? <Text style={{ color: tokens.muted }}>{t('courses.semesterSwitcher.current')}</Text> : null}
                 </Text>
                 {semester.id === shown?.id ? <Ionicons name="checkmark" size={18} color={tokens.accent} /> : null}
               </Pressable>
@@ -73,7 +75,7 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
           {shown ? (
             <Pressable style={styles.row} onPress={() => archive(shown)} accessibilityRole="button">
               <Ionicons name="archive-outline" size={18} color={tokens.danger} />
-              <Text style={[styles.rowLabel, { color: tokens.danger }]}>Archive {shown.name}…</Text>
+              <Text style={[styles.rowLabel, { color: tokens.danger }]}>{t('courses.semesterSwitcher.archiveRow', { name: shown.name })}</Text>
             </Pressable>
           ) : null}
         </Pressable>

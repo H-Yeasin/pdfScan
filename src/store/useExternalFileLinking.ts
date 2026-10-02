@@ -4,6 +4,7 @@ import { importExternalFile, pruneExternalOpens } from '../services/files/extern
 import { promoteExternalToLibrary } from '../services/persistence/libraryOperations';
 import { useAppState } from './AppStateContext';
 import { useRouter } from '../navigation/router';
+import { t } from '../i18n';
 
 // Handles the app being launched (or brought to foreground) via an OS "Open with pdfScan" /
 // "Share to pdfScan" intent for a supported file. Cold start goes through getInitialURL(); warm
@@ -34,7 +35,7 @@ export function useExternalFileLinking(libraryLoaded: boolean): void {
         go('reader');
       } catch (e) {
         console.warn('useExternalFileLinking: failed to open', uri, e);
-        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't open that file" });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.openFailed') });
       }
     },
     [dispatch, go]

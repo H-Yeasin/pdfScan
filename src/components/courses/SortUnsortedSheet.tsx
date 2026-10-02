@@ -8,12 +8,14 @@ import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatRelativeDate } from '../../utils/format';
+import { useT } from '../../i18n/useT';
 
 // §3 K6: files Unsorted documents one at a time. Each shows its first page and the active
 // courses, best guess first (suggestCourses, as if it were scanned at the time it was made, so a
 // timetable puts the right lecture first); one tap files it and moves on, Skip leaves it.
 export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean; docs: readonly LibraryDocument[]; onClose: () => void }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useAppState();
   const { courses, timetable, files } = state.library;
@@ -41,24 +43,24 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
         {done ? (
           <View style={styles.doneBox}>
-            <Text style={[styles.title, { color: tokens.ink }]}>All sorted</Text>
+            <Text style={[styles.title, { color: tokens.ink }]}>{t('courses.sort.allSorted')}</Text>
             <Text style={[styles.meta, { color: tokens.muted }]}>
-              Filed {filed} of {queue.length}. Anything you skipped stays in Unsorted.
+              {t('courses.sort.filedSummary', { filed, total: queue.length })}
             </Text>
             <Pressable style={[styles.primary, { backgroundColor: tokens.accent }]} onPress={onClose} accessibilityRole="button">
-              <Text style={styles.primaryLabel}>Done</Text>
+              <Text style={styles.primaryLabel}>{t('courses.sort.done')}</Text>
             </Pressable>
           </View>
         ) : (
           <>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: tokens.ink }]}>Sort Unsorted</Text>
+              <Text style={[styles.title, { color: tokens.ink }]}>{t('courses.sort.title')}</Text>
               <Text style={[styles.meta, { color: tokens.muted }]}>
-                {index + 1} of {queue.length}
+                {t('courses.sort.progress', { current: index + 1, total: queue.length })}
               </Text>
             </View>
             <View style={styles.docRow}>
@@ -72,7 +74,7 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
                   {doc.name}
                 </Text>
                 <Text style={[styles.meta, { color: tokens.muted }]}>
-                  {getDocType(docTypeOf(doc)).label} · {formatRelativeDate(doc.createdAt)}
+                  {t(getDocType(docTypeOf(doc)).labelKey)} · {formatRelativeDate(doc.createdAt)}
                 </Text>
               </View>
             </View>
@@ -87,7 +89,7 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
                     next();
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`File under ${course.name}`}
+                  accessibilityLabel={t('courses.sort.fileUnder', { name: course.name })}
                 >
                   <View style={[styles.dot, { backgroundColor: courseColorValue(course.color, tokens) }]} />
                   <Text style={[styles.chipLabel, { color: tokens.ink }]}>{course.code ? `${course.code} · ${course.name}` : course.name}</Text>
@@ -96,10 +98,10 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
             </ScrollView>
             <View style={styles.actions}>
               <Pressable style={styles.ghost} onPress={onClose} accessibilityRole="button">
-                <Text style={[styles.ghostLabel, { color: tokens.muted }]}>Stop</Text>
+                <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('courses.sort.stop')}</Text>
               </Pressable>
               <Pressable style={styles.ghost} onPress={next} accessibilityRole="button">
-                <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>Skip</Text>
+                <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('courses.sort.skip')}</Text>
               </Pressable>
             </View>
           </>

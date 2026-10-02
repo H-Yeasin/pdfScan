@@ -6,9 +6,11 @@ import { CourseList } from '../components/courses/CourseList';
 import { useRouter } from '../navigation/router';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { useT } from '../i18n/useT';
 
 export function ManageFoldersScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go } = useRouter();
   const { state } = useAppState();
   const { files } = state.library;
@@ -26,10 +28,10 @@ export function ManageFoldersScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')}>
+        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Manage courses</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('library.manageCourses')}</Text>
       </View>
 
       <ScrollView>

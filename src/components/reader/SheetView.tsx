@@ -6,6 +6,7 @@ import Papa from 'papaparse';
 import { spacing, useTheme } from '../../theme';
 import { readTextWithEncodingFallback } from '../../services/documents/txtService';
 import type { DocFormat } from '../../types/models';
+import { useT } from '../../i18n/useT';
 
 const MAX_COLUMNS = 200;
 const SAMPLE_ROWS_FOR_WIDTH = 50;
@@ -72,6 +73,7 @@ type SheetViewProps = {
 
 export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }: SheetViewProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [sheets, setSheets] = useState<Sheet[] | null>(null);
   const [error, setError] = useState(false);
   const [activeSheet, setActiveSheet] = useState(0);
@@ -112,7 +114,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
   if (error) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>Couldn't open this file.</Text>
+        <Text style={{ color: tokens.muted }}>{t('reader.openFailed')}</Text>
       </View>
     );
   }
@@ -120,7 +122,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
   if (!sheets) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>Loading…</Text>
+        <Text style={{ color: tokens.muted }}>{t('reader.loading')}</Text>
       </View>
     );
   }
@@ -146,7 +148,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
         </ScrollView>
       )}
       {totalColumns > MAX_COLUMNS && (
-        <Text style={[styles.truncNote, { color: tokens.muted }]}>Showing the first {MAX_COLUMNS} columns.</Text>
+        <Text style={[styles.truncNote, { color: tokens.muted }]}>{t('reader.firstColumns', { count: MAX_COLUMNS })}</Text>
       )}
       <ScrollView horizontal>
         <FlatList

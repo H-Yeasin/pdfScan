@@ -9,6 +9,7 @@ import { ensureSubmissionFile, submissionRecord } from '../services/submit/histo
 import { matchDeadline } from '../services/submit/deadlines';
 import type { LibraryDocument, Submission } from '../types/models';
 import { useAppState } from './AppStateContext';
+import { t } from '../i18n';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
 // with its course's preset as it is now, then opens the share sheet. Returns false when the
@@ -21,12 +22,12 @@ export function useSubmitDocument() {
   return useCallback(
     async (doc: LibraryDocument): Promise<boolean> => {
       if (!canSubmit(doc)) {
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Only scanned documents can be submitted' });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.onlyScanned') });
         return false;
       }
       const course = courses.find((c) => c.id === doc.courseId);
       const preset = course?.submitPreset ?? defaultSubmitPreset(doc.courseId ?? null);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: preset.sizeLimitBytes ? `Fitting under ${formatLimit(preset.sizeLimitBytes)}…` : 'Building PDF…' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: preset.sizeLimitBytes ? t('deliver.progress.fitting', { size: formatLimit(preset.sizeLimitBytes) }) : t('deliver.progress.building') });
       try {
         const n = typeNumberOf(doc, files);
         const result = await submitDocument({
@@ -40,15 +41,15 @@ export function useSubmitDocument() {
         const record = submissionRecord(doc, result, preset, n);
         dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
         const msg = result.fits
-          ? `Submitting ${result.fileName} · ${formatLimit(result.sizeBytes)}`
+          ? t('deliver.snack.submitting', { file: result.fileName, size: formatLimit(result.sizeBytes) })
           : tooLargeMessage(result, preset.sizeLimitBytes ?? 0);
         const deadline = matchDeadline(doc, deadlines);
         dispatch(
           deadline
             ? {
                 type: 'ui/SHOW_SNACK',
-                msg: `${msg} · Mark '${deadline.title}' as done?`,
-                action: 'Done',
+                msg: t('deliver.snack.markDone', { message: msg, title: deadline.title }),
+                action: t('deliver.snack.done'),
                 onAction: () => dispatch({ type: 'library/UPDATE_DEADLINE', id: deadline.id, patch: { doneSubmissionId: record.id } }),
               }
             : { type: 'ui/SHOW_SNACK', msg }
@@ -57,7 +58,7 @@ export function useSubmitDocument() {
         return true;
       } catch (error) {
         console.warn('useSubmitDocument: submit failed', error);
-        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't build the submission" });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.buildFailed') });
         return false;
       }
     },
@@ -79,11 +80,11 @@ export function useShareSubmission() {
       try {
         const course = courses.find((c) => c.id === doc.courseId);
         const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files, annotations });
-        if (rebuilt) dispatch({ type: 'ui/SHOW_SNACK', msg: `Rebuilt ${submission.fileName}` });
+        if (rebuilt) dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.rebuilt', { file: submission.fileName }) });
         await shareAs(uri, submission.fileName, 'application/pdf');
       } catch (error) {
         console.warn('useShareSubmission: failed', error);
-        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't share the submission" });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.shareFailed') });
       }
     },
     [files, courses, annotations, profile, dispatch]

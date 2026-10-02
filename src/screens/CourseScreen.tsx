@@ -24,12 +24,14 @@ import { startScan } from '../services/courses/startScan';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { DocType } from '../types/models';
+import { useT } from '../i18n/useT';
 
 // One course's page: its header and its documents, newest first. Opened from Home's course grid
 // and Library's Courses tab (state.library.activeCourseId says which). Scanning from here files
 // the scan into this course (startScan preselects it in Deliver). Type chips filter the list (K4).
 export function CourseScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const { go, tabHub } = useRouter();
   const { state, dispatch } = useAppState();
@@ -85,7 +87,7 @@ export function CourseScreen() {
       items: bookmarked.map((b) => ({ documentId: b.doc.id, pageId: b.bookmark.pageId })),
       courseId: course?.id ?? null,
     });
-    dispatch({ type: 'ui/SHOW_SNACK', msg: `Added ${bookmarked.length} bookmarked pages to the exam pack`, action: 'Open', onAction: () => go('examPack') });
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('courses.page.addedBookmarks', { count: bookmarked.length }), action: t('courses.page.open'), onAction: () => go('examPack') });
   };
 
   // Unsorted: a one-time "Sort them now?" banner, and a Sort button that's always there.
@@ -109,8 +111,8 @@ export function CourseScreen() {
   };
 
   const subtitle = course
-    ? [course.code, course.teacher, course.archived ? 'Archived' : undefined].filter(Boolean).join(' · ')
-    : 'Documents not filed under a course';
+    ? [course.code, course.teacher, course.archived ? t('courses.page.archived') : undefined].filter(Boolean).join(' · ')
+    : t('courses.page.unsortedSubtitle');
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -119,21 +121,21 @@ export function CourseScreen() {
           <Pressable
             style={[styles.iconButton, { backgroundColor: tokens.surface2, borderRadius: 22 }]}
             onPress={() => dispatch({ type: 'library/CLEAR_SELECTION' })}
-            accessibilityLabel="Clear selection"
+            accessibilityLabel={t('library.clearSelection')}
           >
             <Ionicons name="close" size={20} color={tokens.ink} />
           </Pressable>
-          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{selection.length} selected</Text>
+          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.length })}</Text>
         </View>
       ) : (
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={goBack} accessibilityLabel="Back">
+          <Pressable style={styles.iconButton} onPress={goBack} accessibilityLabel={t('common.back')}>
             <Ionicons name="chevron-back" size={22} color={tokens.ink} />
           </Pressable>
           {course ? <CourseBadge course={course} size={40} /> : null}
           <View style={styles.titleWrap}>
             <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
-              {course?.name ?? 'Unsorted'}
+              {course?.name ?? t('common.unsorted')}
             </Text>
             {subtitle ? (
               <Text style={[styles.subtitle, { color: tokens.muted }]} numberOfLines={1}>
@@ -142,7 +144,7 @@ export function CourseScreen() {
             ) : null}
           </View>
           {docs.length > 0 ? (
-            <Pressable style={styles.iconButton} onPress={openPack} accessibilityLabel={`Exam pack${packCount ? `, ${packCount} pages` : ''}`}>
+            <Pressable style={styles.iconButton} onPress={openPack} accessibilityLabel={packCount ? t('courses.page.examPackCountA11y', { count: packCount }) : t('courses.page.examPackA11y')}>
               <Ionicons name="layers-outline" size={21} color={tokens.ink} />
               {packCount ? (
                 <View style={[styles.badge, { backgroundColor: tokens.accent }]}>
@@ -152,11 +154,11 @@ export function CourseScreen() {
             </Pressable>
           ) : null}
           {course ? (
-            <Pressable style={styles.iconButton} onPress={() => setEditing(true)} accessibilityLabel="Edit course">
+            <Pressable style={styles.iconButton} onPress={() => setEditing(true)} accessibilityLabel={t('courses.editCourse')}>
               <Ionicons name="create-outline" size={21} color={tokens.ink} />
             </Pressable>
           ) : toSort.length > 0 && state.library.courses.some((c) => !c.archived) ? (
-            <Pressable style={styles.iconButton} onPress={startSorting} accessibilityLabel="Sort into courses">
+            <Pressable style={styles.iconButton} onPress={startSorting} accessibilityLabel={t('courses.page.sortInto')}>
               <Ionicons name="git-pull-request-outline" size={21} color={tokens.ink} />
             </Pressable>
           ) : null}
@@ -166,14 +168,14 @@ export function CourseScreen() {
       {showSortBanner && !selMode && state.library.courses.some((c) => !c.archived) ? (
         <View style={[styles.banner, { backgroundColor: tokens.accentSoft, borderColor: tokens.edge }]}>
           <Text style={[styles.bannerText, { color: tokens.ink }]}>
-            {toSort.length} {toSort.length === 1 ? 'document has' : 'documents have'} no course. Sort them now?
+            {t('courses.page.sortBanner', { count: toSort.length })}
           </Text>
           <View style={styles.bannerActions}>
             <Pressable onPress={() => dispatch({ type: 'settings/SET_UNSORTED_PROMPT_DONE' })} accessibilityRole="button" hitSlop={8}>
-              <Text style={[styles.addLink, { color: tokens.muted }]}>Not now</Text>
+              <Text style={[styles.addLink, { color: tokens.muted }]}>{t('courses.page.notNow')}</Text>
             </Pressable>
             <Pressable onPress={startSorting} accessibilityRole="button" hitSlop={8}>
-              <Text style={[styles.addLink, { color: tokens.accentInk }]}>Sort now</Text>
+              <Text style={[styles.addLink, { color: tokens.accentInk }]}>{t('courses.page.sortNow')}</Text>
             </Pressable>
           </View>
         </View>
@@ -182,9 +184,9 @@ export function CourseScreen() {
       {course && !selMode ? (
         <View style={styles.deadlines}>
           <View style={styles.deadlinesHeader}>
-            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Deadlines</Text>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('courses.page.deadlines')}</Text>
             <Pressable onPress={() => setDeadlineEditor({})} accessibilityRole="button" hitSlop={8}>
-              <Text style={[styles.addLink, { color: tokens.accentInk }]}>+ Add deadline</Text>
+              <Text style={[styles.addLink, { color: tokens.accentInk }]}>{t('courses.page.addDeadline')}</Text>
             </Pressable>
           </View>
           {deadlines.length > 0 ? (
@@ -202,13 +204,13 @@ export function CourseScreen() {
       {bookmarked.length > 0 && !selMode ? (
         <View style={styles.deadlines}>
           <View style={styles.deadlinesHeader}>
-            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Bookmarked</Text>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('courses.page.bookmarked')}</Text>
             <Pressable onPress={addBookmarksToPack} accessibilityRole="button" hitSlop={8}>
-              <Text style={[styles.addLink, { color: tokens.accentInk }]}>Add all to exam pack</Text>
+              <Text style={[styles.addLink, { color: tokens.accentInk }]}>{t('courses.page.addAllToPack')}</Text>
             </Pressable>
             {bookmarked.length > 3 ? (
               <Pressable onPress={() => setAllBookmarks((v) => !v)} accessibilityRole="button" hitSlop={8}>
-                <Text style={[styles.addLink, { color: tokens.accentInk }]}>{allBookmarks ? 'Show less' : `Show all ${bookmarked.length}`}</Text>
+                <Text style={[styles.addLink, { color: tokens.accentInk }]}>{allBookmarks ? t('courses.page.showLess') : t('courses.page.showAll', { count: bookmarked.length })}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -224,9 +226,9 @@ export function CourseScreen() {
 
       {docs.length === 0 ? (
         <EmptyState
-          title={course ? `Nothing in ${course.name} yet` : 'Nothing unsorted'}
-          body={course ? 'Scans you start here are saved to this course.' : undefined}
-          actionLabel={course ? 'Scan into this course' : undefined}
+          title={course ? t('courses.page.emptyCourse', { name: course.name }) : t('courses.page.emptyUnsorted')}
+          body={course ? t('courses.page.emptyBody') : undefined}
+          actionLabel={course ? t('courses.page.scanInto') : undefined}
           onAction={course ? handleScan : undefined}
         />
       ) : (
@@ -241,13 +243,13 @@ export function CourseScreen() {
                 {archivedCount > 0 ? (
                   <Pressable style={styles.archivedToggle} onPress={() => setShowArchived((v) => !v)} accessibilityRole="button">
                     <Text style={[styles.addLink, { color: tokens.accentInk }]}>
-                      {showArchived ? 'Hide archived' : `Show ${archivedCount} archived`}
+                      {showArchived ? t('library.hideArchived') : t('library.showArchived', { count: archivedCount })}
                     </Text>
                   </Pressable>
                 ) : null}
                 {submissions.length > 0 ? (
                   <View style={styles.submitted}>
-                    <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Submitted</Text>
+                    <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('courses.page.submitted')}</Text>
                     <SubmissionList
                       submissions={submissions}
                       onShareAgain={shareSubmission}
@@ -281,10 +283,10 @@ export function CourseScreen() {
           style={[styles.scanButton, { backgroundColor: tokens.accent, bottom: spacing.lg + insets.bottom }]}
           onPress={handleScan}
           accessibilityRole="button"
-          accessibilityLabel={course ? `Scan into ${course.name}` : 'Scan'}
+          accessibilityLabel={course ? t('courses.page.scanIntoA11y', { name: course.name }) : t('common.scan')}
         >
           <Ionicons name="scan" size={20} color="#fff" />
-          <Text style={styles.scanLabel}>Scan</Text>
+          <Text style={styles.scanLabel}>{t('common.scan')}</Text>
         </Pressable>
       ) : null}
 

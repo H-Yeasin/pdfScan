@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 export type OverflowItemId =
   | 'share'
@@ -18,25 +19,25 @@ export type OverflowItemId =
   | 'annotate'
   | 'bookmarks';
 
-type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
+type Item = { id: OverflowItemId; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
 
 // Share/Sign/Export/Print live in the persistent ReaderActionBar; management/destructive actions
 // stay here so there's exactly one, deliberately-gated path to each.
-const DELETE_ITEM: Item = { id: 'delete', label: 'Delete', icon: 'trash-outline', destructive: true };
-const CHANGE_TYPE_ITEM: Item = { id: 'changeType', label: 'Change type', icon: 'pricetag-outline' };
+const DELETE_ITEM: Item = { id: 'delete', icon: 'trash-outline', destructive: true };
+const CHANGE_TYPE_ITEM: Item = { id: 'changeType', icon: 'pricetag-outline' };
 // §4 S6: rebuild and share the teacher's copy with the course's preset.
-const SUBMIT_ITEM: Item = { id: 'submit', label: 'Submit', icon: 'paper-plane-outline' };
+const SUBMIT_ITEM: Item = { id: 'submit', icon: 'paper-plane-outline' };
 // §5 T3: the OCR text of scanned pages.
 const TEXT_ITEMS: Item[] = [
   // §5 T4.
-  { id: 'annotate', label: 'Annotate', icon: 'color-fill-outline' },
+  { id: 'annotate', icon: 'color-fill-outline' },
   // §5 T5.
-  { id: 'bookmarks', label: 'Bookmarks', icon: 'bookmarks-outline' },
-  { id: 'selectText', label: 'Select text', icon: 'text-outline' },
-  { id: 'copyText', label: 'Copy page text', icon: 'copy-outline' },
-  { id: 'extractText', label: 'Extract text (.txt)', icon: 'document-text-outline' },
+  { id: 'bookmarks', icon: 'bookmarks-outline' },
+  { id: 'selectText', icon: 'text-outline' },
+  { id: 'copyText', icon: 'copy-outline' },
+  { id: 'extractText', icon: 'document-text-outline' },
 ];
-const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', label: 'Add to Library', icon: 'add-circle-outline' };
+const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', icon: 'add-circle-outline' };
 
 type OverflowSheetProps = {
   visible: boolean;
@@ -60,6 +61,7 @@ export function OverflowSheet({
   showText = false,
 }: OverflowSheetProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const items: Item[] = [
     ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
@@ -87,7 +89,7 @@ export function OverflowSheet({
             >
               <Ionicons name={item.icon} size={20} color={item.destructive ? tokens.danger : tokens.ink} />
               <Text style={[styles.itemLabel, { color: item.destructive ? tokens.danger : tokens.ink }]}>
-                {item.label}
+                {t(`reader.actions.${item.id}`)}
               </Text>
             </Pressable>
           ))}

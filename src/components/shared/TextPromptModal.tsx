@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type TextPromptModalProps = {
   visible: boolean;
@@ -24,6 +25,7 @@ export function TextPromptModal({
   onSubmit,
 }: TextPromptModalProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [value, setValue] = useState(initialValue);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function TextPromptModal({
           />
           <View style={styles.actions}>
             <Pressable style={styles.ghostButton} onPress={onCancel}>
-              <Text style={[styles.ghostLabel, { color: tokens.muted }]}>Cancel</Text>
+              <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable
               style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: trimmed ? 1 : 0.5 }]}

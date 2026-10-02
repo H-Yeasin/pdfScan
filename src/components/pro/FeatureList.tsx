@@ -1,16 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
-const FEATURES = [
-  'Batch OCR and batch export across many files',
-  'Folder lock with fingerprint or passcode',
-  'Theme accents beyond the default',
-  'Automatic backup to your own Drive or Dropbox',
-];
+const FEATURES = ['batch', 'lock', 'accents', 'backup'] as const;
 
 export function FeatureList() {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <View style={styles.list}>
@@ -19,7 +16,7 @@ export function FeatureList() {
           <View style={[styles.iconWrap, { backgroundColor: tokens.accentSoft }]}>
             <Ionicons name="checkmark" size={13} color={tokens.accentInk} />
           </View>
-          <Text style={[styles.label, { color: tokens.ink }]}>{feature}</Text>
+          <Text style={[styles.label, { color: tokens.ink }]}>{t(`pro.features.${feature}`)}</Text>
         </View>
       ))}
     </View>

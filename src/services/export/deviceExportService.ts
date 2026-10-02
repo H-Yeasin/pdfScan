@@ -10,6 +10,7 @@ import { EncodingType, readAsStringAsync, StorageAccessFramework } from 'expo-fi
 import { isPageRasterFormat } from '../documents/formatCapabilities';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import type { LibraryDocument } from '../../types/models';
+import { t } from '../../i18n';
 
 export type DeviceExportResult = { ok: number; failed: number };
 
@@ -21,9 +22,9 @@ export function deriveFolderLabel(treeUri: string): string {
     const decoded = decodeURIComponent(treeUri);
     const afterColon = decoded.split(':').pop() ?? decoded;
     const segments = afterColon.split('/').filter(Boolean);
-    return segments[segments.length - 1] || 'Selected folder';
+    return segments[segments.length - 1] || t('library.selectedFolder');
   } catch {
-    return 'Selected folder';
+    return t('library.selectedFolder');
   }
 }
 

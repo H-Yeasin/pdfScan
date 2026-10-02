@@ -2,6 +2,7 @@ import type { LibraryAction } from '../../store/slices/librarySlice';
 import type { Course, CourseColor, Semester } from '../../types/models';
 import { toLocalDateString } from '../../utils/localDate';
 import { nextCourseColor } from './palette';
+import { t } from '../../i18n';
 
 // Course setup rules shared by CourseEditorSheet (one course) and QuickSetupSheet (several at
 // once, also reused by §9 onboarding). Pure, so the rules are tested without any UI.
@@ -24,9 +25,10 @@ export function defaultSemester(now: Date): { name: string; startsOn: string; en
     startsOn: toLocalDateString(new Date(year, from, 1).getTime()),
     endsOn: toLocalDateString(new Date(year, toMonth, toDay).getTime()),
   });
-  if (month <= 4) return { name: `Spring ${year}`, ...span(0, 4, 31) };
-  if (month <= 6) return { name: `Summer ${year}`, ...span(5, 6, 31) };
-  return { name: `Fall ${year}`, ...span(7, 11, 31) };
+  // The name is a default the student can change; it's stored as typed, in the UI language.
+  if (month <= 4) return { name: t('courses.semesterNames.spring', { year: String(year) }), ...span(0, 4, 31) };
+  if (month <= 6) return { name: t('courses.semesterNames.summer', { year: String(year) }), ...span(5, 6, 31) };
+  return { name: t('courses.semesterNames.fall', { year: String(year) }), ...span(7, 11, 31) };
 }
 
 // Codes compare loosely: "cse 101", "CSE101" and " CSE  101 " are the same course code.
@@ -51,13 +53,13 @@ export type CourseDraftErrors = { name?: string; code?: string };
 // `selfId` is the course being edited, so it doesn't clash with itself.
 export function validateCourseDraft(draft: CourseDraft, courses: readonly Course[], selfId?: string): CourseDraftErrors {
   const errors: CourseDraftErrors = {};
-  if (!draft.name.trim()) errors.name = 'Give the course a name';
+  if (!draft.name.trim()) errors.name = t('courses.errors.nameMissing');
   const code = codeKey(draft.code);
   if (code) {
     const clash = courses.find(
       (c) => c.id !== selfId && !c.archived && c.semesterId === draft.semesterId && codeKey(c.code) === code
     );
-    if (clash) errors.code = `${clash.name} already uses this code`;
+    if (clash) errors.code = t('courses.errors.codeTaken', { name: clash.name });
   }
   return errors;
 }
@@ -87,12 +89,12 @@ export function validateQuickSetup(
     const code = codeKey(row.code);
     if (code && !errors.code) {
       const earlier = seenCodes.get(code);
-      if (earlier !== undefined) errors.code = `Same code as row ${earlier + 1}`;
+      if (earlier !== undefined) errors.code = t('courses.errors.codeRepeated', { row: earlier + 1 });
       else seenCodes.set(code, index);
     }
     return errors;
   });
-  return { rowErrors, semesterError: semesterName.trim() ? undefined : 'Name the semester', count };
+  return { rowErrors, semesterError: semesterName.trim() ? undefined : t('courses.errors.semesterMissing'), count };
 }
 
 // The colours the next `n` new courses will get, in order - what the sheet shows next to each row

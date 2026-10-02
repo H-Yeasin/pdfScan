@@ -7,6 +7,8 @@ import type { Course } from '../../types/models';
 import { CourseBadge } from './CourseBadge';
 import { CourseEditorSheet } from './CourseEditorSheet';
 import { QuickSetupSheet } from './QuickSetupSheet';
+import { t } from '../../i18n';
+import { useT } from '../../i18n/useT';
 
 // Sentinel id for the synthetic "Unsorted" bucket — never a real Course.id,
 // so it can share the same activeCourseId slot as real course ids.
@@ -19,7 +21,7 @@ type CourseListProps = {
 };
 
 function pluralFiles(n: number): string {
-  return `${n} ${n === 1 ? 'file' : 'files'}`;
+  return t('courses.files', { count: n });
 }
 
 // The course list with everything to manage it: create (one, or several with Quick setup), edit,
@@ -28,6 +30,8 @@ function pluralFiles(n: number): string {
 // it (Library's Courses tab, Manage courses, K2's Home) behaves the same.
 export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListProps) {
   const { tokens } = useTheme();
+  // t is imported (pluralFiles uses it too); this re-renders on a language change.
+  useT();
   const { state, dispatch } = useAppState();
   const { courses, files } = state.library;
 
@@ -41,36 +45,36 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
 
   const handleMenu = (course: Course) => {
     Alert.alert(course.name, undefined, [
-      { text: 'Edit', onPress: () => setEditing({ course }) },
+      { text: t('courses.edit'), onPress: () => setEditing({ course }) },
       {
-        text: course.archived ? 'Unarchive' : 'Archive',
+        text: course.archived ? t('courses.unarchive') : t('courses.archive'),
         onPress: () => dispatch({ type: 'library/UPDATE_COURSE', id: course.id, patch: { archived: !course.archived } }),
       },
       {
-        text: 'Delete',
+        text: t('courses.delete'),
         style: 'destructive',
         onPress: () => {
           // K6: say what happens to its documents, and offer archiving, which keeps them together.
           const count = files.filter((f) => f.courseId === course.id).length;
           const body =
             count === 0
-              ? 'It has no documents.'
-              : `Its ${count} ${count === 1 ? 'document moves' : 'documents move'} to Unsorted; nothing is deleted. Archiving keeps them together under the course instead.`;
-          Alert.alert(`Delete ${course.name}?`, body, [
-            { text: 'Cancel', style: 'cancel' },
+              ? t('courses.deleteEmpty')
+              : t('courses.deleteBody', { count });
+          Alert.alert(t('courses.deleteTitle', { name: course.name }), body, [
+            { text: t('common.cancel'), style: 'cancel' },
             ...(course.archived || count === 0
               ? []
               : [
                   {
-                    text: 'Archive instead',
+                    text: t('courses.archiveInstead'),
                     onPress: () => dispatch({ type: 'library/UPDATE_COURSE', id: course.id, patch: { archived: true } }),
                   },
                 ]),
-            { text: 'Delete', style: 'destructive', onPress: () => dispatch({ type: 'library/DELETE_COURSE', id: course.id }) },
+            { text: t('courses.delete'), style: 'destructive', onPress: () => dispatch({ type: 'library/DELETE_COURSE', id: course.id }) },
           ]);
         },
       },
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -81,16 +85,14 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
     <View style={styles.container}>
       {courses.length === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={[styles.emptyTitle, { color: tokens.ink }]}>Add your courses</Text>
-          <Text style={[styles.emptyBody, { color: tokens.muted }]}>
-            Scans get filed under a course, so each subject's notes and handouts stay together.
-          </Text>
+          <Text style={[styles.emptyTitle, { color: tokens.ink }]}>{t('courses.emptyTitle')}</Text>
+          <Text style={[styles.emptyBody, { color: tokens.muted }]}>{t('courses.emptyBody')}</Text>
           <Pressable
             style={[styles.primaryButton, { backgroundColor: tokens.accent }]}
             onPress={() => setQuickSetup(true)}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryLabel}>Add your courses</Text>
+            <Text style={styles.primaryLabel}>{t('courses.emptyTitle')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -105,7 +107,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
             <Ionicons name="file-tray-outline" size={18} color={tokens.muted} />
           </View>
           <View style={styles.textWrap}>
-            <Text style={[styles.title, { color: tokens.ink }]}>Unsorted</Text>
+            <Text style={[styles.title, { color: tokens.ink }]}>{t('common.unsorted')}</Text>
             <Text style={[styles.subtitle, { color: tokens.muted }]}>{pluralFiles(unsortedCount)}</Text>
           </View>
           {onOpenCourse ? <Ionicons name="chevron-forward" size={18} color={tokens.muted} /> : null}
@@ -133,7 +135,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
               {subtitle(course)}
             </Text>
           </View>
-          <Pressable onPress={() => handleMenu(course)} hitSlop={8} accessibilityLabel={`${course.name} options`}>
+          <Pressable onPress={() => handleMenu(course)} hitSlop={8} accessibilityLabel={t('courses.options', { name: course.name })}>
             <Ionicons name="ellipsis-horizontal" size={18} color={tokens.muted} />
           </Pressable>
         </Pressable>
@@ -147,7 +149,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
             accessibilityRole="button"
           >
             <Ionicons name="add" size={18} color={tokens.accentInk} />
-            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>New course</Text>
+            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>{t('courses.newCourse')}</Text>
           </Pressable>
           <Pressable
             style={[styles.newRow, { borderColor: tokens.edge }]}
@@ -155,14 +157,14 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
             accessibilityRole="button"
           >
             <Ionicons name="list" size={18} color={tokens.accentInk} />
-            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>Add several</Text>
+            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>{t('courses.addSeveral')}</Text>
           </Pressable>
         </View>
       ) : null}
 
       {archived.length > 0 ? (
         <View style={styles.switchRow}>
-          <Text style={[styles.switchLabel, { color: tokens.muted }]}>Show archived ({archived.length})</Text>
+          <Text style={[styles.switchLabel, { color: tokens.muted }]}>{t('courses.showArchived', { count: archived.length })}</Text>
           <Switch value={showArchived} onValueChange={setShowArchived} trackColor={{ true: tokens.accent }} />
         </View>
       ) : null}

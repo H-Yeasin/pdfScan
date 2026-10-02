@@ -6,7 +6,7 @@ import { formatCoverDate, itemsAsOcr, layoutContents, type ContentsEntry } from 
 import { buildPdfFromPages, pageDimensions, type PageSizeId } from '../pdf/pdfService';
 import { copyPageInto } from '../persistence/libraryOperations';
 import { footerPresetText } from '../submit/footerPresets';
-import { tDoc } from '../../i18n';
+import { t, tDoc } from '../../i18n';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { buildSearchHaystack } from '../search/searchService';
 import type { Annotation, LibraryDocument, LibraryPage } from '../../types/models';
@@ -72,7 +72,7 @@ export async function buildExamPack(
   const pages: LibraryPage[] = [];
 
   if (options.contents) {
-    options.onProgress?.('Making the contents page…');
+    options.onProgress?.(t('study.pack.progressContents'));
     const dims = pageDimensions(options.pageSize);
     const items = layoutContents(options.title, options.subtitle ?? '', contentsEntries(picked, 2), dims);
     const rendered = await renderPage(items, options.pageSize, 'contents');
@@ -91,7 +91,7 @@ export async function buildExamPack(
   const newPageIdFor = new Map<string, string>();
   const offset = pages.length;
   const copied = await processSequentially(picked, async (p, i) => {
-    options.onProgress?.(`Copying page ${i + 1} of ${picked.length}…`);
+    options.onProgress?.(t('study.pack.progressCopying', { current: i + 1, total: picked.length }));
     const page = copyPageInto(p.page, dir, offset + i + 1);
     newPageIdFor.set(`${p.doc.id}:${p.page.id}`, page.id);
     return page;
@@ -116,7 +116,7 @@ export async function buildExamPack(
     'standard',
     options.pageSize,
     {
-      onPage: (done, total) => options.onProgress?.(`Building PDF… page ${done} of ${total}`),
+      onPage: (done, total) => options.onProgress?.(t('deliver.progress.buildingPage', { current: done, total })),
       beforeSave: packAnnotations.length ? (pdfDoc) => writeAnnotations(pdfDoc, mapped, packAnnotations) : undefined,
     }
   );

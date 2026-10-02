@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureSignedPage } from '../../services/signature/signatureService';
 import { radii, spacing, useTheme } from '../../theme';
 import { INK_COLORS, SignaturePad } from './SignaturePad';
+import { useT } from '../../i18n/useT';
 
 type SignatureModalProps = {
   visible: boolean;
@@ -16,6 +17,7 @@ type SignatureModalProps = {
 
 export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCancel, onConfirm }: SignatureModalProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const shotRef = useRef<View>(null);
   const [empty, setEmpty] = useState(true);
@@ -71,21 +73,21 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
           ))}
         </View>
 
-        <Text style={styles.hint}>Draw your signature above</Text>
+        <Text style={styles.hint}>{t('shared.signature.hint')}</Text>
 
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
-            <Text style={styles.ghostLabel}>Cancel</Text>
+            <Text style={styles.ghostLabel}>{t('common.cancel')}</Text>
           </Pressable>
           <Pressable style={styles.ghostButton} onPress={handleClear}>
-            <Text style={styles.ghostLabel}>Clear</Text>
+            <Text style={styles.ghostLabel}>{t('shared.signature.clear')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: empty || saving ? 0.5 : 1 }]}
             onPress={handleDone}
             disabled={empty || saving}
           >
-            <Text style={styles.primaryLabel}>{saving ? 'Saving…' : 'Done'}</Text>
+            <Text style={styles.primaryLabel}>{saving ? t('shared.signature.saving') : t('shared.signature.done')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>

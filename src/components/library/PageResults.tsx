@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PageHit } from '../../services/persistence/dbService';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
+import { useT } from '../../i18n/useT';
 
 const SHOWN_PER_DOCUMENT = 3;
 
@@ -39,6 +40,7 @@ export function PageResults({
   onAddAll?: () => void;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const groups: { doc: LibraryDocument; hits: PageHit[] }[] = [];
@@ -54,11 +56,11 @@ export function PageResults({
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={[styles.label, { color: tokens.muted }]}>Pages</Text>
+        <Text style={[styles.label, { color: tokens.muted }]}>{t('library.pageResults')}</Text>
         {onAddAll ? (
           <Pressable onPress={onAddAll} accessibilityRole="button" hitSlop={8}>
             <Text style={[styles.moreLabel, { color: tokens.accentInk }]}>
-              Add {hits.length === 1 ? 'this page' : `these ${hits.length} pages`} to an exam pack
+              {t('library.addHitsToPack', { count: hits.length })}
             </Text>
           </Pressable>
         ) : null}
@@ -76,7 +78,7 @@ export function PageResults({
                   style={[styles.row, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
                   onPress={() => onOpen(doc, hit)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${doc.name}, page ${hit.idx + 1}`}
+                  accessibilityLabel={t('library.hitA11y', { doc: doc.name, page: hit.idx + 1 })}
                 >
                   <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
                     {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={styles.thumbImage} resizeMode="cover" /> : null}
@@ -98,7 +100,7 @@ export function PageResults({
                 style={styles.more}
               >
                 <Text style={[styles.moreLabel, { color: tokens.accentInk }]}>
-                  +{docHits.length - SHOWN_PER_DOCUMENT} more {docHits.length - SHOWN_PER_DOCUMENT === 1 ? 'page' : 'pages'} in {doc.name}
+                  {t('library.moreHits', { count: docHits.length - SHOWN_PER_DOCUMENT, doc: doc.name })}
                 </Text>
               </Pressable>
             ) : null}

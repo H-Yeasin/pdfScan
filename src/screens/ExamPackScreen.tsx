@@ -10,12 +10,14 @@ import { canSubmit } from '../services/documents/formatCapabilities';
 import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { useT } from '../i18n/useT';
 
 // §5 T6: the exam-pack tray: the picked pages in order (move up/down, remove), "Add pages" from
 // the course's documents, a title and options, and Build, which makes a new searchable,
 // annotated document in the course.
 export function ExamPackScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go, previousScreen } = useRouter();
   const { state, dispatch } = useAppState();
   const openDocument = useOpenDocument();
@@ -60,11 +62,11 @@ export function ExamPackScreen() {
       dispatch({ type: 'library/ADD_FILE', file: doc });
       for (const annotation of copied) dispatch({ type: 'library/ADD_ANNOTATION', annotation });
       dispatch({ type: 'pack/CLEAR' });
-      dispatch({ type: 'ui/SHOW_SNACK', msg: `${doc.name} · ${doc.pages.length} pages` });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('study.pack.built', { name: doc.name, count: doc.pages.length }) });
       openDocument(doc);
     } catch (error) {
       console.warn('ExamPackScreen: build failed', error);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't build the exam pack" });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('study.pack.buildFailed') });
     } finally {
       setBuilding(false);
       setProgress(null);
@@ -88,32 +90,32 @@ export function ExamPackScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable style={styles.iconButton} onPress={() => go(previousScreen ?? 'course', 'back')} accessibilityLabel="Back">
+        <Pressable style={styles.iconButton} onPress={() => go(previousScreen ?? 'course', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={22} color={tokens.ink} />
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Exam pack</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('study.pack.title')}</Text>
         {rows.length ? (
           <Pressable onPress={() => dispatch({ type: 'pack/CLEAR' })} accessibilityRole="button" hitSlop={8} style={styles.clear}>
-            <Text style={[styles.link, { color: tokens.muted }]}>Clear</Text>
+            <Text style={[styles.link, { color: tokens.muted }]}>{t('study.pack.clear')}</Text>
           </Pressable>
         ) : null}
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <NameField label="Title" value={pack.title} onChange={(title) => dispatch({ type: 'pack/SET_TITLE', title })} placeholder={placeholderTitle} />
+        <NameField label={t('study.pack.titleField')} value={pack.title} onChange={(title) => dispatch({ type: 'pack/SET_TITLE', title })} placeholder={placeholderTitle} />
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: tokens.muted }]}>
-              {rows.length} {rows.length === 1 ? 'page' : 'pages'}
+              {t('study.pack.pages', { count: rows.length })}
             </Text>
             <Pressable onPress={() => setPickerOpen(true)} accessibilityRole="button" hitSlop={8}>
-              <Text style={[styles.link, { color: tokens.accentInk }]}>+ Add pages</Text>
+              <Text style={[styles.link, { color: tokens.accentInk }]}>{t('study.pack.addPages')}</Text>
             </Pressable>
           </View>
           {rows.length === 0 ? (
             <Text style={[styles.meta, { color: tokens.muted }]}>
-              Add pages here, from a course's bookmarks ("Add all"), or from page search results in the Library.
+              {t('study.pack.emptyHint')}
             </Text>
           ) : null}
           {rows.map((row, i) => (
@@ -122,15 +124,15 @@ export function ExamPackScreen() {
                 {row.page ? <Image source={{ uri: row.page.thumbUri ?? row.page.fileUri }} style={styles.thumbImage} resizeMode="cover" /> : null}
               </View>
               <Text style={[styles.rowText, { color: row.doc ? tokens.ink : tokens.muted }]} numberOfLines={2}>
-                {row.doc && row.idx >= 0 ? `${row.doc.name} · p. ${row.idx + 1}` : 'Page no longer exists (skipped)'}
+                {row.doc && row.idx >= 0 ? t('study.pack.rowLabel', { name: row.doc.name, page: row.idx + 1 }) : t('study.pack.missing')}
               </Text>
-              <Pressable onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i - 1 })} disabled={i === 0} hitSlop={6} accessibilityLabel="Move up">
+              <Pressable onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i - 1 })} disabled={i === 0} hitSlop={6} accessibilityLabel={t('study.pack.moveUp')}>
                 <Ionicons name="arrow-up" size={18} color={i === 0 ? tokens.edge : tokens.ink} />
               </Pressable>
-              <Pressable onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i + 1 })} disabled={i === rows.length - 1} hitSlop={6} accessibilityLabel="Move down">
+              <Pressable onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i + 1 })} disabled={i === rows.length - 1} hitSlop={6} accessibilityLabel={t('study.pack.moveDown')}>
                 <Ionicons name="arrow-down" size={18} color={i === rows.length - 1 ? tokens.edge : tokens.ink} />
               </Pressable>
-              <Pressable onPress={() => dispatch({ type: 'pack/REMOVE', index: i })} hitSlop={6} accessibilityLabel="Remove">
+              <Pressable onPress={() => dispatch({ type: 'pack/REMOVE', index: i })} hitSlop={6} accessibilityLabel={t('study.pack.remove')}>
                 <Ionicons name="close" size={18} color={tokens.muted} />
               </Pressable>
             </View>
@@ -138,9 +140,9 @@ export function ExamPackScreen() {
         </View>
 
         <View style={styles.section}>
-          {option('contents', 'Contents page', 'First page lists where each page came from.')}
-          {option('includeAnnotations', 'Include annotations', 'Highlights, pen and notes come along.')}
-          {option('pageNumbers', 'Page numbers', '"Page X of Y" at the bottom.')}
+          {option('contents', t('study.pack.contents'), t('study.pack.contentsHint'))}
+          {option('includeAnnotations', t('study.pack.annotations'), t('study.pack.annotationsHint'))}
+          {option('pageNumbers', t('study.pack.pageNumbers'), t('study.pack.pageNumbersHint'))}
         </View>
       </ScrollView>
 
@@ -152,7 +154,7 @@ export function ExamPackScreen() {
           disabled={!rows.length || building}
           accessibilityRole="button"
         >
-          {building ? <ActivityIndicator color="#fff" /> : <Text style={styles.buildLabel}>Build PDF</Text>}
+          {building ? <ActivityIndicator color="#fff" /> : <Text style={styles.buildLabel}>{t('study.pack.build')}</Text>}
         </Pressable>
       </View>
 

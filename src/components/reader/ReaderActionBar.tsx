@@ -3,14 +3,15 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, typeScale, useTheme } from '../../theme';
 import type { OverflowItemId } from './OverflowSheet';
+import { useT } from '../../i18n/useT';
 
-type Item = { id: OverflowItemId; label: string; icon: keyof typeof Ionicons.glyphMap };
+type Item = { id: OverflowItemId; icon: keyof typeof Ionicons.glyphMap };
 
 const ITEMS: Item[] = [
-  { id: 'share', label: 'Share', icon: 'share-outline' },
-  { id: 'sign', label: 'Sign', icon: 'create-outline' },
-  { id: 'export', label: 'Export', icon: 'download-outline' },
-  { id: 'print', label: 'Print', icon: 'print-outline' },
+  { id: 'share', icon: 'share-outline' },
+  { id: 'sign', icon: 'create-outline' },
+  { id: 'export', icon: 'download-outline' },
+  { id: 'print', icon: 'print-outline' },
 ];
 
 type ReaderActionBarProps = {
@@ -24,6 +25,7 @@ type ReaderActionBarProps = {
 // there's exactly one, deliberately-gated path to a destructive action.
 export function ReaderActionBar({ visible, onPress, hiddenIds }: ReaderActionBarProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const items = hiddenIds?.length ? ITEMS.filter((item) => !hiddenIds.includes(item.id)) : ITEMS;
 
@@ -45,7 +47,7 @@ export function ReaderActionBar({ visible, onPress, hiddenIds }: ReaderActionBar
         {items.map((item) => (
           <Pressable key={item.id} style={styles.item} onPress={() => onPress(item.id)}>
             <Ionicons name={item.icon} size={21} color={tokens.ink} />
-            <Text style={[styles.label, { color: tokens.ink }]}>{item.label}</Text>
+            <Text style={[styles.label, { color: tokens.ink }]}>{t(`reader.actions.${item.id}`)}</Text>
           </Pressable>
         ))}
       </View>

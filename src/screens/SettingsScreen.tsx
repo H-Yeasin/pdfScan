@@ -116,7 +116,7 @@ export function SettingsScreen() {
               <LanguageRow
                 key={script.id}
                 name={script.nativeName}
-                subtitle={script.label}
+                subtitle={t(script.labelKey)}
                 sample={script.sampleText}
                 selected={ocrScript === script.id}
                 onPress={() => dispatch({ type: 'settings/SET_OCR_SCRIPT', script: script.id })}
@@ -126,7 +126,7 @@ export function SettingsScreen() {
               <LanguageRow
                 key={script.id}
                 name={script.nativeName}
-                subtitle={script.label}
+                subtitle={t(script.labelKey)}
                 selected={false}
                 comingSoon
               />

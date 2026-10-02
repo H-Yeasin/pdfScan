@@ -3,20 +3,21 @@ import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { spacing, useTheme } from '../../theme';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import type { LibraryDocument } from '../../types/models';
+import { useT } from '../../i18n/useT';
 
 export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign' | 'type' | 'submit' | 'move' | 'archive';
 
-type Tool = { id: SelectionToolId; label: string; icon: keyof typeof Ionicons.glyphMap };
+type Tool = { id: SelectionToolId; icon: keyof typeof Ionicons.glyphMap };
 
 const TOOLS: Tool[] = [
-  { id: 'submit', label: 'Submit', icon: 'paper-plane-outline' },
-  { id: 'move', label: 'Move', icon: 'folder-open-outline' },
-  { id: 'type', label: 'Set type', icon: 'pricetag-outline' },
-  { id: 'archive', label: 'Archive', icon: 'archive-outline' },
-  { id: 'merge', label: 'Merge', icon: 'git-merge-outline' },
-  { id: 'split', label: 'Split', icon: 'git-branch-outline' },
-  { id: 'compress', label: 'Compress', icon: 'contract-outline' },
-  { id: 'sign', label: 'Sign', icon: 'create-outline' },
+  { id: 'submit', icon: 'paper-plane-outline' },
+  { id: 'move', icon: 'folder-open-outline' },
+  { id: 'type', icon: 'pricetag-outline' },
+  { id: 'archive', icon: 'archive-outline' },
+  { id: 'merge', icon: 'git-merge-outline' },
+  { id: 'split', icon: 'git-branch-outline' },
+  { id: 'compress', icon: 'contract-outline' },
+  { id: 'sign', icon: 'create-outline' },
 ];
 
 // Merge/Split/Compress/Sign all rebuild a PDF from doc.pages' raster images - meaningless (and, for
@@ -30,6 +31,7 @@ type SelectionBarProps = {
 
 export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const selectionCount = selectedDocs.length;
   const allRaster = selectedDocs.every((doc) => isPageRasterFormat(doc.format));
   // Archive turns into Unarchive when everything selected is already archived.
@@ -59,7 +61,7 @@ export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
             disabled={isDisabled}
           >
             <Ionicons name={tool.id === 'archive' && allArchived ? 'arrow-undo-outline' : tool.icon} size={20} color={tokens.ink} />
-            <Text style={[styles.label, { color: tokens.ink }]}>{tool.id === 'archive' && allArchived ? 'Unarchive' : tool.label}</Text>
+            <Text style={[styles.label, { color: tokens.ink }]}>{tool.id === 'archive' && allArchived ? t('library.tools.unarchive') : t(`library.tools.${tool.id}`)}</Text>
           </Pressable>
         );
       })}

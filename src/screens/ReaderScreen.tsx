@@ -41,11 +41,13 @@ import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
+import { useT } from '../i18n/useT';
 
 const SEARCH_DEBOUNCE_MS = 200;
 
 export function ReaderScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   // Back returns to wherever the document was opened from: Home, Library or a course page.
   const { go, hub } = useRouter();
   const { state, dispatch } = useAppState();
@@ -248,7 +250,7 @@ export function ReaderScreen() {
         const promoted = await promoteExternalToLibrary(external);
         dispatch({ type: 'library/ADD_FILE', file: promoted });
         dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Added to Library' });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.addedToLibrary') });
       } else if (id === 'changeType') {
         if (doc) setTypePickerOpen(true);
       } else if (id === 'submit') {
@@ -266,33 +268,33 @@ export function ReaderScreen() {
         } else if (id === 'copyText') {
           const text = doc.pages[idx]?.ocr?.text.trim() ?? '';
           if (!text) {
-            dispatch({ type: 'ui/SHOW_SNACK', msg: 'No text found on this page' });
+            dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noPageText') });
             return;
           }
           await Clipboard.setStringAsync(text);
-          dispatch({ type: 'ui/SHOW_SNACK', msg: `Copied the text of page ${idx + 1}` });
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.copiedPage', { page: idx + 1 }) });
         } else {
-          Alert.alert('Extract text', 'All pages\' text, with a line marking each page.', [
-            { text: 'Cancel', style: 'cancel' },
+          Alert.alert(t('reader.extractTitle'), t('reader.extractBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Copy',
+              text: t('reader.copy'),
               onPress: async () => {
                 await Clipboard.setStringAsync(extractDocumentText(doc));
-                dispatch({ type: 'ui/SHOW_SNACK', msg: 'Copied the text of every page' });
+                dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.copiedAll') });
               },
             },
-            { text: 'Share .txt', onPress: () => shareAs(writeDocumentText(doc), shareFileName(doc.name, 'txt'), 'text/plain') },
+            { text: t('reader.shareTxt'), onPress: () => shareAs(writeDocumentText(doc), shareFileName(doc.name, 'txt'), 'text/plain') },
           ]);
         }
       } else if (id === 'delete') {
         if (!doc) return;
         Alert.alert(
-          'Delete document?',
-          `"${doc.name}" and its files will be permanently removed. This can't be undone.`,
+          t('reader.deleteTitle'),
+          t('reader.deleteBody', { name: doc.name }),
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
             {
-              text: 'Delete',
+              text: t('reader.delete'),
               style: 'destructive',
               onPress: () => {
                 dispatch({ type: 'library/REMOVE_FILES', ids: [doc.id] });
@@ -318,7 +320,7 @@ export function ReaderScreen() {
       );
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${activeIndex + 1}` });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: activeIndex + 1 }) });
     },
     [doc, activeIndex, dispatch]
   );
@@ -349,7 +351,7 @@ export function ReaderScreen() {
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSignStep(null);
       setCapturedSignature(null);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signature added — visible in exported PDF' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.added') });
     },
     [doc, activeIndex, capturedSignature, dispatch]
   );
@@ -357,7 +359,7 @@ export function ReaderScreen() {
   if (!doc && !external) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>Document not found.</Text>
+        <Text style={{ color: tokens.muted }}>{t('reader.notFound')}</Text>
       </View>
     );
   }
@@ -365,7 +367,7 @@ export function ReaderScreen() {
   if (doc && !external && isPageRaster && !pdfUri) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>{backfilling ? 'Preparing preview…' : 'Loading…'}</Text>
+        <Text style={{ color: tokens.muted }}>{backfilling ? t('reader.preparingPreview') : t('reader.loading')}</Text>
       </View>
     );
   }
@@ -373,7 +375,7 @@ export function ReaderScreen() {
   if (doc && !external && !isPageRaster && !nativeUri) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>Loading…</Text>
+        <Text style={{ color: tokens.muted }}>{t('reader.loading')}</Text>
       </View>
     );
   }
@@ -421,11 +423,11 @@ export function ReaderScreen() {
         <View style={styles.passwordOverlay} pointerEvents="box-none">
           <View style={[styles.passwordCard, { backgroundColor: tokens.surface }]}>
             <Text style={[styles.passwordTitle, { color: tokens.ink }]}>
-              Couldn't open this PDF. It may be password protected.
+              {t('reader.passwordTitle')}
             </Text>
             <TextInput
               style={[styles.passwordInput, { color: tokens.ink, borderColor: tokens.edge }]}
-              placeholder="Password"
+              placeholder={t('reader.password')}
               placeholderTextColor={tokens.muted}
               secureTextEntry
               value={passwordDraft}
@@ -434,10 +436,10 @@ export function ReaderScreen() {
             />
             <View style={styles.passwordActions}>
               <Pressable onPress={() => go(hub, 'back')}>
-                <Text style={{ color: tokens.muted }}>Cancel</Text>
+                <Text style={{ color: tokens.muted }}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable onPress={handleSubmitPassword}>
-                <Text style={{ color: tokens.accent, fontWeight: '600' }}>Unlock</Text>
+                <Text style={{ color: tokens.accent, fontWeight: '600' }}>{t('reader.unlock')}</Text>
               </Pressable>
             </View>
           </View>
@@ -486,11 +488,11 @@ export function ReaderScreen() {
       {doc ? (
         <DocTypePickerModal
           visible={typePickerOpen}
-          title="Change type"
+          title={t('reader.changeType')}
           value={docTypeOf(doc)}
           onSelect={(docType) => {
             dispatch({ type: 'library/SET_DOC_TYPE', ids: [doc.id], docType });
-            dispatch({ type: 'ui/SHOW_SNACK', msg: `Type · ${getDocType(docType).label}` });
+            dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.typeSet', { type: t(getDocType(docType).labelKey) }) });
           }}
           onClose={() => setTypePickerOpen(false)}
         />
@@ -529,10 +531,10 @@ export function ReaderScreen() {
 
       <TextPromptModal
         visible={labelling}
-        title={currentBookmark ? 'Bookmark label' : 'Bookmark this page'}
+        title={currentBookmark ? t('reader.bookmarkLabel') : t('reader.bookmarkPage')}
         initialValue={currentBookmark?.label ?? ''}
-        placeholder="e.g. Formula sheet"
-        submitLabel="Save"
+        placeholder={t('reader.bookmarkPlaceholder')}
+        submitLabel={t('reader.save')}
         onCancel={() => setLabelling(false)}
         onSubmit={(label) => {
           setLabelling(false);

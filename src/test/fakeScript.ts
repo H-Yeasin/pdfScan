@@ -2,6 +2,7 @@ import { registerEngine } from '../services/ocr/engines';
 import type { OcrEngine } from '../services/ocr/engines/types';
 import { registerScript, type OcrEngineId, type ScriptEntry } from '../services/scripts/registry';
 import type { OcrScript, PageOcr } from '../types/models';
+import type { TKey } from '../i18n';
 
 // §6 "done when": a new script touches only the registry plus one file for its engine. This is
 // that branch, as a test fixture - a registry entry (what would be added to SCRIPTS) and an engine
@@ -14,7 +15,8 @@ export const FAKE_TEXT = ['ᏣᎳᎩ ᎦᏬᏂᎯᏍᏗ', 'ᎠᏍᎦᏯ'];
 
 export const fakeScript: ScriptEntry = {
   id: FAKE_SCRIPT_ID,
-  label: 'Fake (test script)',
+  // Not in the catalog: t() shows the key, which is fine for a test script.
+  labelKey: 'settings.scripts.fake' as TKey,
   nativeName: 'ᏣᎳᎩ',
   engine: FAKE_ENGINE_ID,
   model: 'fake-model',

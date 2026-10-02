@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type PropsWithChildren } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { t } from '../i18n';
 
 type State = { error: Error | null; generation: number };
 
@@ -27,10 +28,10 @@ export class ErrorBoundary extends Component<PropsWithChildren<{ onError?: (erro
     if (this.state.error) {
       return (
         <View style={styles.container} accessibilityRole="alert">
-          <Text style={styles.title}>Something went wrong.</Text>
-          <Text style={styles.body}>Your documents are safe.</Text>
+          <Text style={styles.title}>{t('shared.crash.title')}</Text>
+          <Text style={styles.body}>{t('shared.crash.body')}</Text>
           <Pressable style={styles.button} onPress={this.restart} accessibilityRole="button">
-            <Text style={styles.buttonLabel}>Restart</Text>
+            <Text style={styles.buttonLabel}>{t('shared.crash.restart')}</Text>
           </Pressable>
         </View>
       );

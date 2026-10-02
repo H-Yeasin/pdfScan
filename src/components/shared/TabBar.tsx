@@ -4,6 +4,8 @@ import { useRouter } from '../../navigation/router';
 import { startScan } from '../../services/courses/startScan';
 import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, typeScale } from '../../theme';
+import { useT } from '../../i18n/useT';
+import type { TKey } from '../../i18n';
 
 type Tab = 'home' | 'capture' | 'library';
 
@@ -15,14 +17,15 @@ type TabBarProps = {
   accent: string;
 };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'home', label: 'Home' },
-  { id: 'capture', label: 'Scan' },
-  { id: 'library', label: 'Library' },
+const TABS: { id: Tab; labelKey: TKey }[] = [
+  { id: 'home', labelKey: 'shared.tabs.home' },
+  { id: 'capture', labelKey: 'shared.tabs.scan' },
+  { id: 'library', labelKey: 'shared.tabs.library' },
 ];
 
 export function TabBar({ active, background, activeColor, inactiveColor, accent }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useT();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
 
@@ -39,7 +42,7 @@ export function TabBar({ active, background, activeColor, inactiveColor, accent 
     <View style={[styles.container, { backgroundColor: background, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       {TABS.map((tab) => (
         <Pressable key={tab.id} style={styles.tab} onPress={() => open(tab.id)} accessibilityRole="tab" accessibilityState={{ selected: tab.id === active }}>
-          <Text style={[styles.label, { color: active === tab.id ? activeColor : inactiveColor }]}>{tab.label}</Text>
+          <Text style={[styles.label, { color: active === tab.id ? activeColor : inactiveColor }]}>{t(tab.labelKey)}</Text>
           {active === tab.id && <View style={[styles.indicator, { backgroundColor: accent }]} />}
         </Pressable>
       ))}

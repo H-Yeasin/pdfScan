@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { formatTime, parseSlotTimes, slotChanges, WEEKDAY_ORDER, WEEKDAYS } from '../../services/courses/timetable';
+import { formatTime, parseSlotTimes, slotChanges, WEEKDAY_ORDER, weekdayName } from '../../services/courses/timetable';
 import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { TimetableSlot } from '../../types/models';
 import { createId } from '../../utils/id';
 import { CourseBadge } from './CourseBadge';
 import { CourseSheet, SheetField, sheetInputStyle } from './CourseSheet';
+import { useT } from '../../i18n/useT';
 
 type TimetableEditorProps = {
   visible: boolean;
@@ -23,6 +24,7 @@ type Form = { editingId: string | null; courseId: string; weekday: number; start
 // is no time-picker dependency, and typing is faster for a whole week anyway.
 export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { state, dispatch } = useAppState();
   const { courses, timetable } = state.library;
   const scopeCourses = courseId ? courses.filter((c) => c.id === courseId) : courses.filter((c) => !c.archived);
@@ -78,13 +80,13 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
     [...slots].sort((a, b) => WEEKDAY_ORDER.indexOf(a.weekday as never) - WEEKDAY_ORDER.indexOf(b.weekday as never) || a.startMin - b.startMin);
 
   return (
-    <CourseSheet visible={visible} title="Class times" submitLabel="Done" submitDisabled={!!form} onSubmit={handleDone} onClose={onClose}>
+    <CourseSheet visible={visible} title={t('courses.timetable.title')} submitLabel={t('courses.timetable.done')} submitDisabled={!!form} onSubmit={handleDone} onClose={onClose}>
       <Text style={[styles.hint, { color: tokens.muted }]}>
-        A scan during a class (or 15 minutes either side) is saved to that course automatically.
+        {t('courses.timetable.hint')}
       </Text>
 
       {scopeCourses.length === 0 ? (
-        <Text style={[styles.hint, { color: tokens.muted }]}>Add a course first.</Text>
+        <Text style={[styles.hint, { color: tokens.muted }]}>{t('courses.timetable.noCourses')}</Text>
       ) : null}
 
       {scopeCourses.map((course) => (
@@ -100,7 +102,7 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
           {sorted(draft.filter((s) => s.courseId === course.id)).map((slot) => (
             <View key={slot.id} style={[styles.slotRow, { backgroundColor: tokens.surface2 }]}>
               <Pressable style={styles.slotText} onPress={() => openForm(course.id, slot)} accessibilityRole="button">
-                <Text style={[styles.slotDay, { color: tokens.ink }]}>{WEEKDAYS[slot.weekday]}</Text>
+                <Text style={[styles.slotDay, { color: tokens.ink }]}>{weekdayName(slot.weekday)}</Text>
                 <Text style={{ color: tokens.ink, fontSize: 15 }}>
                   {formatTime(slot.startMin)}–{formatTime(slot.endMin)}
                 </Text>
@@ -108,7 +110,7 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
               <Pressable
                 onPress={() => setDraft((prev) => prev.filter((s) => s.id !== slot.id))}
                 hitSlop={8}
-                accessibilityLabel={`Remove ${WEEKDAYS[slot.weekday]} ${formatTime(slot.startMin)}`}
+                accessibilityLabel={t('courses.timetable.remove', { day: weekdayName(slot.weekday), time: formatTime(slot.startMin) })}
               >
                 <Ionicons name="close" size={18} color={tokens.muted} />
               </Pressable>
@@ -120,13 +122,13 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
               <View style={styles.days}>
                 {WEEKDAY_ORDER.map((day) => (
                   <Pressable key={day} style={chip(form.weekday === day)} onPress={() => setForm({ ...form, weekday: day })}>
-                    <Text style={[styles.chipLabel, { color: tokens.ink }]}>{WEEKDAYS[day]}</Text>
+                    <Text style={[styles.chipLabel, { color: tokens.ink }]}>{weekdayName(day)}</Text>
                   </Pressable>
                 ))}
               </View>
               <View style={styles.times}>
                 <View style={styles.flex}>
-                  <SheetField label="Starts">
+                  <SheetField label={t('courses.timetable.starts')}>
                     <TextInput
                       value={form.start}
                       onChangeText={(start) => setForm({ ...form, start, error: undefined })}
@@ -138,7 +140,7 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
                   </SheetField>
                 </View>
                 <View style={styles.flex}>
-                  <SheetField label="Ends">
+                  <SheetField label={t('courses.timetable.ends')}>
                     <TextInput
                       value={form.end}
                       onChangeText={(end) => setForm({ ...form, end, error: undefined })}
@@ -153,17 +155,17 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
               {form.error ? <Text style={{ color: tokens.danger, fontSize: 13 }}>{form.error}</Text> : null}
               <View style={styles.formActions}>
                 <Pressable onPress={() => setForm(null)} style={styles.formButton}>
-                  <Text style={[styles.formButtonLabel, { color: tokens.muted }]}>Cancel</Text>
+                  <Text style={[styles.formButtonLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
                 </Pressable>
                 <Pressable onPress={saveForm} style={[styles.formButton, { backgroundColor: tokens.accentSoft, borderRadius: radii.full }]}>
-                  <Text style={[styles.formButtonLabel, { color: tokens.accentInk }]}>{form.editingId ? 'Update' : 'Add'}</Text>
+                  <Text style={[styles.formButtonLabel, { color: tokens.accentInk }]}>{form.editingId ? t('courses.timetable.update') : t('courses.timetable.add')}</Text>
                 </Pressable>
               </View>
             </View>
           ) : (
             <Pressable style={styles.addRow} onPress={() => openForm(course.id)} disabled={!!form} accessibilityRole="button">
               <Ionicons name="add" size={18} color={form ? tokens.muted : tokens.accentInk} />
-              <Text style={[styles.addLabel, { color: form ? tokens.muted : tokens.accentInk }]}>Add class time</Text>
+              <Text style={[styles.addLabel, { color: form ? tokens.muted : tokens.accentInk }]}>{t('courses.timetable.addClassTime')}</Text>
             </Pressable>
           )}
         </View>

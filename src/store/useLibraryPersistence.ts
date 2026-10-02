@@ -3,6 +3,7 @@ import { backfillPdfInfo } from '../services/documents/pdfInfoBackfill';
 import { getDb } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
 import { useAppState } from './AppStateContext';
+import { t } from '../i18n';
 
 // Loads the library from SQLite, then mirrors every later change to state.library.files/courses/
 // semesters back to disk as a diff (only rows whose object identity changed are written).
@@ -61,7 +62,7 @@ export function useLibraryPersistence(): boolean {
         if (cancelled) return;
         console.warn('Failed to load library', error);
         dispatch({ type: 'library/SET_LOAD_STATUS', status: 'failed' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't load library" });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.loadFailed') });
       });
     return () => {
       cancelled = true;

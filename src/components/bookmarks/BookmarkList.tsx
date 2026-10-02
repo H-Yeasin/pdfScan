@@ -3,6 +3,7 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BookmarkedPage } from '../../services/study/bookmarks';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 // §5 T5: bookmarked pages as rows: the page's thumbnail, "<document> · p. 4", and its label.
 export function BookmarkList({
@@ -17,6 +18,7 @@ export function BookmarkList({
   showDocument?: boolean;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   return (
     <View style={styles.list}>
       {items.map((item) => {
@@ -43,7 +45,7 @@ export function BookmarkList({
               ) : null}
             </View>
             {onRemove ? (
-              <Pressable onPress={() => onRemove(item)} hitSlop={10} accessibilityLabel="Remove bookmark" style={styles.remove}>
+              <Pressable onPress={() => onRemove(item)} hitSlop={10} accessibilityLabel={t('study.removeBookmark')} style={styles.remove}>
                 <Ionicons name="close" size={18} color={tokens.muted} />
               </Pressable>
             ) : (
@@ -71,17 +73,18 @@ export function BookmarksSheet({
   onClose: () => void;
 }) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
-        <Text style={[styles.sheetTitle, { color: tokens.ink }]}>Bookmarks</Text>
+        <Text style={[styles.sheetTitle, { color: tokens.ink }]}>{t('study.bookmarks')}</Text>
         <ScrollView contentContainerStyle={styles.sheetBody}>
           {items.length ? (
             <BookmarkList items={items} onOpen={onOpen} onRemove={onRemove} showDocument={false} />
           ) : (
-            <Text style={[styles.label, { color: tokens.muted }]}>No bookmarks yet. Tap the bookmark at the top to add this page.</Text>
+            <Text style={[styles.label, { color: tokens.muted }]}>{t('study.noBookmarks')}</Text>
           )}
         </ScrollView>
       </View>

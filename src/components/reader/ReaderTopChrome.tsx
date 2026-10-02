@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fontFamily, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type ReaderTopChromeProps = {
   visible: Animated.AnimatedInterpolation<number> | Animated.Value;
@@ -38,6 +39,7 @@ export function ReaderTopChrome({
   onBookmarkLongPress,
 }: ReaderTopChromeProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
 
   return (
@@ -55,14 +57,14 @@ export function ReaderTopChrome({
       pointerEvents="box-none"
     >
       <View style={styles.row}>
-        <Pressable style={styles.iconButton} onPress={onBack}>
+        <Pressable style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         {findOpen ? (
           <TextInput
             value={findQuery}
             onChangeText={onChangeFindQuery}
-            placeholder="Find in document"
+            placeholder={t('reader.findPlaceholder')}
             placeholderTextColor={tokens.muted}
             autoFocus
             style={[styles.findInput, { color: tokens.ink }]}
@@ -91,8 +93,8 @@ export function ReaderTopChrome({
                 onPress={onBookmark}
                 onLongPress={onBookmarkLongPress}
                 accessibilityRole="button"
-                accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-                accessibilityHint="Long-press to add a label"
+                accessibilityLabel={bookmarked ? t('reader.removeBookmark') : t('reader.bookmarkPage')}
+                accessibilityHint={t('reader.bookmarkHint')}
               >
                 <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={19} color={bookmarked ? tokens.accentInk : tokens.ink} />
               </Pressable>

@@ -5,9 +5,8 @@ import type { LibraryDocument } from '../../types/models';
 import { formatBytes, formatRelativeDate } from '../../utils/format';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import { FileTypeIcon } from './FileTypeIcon';
+import { useT } from '../../i18n/useT';
 
-const LOCK_DISCLOSURE =
-  "This marks the file as protected in your library — it doesn't encrypt the PDF itself.";
 
 const LONG_PRESS_MS = 400;
 
@@ -26,6 +25,7 @@ type FileRowProps = {
 
 export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColor, onPress, onLongPress, onToggleStar }: FileRowProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const cover = doc.pages[0];
 
   return (
@@ -47,7 +47,7 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
         {doc.locked && (
           <Pressable
             style={styles.lockOverlay}
-            onPress={() => Alert.alert('Not actually encrypted', LOCK_DISCLOSURE)}
+            onPress={() => Alert.alert(t('library.notEncrypted'), t('library.lockDisclosure'))}
             hitSlop={4}
           >
             <Ionicons name="lock-closed-outline" size={16} color="#fff" />
@@ -64,10 +64,10 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
         </View>
         <Text style={[styles.meta, { color: tokens.muted }]}>
           {isPageRasterFormat(doc.format)
-            ? `${doc.pages.length} ${doc.pages.length === 1 ? 'page' : 'pages'}`
+            ? t('library.pages', { count: doc.pages.length })
             : doc.format}{' '}
           · {formatBytes(doc.sizeBytes)} · {formatRelativeDate(doc.createdAt)}
-          {doc.archived ? ' · Archived' : ''}
+          {doc.archived ? t('library.archivedSuffix') : ''}
         </Text>
         {matchSnippet ? (
           <Text style={[styles.snippet, { color: tokens.accentInk }]} numberOfLines={1}>

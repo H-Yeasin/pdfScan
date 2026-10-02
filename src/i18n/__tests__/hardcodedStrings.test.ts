@@ -2,58 +2,17 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 
 // §6 L4: UI text comes from the catalog (en.ts), never string literals in components. This scans
-// every .tsx under src for JSX text and for string literals in the props and calls that show text.
-// Converted files must have none; the rest are listed (I18N_REPORT=1 npm test -- hardcoded) until
-// L4d turns this into a failure for every file.
+// every .tsx under src for JSX text and for string literals in the props and calls that show text,
+// and fails on any it finds (L4d). Run with I18N_REPORT=1 to print every hit with its file.
 
 const SRC = join(__dirname, '../..');
 
-// Converted so far (L4a: Settings, Home; L4b: Capture, Review; L4c: Deliver, Academic options,
-// submissions, deadlines). L4d adds the rest and replaces this with "every file".
-const CONVERTED = [
-  'screens/SettingsScreen.tsx',
-  'screens/HomeScreen.tsx',
-  'components/settings/LanguageRow.tsx',
-  'components/settings/NameTemplateSection.tsx',
-  'components/settings/ProfileSection.tsx',
-  'components/settings/SettingRow.tsx',
-  'screens/CaptureScreen.tsx',
-  'screens/ReviewScreen.tsx',
-  'components/capture/CaptureControls.tsx',
-  'components/capture/CaptureModePicker.tsx',
-  'components/review/AdjustPanel.tsx',
-  'components/review/AdjustSlider.tsx',
-  'components/review/ContextBar.tsx',
-  'components/review/CropOverlay.tsx',
-  'components/review/FilterOptionsPanel.tsx',
-  'components/review/FilterStrip.tsx',
-  'components/review/FilteredPreview.tsx',
-  'components/review/GridPagesModal.tsx',
-  'components/review/PagePeekCarousel.tsx',
-  'components/review/PreviewControls.tsx',
-  'components/review/ProcessingProgress.tsx',
-  'components/review/ThumbnailStrip.tsx',
-  'screens/DeliverScreen.tsx',
-  'screens/AcademicOptionsScreen.tsx',
-  'components/deliver/CoverThumbnail.tsx',
-  'components/deliver/FolderPickerModal.tsx',
-  'components/deliver/FormatSegmented.tsx',
-  'components/deliver/LayoutModeSegmented.tsx',
-  'components/deliver/MoreOptionsPanel.tsx',
-  'components/deliver/NameField.tsx',
-  'components/deliver/ProfilePromptSheet.tsx',
-  'components/deliver/QualitySlider.tsx',
-  'components/deliver/SizeTargetRow.tsx',
-  'components/deliver/StickyActions.tsx',
-  'components/submit/SubmissionList.tsx',
-  'components/submit/SubmissionsSheet.tsx',
-  'components/submit/SubmittedFilterChips.tsx',
-  'components/deadlines/DeadlineEditorSheet.tsx',
-  'components/deadlines/DeadlineList.tsx',
-];
+// §6 L4d: every file is converted. Only the developer tools in src/dev (the Filter Lab, never
+// shipped to students) keep English literals.
+const EXEMPT_DIRS = ['dev'];
 
 // Literals that aren't language: the app's name, example values in a fixed format.
-const ALLOWED = new Set(['PDF Scan', 'PHY 101']);
+const ALLOWED = new Set(['PDF Scan', 'PHY 101', 'PDF', 'JPG', 'A4', 'DOCX', 'XLSX', 'CSV', 'TXT', 'OCR']);
 
 const PATTERNS: RegExp[] = [
   // JSX text: after a tag's closing '>' (never '=>' or a spaced comparison), up to a closing tag.
@@ -63,14 +22,30 @@ const PATTERNS: RegExp[] = [
   // Snack messages and Alert buttons/titles.
   /\b(?:msg|text):\s*["'`]([A-Za-z][^"'`]*)["'`]/g,
   /Alert\.alert\(\s*["'`]([A-Za-z][^"'`]*)["'`]/g,
+  // JSX text that runs into an expression ("Page 1 shows: {x}") or follows one ("{n} selected").
+  /(?<=[\w"'}/])>[ \t]*([A-Za-z][^<>{}=;]*?)\s*\{/g,
+  /\}([ \t]*[A-Za-z][^<>{}=;()]*?)\s*<\//g,
+  // Object fields that are shown: { label: 'Rename' }, { title: '…' }.
+  /\b(?:label|title|hint|subtitle|action|message|placeholder|description|plural|heading):\s*["'`]([A-Za-z][^"'`]*)["'`]/g,
+  // Capitalised words picked by a condition: x ? 'Done' : 'Cancel', name ?? 'Untitled'.
+  /(?:\?|\?\?|\|\||\s:)\s*["'`]([A-Z][a-z][^"'`]*)["'`]/g,
+  // A list of sentences: [ 'Batch OCR and batch export', ... ].
+  /^\s*["'`]([A-Z][a-z]+ [^"'`]*)["'`],?\s*$/gm,
+  // Progress and error setters: setProgress('Building…'), setError(`Couldn't…`).
+  /\bset(?:Progress|Error|Message|Status)\(\s*["'`]([A-Za-z][^"'`]*)["'`]/g,
 ];
 
+// Catalog keys ('settings.profile.name') are what converted code passes around, not text.
+const CATALOG_KEY = /^[a-z]\w*(\.\w+)+$/;
+
 export function hardcodedStrings(source: string): string[] {
+  // Comments are prose, not UI.
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
   const found: string[] = [];
   for (const pattern of PATTERNS) {
-    for (const match of source.matchAll(pattern)) {
+    for (const match of code.matchAll(pattern)) {
       const text = match[1].replace(/\s+/g, ' ').trim();
-      if (text && !ALLOWED.has(text)) found.push(text);
+      if (text && !ALLOWED.has(text) && !CATALOG_KEY.test(text)) found.push(text);
     }
   }
   return found;
@@ -97,27 +72,27 @@ describe('hard-coded UI strings', () => {
       const ok = a > b && c < d; const f = () => <View />;
       <Text>{t('home.title')}</Text>
       <Text>PDF Scan</Text>
+      const FEATURES = [
+        'Batch OCR and batch export',
+      ];
+      const key = t('settings.profile.name'); // a comment with Words in it
     `;
     expect(hardcodedStrings(source).sort()).toEqual(
-      ['Cancel', 'Class times', 'Delete?', 'Due soon', 'Each scan gets filed', 'No folder selected'].sort()
+      ['Batch OCR and batch export', 'Cancel', 'Class times', 'Delete?', 'Due soon', 'Each scan gets filed', 'No folder selected'].sort()
     );
   });
 
-  it.each(CONVERTED)('%s reads all its text from the catalog', (file) => {
-    expect(hardcodedStrings(readFileSync(join(SRC, file), 'utf8'))).toEqual([]);
+  const files = tsxFiles(SRC)
+    .map((path) => relative(SRC, path))
+    .filter((file) => !EXEMPT_DIRS.includes(file.split('/')[0]));
+
+  it('covers the whole app', () => {
+    expect(files.length).toBeGreaterThan(80);
   });
 
-  it('lists what is left to convert', () => {
-    const left = tsxFiles(SRC)
-      .map((path) => relative(SRC, path))
-      .filter((file) => !CONVERTED.includes(file))
-      .map((file) => ({ file, strings: hardcodedStrings(readFileSync(join(SRC, file), 'utf8')) }))
-      .filter((entry) => entry.strings.length > 0);
-    if (process.env.I18N_REPORT) {
-      const total = left.reduce((sum, entry) => sum + entry.strings.length, 0);
-      console.info(`${total} hard-coded strings in ${left.length} files:\n${left.map((e) => `  ${e.file}: ${e.strings.join(' | ')}`).join('\n')}`);
-    }
-    // A warning list until L4d: it only has to be readable, not empty.
-    expect(Array.isArray(left)).toBe(true);
+  it.each(files)('%s reads all its text from the catalog', (file) => {
+    const found = hardcodedStrings(readFileSync(join(SRC, file), 'utf8'));
+    if (process.env.I18N_REPORT && found.length) console.info(`${file}: ${found.join(' | ')}`);
+    expect(found).toEqual([]);
   });
 });

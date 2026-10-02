@@ -1,8 +1,12 @@
 import type { TimetableSlot } from '../../types/models';
+import { formatDate, t } from '../../i18n';
 
 // Weekly class times. Minutes since local midnight; weekday 0 = Sunday (Date.getDay()).
 
-export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+// A weekday's short name ("Mon") in the UI language; 0 = Sunday. 7 January 2024 was a Sunday.
+export function weekdayName(day: number): string {
+  return formatDate(new Date(2024, 0, 7 + day), { weekday: 'short' });
+}
 // Display order for the editor: the school week first.
 export const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
@@ -35,7 +39,7 @@ export function formatTime(minutes: number): string {
 }
 
 export function formatSlot(slot: Pick<TimetableSlot, 'weekday' | 'startMin' | 'endMin'>): string {
-  return `${WEEKDAYS[slot.weekday]} ${formatTime(slot.startMin)}–${formatTime(slot.endMin)}`;
+  return `${weekdayName(slot.weekday)} ${formatTime(slot.startMin)}–${formatTime(slot.endMin)}`;
 }
 
 // The slots `at` falls in, nearest first: 0 inside the slot, else minutes outside it, up to
@@ -54,9 +58,9 @@ export function slotsAt(slots: readonly TimetableSlot[], at: Date): TimetableSlo
 export function parseSlotTimes(start: string, end: string): { startMin: number; endMin: number } | { error: string } {
   const startMin = parseTime(start);
   const endMin = parseTime(end);
-  if (startMin === null) return { error: 'Start time: try 9:30 or 2pm' };
-  if (endMin === null) return { error: 'End time: try 10:45 or 3pm' };
-  if (endMin <= startMin) return { error: 'The class has to end after it starts' };
+  if (startMin === null) return { error: t('courses.errors.startTime') };
+  if (endMin === null) return { error: t('courses.errors.endTime') };
+  if (endMin <= startMin) return { error: t('courses.errors.endBeforeStart') };
   return { startMin, endMin };
 }
 

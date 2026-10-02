@@ -29,6 +29,7 @@ import { importExternalFile } from '../services/files/externalFileService';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { useT } from '../i18n/useT';
 
 // Formats reachable via the in-app picker today. Widens as DOCX/XLSX/XLS viewers land (see the
 // universal-reader plan's phasing) - deliberately narrower than docFormat.ts's full MIME_BY_FORMAT
@@ -37,6 +38,7 @@ const PICKABLE_MIME_TYPES = [MIME_BY_FORMAT.PDF, MIME_BY_FORMAT.TXT, MIME_BY_FOR
 
 export function LibraryScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { loadStatus, files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
@@ -153,7 +155,7 @@ export function LibraryScreen() {
       go('reader');
     } catch (e) {
       console.warn('LibraryScreen.handleOpenFile failed', e);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't open that file" });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.openFailed') });
     }
   }, [dispatch, go]);
 
@@ -165,18 +167,20 @@ export function LibraryScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       {!selMode ? (
         <View style={styles.header}>
-          <Text style={[styles.title, { color: tokens.ink }]}>Library</Text>
+          <Text style={[styles.title, { color: tokens.ink }]}>{t('library.title')}</Text>
           <View style={styles.headerIcons}>
-            <Pressable style={styles.iconButton} onPress={handleOpenFile}>
+            <Pressable style={styles.iconButton} onPress={handleOpenFile} accessibilityRole="button" accessibilityLabel={t('library.openFile')}>
               <Ionicons name="document-outline" size={21} color={tokens.ink} />
             </Pressable>
             <Pressable
               style={styles.iconButton}
               onPress={() => dispatch({ type: 'library/TOGGLE_SEARCH_OPEN' })}
+              accessibilityRole="button"
+              accessibilityLabel={t('library.search')}
             >
               <Ionicons name="search" size={21} color={tokens.ink} />
             </Pressable>
-            <Pressable style={styles.iconButton} onPress={() => go('settings')}>
+            <Pressable style={styles.iconButton} onPress={() => go('settings')} accessibilityRole="button" accessibilityLabel={t('common.settings')}>
               <Ionicons name="settings-outline" size={21} color={tokens.ink} />
             </Pressable>
           </View>
@@ -186,10 +190,12 @@ export function LibraryScreen() {
           <Pressable
             style={[styles.clearButton, { backgroundColor: tokens.surface2 }]}
             onPress={() => dispatch({ type: 'library/CLEAR_SELECTION' })}
+            accessibilityRole="button"
+            accessibilityLabel={t('library.clearSelection')}
           >
             <Ionicons name="close" size={20} color={tokens.ink} />
           </Pressable>
-          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{selection.length} selected</Text>
+          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.length })}</Text>
         </View>
       )}
 
@@ -201,9 +207,9 @@ export function LibraryScreen() {
 
       {loadStatus === 'failed' ? (
         <EmptyState
-          title="Couldn't load library"
-          body="Your documents are still on this phone. Nothing has been changed."
-          actionLabel="Try again"
+          title={t('library.loadFailed')}
+          body={t('library.loadFailedBody')}
+          actionLabel={t('library.tryAgain')}
           onAction={() => dispatch({ type: 'library/RETRY_LOAD' })}
         />
       ) : tab === 'courses' ? (
@@ -219,8 +225,8 @@ export function LibraryScreen() {
         </ScrollView>
       ) : isEmptyLibrary ? (
         <EmptyState
-          title="Your scans will appear here."
-          actionLabel="Scan now"
+          title={t('library.empty')}
+          actionLabel={t('library.scanNow')}
           onAction={() => {
             startScan(state, dispatch, null, { launch: true });
             go('capture');
@@ -228,8 +234,8 @@ export function LibraryScreen() {
         />
       ) : isNoResults ? (
         <EmptyState
-          title={`No documents match "${search}".`}
-          body="Search also looks inside scans — OCR text is indexed for every document, free."
+          title={t('library.noMatch', { query: search })}
+          body={t('library.noMatchBody')}
         />
       ) : (
         <>
@@ -267,8 +273,8 @@ export function LibraryScreen() {
                     });
                     dispatch({
                       type: 'ui/SHOW_SNACK',
-                      msg: `Added ${pageHits.length} ${pageHits.length === 1 ? 'page' : 'pages'} to the exam pack`,
-                      action: 'Open',
+                      msg: t('library.addedToPack', { count: pageHits.length }),
+                      action: t('library.open'),
                       onAction: () => go('examPack'),
                     });
                   }}
@@ -276,7 +282,7 @@ export function LibraryScreen() {
               ) : archivedCount > 0 ? (
                 <Pressable style={styles.archivedToggle} onPress={() => setShowArchived((v) => !v)} accessibilityRole="button">
                   <Text style={[styles.archivedToggleLabel, { color: tokens.accentInk }]}>
-                    {showArchived ? 'Hide archived' : `Show ${archivedCount} archived`}
+                    {showArchived ? t('library.hideArchived') : t('library.showArchived', { count: archivedCount })}
                   </Text>
                 </Pressable>
               ) : null

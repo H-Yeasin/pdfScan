@@ -14,6 +14,7 @@ import { radii, spacing, useTheme } from '../../theme';
 import type { Annotation, LibraryDocument } from '../../types/models';
 import { createId } from '../../utils/id';
 import { PageCanvas, type MasterPoint } from './PageCanvas';
+import { useT } from '../../i18n/useT';
 
 type Tool = 'highlight' | 'pen' | 'note' | 'eraser';
 type Undo = { kind: 'added'; annotation: Annotation } | { kind: 'removed'; annotation: Annotation } | { kind: 'edited'; before: Annotation };
@@ -34,6 +35,7 @@ export function AnnotateSheet({
   onClose: (changed: boolean) => void;
 }) {
   const { tokens: theme } = useTheme();
+  const { t } = useT();
   const { state, dispatch } = useAppState();
   const [idx, setIdx] = useState(Math.min(Math.max(0, startIdx), doc.pages.length - 1));
   const [tool, setTool] = useState<Tool>('highlight');
@@ -111,7 +113,7 @@ export function AnnotateSheet({
       if (size !== null && doc.format === 'PDF') dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: { sizeBytes: size } });
     } catch (error) {
       console.warn('AnnotateSheet: writing annotations into the PDF failed', error);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: "Saved, but couldn't update the PDF file" });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.annotate.saveFailed') });
     } finally {
       setSaving(false);
       onClose(true);
@@ -134,25 +136,25 @@ export function AnnotateSheet({
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]}>
           <View style={styles.header}>
-            <Pressable style={styles.iconButton} onPress={undo} disabled={undoCount === 0} accessibilityLabel="Undo">
+            <Pressable style={styles.iconButton} onPress={undo} disabled={undoCount === 0} accessibilityLabel={t('reader.annotate.undo')}>
               <Ionicons name="arrow-undo" size={21} color={undoCount ? theme.ink : theme.muted} />
             </Pressable>
-            <Pressable style={styles.iconButton} onPress={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0} accessibilityLabel="Previous page">
+            <Pressable style={styles.iconButton} onPress={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0} accessibilityLabel={t('reader.annotate.previousPage')}>
               <Ionicons name="chevron-back" size={21} color={idx === 0 ? theme.muted : theme.ink} />
             </Pressable>
             <Text style={[styles.title, { color: theme.ink }]}>
-              p. {idx + 1} / {doc.pages.length}
+              {t('reader.annotate.pageOf', { page: idx + 1, total: doc.pages.length })}
             </Text>
             <Pressable
               style={styles.iconButton}
               onPress={() => setIdx((i) => Math.min(doc.pages.length - 1, i + 1))}
               disabled={idx === doc.pages.length - 1}
-              accessibilityLabel="Next page"
+              accessibilityLabel={t('reader.annotate.nextPage')}
             >
               <Ionicons name="chevron-forward" size={21} color={idx === doc.pages.length - 1 ? theme.muted : theme.ink} />
             </Pressable>
             <Pressable style={[styles.doneButton, { backgroundColor: theme.accent }]} onPress={done} disabled={saving} accessibilityRole="button">
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.doneLabel}>Done</Text>}
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.doneLabel}>{t('reader.annotate.done')}</Text>}
             </Pressable>
           </View>
 
@@ -223,12 +225,12 @@ export function AnnotateSheet({
             <View style={styles.toolRow}>
               {(
                 [
-                  ['highlight', 'color-fill-outline', 'Highlighter'],
-                  ['pen', 'pencil-outline', 'Pen'],
-                  ['note', 'chatbox-ellipses-outline', 'Note'],
-                  ['eraser', 'backspace-outline', 'Eraser'],
+                  ['highlight', 'color-fill-outline'],
+                  ['pen', 'pencil-outline'],
+                  ['note', 'chatbox-ellipses-outline'],
+                  ['eraser', 'backspace-outline'],
                 ] as const
-              ).map(([id, icon, label]) => (
+              ).map(([id, icon]) => (
                 <Pressable
                   key={id}
                   style={[styles.tool, tool === id && { backgroundColor: theme.accentSoft }]}
@@ -237,20 +239,20 @@ export function AnnotateSheet({
                   accessibilityState={{ selected: tool === id }}
                 >
                   <Ionicons name={icon} size={20} color={tool === id ? theme.accentInk : theme.ink} />
-                  <Text style={[styles.toolLabel, { color: tool === id ? theme.accentInk : theme.ink }]}>{label}</Text>
+                  <Text style={[styles.toolLabel, { color: tool === id ? theme.accentInk : theme.ink }]}>{t(`reader.annotate.tools.${id}`)}</Text>
                 </Pressable>
               ))}
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.options}>
               {tool === 'highlight'
                 ? (Object.keys(HIGHLIGHT_COLORS) as (keyof typeof HIGHLIGHT_COLORS)[]).map((key) =>
-                    swatch(HIGHLIGHT_COLORS[key], hlColor === key, () => setHlColor(key), `${key} highlighter`)
+                    swatch(HIGHLIGHT_COLORS[key], hlColor === key, () => setHlColor(key), t('reader.annotate.colourHighlighter', { colour: t(`reader.annotate.colours.${key}`) }))
                   )
                 : null}
               {tool === 'pen' ? (
                 <>
                   {(Object.keys(PEN_COLORS) as (keyof typeof PEN_COLORS)[]).map((key) =>
-                    swatch(PEN_COLORS[key], penColor === key, () => setPenColor(key), `${key} pen`)
+                    swatch(PEN_COLORS[key], penColor === key, () => setPenColor(key), t('reader.annotate.colourPen', { colour: t(`reader.annotate.colours.${key}`) }))
                   )}
                   {(Object.keys(PEN_WIDTHS) as (keyof typeof PEN_WIDTHS)[]).map((key) => (
                     <Pressable
@@ -259,23 +261,23 @@ export function AnnotateSheet({
                       style={[styles.widthChip, { borderColor: penWidth === key ? theme.accent : theme.edge }]}
                       accessibilityRole="button"
                     >
-                      <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '600' }}>{key === 'thin' ? 'Thin' : 'Thick'}</Text>
+                      <Text style={{ color: theme.ink, fontSize: 13, fontWeight: '600' }}>{key === 'thin' ? t('reader.annotate.thin') : t('reader.annotate.thick')}</Text>
                     </Pressable>
                   ))}
                 </>
               ) : null}
-              {tool === 'note' ? <Text style={[styles.hint, { color: theme.muted }]}>Tap to add a note; tap a note to edit it.</Text> : null}
-              {tool === 'eraser' ? <Text style={[styles.hint, { color: theme.muted }]}>Tap a mark to remove it.</Text> : null}
-              {drawing ? <Text style={[styles.hint, { color: theme.muted }]}>Two fingers zoom.</Text> : null}
+              {tool === 'note' ? <Text style={[styles.hint, { color: theme.muted }]}>{t('reader.annotate.noteHint')}</Text> : null}
+              {tool === 'eraser' ? <Text style={[styles.hint, { color: theme.muted }]}>{t('reader.annotate.eraserHint')}</Text> : null}
+              {drawing ? <Text style={[styles.hint, { color: theme.muted }]}>{t('reader.annotate.zoomHint')}</Text> : null}
             </ScrollView>
           </View>
 
           <TextPromptModal
             visible={noteDraft !== null}
-            title={noteDraft?.editing ? 'Edit note' : 'Add note'}
+            title={noteDraft?.editing ? t('reader.annotate.editNote') : t('reader.annotate.addNote')}
             initialValue={noteDraft?.editing?.text ?? ''}
-            placeholder="Your note"
-            submitLabel="Save"
+            placeholder={t('reader.annotate.notePlaceholder')}
+            submitLabel={t('reader.annotate.save')}
             onCancel={() => setNoteDraft(null)}
             onSubmit={(text) => {
               if (noteDraft?.editing) {

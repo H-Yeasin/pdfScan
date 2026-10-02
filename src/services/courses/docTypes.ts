@@ -1,4 +1,5 @@
 import type { Ionicons } from '@expo/vector-icons';
+import type { TKey } from '../../i18n';
 import type { CaptureModeSpec } from '../capture/captureModes';
 import type { DocType, LibraryDocument } from '../../types/models';
 
@@ -6,23 +7,21 @@ type IoniconName = keyof typeof Ionicons.glyphMap;
 
 export type DocTypeSpec = {
   id: DocType;
-  label: string;
-  // Plural, for filter chips ("Assignments 3").
-  plural: string;
+  // Catalog keys (§6 L4): the name, and the plural for filter chips ("Assignments 3"). What the
+  // naming template writes for {type} (HW, Lab, ...) is document text: document.docTypeShort.
+  labelKey: TKey;
+  pluralKey: TKey;
   icon: IoniconName;
-  // What §4's naming template writes for `{type}`, so `{type}{n}` reads like a student would
-  // label it: HW3, Lab2, Exam1.
-  short: string;
 };
 
 // Display order everywhere (Deliver chips, filters, pickers).
 export const DOC_TYPES: readonly DocTypeSpec[] = [
-  { id: 'assignment', label: 'Assignment', plural: 'Assignments', icon: 'clipboard-outline', short: 'HW' },
-  { id: 'notes', label: 'Notes', plural: 'Notes', icon: 'create-outline', short: 'Notes' },
-  { id: 'handout', label: 'Handout', plural: 'Handouts', icon: 'document-text-outline', short: 'Handout' },
-  { id: 'exam', label: 'Exam', plural: 'Exams', icon: 'school-outline', short: 'Exam' },
-  { id: 'lab', label: 'Lab', plural: 'Labs', icon: 'flask-outline', short: 'Lab' },
-  { id: 'other', label: 'Other', plural: 'Other', icon: 'ellipsis-horizontal-circle-outline', short: 'Doc' },
+  { id: 'assignment', labelKey: 'courses.docTypes.assignment', pluralKey: 'courses.docTypesPlural.assignment', icon: 'clipboard-outline' },
+  { id: 'notes', labelKey: 'courses.docTypes.notes', pluralKey: 'courses.docTypesPlural.notes', icon: 'create-outline' },
+  { id: 'handout', labelKey: 'courses.docTypes.handout', pluralKey: 'courses.docTypesPlural.handout', icon: 'document-text-outline' },
+  { id: 'exam', labelKey: 'courses.docTypes.exam', pluralKey: 'courses.docTypesPlural.exam', icon: 'school-outline' },
+  { id: 'lab', labelKey: 'courses.docTypes.lab', pluralKey: 'courses.docTypesPlural.lab', icon: 'flask-outline' },
+  { id: 'other', labelKey: 'courses.docTypes.other', pluralKey: 'courses.docTypesPlural.other', icon: 'ellipsis-horizontal-circle-outline' },
 ];
 
 const BY_ID = new Map(DOC_TYPES.map((spec) => [spec.id, spec]));

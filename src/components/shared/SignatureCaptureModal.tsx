@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureIsolatedSignature } from '../../services/signature/signatureService';
 import { radii, spacing, useTheme } from '../../theme';
 import { INK_COLORS, SignaturePad } from './SignaturePad';
+import { useT } from '../../i18n/useT';
 
 const SIGNATURE_CANVAS_RATIO = 0.4; // canvasHeight = canvasWidth * this — a landscape signature box
 
@@ -18,6 +19,7 @@ type SignatureCaptureModalProps = {
 // lives on an outer View, not the screenshotted node, so it never gets rasterized into the PNG.
 export function SignatureCaptureModal({ visible, onCancel, onCapture }: SignatureCaptureModalProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { width: screenWidth } = useWindowDimensions();
   const shotRef = useRef<View>(null);
   const [empty, setEmpty] = useState(true);
@@ -67,21 +69,21 @@ export function SignatureCaptureModal({ visible, onCancel, onCapture }: Signatur
           ))}
         </View>
 
-        <Text style={styles.hint}>Draw your signature above</Text>
+        <Text style={styles.hint}>{t('shared.signature.hint')}</Text>
 
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
-            <Text style={styles.ghostLabel}>Cancel</Text>
+            <Text style={styles.ghostLabel}>{t('common.cancel')}</Text>
           </Pressable>
           <Pressable style={styles.ghostButton} onPress={handleClear}>
-            <Text style={styles.ghostLabel}>Clear</Text>
+            <Text style={styles.ghostLabel}>{t('shared.signature.clear')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: empty || saving ? 0.5 : 1 }]}
             onPress={handleDone}
             disabled={empty || saving}
           >
-            <Text style={styles.primaryLabel}>{saving ? 'Saving…' : 'Next'}</Text>
+            <Text style={styles.primaryLabel}>{saving ? t('shared.signature.saving') : t('shared.signature.next')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>

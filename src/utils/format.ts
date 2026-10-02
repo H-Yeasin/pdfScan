@@ -1,23 +1,24 @@
+import { formatBytes as formatBytesI18n, formatDate, t } from '../i18n';
+
+// In the UI language (§6 L4); i18n/index.ts holds the actual formatting.
 export function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 KB';
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return formatBytesI18n(bytes);
 }
 
 export function formatRelativeDate(timestamp: number): string {
   const date = new Date(timestamp);
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
-  if (isToday) return 'Today';
+  if (isToday) return t('common.today');
 
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  if (date.toDateString() === yesterday.toDateString()) return t('common.yesterday');
 
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return formatDate(date, { month: 'short', day: 'numeric' });
 }
 
 // "3 Oct": a short date for lists where the year is obvious.
 export function formatShortDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return formatDate(timestamp, { day: 'numeric', month: 'short' });
 }

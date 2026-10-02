@@ -4,6 +4,8 @@
 // touching screens. The PDF text layer needs nothing per script: the glyphless font
 // (pdf/textLayer.ts) carries any BMP text.
 //
+import type { TKey } from '../../i18n';
+
 // No imports from types/models.ts: that file re-exports OcrScript from here, so the dependency
 // only goes one way.
 export type ScriptStatus = 'ready' | 'planned';
@@ -11,8 +13,9 @@ export type OcrEngineId = 'mlkit' | 'tesseract';
 
 type ScriptDefinition = {
   id: string;
-  // English name, with the languages it covers when the script name alone wouldn't say.
-  label: string;
+  // Catalog key of its name in the UI language, with the languages it covers when the script
+  // name alone wouldn't say (§6 L4).
+  labelKey: TKey;
   // The name in its own script, shown first so a student finds their language at a glance.
   nativeName: string;
   // Which on-device recognizer handles it, and that engine's model name (rn-mlkit-ocr's detector
@@ -31,7 +34,7 @@ type ScriptDefinition = {
 export const SCRIPTS = [
   {
     id: 'latin',
-    label: 'English / Western (Latin)',
+    labelKey: 'settings.scripts.latin',
     nativeName: 'English',
     engine: 'mlkit',
     model: 'latin',
@@ -41,7 +44,7 @@ export const SCRIPTS = [
   },
   {
     id: 'devanagari',
-    label: 'Hindi · Marathi · Nepali (Devanagari)',
+    labelKey: 'settings.scripts.devanagari',
     nativeName: 'हिन्दी',
     engine: 'mlkit',
     model: 'devanagari',
@@ -51,7 +54,7 @@ export const SCRIPTS = [
   },
   {
     id: 'chinese',
-    label: 'Chinese',
+    labelKey: 'settings.scripts.chinese',
     nativeName: '中文',
     engine: 'mlkit',
     model: 'chinese',
@@ -61,7 +64,7 @@ export const SCRIPTS = [
   },
   {
     id: 'japanese',
-    label: 'Japanese',
+    labelKey: 'settings.scripts.japanese',
     nativeName: '日本語',
     engine: 'mlkit',
     model: 'japanese',
@@ -71,7 +74,7 @@ export const SCRIPTS = [
   },
   {
     id: 'korean',
-    label: 'Korean',
+    labelKey: 'settings.scripts.korean',
     nativeName: '한국어',
     engine: 'mlkit',
     model: 'korean',
@@ -83,7 +86,7 @@ export const SCRIPTS = [
   // downloadable pack (L6). Until then it is listed, never offered.
   {
     id: 'bengali',
-    label: 'Bangla (Bengali)',
+    labelKey: 'settings.scripts.bengali',
     nativeName: 'বাংলা',
     engine: 'tesseract',
     model: 'ben',

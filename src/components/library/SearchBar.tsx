@@ -1,5 +1,6 @@
 import { StyleSheet, TextInput } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type SearchBarProps = {
   value: string;
@@ -8,12 +9,13 @@ type SearchBarProps = {
 
 export function SearchBar({ value, onChange }: SearchBarProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <TextInput
       value={value}
       onChangeText={onChange}
-      placeholder="Search names and text inside scans"
+      placeholder={t('library.searchPlaceholder')}
       placeholderTextColor={tokens.muted}
       autoFocus
       style={[

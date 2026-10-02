@@ -13,6 +13,7 @@ import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import { createId } from '../../utils/id';
 import { CourseSheet, SheetField, sheetInputStyle } from './CourseSheet';
+import { useT } from '../../i18n/useT';
 
 type QuickSetupSheetProps = {
   visible: boolean;
@@ -29,6 +30,7 @@ const emptyRows = (): QuickSetupRow[] => Array.from({ length: INITIAL_ROWS }, ()
 // Opened from the empty course list now, and reused by §9 onboarding.
 export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { state, dispatch } = useAppState();
   const { courses, semesters } = state.library;
 
@@ -69,7 +71,7 @@ export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
     setAttempted(true);
     if (anyError || count === 0) return;
     for (const action of quickSetupActions(rows, semesterName, courses, semesters, new Date(), createId)) dispatch(action);
-    dispatch({ type: 'ui/SHOW_SNACK', msg: count === 1 ? 'Added 1 course' : `Added ${count} courses` });
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('courses.quickSetup.added', { count }) });
     onClose();
   };
 
@@ -80,17 +82,17 @@ export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
   return (
     <CourseSheet
       visible={visible}
-      title="Add your courses"
-      submitLabel={count > 1 ? `Add ${count} courses` : 'Add course'}
+      title={t('courses.quickSetup.title')}
+      submitLabel={t('courses.quickSetup.submit', { count: Math.max(1, count) })}
       submitDisabled={count === 0 || (attempted && anyError)}
       onSubmit={handleSave}
       onClose={onClose}
     >
-      <SheetField label="Semester" error={attempted ? semesterError : undefined}>
+      <SheetField label={t('courses.semester')} error={attempted ? semesterError : undefined}>
         <TextInput
           value={semesterName}
           onChangeText={setSemesterName}
-          placeholder="e.g. Fall 2026"
+          placeholder={t('courses.quickSetup.semesterPlaceholder')}
           placeholderTextColor={tokens.muted}
           style={inputStyle}
         />
@@ -99,8 +101,8 @@ export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
       <View style={styles.rows}>
         <View style={styles.headerRow}>
           <View style={styles.dotSpace} />
-          <Text style={[styles.header, styles.nameCol, { color: tokens.muted }]}>Course name</Text>
-          <Text style={[styles.header, styles.codeCol, { color: tokens.muted }]}>Code</Text>
+          <Text style={[styles.header, styles.nameCol, { color: tokens.muted }]}>{t('courses.quickSetup.courseName')}</Text>
+          <Text style={[styles.header, styles.codeCol, { color: tokens.muted }]}>{t('courses.code')}</Text>
         </View>
         {rows.map((row, i) => (
           <View key={i} style={styles.rowWrap}>
@@ -112,7 +114,7 @@ export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
                 }}
                 value={row.name}
                 onChangeText={(name) => updateRow(i, { name })}
-                placeholder={i === 0 ? 'e.g. Calculus' : `Course ${i + 1}`}
+                placeholder={i === 0 ? t('courses.quickSetup.firstPlaceholder') : t('courses.quickSetup.rowPlaceholder', { n: i + 1 })}
                 placeholderTextColor={tokens.muted}
                 autoFocus={i === 0}
                 autoCapitalize="words"
@@ -127,7 +129,7 @@ export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
                 }}
                 value={row.code}
                 onChangeText={(code) => updateRow(i, { code })}
-                placeholder="Optional"
+                placeholder={t('courses.optional')}
                 placeholderTextColor={tokens.muted}
                 autoCapitalize="characters"
                 returnKeyType="next"
@@ -141,10 +143,10 @@ export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
         ))}
         <Pressable style={[styles.addRow, { borderColor: tokens.edge }]} onPress={() => addRow(true)} accessibilityRole="button">
           <Ionicons name="add" size={18} color={tokens.accentInk} />
-          <Text style={[styles.addLabel, { color: tokens.accentInk }]}>Add another</Text>
+          <Text style={[styles.addLabel, { color: tokens.accentInk }]}>{t('courses.quickSetup.addAnother')}</Text>
         </Pressable>
         <Text style={[styles.hint, { color: tokens.muted }]}>
-          Empty rows are skipped. Add an emoji or teacher later from each course.
+          {t('courses.quickSetup.hint')}
         </Text>
       </View>
     </CourseSheet>

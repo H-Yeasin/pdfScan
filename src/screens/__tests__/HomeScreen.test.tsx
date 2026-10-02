@@ -8,7 +8,6 @@ import { HomeScreen } from '../HomeScreen';
 import { makeDoc } from '../../test/fixtures';
 import { en } from '../../i18n/en';
 import { setUiLanguage } from '../../i18n';
-import { TabBar } from '../../components/shared/TabBar';
 
 // Icon components load their font through expo-asset; they draw nothing these tests look at.
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -132,7 +131,7 @@ describe('Home in the pseudo-locale', () => {
     act(() => {
       setUiLanguage('en-XA');
       const { dispatch } = ctx().app;
-      dispatch({ type: 'library/CREATE_SEMESTER', semester: { id: 's1', name: 'Fall 2026', startsOn: '2000-01-01' } });
+      dispatch({ type: 'library/CREATE_SEMESTER', semester: { id: 's1', name: 'Term A', startsOn: '2000-01-01' } });
       dispatch({ type: 'library/CREATE_COURSE', id: 'phy', name: 'Physics', fields: { semesterId: 's1' } });
       dispatch({ type: 'library/CREATE_COURSE', id: 'chem', name: 'Chemistry', fields: { semesterId: 's1' } });
       dispatch({
@@ -146,17 +145,10 @@ describe('Home in the pseudo-locale', () => {
       if (typeof node === 'string') english.push(...node.split(/\{\w+\}/).map((part) => part.trim()).filter((part) => part.length >= 4));
       else if (node && typeof node === 'object') Object.values(node).forEach(collect);
     };
-    collect({ home: en.home, common: en.common });
+    collect({ home: en.home, common: en.common, shared: en.shared, courses: en.courses });
 
-    // The tab bar is a shared component, converted in L4d.
-    const tabBar = root.root.findByType(TabBar);
-    const shown = root.root
-      .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
-      .filter((n) => {
-        for (let p: ReactTestInstance | null = n; p; p = p.parent) if (p === tabBar) return false;
-        return true;
-      })
-      .map((n) => n.props.children as string);
+    // Every text node, the tab bar included (L4d).
+    const shown = texts(root);
     expect(shown).toEqual(expect.arrayContaining(['Physics', 'Chemistry']));
     expect(shown.some((text) => text.startsWith('['))).toBe(true);
     for (const text of shown) for (const phrase of english) expect(text).not.toContain(phrase);

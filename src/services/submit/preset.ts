@@ -155,7 +155,7 @@ export function summarizePreset(preset: SubmitPreset): string {
     preset.border ? t('deliver.summary.border') : null,
     preset.layout === '2_in_1' ? t('deliver.summary.twoPerSheet') : null,
     preset.includeAnnotations ? t('deliver.summary.withAnnotations') : null,
-    preset.pageSize,
+    preset.pageSize === 'Letter' ? t('deliver.paperLetter') : preset.pageSize,
   ];
   return parts.filter(Boolean).join(' · ');
 }

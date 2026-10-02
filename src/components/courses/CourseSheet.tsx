@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fontFamily, radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type CourseSheetProps = {
   visible: boolean;
@@ -17,12 +18,13 @@ type CourseSheetProps = {
 // pinned under it so the main action stays reachable with the keyboard up.
 export function CourseSheet({ visible, title, submitLabel, submitDisabled, onSubmit, onClose, children }: CourseSheetProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
         <View
           style={[
             styles.sheet,
@@ -35,7 +37,7 @@ export function CourseSheet({ visible, title, submitLabel, submitDisabled, onSub
           </ScrollView>
           <View style={styles.actions}>
             <Pressable style={styles.ghostButton} onPress={onClose} accessibilityRole="button">
-              <Text style={[styles.ghostLabel, { color: tokens.muted }]}>Cancel</Text>
+              <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable
               style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: submitDisabled ? 0.5 : 1 }]}

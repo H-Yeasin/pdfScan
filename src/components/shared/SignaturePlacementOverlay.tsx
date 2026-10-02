@@ -3,6 +3,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } 
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 const HANDLE_SIZE = 28;
 const MIN_SIGNATURE_WIDTH = 60;
@@ -34,6 +35,7 @@ export function SignaturePlacementOverlay({
   onRedraw,
 }: SignaturePlacementOverlayProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const { displayWidth, displayHeight } = useMemo(() => {
@@ -121,19 +123,19 @@ export function SignaturePlacementOverlay({
           </GestureDetector>
         </View>
 
-        <Text style={styles.hint}>Drag to move · drag corner to resize</Text>
+        <Text style={styles.hint}>{t('shared.signature.placeHint')}</Text>
 
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
-            <Text style={styles.ghostLabel}>Cancel</Text>
+            <Text style={styles.ghostLabel}>{t('common.cancel')}</Text>
           </Pressable>
           {onRedraw && (
             <Pressable style={styles.ghostButton} onPress={onRedraw}>
-              <Text style={styles.ghostLabel}>Redraw</Text>
+              <Text style={styles.ghostLabel}>{t('shared.signature.redraw')}</Text>
             </Pressable>
           )}
           <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
-            <Text style={styles.primaryLabel}>Place signature</Text>
+            <Text style={styles.primaryLabel}>{t('shared.signature.place')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>

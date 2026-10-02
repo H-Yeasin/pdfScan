@@ -21,6 +21,7 @@ import { useAppState } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { docTypeOf } from '../../services/courses/docTypes';
 import type { LibraryDocument } from '../../types/models';
+import { t } from '../../i18n';
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
 export function useOpenDocument() {
@@ -94,8 +95,8 @@ export function useDocumentListActions() {
         dispatch({ type: 'library/CLEAR_SELECTION' });
         dispatch({
           type: 'ui/SHOW_SNACK',
-          msg: `${ids.length} ${ids.length === 1 ? 'document' : 'documents'} ${archived ? 'archived' : 'back from the archive'}`,
-          action: 'Undo',
+          msg: archived ? t('library.archivedSnack', { count: ids.length }) : t('library.unarchivedSnack', { count: ids.length }),
+          action: t('library.undo'),
           onAction: () => dispatch({ type: 'library/SET_ARCHIVED', ids, archived: !archived }),
         });
         return;
@@ -112,21 +113,21 @@ export function useDocumentListActions() {
         selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
         dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
         dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: `${selectedDocs.length} files merged` });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.merged', { count: selectedDocs.length }) });
       } else if (id === 'split' && selectedDocs.length === 1) {
         const [doc] = selectedDocs;
         const split = await splitDocument(doc);
         deleteDocumentFiles(doc.id);
         dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
         dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: `Split into ${split.length} files` });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.splitInto', { count: split.length }) });
       } else if (id === 'compress') {
         for (const doc of selectedDocs) {
           const compressed = await compressDocument(doc, undefined, state.library.annotations.filter((a) => a.documentId === doc.id));
           dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
         }
         dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Compressed · done' });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.compressed') });
       } else if (id === 'sign' && selectedDocs.length === 1 && canSign(selectedDocs[0])) {
         const [target] = selectedDocs;
         setSignTarget(target);
@@ -155,7 +156,7 @@ export function useDocumentListActions() {
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignTarget(null);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signed · page 1' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: 1 }) });
     },
     [signTarget, dispatch, state.library.annotations]
   );
@@ -185,7 +186,7 @@ export function useDocumentListActions() {
       setSignStep(null);
       setCapturedSignature(null);
       setSignTarget(null);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Signature added — visible in exported PDF' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.added') });
     },
     [signTarget, capturedSignature, dispatch]
   );
@@ -202,7 +203,7 @@ export function useDocumentListActions() {
     <>
       <DocTypePickerModal
         visible={typePickerOpen}
-        title={selectedDocs.length === 1 ? 'Set type' : `Set type for ${selectedDocs.length} documents`}
+        title={selectedDocs.length === 1 ? t('library.setType') : t('library.setTypeFor', { count: selectedDocs.length })}
         value={sharedType}
         onSelect={(docType) => {
           dispatch({ type: 'library/SET_DOC_TYPE', ids: selectedDocs.map((d) => d.id), docType });
@@ -221,8 +222,8 @@ export function useDocumentListActions() {
           const ids = selectedDocs.map((d) => d.id);
           dispatch({ type: 'library/ASSIGN_COURSE', ids, courseId });
           dispatch({ type: 'library/CLEAR_SELECTION' });
-          const name = courseId ? state.library.courses.find((c) => c.id === courseId)?.name : 'Unsorted';
-          dispatch({ type: 'ui/SHOW_SNACK', msg: `Moved ${ids.length} to ${name ?? 'course'}` });
+          const name = courseId ? state.library.courses.find((c) => c.id === courseId)?.name : t('common.unsorted');
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.moved', { count: ids.length, name: name ?? t('library.movedFallback') }) });
         }}
         onCreate={(name) => {
           const id = createId('course');
