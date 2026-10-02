@@ -55,6 +55,7 @@ function backTarget(ctx: BackContext): ScreenName {
       return ctx.hub;
     case 'manageFolders':
     case 'storage':
+    case 'backup':
     case 'pro':
     case 'filterLab':
       return 'settings';

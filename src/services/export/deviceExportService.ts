@@ -6,6 +6,7 @@
 // DocumentFile.createFile appends one from the mimeType, and requestDirectoryPermissionsAsync
 // already calls takePersistableUriPermission natively, so the granted tree URI survives restarts
 // with no extra JS-side bookkeeping.
+import { File, FileMode } from 'expo-file-system';
 import { EncodingType, readAsStringAsync, StorageAccessFramework } from 'expo-file-system/legacy';
 import { isPageRasterFormat } from '../documents/formatCapabilities';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
@@ -74,3 +75,46 @@ export async function exportCopyToDeviceFolder(treeUri: string, doc: LibraryDocu
 
   return { ok, failed };
 }
+
+// §8 B3: copies a big file (a backup zip) into the folder in 1 MB chunks. writeFileToTree reads the
+// whole file into one base64 string, which a backup of a few hundred MB would run out of memory
+// on. The SAF document is created through the legacy API (it takes a name without extension and
+// adds one from the mime type) and then written through the new API's file handle, which opens
+// SAF content:// documents for writing (write-only: they can't seek). A failed or cancelled copy
+// deletes the half-written file. Throws, unlike exportCopyToDeviceFolder: a backup that didn't
+// arrive must be said plainly.
+export async function saveFileToFolder(
+  treeUri: string,
+  fileNameWithoutExtension: string,
+  mimeType: string,
+  source: File,
+  options: { signal?: AbortSignal; onProgress?: (bytesCopied: number) => void } = {}
+): Promise<void> {
+  const destUri = await StorageAccessFramework.createFileAsync(treeUri, fileNameWithoutExtension, mimeType);
+  const input = source.open(FileMode.ReadOnly);
+  let output: ReturnType<File['open']> | null = null;
+  try {
+    output = new File(destUri).open(FileMode.WriteOnly);
+    const size = input.size ?? 0;
+    let copied = 0;
+    while (copied < size) {
+      if (options.signal?.aborted) throw new Error('cancelled');
+      const chunk = input.readBytes(Math.min(COPY_CHUNK_BYTES, size - copied));
+      if (chunk.length === 0) break;
+      output.writeBytes(chunk);
+      copied += chunk.length;
+      options.onProgress?.(copied);
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+    output.close();
+    output = null;
+  } catch (error) {
+    output?.close();
+    await StorageAccessFramework.deleteAsync(destUri, { idempotent: true }).catch(() => undefined);
+    throw error;
+  } finally {
+    input.close();
+  }
+}
+
+const COPY_CHUNK_BYTES = 1024 * 1024;

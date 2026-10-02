@@ -6,6 +6,7 @@ import { SignatureCaptureModal } from '../shared/SignatureCaptureModal';
 import { SignatureModal } from '../shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
 import type { SelectionToolId } from './SelectionBar';
+import { useBackupExport } from '../backup/useBackupExport';
 import { useRouter } from '../../navigation/router';
 import { saveSignatureForReuse } from '../../services/signature/savedSignatureStorage';
 import {
@@ -84,6 +85,7 @@ export function useDocumentListActions() {
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [movePickerOpen, setMovePickerOpen] = useState(false);
   const submit = useSubmitDocument();
+  const { exportScope, overlay: backupOverlay } = useBackupExport();
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
 
@@ -112,6 +114,13 @@ export function useDocumentListActions() {
 
       if (id === 'type') {
         setTypePickerOpen(true);
+        return;
+      }
+
+      // §8 B3: Everything or PDFs only, then share or save the zip.
+      if (id === 'export') {
+        exportScope({ kind: 'documents', documentIds: selectedDocs.map((d) => d.id) });
+        dispatch({ type: 'library/CLEAR_SELECTION' });
         return;
       }
 
@@ -190,7 +199,7 @@ export function useDocumentListActions() {
         }
       }
     },
-    [selectedDocs, selection, dispatch, state.signature.saved, state.library.annotations, submit]
+    [selectedDocs, selection, dispatch, state.signature.saved, state.library.annotations, submit, exportScope]
   );
 
   const handleSignConfirm = useCallback(
@@ -253,6 +262,7 @@ export function useDocumentListActions() {
 
   const overlays = (
     <>
+      {backupOverlay}
       <DocTypePickerModal
         visible={typePickerOpen}
         title={selectedDocs.length === 1 ? t('library.setType') : t('library.setTypeFor', { count: selectedDocs.length })}

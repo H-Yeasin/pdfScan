@@ -14,6 +14,8 @@ export type ScreenName =
   | 'examPack'
   // §8 B1: Settings → Storage.
   | 'storage'
+  // §8 B3: Settings → Backup.
+  | 'backup'
   // Dev-only (__DEV__): see src/dev/FilterLabScreen.tsx.
   | 'filterLab';
 export type NavDir = 'fwd' | 'back';

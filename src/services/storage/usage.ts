@@ -18,7 +18,9 @@ export const CRITICAL_SPACE_BYTES = 50 * MB;
 export const BYTES_PER_SAVED_PAGE = 3 * MB;
 
 // Paths.cache folders only this app writes to, safe to empty whenever no work is running.
-const OWNED_CACHE_FOLDERS = ['share', 'extract', 'pdf-ops', 'pdf-native'];
+// 'backup' (§8 B3) holds a zip only until it is shared or saved; one left behind by a crash is
+// the biggest thing in the cache.
+const OWNED_CACHE_FOLDERS = ['share', 'extract', 'pdf-ops', 'pdf-native', 'backup'];
 // Where an open scan session's images live (expo-image-manipulator's output, and the loose
 // render/crop/merge files in Paths.cache itself): only emptied when there is no session.
 const SESSION_CACHE_FOLDERS = ['ImageManipulator'];

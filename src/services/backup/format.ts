@@ -22,6 +22,8 @@ export const BACKUP_FORMAT = 'pdfscan-backup';
 export const BACKUP_FORMAT_VERSION = 1;
 export const MANIFEST_ENTRY = 'manifest.json';
 export const LIBRARY_ENTRY = 'library.json';
+// Full backups only (§8 B3): the student's settings and the saved signature (signature/…).
+export const SETTINGS_ENTRY = 'settings.json';
 
 // Parents before children: the order rows are inserted in.
 export const TABLES = [
@@ -66,7 +68,7 @@ export type Manifest = {
 
 export type LibraryJson = { formatVersion: number; schemaVersion: number; tables: Tables };
 
-export type BackupFile = { zipPath: string; uri: string; bytes: number };
+export type BackupFile = { zipPath: string; uri: string; bytes: number; documentId: string };
 
 export type ExportedLibrary = {
   libraryJson: LibraryJson;
@@ -219,7 +221,7 @@ export async function exportRows(db: SQLiteDatabase, scope: BackupScope, schemaV
       const zipPath = zipPathFor(stored, docId, docReadable);
       if (seen.has(zipPath) || !file.exists) return;
       seen.add(zipPath);
-      files.push({ zipPath, uri: file.uri, bytes: file.size ?? 0 });
+      files.push({ zipPath, uri: file.uri, bytes: file.size ?? 0, documentId: docId });
     };
     // The readable copy first, then the folder.
     if (docReadable) add(docReadable.stored, new File(fromStoredPath(docReadable.stored)!));

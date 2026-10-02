@@ -5,7 +5,7 @@ import { isPageRasterFormat, isPasswordProtected } from '../../services/document
 import type { LibraryDocument } from '../../types/models';
 import { useT } from '../../i18n/useT';
 
-export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign' | 'type' | 'submit' | 'move' | 'archive';
+export type SelectionToolId = 'merge' | 'split' | 'compress' | 'sign' | 'type' | 'submit' | 'move' | 'archive' | 'export';
 
 type Tool = { id: SelectionToolId; icon: keyof typeof Ionicons.glyphMap };
 
@@ -14,6 +14,8 @@ const TOOLS: Tool[] = [
   { id: 'move', icon: 'folder-open-outline' },
   { id: 'type', icon: 'pricetag-outline' },
   { id: 'archive', icon: 'archive-outline' },
+  // §8 B3: a zip of the chosen documents (Everything or PDFs only), for any format.
+  { id: 'export', icon: 'download-outline' },
   { id: 'merge', icon: 'git-merge-outline' },
   { id: 'split', icon: 'git-branch-outline' },
   { id: 'compress', icon: 'contract-outline' },

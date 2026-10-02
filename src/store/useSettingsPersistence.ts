@@ -55,6 +55,16 @@ export function useSettingsPersistence() {
         if (isDocumentLanguage(settings.documentLanguage)) {
           dispatch({ type: 'settings/SET_DOCUMENT_LANGUAGE', language: settings.documentLanguage });
         }
+        if (typeof settings.lastBackupAt === 'number') {
+          dispatch({
+            type: 'settings/SET_LAST_BACKUP',
+            at: settings.lastBackupAt,
+            bytes: typeof settings.lastBackupBytes === 'number' ? settings.lastBackupBytes : null,
+          });
+        }
+        if (typeof settings.backupFolderUri === 'string') {
+          dispatch({ type: 'settings/SET_BACKUP_FOLDER', uri: settings.backupFolderUri, label: settings.backupFolderLabel ?? null });
+        }
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -84,6 +94,10 @@ export function useSettingsPersistence() {
       unsortedPromptDone: state.settings.unsortedPromptDone,
       uiLanguage: state.settings.uiLanguage,
       documentLanguage: state.settings.documentLanguage,
+      lastBackupAt: state.settings.lastBackupAt,
+      lastBackupBytes: state.settings.lastBackupBytes,
+      backupFolderUri: state.settings.backupFolderUri,
+      backupFolderLabel: state.settings.backupFolderLabel,
     });
   }, [
     loaded,
@@ -103,6 +117,10 @@ export function useSettingsPersistence() {
     state.settings.unsortedPromptDone,
     state.settings.uiLanguage,
     state.settings.documentLanguage,
+    state.settings.lastBackupAt,
+    state.settings.lastBackupBytes,
+    state.settings.backupFolderUri,
+    state.settings.backupFolderLabel,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.

@@ -168,6 +168,16 @@ export function SettingsScreen() {
         )}
 
         <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('backup.screen.section')}</Text>
+          <SettingRow
+            title={t('backup.screen.row')}
+            subtitle={t('backup.screen.rowSubtitle')}
+            chevron
+            onPress={() => go('backup')}
+          />
+        </View>
+
+        <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.storage.section')}</Text>
           <SettingRow
             title={t('settings.storage.row')}

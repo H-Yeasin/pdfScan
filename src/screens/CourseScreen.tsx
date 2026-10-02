@@ -10,6 +10,7 @@ import { EmptyState } from '../components/library/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
+import { useBackupExport } from '../components/backup/useBackupExport';
 import { SubmissionList } from '../components/submit/SubmissionList';
 import { DeadlineList } from '../components/deadlines/DeadlineList';
 import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
@@ -39,6 +40,8 @@ export function CourseScreen() {
   const store = useAppStore();
   const { files, courses, activeCourseId, selection, selMode } = state.library;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
+  // §8 B3: "Export course…" (Unsorted: its documents).
+  const { exportScope, overlay: exportOverlay } = useBackupExport();
   const [editing, setEditing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
 
@@ -153,6 +156,19 @@ export function CourseScreen() {
                   <Text style={styles.badgeLabel}>{packCount}</Text>
                 </View>
               ) : null}
+            </Pressable>
+          ) : null}
+          {docs.length > 0 ? (
+            <Pressable
+              style={styles.iconButton}
+              onPress={() =>
+                course
+                  ? exportScope({ kind: 'courses', courseIds: [course.id] }, course.name)
+                  : exportScope({ kind: 'documents', documentIds: docs.map((d) => d.id) })
+              }
+              accessibilityLabel={t('backup.export.course')}
+            >
+              <Ionicons name="download-outline" size={21} color={tokens.ink} />
             </Pressable>
           ) : null}
           {course ? (
@@ -303,6 +319,7 @@ export function CourseScreen() {
         />
       ) : null}
       {overlays}
+      {exportOverlay}
     </SafeAreaView>
   );
 }

@@ -44,6 +44,14 @@ export type SettingsState = {
   // §6 L4: the language of text that goes into documents (cover labels, footers, the {type} file
   // name token). 'ui' follows the app language; a Bangla UI can still make English covers.
   documentLanguage: DocumentLanguage;
+  // §8 B3: when the last full backup was handed over (shared or saved) and how big it was. null:
+  // never. Course and document exports don't count.
+  lastBackupAt: number | null;
+  lastBackupBytes: number | null;
+  // §8 B3, Android: the SAF folder backups are saved to (kept apart from the export folder above,
+  // so B5's automatic backups only ever rotate files in a folder chosen for them).
+  backupFolderUri: string | null;
+  backupFolderLabel: string | null;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -63,6 +71,10 @@ export const initialSettingsState: SettingsState = {
   unsortedPromptDone: false,
   uiLanguage: 'system',
   documentLanguage: 'ui',
+  lastBackupAt: null,
+  lastBackupBytes: null,
+  backupFolderUri: null,
+  backupFolderLabel: null,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -93,7 +105,9 @@ export type SettingsAction =
   | { type: 'settings/SET_PROFILE_PROMPTED' }
   | { type: 'settings/SET_UNSORTED_PROMPT_DONE' }
   | { type: 'settings/SET_UI_LANGUAGE'; language: UiLanguage }
-  | { type: 'settings/SET_DOCUMENT_LANGUAGE'; language: DocumentLanguage };
+  | { type: 'settings/SET_DOCUMENT_LANGUAGE'; language: DocumentLanguage }
+  | { type: 'settings/SET_LAST_BACKUP'; at: number | null; bytes: number | null }
+  | { type: 'settings/SET_BACKUP_FOLDER'; uri: string | null; label: string | null };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -105,6 +119,10 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, firstRun: action.firstRun };
     case 'settings/SET_OCR_SCRIPT':
       return { ...state, ocrScript: action.script };
+    case 'settings/SET_LAST_BACKUP':
+      return { ...state, lastBackupAt: action.at, lastBackupBytes: action.bytes };
+    case 'settings/SET_BACKUP_FOLDER':
+      return { ...state, backupFolderUri: action.uri, backupFolderLabel: action.label };
     case 'settings/SET_ANDROID_EXPORT_FOLDER':
       return { ...state, androidExportFolderUri: action.uri, androidExportFolderLabel: action.label };
     case 'settings/SET_DEFAULT_ENHANCE':

@@ -28,6 +28,11 @@ export type PersistedSettings = {
   uiLanguage?: string;
   // Optional: added in §6 L4c. Unknown values read as 'ui'.
   documentLanguage?: string;
+  // Optional: added in §8 B3.
+  lastBackupAt?: number | null;
+  lastBackupBytes?: number | null;
+  backupFolderUri?: string | null;
+  backupFolderLabel?: string | null;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

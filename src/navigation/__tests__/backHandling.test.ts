@@ -51,6 +51,7 @@ describe('resolveBack order', () => {
     expect(to({ screen: 'reader', hub: 'course' })).toBe('course');
     expect(to({ screen: 'settings', hub: 'library' })).toBe('library');
     expect(to({ screen: 'storage' })).toBe('settings');
+    expect(to({ screen: 'backup' })).toBe('settings');
     expect(to({ screen: 'manageFolders' })).toBe('settings');
     expect(to({ screen: 'academicOptions', previousScreen: 'review' })).toBe('review');
     expect(to({ screen: 'academicOptions' })).toBe('deliver');

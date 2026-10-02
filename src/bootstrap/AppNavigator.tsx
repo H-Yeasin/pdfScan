@@ -20,6 +20,7 @@ import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
 import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { ExamPackScreen } from '../screens/ExamPackScreen';
 import { StorageScreen } from '../screens/StorageScreen';
+import { BackupScreen } from '../screens/BackupScreen';
 import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
@@ -48,6 +49,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   academicOptions: AcademicOptionsScreen,
   examPack: ExamPackScreen,
   storage: StorageScreen,
+  backup: BackupScreen,
   filterLab: FilterLabScreen,
 };
 
