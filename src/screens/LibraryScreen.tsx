@@ -35,6 +35,7 @@ import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
+import { SkeletonRows } from '../components/library/SkeletonRows';
 
 export function LibraryScreen() {
   const { tokens } = useTheme();
@@ -217,7 +218,9 @@ export function LibraryScreen() {
 
       <LibraryTabs value={tab} onChange={(value) => dispatch({ type: 'library/SET_TAB', tab: value })} />
 
-      {loadStatus === 'failed' ? (
+      {loadStatus === 'loading' ? (
+        <SkeletonRows />
+      ) : loadStatus === 'failed' ? (
         <EmptyState
           title={t('library.loadFailed')}
           body={t('library.loadFailedBody')}

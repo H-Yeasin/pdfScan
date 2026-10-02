@@ -28,6 +28,7 @@ import type { Dispatch } from 'react';
 import type { AppAction } from '../../store/appReducer';
 import type { Annotation, LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
+import { hapticSelection } from '../../services/feedback/haptics';
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
 export function useOpenDocument() {
@@ -102,10 +103,11 @@ export function useDocumentListActions() {
 
   const handleLongPress = useCallback(
     (doc: LibraryDocument) => {
+      if (!selMode) hapticSelection();
       dispatch({ type: 'library/SET_SEL_MODE', on: true });
       dispatch({ type: 'library/TOGGLE_SELECTION', id: doc.id });
     },
-    [dispatch]
+    [dispatch, selMode]
   );
 
   const handleSelectionTool = useCallback(

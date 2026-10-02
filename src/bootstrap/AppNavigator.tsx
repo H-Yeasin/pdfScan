@@ -41,6 +41,24 @@ import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
 import { initCrashReporting } from '../services/telemetry/crash';
 import { useTheme } from '../theme';
+import { StatusBar } from 'expo-status-bar';
+
+// §9 O6: on a tablet, content stays at a readable width, centred, instead of stretching across the
+// screen. The camera, Review's page editor and the Reader use the whole screen.
+const CONTENT_MAX_WIDTH = 720;
+const FULL_BLEED: ReadonlySet<ScreenName> = new Set(['capture', 'review', 'reader']);
+
+function ScreenFrame({ name, background }: { name: ScreenName; background: string }) {
+  const Screen = SCREENS[name];
+  if (FULL_BLEED.has(name)) return <Screen />;
+  return (
+    <View style={[styles.frame, { backgroundColor: background }]}>
+      <View style={styles.content}>
+        <Screen />
+      </View>
+    </View>
+  );
+}
 
 const SCREENS: Record<ScreenName, React.ComponentType> = {
   home: HomeScreen,
@@ -76,7 +94,7 @@ export function AppNavigator() {
   useStorageIntegrity(libraryAfterBoot);
   useAutoBackup(libraryAfterBoot);
   const { screen, previousScreen, hub, tabHub, navDir, navTick, go, replace } = useRouter();
-  const { tokens } = useTheme();
+  const { tokens, theme } = useTheme();
   const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const progress = useRef(new Animated.Value(1)).current;
@@ -222,19 +240,18 @@ export function AppNavigator() {
 
   if (booting) return <View style={[styles.container, { backgroundColor: tokens.bg }]} />;
 
-  const Incoming = SCREENS[screen];
-  const Outgoing = outgoing ? SCREENS[outgoing.screen] : null;
-
   return (
     <View style={styles.container}>
-      {Outgoing && outgoing && (
+      {/* §9 O6: follows the app's theme setting, not the system's (Capture sets its own). */}
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+      {outgoing && (
         <Animated.View
           style={[
             styles.layer,
             transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
           ]}
         >
-          <Outgoing />
+          <ScreenFrame name={outgoing.screen} background={tokens.bg} />
         </Animated.View>
       )}
       <Animated.View
@@ -243,7 +260,7 @@ export function AppNavigator() {
           outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : null,
         ]}
       >
-        <Incoming />
+        <ScreenFrame name={screen} background={tokens.bg} />
       </Animated.View>
       {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
       <RestoreHost />
@@ -257,4 +274,6 @@ export function AppNavigator() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   layer: StyleSheet.absoluteFill,
+  frame: { flex: 1, alignItems: 'center' },
+  content: { flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH },
 });

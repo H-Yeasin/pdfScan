@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 
@@ -36,7 +36,8 @@ export function TextPromptModal({
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
+      {/* §9 O6: on iOS the card moves up with the keyboard instead of sitting under it. */}
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
           <TextInput
@@ -46,6 +47,8 @@ export function TextPromptModal({
             placeholderTextColor={tokens.muted}
             autoFocus
             keyboardType={keyboardType}
+            returnKeyType="done"
+            onSubmitEditing={() => trimmed && onSubmit(trimmed)}
             style={[styles.input, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
           />
           <View style={styles.actions}>
@@ -61,7 +64,7 @@ export function TextPromptModal({
             </Pressable>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DocTypeSelector } from '../courses/DocTypeChips';
 import { NameField } from '../deliver/NameField';
@@ -119,89 +119,93 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
-      <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
-        <Text style={[styles.title, { color: tokens.ink }]}>{deadline ? t('deadlines.edit') : t('deadlines.add')}</Text>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {!fixedCourseId && !deadline ? (
+      {/* §9 O6: on iOS the sheet moves up with the keyboard (the title field is near its top). */}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
+        <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
+          <Text style={[styles.title, { color: tokens.ink }]}>{deadline ? t('deadlines.edit') : t('deadlines.add')}</Text>
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {!fixedCourseId && !deadline ? (
+              <View style={styles.group}>
+                <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.course')}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                  {activeCourses.map((c) => (
+                    <Chip key={c.id} label={c.code || c.name} selected={c.id === courseId} onPress={() => setCourseId(c.id)} />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
             <View style={styles.group}>
-              <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.course')}</Text>
+              <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.type')}</Text>
+              <DocTypeSelector value={docType} onChange={setDocType} />
+            </View>
+
+            <NameField
+              label={t('deadlines.title')}
+              value={title}
+              onChange={(value) => {
+                setTitle(value);
+                setTitleEdited(true);
+              }}
+              placeholder={t('deadlines.titlePlaceholder')}
+            />
+
+            <View style={styles.group}>
+              <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.due')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-                {activeCourses.map((c) => (
-                  <Chip key={c.id} label={c.code || c.name} selected={c.id === courseId} onPress={() => setCourseId(c.id)} />
+                {days.map((d) => (
+                  <Chip key={d} label={dayLabel(d, Date.now())} selected={d === day} onPress={() => setDay(d)} />
                 ))}
               </ScrollView>
+              <View style={styles.timeRow}>
+                {TIME_PRESETS.map((m) => (
+                  <Chip key={m} label={formatTime(m)} selected={minutes === m} onPress={() => setTimeText(formatTime(m))} />
+                ))}
+                <TextInput
+                  value={timeText}
+                  onChangeText={setTimeText}
+                  keyboardType="numbers-and-punctuation"
+                  accessibilityLabel={t('deadlines.time')}
+                  style={[styles.timeInput, { color: tokens.ink, borderColor: tokens.edge, backgroundColor: tokens.surface }]}
+                />
+              </View>
+              <Text style={[styles.hint, { color: problem ? tokens.danger : tokens.muted }]}>
+                {problem ?? t('deadlines.remindersHint')}
+              </Text>
             </View>
-          ) : null}
 
-          <View style={styles.group}>
-            <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.type')}</Text>
-            <DocTypeSelector value={docType} onChange={setDocType} />
-          </View>
-
-          <NameField
-            label={t('deadlines.title')}
-            value={title}
-            onChange={(value) => {
-              setTitle(value);
-              setTitleEdited(true);
-            }}
-            placeholder={t('deadlines.titlePlaceholder')}
-          />
-
-          <View style={styles.group}>
-            <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.due')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {days.map((d) => (
-                <Chip key={d} label={dayLabel(d, Date.now())} selected={d === day} onPress={() => setDay(d)} />
-              ))}
-            </ScrollView>
-            <View style={styles.timeRow}>
-              {TIME_PRESETS.map((m) => (
-                <Chip key={m} label={formatTime(m)} selected={minutes === m} onPress={() => setTimeText(formatTime(m))} />
-              ))}
-              <TextInput
-                value={timeText}
-                onChangeText={setTimeText}
-                keyboardType="numbers-and-punctuation"
-                accessibilityLabel={t('deadlines.time')}
-                style={[styles.timeInput, { color: tokens.ink, borderColor: tokens.edge, backgroundColor: tokens.surface }]}
-              />
-            </View>
-            <Text style={[styles.hint, { color: problem ? tokens.danger : tokens.muted }]}>
-              {problem ?? t('deadlines.remindersHint')}
-            </Text>
-          </View>
-
-          <View style={styles.actions}>
-            {deadline ? (
+            <View style={styles.actions}>
+              {deadline ? (
+                <Pressable
+                  style={styles.ghost}
+                  onPress={() => {
+                    remove(deadline.id);
+                    onClose();
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.ghostLabel, { color: tokens.danger }]}>{t('deadlines.delete')}</Text>
+                </Pressable>
+              ) : null}
               <Pressable
-                style={styles.ghost}
-                onPress={() => {
-                  remove(deadline.id);
-                  onClose();
-                }}
+                style={[styles.primary, { backgroundColor: tokens.accent, opacity: problem || saving ? 0.5 : 1 }]}
+                onPress={handleSave}
+                disabled={!!problem || saving}
                 accessibilityRole="button"
               >
-                <Text style={[styles.ghostLabel, { color: tokens.danger }]}>{t('deadlines.delete')}</Text>
+                <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deadlines.save')}</Text>
               </Pressable>
-            ) : null}
-            <Pressable
-              style={[styles.primary, { backgroundColor: tokens.accent, opacity: problem || saving ? 0.5 : 1 }]}
-              onPress={handleSave}
-              disabled={!!problem || saving}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deadlines.save')}</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </View>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,.4)',

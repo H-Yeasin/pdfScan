@@ -10,6 +10,7 @@ import { matchDeadline } from '../services/submit/deadlines';
 import type { LibraryDocument, Submission } from '../types/models';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
+import { hapticSuccess, hapticWarning } from '../services/feedback/haptics';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
 // with its course's preset as it is now, then opens the share sheet. Returns false when the
@@ -57,10 +58,12 @@ export function useSubmitDocument() {
               }
             : { type: 'ui/SHOW_SNACK', msg }
         );
+        hapticSuccess();
         await shareAs(result.uri, result.fileName, 'application/pdf');
         return true;
       } catch (error) {
         console.warn('useSubmitDocument: submit failed', error);
+        hapticWarning();
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.buildFailed') });
         return false;
       }

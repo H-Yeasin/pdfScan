@@ -51,6 +51,7 @@ import { resolveOcrScript } from '../services/scripts/registry';
 import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { createId } from '../utils/id';
+import { hapticSuccess, hapticWarning } from '../services/feedback/haptics';
 
 
 type SaveMode = 'save' | 'share' | 'submit';
@@ -434,10 +435,12 @@ export function DeliverScreen() {
           });
         }
 
+        hapticSuccess();
         if (shareAfter) await shareDocument(doc);
         if (submission) await shareAs(submission.uri, submission.fileName, 'application/pdf');
       } catch (error) {
         console.warn('DeliverScreen: save failed', error);
+        hapticWarning();
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('deliver.snack.saveFailed') });
       } finally {
         setSaving(false);
