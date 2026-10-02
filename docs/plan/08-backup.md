@@ -142,7 +142,50 @@ As built:
 folder deleted by hand shows as "files missing" instead of crashing the Reader.
 
 ### B2 · Backup format: zip writer and reader, library export and import mapping *(M)*
-Status: todo
+Status: done (commit a762099)
+
+As built:
+- **Checked:** `expo-file-system@57`'s `File.open(mode)` returns a `FileHandle` with
+  `readBytes`, `writeBytes`, and a settable `offset` and `size` (sync). `file://` handles are
+  seekable; SAF `content://` ones are not (and can't be `ReadWrite`).
+- **Patched local headers, not data descriptors.** Sizes are known before a file is copied, so
+  the writer puts the real size in the local header, streams the data while computing the CRC,
+  then seeks back to fill the CRC in. That's a plain zip any reader handles (Java's
+  `ZipInputStream` rejects STORE entries with data descriptors). It needs a seekable
+  destination, so B3 writes to `Paths.cache/backup/` and then copies to SAF, as planned.
+- `zip/zipFormat.ts` (records, `ZipError` codes `NOT_A_ZIP` / `UNSUPPORTED_ZIP` /
+  `CRC_MISMATCH`, `ReadableHandle`/`WritableHandle` = expo's `FileHandle` shape),
+  `zip/utf8.ts` (own UTF-8, not `TextEncoder`/`TextDecoder`), `zip/index.ts`
+  (`createZip`, `addFileFromDisk`, `openZip`, `extractToFile`, which deletes a partial file on
+  failure). The writer and reader yield between 1 MB chunks and take an `AbortSignal`.
+  Folder entries from other tools are skipped. The user-facing message for `UNSUPPORTED_ZIP` is
+  B4's (i18n).
+- Zip64 is tested by lowering the limits (`ZipLimits`) instead of a 4 GB fake (a CRC over 4 GB
+  takes too long in a test); the 70,000-entry test is real. Other readers: Python's `zipfile`
+  (Zip64, CRC check), `unzip -t` (each skipped when missing) and jszip (comes with mammoth),
+  not yauzl.
+- `manifest.readable` maps a document id to `{ path, original }` (the readable zip path and the
+  file's name in its folder). Office documents get a readable copy too (`Courses/Math/Essay.docx`);
+  `document.pdf` never appears under `data/`. Files that are missing are left out; the row keeps its
+  `data/` path, and the integrity check flags it after restore. Folder names come from `tDoc`
+  (`document.backupCourses` / `backupUnsorted`).
+- `exportRows(db, scope, schemaVersion)` returns `{ libraryJson, readable, files, counts }`;
+  `buildManifest(...)` wraps it. Every file in `library/<docId>/` is included (submissions
+  too). It blanks `deadlines.reminder_ids` and `documents.disk_bytes`. A course scope brings its
+  semester, timetable and deadlines; a documents scope brings their courses (and semesters)
+  only.
+- `importPlan` extras: a row whose id is taken by something else on this phone gets a new id
+  (e.g. a page moved by a merge). Add mode drops submissions and timetable slots, and brings
+  deadlines only for courses it creates. Courses match on trimmed, case-insensitive name and
+  code. New courses go after the existing ones (`sort_order`), into a semester matched by name
+  or a new one. Also for B4: `loadCurrentLibrary(db)`, `targetPathForEntry(plan, manifest,
+  entry)` (refuses `..`), and `insertRows(db, tables)` (only the current schema's columns; run
+  it inside B4's transaction).
+- **For B4:** `updated_at` changes on *every* document write, including the Reader saving the
+  last page (§7 R4). So a document that was only *read* after a backup counts as changed and
+  gets "keep both" on a second restore. If that shows up in practice, compare content columns
+  instead of `updated_at` in `importPlan`.
+- Test mock: `File.open()` and `FileMode` in `src/test/mocks/expoFileSystem.ts`.
 
 - **Check first:** the `expo-file-system@57` file handle API (`File.open()`, `readBytes`,
   `writeBytes`, offsets) in the package source; the zip code needs random-access writes for
