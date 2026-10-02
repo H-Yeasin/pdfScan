@@ -8,4 +8,8 @@ describe('chooseStartScreen', () => {
   it('opens Home once a course exists', () => {
     expect(chooseStartScreen({ hasActiveCourse: true })).toBe('home');
   });
+
+  it('opens the introduction for a brand-new user (§9 O2)', () => {
+    expect(chooseStartScreen({ hasActiveCourse: false, showOnboarding: true })).toBe('onboarding');
+  });
 });

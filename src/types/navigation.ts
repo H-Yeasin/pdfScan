@@ -16,6 +16,8 @@ export type ScreenName =
   | 'storage'
   // §8 B3: Settings → Backup.
   | 'backup'
+  // §9 O2: the three-page introduction for new users.
+  | 'onboarding'
   // Dev-only (__DEV__): see src/dev/FilterLabScreen.tsx.
   | 'filterLab';
 export type NavDir = 'fwd' | 'back';

@@ -60,6 +60,8 @@ export type SettingsState = {
   autoBackup: AutoBackupFrequency;
   lastAutoBackupAt: number | null;
   autoBackupUris: string[];
+  // §9 O2: the introduction was finished or skipped (or never needed: an existing library).
+  onboardingDone: boolean;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -87,6 +89,7 @@ export const initialSettingsState: SettingsState = {
   autoBackup: 'off',
   lastAutoBackupAt: null,
   autoBackupUris: [],
+  onboardingDone: false,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -123,7 +126,8 @@ export type SettingsAction =
   | { type: 'settings/SNOOZE_BACKUP_REMINDER'; until: number | null }
   | { type: 'settings/SET_AUTO_BACKUP'; frequency: AutoBackupFrequency }
   | { type: 'settings/AUTO_BACKUP_DONE'; at: number; bytes: number; uris: string[] }
-  | { type: 'settings/LOAD_AUTO_BACKUP_STATE'; lastAt: number | null; uris: string[] };
+  | { type: 'settings/LOAD_AUTO_BACKUP_STATE'; lastAt: number | null; uris: string[] }
+  | { type: 'settings/SET_ONBOARDING_DONE'; done: boolean };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -139,6 +143,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, lastBackupAt: action.at, lastBackupBytes: action.bytes };
     case 'settings/SET_BACKUP_FOLDER':
       return { ...state, backupFolderUri: action.uri, backupFolderLabel: action.label };
+    case 'settings/SET_ONBOARDING_DONE':
+      return { ...state, onboardingDone: action.done };
     case 'settings/SNOOZE_BACKUP_REMINDER':
       return { ...state, backupReminderSnoozedUntil: action.until };
     case 'settings/SET_AUTO_BACKUP':

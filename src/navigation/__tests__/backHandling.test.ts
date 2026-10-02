@@ -52,6 +52,9 @@ describe('resolveBack order', () => {
     expect(to({ screen: 'settings', hub: 'library' })).toBe('library');
     expect(to({ screen: 'storage' })).toBe('settings');
     expect(to({ screen: 'backup' })).toBe('settings');
+    expect(to({ screen: 'onboarding', previousScreen: 'settings' })).toBe('settings');
+    // First run: Back on the introduction's first page leaves the app.
+    expect(to({ screen: 'onboarding' })).toBe('exit');
     expect(to({ screen: 'manageFolders' })).toBe('settings');
     expect(to({ screen: 'academicOptions', previousScreen: 'review' })).toBe('review');
     expect(to({ screen: 'academicOptions' })).toBe('deliver');

@@ -158,6 +158,7 @@ export const en = {
       crashReportsSubtitle: 'Never includes your documents, names or scanned text.',
     },
     about: {
+      showIntro: 'Show the introduction again',
       section: 'About',
       text: 'Version {version} · Documents never leave your phone unless you share them.',
     },
@@ -890,6 +891,33 @@ export const en = {
     classTimesNotSet: 'Not set — scans in class get filed here',
     archived: 'Archived',
     archivedHint: 'Hidden from course lists and pickers. Its files stay searchable.',
+  },
+
+  // §9 O2: the introduction.
+  onboarding: {
+    skip: 'Skip',
+    next: 'Next',
+    start: 'Start',
+    pageA11y: 'Page {page} of {total}',
+    what: {
+      title: 'Scan, file, submit',
+      body: 'Scan your notes and assignments, file them by course, and submit them as clean PDFs.',
+      scan: 'Scan',
+      file: 'File',
+      submit: 'Submit',
+      privacy: 'Everything stays on your phone. No account.',
+    },
+    you: {
+      title: 'About you',
+      body: 'Optional. Your name and roll number go into file names and cover pages, the way teachers ask for them.',
+      example: 'Your files will be named like',
+      sampleName: 'Rahim',
+      sampleRoll: '2021331045',
+    },
+    courses: {
+      title: 'Your courses',
+      body: "Optional. Add this term's courses, and every scan can be filed under one.",
+    },
   },
 
   // §8 B3: backups and exports.

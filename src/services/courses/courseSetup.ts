@@ -97,6 +97,24 @@ export function validateQuickSetup(
   return { rowErrors, semesterError: semesterName.trim() ? undefined : t('courses.errors.semesterMissing'), count };
 }
 
+// §9 O2: what Skip (or Start) in onboarding saves - the rows that are fine on their own, so a
+// half-typed row doesn't throw away the good ones. A blank semester name takes this term's
+// default. Returns rows only if together they pass validateQuickSetup.
+export function savableQuickSetup(
+  rows: readonly QuickSetupRow[],
+  semesterName: string,
+  courses: readonly Course[],
+  semesters: readonly Semester[],
+  now: Date
+): { rows: QuickSetupRow[]; semesterName: string } {
+  const name = semesterName.trim() || defaultSemester(now).name;
+  const { rowErrors } = validateQuickSetup(rows, name, courses, semesters);
+  const kept = rows.filter((row, i) => (row.name.trim() || row.code.trim()) && !hasErrors(rowErrors[i]));
+  const again = validateQuickSetup(kept, name, courses, semesters);
+  const ok = !again.semesterError && again.rowErrors.every((e) => !hasErrors(e));
+  return { rows: ok ? kept : [], semesterName: name };
+}
+
 // The colours the next `n` new courses will get, in order - what the sheet shows next to each row
 // before saving, and what it saves, so the preview always matches.
 export function upcomingColors(courses: readonly Course[], n: number): CourseColor[] {

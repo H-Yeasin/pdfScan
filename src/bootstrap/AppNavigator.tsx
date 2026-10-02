@@ -22,6 +22,8 @@ import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { ExamPackScreen } from '../screens/ExamPackScreen';
 import { StorageScreen } from '../screens/StorageScreen';
 import { BackupScreen } from '../screens/BackupScreen';
+import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
 import { ExportHost } from '../components/backup/ExportHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
@@ -55,6 +57,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   examPack: ExamPackScreen,
   storage: StorageScreen,
   backup: BackupScreen,
+  onboarding: OnboardingScreen,
   filterLab: FilterLabScreen,
 };
 
@@ -103,11 +106,22 @@ export function AppNavigator() {
   useEffect(() => {
     if (startChosen.current || !bootReady) return;
     startChosen.current = true;
+    // §9 O2: the introduction for a brand-new user; someone updating with a library already in
+    // place is marked done without seeing it.
+    const onboarding = onboardingDecision({
+      onboardingDone: state.settings.onboardingDone,
+      libraryLoaded: libraryStatus === 'ready',
+      documentCount: state.library.files.length,
+      courseCount: state.library.courses.length,
+    });
+    if (onboarding === 'markDone') dispatch({ type: 'settings/SET_ONBOARDING_DONE', done: true });
     if (screen === 'capture' && navTick === 0) {
-      const start = chooseStartScreen({ hasActiveCourse });
+      const start = chooseStartScreen({ hasActiveCourse, showOnboarding: onboarding === 'show' });
       if (start !== screen) replace(start);
     }
     setBooting(false);
+    // Runs once, when boot is ready; the counts are read as they are at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootReady, hasActiveCourse, screen, navTick, replace]);
   useEffect(() => {
     if (!booting) return;

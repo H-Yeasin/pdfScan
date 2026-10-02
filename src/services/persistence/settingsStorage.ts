@@ -48,6 +48,8 @@ export type PersistedSettings = {
   autoBackup?: string;
   lastAutoBackupAt?: number | null;
   autoBackupUris?: string[];
+  // Optional: added in §9 O2.
+  onboardingDone?: boolean;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

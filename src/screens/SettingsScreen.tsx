@@ -228,6 +228,7 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.about.section')}</Text>
           <Text style={[styles.aboutText, { color: tokens.muted }]}>{t('settings.about.text', { version: APP_VERSION })}</Text>
+          <SettingRow title={t('settings.about.showIntro')} chevron onPress={() => go('onboarding')} />
         </View>
       </ScrollView>
       <TimetableEditor visible={timetableOpen} onClose={() => setTimetableOpen(false)} />

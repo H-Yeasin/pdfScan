@@ -52,6 +52,7 @@ export function useSettingsPersistence() {
             bytes: typeof settings.lastBackupBytes === 'number' ? settings.lastBackupBytes : null,
           });
         }
+        if (settings.onboardingDone === true) dispatch({ type: 'settings/SET_ONBOARDING_DONE', done: true });
         if (typeof settings.backupReminderSnoozedUntil === 'number') {
           dispatch({ type: 'settings/SNOOZE_BACKUP_REMINDER', until: settings.backupReminderSnoozedUntil });
         }
@@ -101,6 +102,7 @@ export function useSettingsPersistence() {
       autoBackup: state.settings.autoBackup,
       lastAutoBackupAt: state.settings.lastAutoBackupAt,
       autoBackupUris: state.settings.autoBackupUris,
+      onboardingDone: state.settings.onboardingDone,
     });
   }, [
     loaded,
@@ -128,6 +130,7 @@ export function useSettingsPersistence() {
     state.settings.autoBackup,
     state.settings.lastAutoBackupAt,
     state.settings.autoBackupUris,
+    state.settings.onboardingDone,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.

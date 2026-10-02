@@ -66,6 +66,7 @@ function backTarget(ctx: BackContext): ScreenName {
     case 'home':
     case 'library':
     case 'capture':
+    case 'onboarding':
       return rootScreen(ctx.hasCourses);
   }
 }
@@ -78,6 +79,12 @@ export function resolveBack(ctx: BackContext): BackStep {
     return { kind: 'dispatch', actions: [{ type: 'library/TOGGLE_SEARCH_OPEN' }] };
   }
 
+  // §9 O2: Onboarding's own pages step back with useBackHandler. On its first page: opened again
+  // from Settings, Back returns there; on first run (no previous screen) it leaves the app, so the
+  // introduction isn't skipped by accident and shows again next time.
+  if (ctx.screen === 'onboarding') {
+    return ctx.previousScreen ? { kind: 'go', to: ctx.previousScreen, actions: [] } : { kind: 'exit' };
+  }
   if (TABS.has(ctx.screen) && ctx.screen === rootScreen(ctx.hasCourses)) {
     return ctx.sessionPageCount > 0 ? { kind: 'confirmDiscard', count: ctx.sessionPageCount } : { kind: 'exit' };
   }
