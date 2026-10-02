@@ -51,7 +51,8 @@ directing users of a Play app to pay outside Google Play for in-app features. So
 ## Steps
 
 ### M1 · Policy and privacy groundwork *(S, a checklist plus small code)*
-Status: todo
+Status: done in code (commit 076c8c7); the Play Console checklist is open (owner,
+`docs/policy/play-console.md`), and the privacy policy needs hosting (§11).
 
 - Play Console: target audience **13+** (not "Designed for Families"), "Contains ads: yes",
   and Data safety updated (advertising ID and ad interactions through AdMob; opt-in diagnostics
@@ -64,6 +65,14 @@ Status: todo
   allows it; see M5), "Help improve PDF Scan" (usage counts, off by default, next to the
   existing crash-report toggle from F8).
 - Done when: the checklist is ticked and the in-app texts exist.
+- **As built:** `settings.personalizedAdsEnabled` (default true; a missing stored value reads as
+  true) and `settings.usageStatsEnabled` (default false), actions `settings/SET_PERSONALIZED_ADS`
+  / `SET_USAGE_STATS`, persisted in `app:settings`. Nothing reads them yet: M5 maps the first to
+  `requestNonPersonalizedAdsOnly`, M8 the second to analytics collection. Settings → Privacy
+  shows `settings.privacy.adsNote` above the toggles. The privacy policy draft and the Play
+  Console checklist (with the Data safety table) are in `docs/policy/`. There was no store copy
+  yet; README's intro and "Privacy by design" now say "no ads while you work". Onboarding still
+  shows only the crash-report toggle.
 
 ### M2 · Firebase Remote Config (no login) *(S)*
 Status: todo

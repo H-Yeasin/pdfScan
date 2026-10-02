@@ -19,7 +19,7 @@ code **when the section was planned**, and are kept as history.
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
 | §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | B1–B5 done in code (device checks open; B1's backup rules and B4's zip "Open with" need a new dev build). B6 (Google Drive) waits for Pro. |
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2, O3 and O4 done in code. **O5 and O6 in progress:** their code is done; what's left is on a device: the measurements in `docs/qa/performance.md` and the walkthrough in `docs/qa/walkthrough.md`. |
-| §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). |
+| §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1 done in code (Play Console checklist open: `docs/policy/play-console.md`). Next: M2. |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
 
 ## Phases (from `docs/PLAN.md` §5)
@@ -112,6 +112,7 @@ lines here.
 | O3 Empty states, hints | c4dd4f7 | `components/shared/{EmptyState,Hint,useHint}`, `services/hints/hints.ts`, `settings.hintsSeen`, `store/useGalleryImport` |
 | O4 Accessibility | 38b3fb4, 854cb74 | `__tests__/a11yLabels.test.ts`, `theme/{contrast,useReducedMotion}.ts`, `onAccent` token, `touchSlop`, `services/a11y/announce`; by-hand checks in `docs/qa/walkthrough.md` |
 | O6 Polish (code) | ac1c707 | snack queue, theme status bar, tablet max width, `SkeletonRows`, haptics, error wording, keyboard; walkthrough open |
+| M1 Policy and privacy | 076c8c7 | `settings.{personalizedAdsEnabled,usageStatsEnabled}`, Settings → Privacy ads note, `docs/policy/{privacy-policy,play-console}.md` |
 
 ## How the branches came together
 

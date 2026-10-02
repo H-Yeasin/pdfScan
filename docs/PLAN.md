@@ -241,7 +241,7 @@ exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no
 
 **Detailed steps:** [`docs/plan/10-monetization.md`](plan/10-monetization.md)
 
-- [ ] M1 Policy and privacy groundwork (target audience 13+, Data safety, privacy policy, toggles)
+- [x] M1 Policy and privacy groundwork (target audience 13+, Data safety, privacy policy, toggles)
 - [ ] M2 Firebase Remote Config, no login (ads switch, pass length, support contact)
 - [ ] M3 Pro feature registry and entitlements (pass / lifetime / yearly; a test guards the free list)
 - [ ] M4 Pro features worth a pass: cover templates, theme accents, app lock
