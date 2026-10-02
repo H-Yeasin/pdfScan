@@ -58,7 +58,7 @@ export function PageGrid({ pages, highlightedIndex, selecting, selectedIds, onPr
             </View>
             {selecting ? (
               <View style={[styles.selectBadge, { backgroundColor: chosen ? tokens.accent : 'rgba(0,0,0,.35)' }]}>
-                {chosen && <Ionicons name="checkmark" size={13} color="#fff" />}
+                {chosen && <Ionicons name="checkmark" size={13} color={tokens.onAccent} />}
               </View>
             ) : onDelete ? (
               <Pressable

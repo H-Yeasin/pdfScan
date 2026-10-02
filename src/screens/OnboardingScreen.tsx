@@ -161,7 +161,7 @@ export function OnboardingScreen() {
           onPress={() => (last ? finish() : goToPage(page + 1))}
           accessibilityRole="button"
         >
-          <Text style={styles.primaryLabel}>{last ? t('onboarding.start') : t('onboarding.next')}</Text>
+          <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{last ? t('onboarding.start') : t('onboarding.next')}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -272,7 +272,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },

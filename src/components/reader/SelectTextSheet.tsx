@@ -138,7 +138,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                   disabled={rerunning}
                   accessibilityRole="button"
                 >
-                  {rerunning ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonLabel}>{t('reader.select.runOcr')}</Text>}
+                  {rerunning ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.buttonLabel, { color: theme.onAccent }]}>{t('reader.select.runOcr')}</Text>}
                 </Pressable>
               </View>
             ) : (
@@ -166,7 +166,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                     disabled={!text}
                     accessibilityRole="button"
                   >
-                    <Text style={styles.buttonLabel}>{t('reader.select.copy')}</Text>
+                    <Text style={[styles.buttonLabel, { color: theme.onAccent }]}>{t('reader.select.copy')}</Text>
                   </Pressable>
                 </View>
               </>
@@ -232,7 +232,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

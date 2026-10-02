@@ -155,7 +155,7 @@ export function AnnotateSheet({
               <Ionicons name="chevron-forward" size={21} color={idx === doc.pages.length - 1 ? theme.muted : theme.ink} />
             </Pressable>
             <Pressable style={[styles.doneButton, { backgroundColor: theme.accent }]} onPress={done} disabled={saving} accessibilityRole="button">
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.doneLabel}>{t('reader.annotate.done')}</Text>}
+              {saving ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.doneLabel, { color: theme.onAccent }]}>{t('reader.annotate.done')}</Text>}
             </Pressable>
           </View>
 
@@ -329,7 +329,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   doneLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

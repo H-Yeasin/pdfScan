@@ -160,7 +160,7 @@ export function CourseScreen() {
               <Ionicons name="layers-outline" size={21} color={tokens.ink} />
               {packCount ? (
                 <View style={[styles.badge, { backgroundColor: tokens.accent }]}>
-                  <Text style={styles.badgeLabel}>{packCount}</Text>
+                  <Text style={[styles.badgeLabel, { color: tokens.onAccent }]}>{packCount}</Text>
                 </View>
               ) : null}
             </Pressable>
@@ -316,8 +316,8 @@ export function CourseScreen() {
           accessibilityRole="button"
           accessibilityLabel={course ? t('courses.page.scanIntoA11y', { name: course.name }) : t('common.scan')}
         >
-          <Ionicons name="scan" size={20} color="#fff" />
-          <Text style={styles.scanLabel}>{t('common.scan')}</Text>
+          <Ionicons name="scan" size={20} color={tokens.onAccent} />
+          <Text style={[styles.scanLabel, { color: tokens.onAccent }]}>{t('common.scan')}</Text>
         </Pressable>
       ) : null}
 
@@ -385,7 +385,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   scanLabel: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -446,7 +445,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeLabel: {
-    color: '#fff',
     fontSize: 11,
     fontWeight: '700',
   },

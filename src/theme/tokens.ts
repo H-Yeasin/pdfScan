@@ -9,8 +9,11 @@ export type ThemeTokens = {
   ink: string;
   muted: string;
   edge: string;
+  // A fill (buttons, selection, the active tab's underline) and icons; never body text, which uses
+  // accentInk. Text and icons drawn ON an accent fill use onAccent. Contrast: theme/__tests__/contrast.test.ts.
   accent: string;
   accentInk: string;
+  onAccent: string;
   accentSoft: string;
   danger: string;
   // Course colours (services/courses/palette.ts), each at least 4.5:1 against bg, surface and
@@ -25,8 +28,10 @@ const light: ThemeTokens = {
   ink: '#201e1d',
   muted: '#645c50',
   edge: 'rgba(32,30,29,.13)',
-  accent: '#16a085',
+  // §9 O4b: deepened from #16a085 so white labels on it reach 4.5:1.
+  accent: '#0f7f69',
   accentInk: '#0e6655',
+  onAccent: '#ffffff',
   accentSoft: '#dff0ea',
   danger: '#c0392b',
   courseColors: {
@@ -52,8 +57,11 @@ const dark: ThemeTokens = {
   edge: 'rgba(255,255,255,.14)',
   accent: '#1abc9c',
   accentInk: '#7fe3cd',
+  // §9 O4b: the bright dark-theme accent takes dark labels (white was 2.4:1).
+  onAccent: '#0b1f1a',
   accentSoft: '#1d302c',
-  danger: '#e74c3c',
+  // §9 O4b: lightened from #e74c3c so error text reaches 4.5:1 on every dark surface.
+  danger: '#f16253',
   courseColors: {
     teal: '#5eead4',
     blue: '#93c5fd',

@@ -192,7 +192,7 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
               disabled={!!problem || saving}
               accessibilityRole="button"
             >
-              <Text style={styles.primaryLabel}>{t('deadlines.save')}</Text>
+              <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deadlines.save')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

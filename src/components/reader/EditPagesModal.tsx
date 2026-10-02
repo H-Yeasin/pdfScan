@@ -99,7 +99,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
             onPress={() => onSave(edit)}
             disabled={!dirty || busy}
           >
-            {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveLabel}>{t('reader.save')}</Text>}
+            {busy ? <ActivityIndicator size="small" color={tokens.onAccent} /> : <Text style={[styles.saveLabel, { color: tokens.onAccent }]}>{t('reader.save')}</Text>}
           </Pressable>
         </View>
         <Text style={[styles.hint, { color: tokens.muted }]}>{t('reader.edit.hint')}</Text>
@@ -118,7 +118,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
               }}
               hitSlop={8}
             >
-              <Text style={[styles.undoLabel, { color: tokens.accent }]}>{t('library.undo')}</Text>
+              <Text style={[styles.undoLabel, { color: tokens.accentInk }]}>{t('library.undo')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: typeScale.title.fontSize },
   iconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   saveButton: { minWidth: 72, alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.full },
-  saveLabel: { color: '#fff', fontWeight: '700' },
+  saveLabel: { fontWeight: '700' },
   hint: { paddingHorizontal: spacing.lg, fontSize: 13 },
   grid: { flex: 1 },
   undoBar: {

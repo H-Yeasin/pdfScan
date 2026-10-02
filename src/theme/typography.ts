@@ -36,3 +36,8 @@ export const typeScale = {
   caption: { fontFamily: fontFamily.bodyRegular, fontSize: 13, lineHeight: 17 },
   mono: { fontFamily: 'monospace', fontSize: 13, lineHeight: 17 },
 } as const;
+
+// §9 O4b: text follows the system font size everywhere, except dense chrome (the tab bar, filter
+// chips and tabs, the Reader's top and bottom bars), which stops growing at 1.4x so its labels
+// don't push the bar's icons off screen at 200 %.
+export const CHROME_MAX_FONT_SCALE = 1.4;

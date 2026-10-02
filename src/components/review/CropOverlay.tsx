@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -11,6 +11,7 @@ import Svg, { Path, Polygon } from 'react-native-svg';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { Point } from '../../services/enhance/perspective';
+import { detectDocumentQuad } from '../../services/capture/quadDetector';
 
 const HANDLE_SIZE = 28;
 const HANDLE_HIT_SLOP = 16;
@@ -182,6 +183,34 @@ export function CropOverlay({
     bottomLeft.y.value = displayHeight;
   };
 
+  // §9 O4b: alternatives to dragging the corners (a screen-reader user can't trace edges).
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  const setCorners = (quad: [Point, Point, Point, Point]) => {
+    const s = displayWidth / naturalWidth;
+    [topLeft, topRight, bottomRight, bottomLeft].forEach((corner, i) => {
+      corner.x.value = clamp(quad[i].x * s, 0, displayWidth);
+      corner.y.value = clamp(quad[i].y * s, 0, displayHeight);
+    });
+  };
+  const handleAuto = async () => {
+    const detection = await detectDocumentQuad(uri);
+    if (detection) {
+      setCorners(detection.quad);
+      setAutoMessage(null);
+    } else {
+      setAutoMessage(t('review.crop.noEdges'));
+    }
+  };
+  const handleWhole = () => {
+    handleReset();
+    onConfirm([
+      { x: 0, y: 0 },
+      { x: naturalWidth, y: 0 },
+      { x: naturalWidth, y: naturalHeight },
+      { x: 0, y: naturalHeight },
+    ]);
+  };
+
   const handleConfirm = () => {
     const scale = naturalWidth / displayWidth;
     const toNatural = (corner: Corner): Point => ({
@@ -228,6 +257,19 @@ export function CropOverlay({
 
         {stepLabel && <Text style={styles.stepLabel}>{stepLabel}</Text>}
         <Text style={styles.hint}>{t('review.crop.hint')}</Text>
+        {autoMessage ? (
+          <Text style={styles.hint} accessibilityLiveRegion="polite">
+            {autoMessage}
+          </Text>
+        ) : null}
+        <View style={styles.altActions}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={() => void handleAuto()}>
+            <Text style={styles.ghostLabel}>{t('review.crop.auto')}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={handleWhole}>
+            <Text style={styles.ghostLabel}>{t('review.crop.whole')}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.actions}>
           <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
@@ -237,7 +279,7 @@ export function CropOverlay({
             <Text style={styles.ghostLabel}>{t('review.crop.reset')}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
-            <Text style={styles.primaryLabel}>{t('review.crop.confirm')}</Text>
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('review.crop.confirm')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>
@@ -302,6 +344,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.lg,
   },
+  altActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   ghostButton: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
@@ -317,7 +363,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

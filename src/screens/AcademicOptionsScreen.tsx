@@ -340,9 +340,9 @@ export function AcademicOptionsScreen() {
           disabled={previewing || pages.length === 0}
         >
           {previewing ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={tokens.onAccent} />
           ) : (
-            <Text style={styles.previewButtonLabel}>{t('deliver.academic.preview')}</Text>
+            <Text style={[styles.previewButtonLabel, { color: tokens.onAccent }]}>{t('deliver.academic.preview')}</Text>
           )}
         </Pressable>
       </ScrollView>
@@ -449,7 +449,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   previewButtonLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

@@ -252,7 +252,7 @@ export function RestoreHost() {
                 onPress={start}
                 disabled={!canStart}
               >
-                <Text style={styles.primaryLabel}>
+                <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>
                   {phase.mode === 'restore' ? tr('backup.restore.startRestore') : tr('backup.restore.startAdd')}
                 </Text>
               </Pressable>
@@ -322,7 +322,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

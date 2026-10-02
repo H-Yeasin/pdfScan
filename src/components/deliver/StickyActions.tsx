@@ -24,7 +24,7 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
         disabled={saving}
         accessibilityLabel={t('deliver.actions.submitA11y')}
       >
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryLabel}>{t('deliver.actions.submit')}</Text>}
+        {saving ? <ActivityIndicator color={tokens.onAccent} /> : <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deliver.actions.submit')}</Text>}
       </Pressable>
       {saving && progress ? (
         <Text style={[styles.progress, { color: tokens.muted }]} accessibilityLiveRegion="polite">
@@ -62,7 +62,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

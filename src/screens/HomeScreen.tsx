@@ -139,7 +139,7 @@ export function HomeScreen() {
               hitSlop={8}
               accessibilityRole="button"
             >
-              <Text style={[styles.backupAction, { color: tokens.accent }]}>{t('backup.reminder.backUp')}</Text>
+              <Text style={[styles.backupAction, { color: tokens.accentInk }]}>{t('backup.reminder.backUp')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -275,8 +275,8 @@ export function HomeScreen() {
         accessibilityRole="button"
         accessibilityLabel={t('common.scan')}
       >
-        <Ionicons name="scan" size={22} color="#fff" />
-        <Text style={styles.scanLabel}>{t('common.scan')}</Text>
+        <Ionicons name="scan" size={22} color={tokens.onAccent} />
+        <Text style={[styles.scanLabel, { color: tokens.onAccent }]}>{t('common.scan')}</Text>
       </Pressable>
 
       <TabBar active="home" background={tokens.surface} activeColor={tokens.ink} inactiveColor={tokens.muted} accent={tokens.accent} />
@@ -423,7 +423,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   scanLabel: {
-    color: '#fff',
     fontSize: 17,
     fontWeight: '700',
   },

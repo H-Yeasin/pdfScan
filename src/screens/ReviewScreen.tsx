@@ -43,6 +43,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/shared/Hint';
 import { useHint } from '../components/shared/useHint';
 import { useGalleryImport } from '../store/useGalleryImport';
+import { useReducedMotion } from '../theme/useReducedMotion';
 
 const OCR_SPARSE_THRESHOLD = 6;
 
@@ -141,15 +142,21 @@ export function ReviewScreen() {
   // reports progress, ProcessingProgress (determinate, with Cancel) takes over.
   const showRibbon = ocrRunning || (scanProcessing && !progress);
   const ribbon = useRef(new Animated.Value(0)).current;
+  // With reduce motion on (§9 O4b) the ribbon stands still: the progress text says what's happening.
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
     if (!showRibbon) return;
+    if (reducedMotion) {
+      ribbon.setValue(0.5);
+      return;
+    }
     ribbon.setValue(0);
     const loop = Animated.loop(
       Animated.timing(ribbon, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
-  }, [showRibbon, ribbon]);
+  }, [showRibbon, ribbon, reducedMotion]);
 
   const handleReorder = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -543,8 +550,8 @@ export function ReviewScreen() {
             </Pressable>
           )}
           <Pressable accessibilityRole="button" style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
-            <Text style={styles.nextLabel}>{t('review.next')}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#fff" />
+            <Text style={[styles.nextLabel, { color: tokens.onAccent }]}>{t('review.next')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={tokens.onAccent} />
           </Pressable>
         </View>
       </View>
@@ -675,7 +682,7 @@ export function ReviewScreen() {
             {adjustable && (
               <Pressable accessibilityRole="button" style={styles.headerToggle} onPress={() => setAdjustOpen((v) => !v)} hitSlop={4}>
                 <Ionicons name="options-outline" size={18} color={adjustOpen ? tokens.accent : tokens.muted} />
-                <Text style={[styles.headerToggleLabel, { color: adjustOpen ? tokens.accent : tokens.muted }]}>
+                <Text style={[styles.headerToggleLabel, { color: adjustOpen ? tokens.accentInk : tokens.muted }]}>
                   {t('review.adjust')}
                 </Text>
               </Pressable>
@@ -823,7 +830,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   nextLabel: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },

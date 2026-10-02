@@ -170,7 +170,7 @@ export function StorageScreen() {
                 accessibilityRole="button"
                 hitSlop={6}
               >
-                <Text style={[styles.pillText, { color: tokens.accent }]}>{t('settings.storage.clear')}</Text>
+                <Text style={[styles.pillText, { color: tokens.accentInk }]}>{t('settings.storage.clear')}</Text>
               </Pressable>
             </View>
             <SettingRow
@@ -201,7 +201,7 @@ export function StorageScreen() {
                         style={[styles.pill, { borderColor: tokens.edge, opacity: compressingId && compressingId !== doc.id ? 0.5 : 1 }]}
                         hitSlop={6}
                       >
-                        <Text style={[styles.pillText, { color: tokens.accent }]}>
+                        <Text style={[styles.pillText, { color: tokens.accentInk }]}>
                           {compressingId === doc.id ? t('settings.storage.compressing') : t('settings.storage.compress')}
                         </Text>
                       </Pressable>

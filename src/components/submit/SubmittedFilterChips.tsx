@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 
 export type SubmittedFilter = 'all' | 'submitted' | 'notSubmitted' | 'bookmarked';
@@ -45,7 +45,7 @@ export function SubmittedFilterChips({
               { borderColor: selected ? tokens.accent : tokens.edge, backgroundColor: selected ? tokens.accentSoft : tokens.surface },
             ]}
           >
-            <Text style={[styles.label, { color: selected ? tokens.accentInk : tokens.ink }]}>{option.label}</Text>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.label, { color: selected ? tokens.accentInk : tokens.ink }]}>{option.label}</Text>
           </Pressable>
         );
       })}

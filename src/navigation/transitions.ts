@@ -17,6 +17,21 @@ export function slideTransform(
   return progress.interpolate({ inputRange: [0, 1], outputRange: [from, to] });
 }
 
+// The animated style of a screen during a transition: a horizontal slide, or (with the system's
+// reduce-motion setting on, §9 O4b) a cross-fade in place.
+export function transitionStyle(
+  progress: Animated.Value,
+  width: number,
+  kind: 'incoming' | 'outgoing',
+  dir: NavDir,
+  reducedMotion: boolean
+) {
+  if (reducedMotion) {
+    return { opacity: kind === 'incoming' ? progress : progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) };
+  }
+  return { transform: [{ translateX: slideTransform(progress, width, kind, dir) }] };
+}
+
 export function runSlide(progress: Animated.Value, onDone?: () => void) {
   progress.setValue(0);
   Animated.timing(progress, {

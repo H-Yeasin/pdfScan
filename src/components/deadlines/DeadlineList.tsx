@@ -53,8 +53,8 @@ export function DeadlineList({ deadlines, now, onPress, courseLabel, highlightId
                 accessibilityRole="button"
                 accessibilityLabel={t('deadlines.scanNowA11y', { title: d.title })}
               >
-                <Ionicons name="scan" size={16} color="#fff" />
-                <Text style={styles.scanLabel}>{t('deadlines.scanNow')}</Text>
+                <Ionicons name="scan" size={16} color={tokens.onAccent} />
+                <Text style={[styles.scanLabel, { color: tokens.onAccent }]}>{t('deadlines.scanNow')}</Text>
               </Pressable>
             ) : null}
           </Pressable>
@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   scanLabel: {
-    color: '#fff',
     fontSize: 13.5,
     fontWeight: '600',
   },

@@ -194,6 +194,8 @@ export const en = {
       placeHint: 'Drag to move · drag corner to resize',
       redraw: 'Redraw',
       place: 'Place signature',
+      // §9 O4b: a placement without dragging.
+      placeBottomRight: 'Place in bottom right',
       added: 'Signature added — visible in exported PDF',
       signedPage: 'Signed · page {page}',
     },
@@ -316,7 +318,15 @@ export const en = {
       whiteboard: 'Whiteboard',
       blackboard: 'Blackboard',
     },
-    crop: { hint: 'Drag each corner to match the page edges', reset: 'Reset', confirm: 'Crop' },
+    crop: {
+      hint: 'Drag each corner to match the page edges',
+      reset: 'Reset',
+      confirm: 'Crop',
+      // §9 O4b: the same result without dragging corners.
+      auto: 'Auto crop',
+      whole: 'Use whole photo',
+      noEdges: 'No page edges found. Drag the corners instead.',
+    },
     grid: { title: 'All Pages', selected: '{count} selected', merge: 'Merge', close: 'Close' },
   },
   library: {

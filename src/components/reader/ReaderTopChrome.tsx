@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fontFamily, spacing, useTheme, touchSlop } from '../../theme';
+import { fontFamily, spacing, useTheme, touchSlop, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 
 type ReaderTopChromeProps = {
@@ -71,12 +71,12 @@ export function ReaderTopChrome({
           />
         ) : (
           <View style={styles.titleWrap}>
-            <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
               {name}
             </Text>
             {subtitle ? (
               <Pressable onPress={onSubtitlePress} disabled={!onSubtitlePress} hitSlop={6} accessibilityRole="button">
-                <Text style={[styles.subtitle, { color: tokens.accentInk }]} numberOfLines={1}>
+                <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.subtitle, { color: tokens.accentInk }]} numberOfLines={1}>
                   {subtitle}
                 </Text>
               </Pressable>
@@ -84,7 +84,7 @@ export function ReaderTopChrome({
           </View>
         )}
         {findOpen ? (
-          <Text style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
+          <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
         ) : (
           <>
             {bookmarked !== undefined && onBookmark ? (

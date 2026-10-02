@@ -27,7 +27,7 @@ export function SegmentedControl<T extends string>({ segments, value, onChange }
             {active && (
               <View style={[StyleSheet.absoluteFill, styles.activeFill, { backgroundColor: tokens.accent }]} />
             )}
-            <Text style={[styles.label, { color: active ? '#fff' : tokens.ink }, active && { fontWeight: '700' }]}>
+            <Text style={[styles.label, { color: active ? tokens.onAccent : tokens.ink }, active && { fontWeight: '700' }]}>
               {segment.label}
             </Text>
           </Pressable>

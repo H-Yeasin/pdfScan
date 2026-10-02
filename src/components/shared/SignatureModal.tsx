@@ -90,7 +90,7 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
             onPress={handleDone}
             disabled={empty || saving}
           >
-            <Text style={styles.primaryLabel}>{saving ? t('shared.signature.saving') : t('shared.signature.done')}</Text>
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{saving ? t('shared.signature.saving') : t('shared.signature.done')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>
@@ -143,7 +143,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

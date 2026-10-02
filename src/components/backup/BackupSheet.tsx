@@ -123,7 +123,7 @@ export function BackupSheet({ phase, canSaveToFolder, onChoose, onShare, onSave,
                   </Pressable>
                 )}
                 <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={onShare}>
-                  <Text style={styles.primaryLabel}>{t('backup.share')}</Text>
+                  <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('backup.share')}</Text>
                 </Pressable>
               </>
             ) : (
@@ -219,7 +219,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

@@ -160,7 +160,7 @@ export function ExamPackScreen() {
           disabled={!rows.length || building}
           accessibilityRole="button"
         >
-          {building ? <ActivityIndicator color="#fff" /> : <Text style={styles.buildLabel}>{t('study.pack.build')}</Text>}
+          {building ? <ActivityIndicator color={tokens.onAccent} /> : <Text style={[styles.buildLabel, { color: tokens.onAccent }]}>{t('study.pack.build')}</Text>}
         </Pressable>
       </View>
 
@@ -275,7 +275,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buildLabel: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

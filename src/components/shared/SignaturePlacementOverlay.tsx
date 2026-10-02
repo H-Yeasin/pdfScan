@@ -96,6 +96,14 @@ export function SignaturePlacementOverlay({
     top: top.value + height.value - HANDLE_SIZE / 2,
   }));
 
+  // §9 O4b: the usual spot, without dragging: bottom right, with a small margin.
+  const handleBottomRight = () => {
+    const margin = displayWidth * 0.06;
+    left.value = Math.max(0, displayWidth - width.value - margin);
+    top.value = Math.max(0, displayHeight - height.value - margin);
+    handleConfirm();
+  };
+
   const handleConfirm = () => {
     const scale = pageNaturalWidth / displayWidth;
     onConfirm({
@@ -124,6 +132,9 @@ export function SignaturePlacementOverlay({
         </View>
 
         <Text style={styles.hint}>{t('shared.signature.placeHint')}</Text>
+        <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={handleBottomRight}>
+          <Text style={styles.ghostLabel}>{t('shared.signature.placeBottomRight')}</Text>
+        </Pressable>
 
         <View style={styles.actions}>
           <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
@@ -135,7 +146,7 @@ export function SignaturePlacementOverlay({
             </Pressable>
           )}
           <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
-            <Text style={styles.primaryLabel}>{t('shared.signature.place')}</Text>
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('shared.signature.place')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>
@@ -192,7 +203,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

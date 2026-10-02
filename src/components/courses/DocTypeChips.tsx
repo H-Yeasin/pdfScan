@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DOC_TYPES, docTypeCounts, getDocType } from '../../services/courses/docTypes';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import type { DocType, LibraryDocument } from '../../types/models';
 import { useT } from '../../i18n/useT';
 
@@ -19,7 +19,7 @@ function Chip({ label, icon, selected, onPress }: { label: string; icon?: keyof 
       ]}
     >
       {icon ? <Ionicons name={icon} size={15} color={selected ? tokens.accentInk : tokens.muted} /> : null}
-      <Text style={[styles.chipLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{label}</Text>
+      <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.chipLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{label}</Text>
     </Pressable>
   );
 }

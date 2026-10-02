@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SegmentedControl } from '../shared/SegmentedControl';
 import { DEFAULT_FADE_LINES, DEFAULT_KEEP_INK_COLOR } from '../../services/enhance/filters/inkMath';
-import { spacing, useTheme } from '../../theme';
+import { spacing, useTheme, touchSlop } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { EnhanceMode, FilterOptions } from '../../types/models';
 
@@ -59,9 +59,16 @@ export function FilterOptionsPanel({ mode, value, onChange }: FilterOptionsPanel
 
 function Toggle({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   const { tokens } = useTheme();
-  const color = on ? tokens.accent : tokens.muted;
+  // Text in accentInk: the accent itself is below 4.5:1 as text (§9 O4b).
+  const color = on ? tokens.accentInk : tokens.muted;
   return (
-    <Pressable accessibilityRole="button" style={styles.toggle} onPress={onPress} hitSlop={4}>
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      style={styles.toggle}
+      onPress={onPress}
+      hitSlop={touchSlop(32)}
+    >
       <Ionicons name={on ? 'checkbox' : 'square-outline'} size={18} color={color} />
       <Text style={[styles.label, { color }]}>{label}</Text>
     </Pressable>

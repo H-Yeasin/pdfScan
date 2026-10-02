@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { courseColorValue } from '../../services/courses/palette';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import type { Course, LibraryDocument } from '../../types/models';
 import { UNSORTED_COURSE_ID } from './CourseList';
 import { useT } from '../../i18n/useT';
@@ -40,7 +40,7 @@ export function CourseFilterChips({
         style={[styles.chip, { borderColor: selected ? tokens.accent : tokens.edge, backgroundColor: selected ? tokens.accentSoft : tokens.surface }]}
       >
         {color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
-        <Text style={[styles.label, { color: selected ? tokens.accentInk : tokens.ink }]}>{`${label} ${count}`}</Text>
+        <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.label, { color: selected ? tokens.accentInk : tokens.ink }]}>{`${label} ${count}`}</Text>
       </Pressable>
     );
   };

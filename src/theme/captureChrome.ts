@@ -23,5 +23,6 @@ export function useCaptureChrome() {
     ...captureChromeStatic,
     accent: tokens.accent,
     accentInk: tokens.accentInk,
+    onAccent: tokens.onAccent,
   };
 }

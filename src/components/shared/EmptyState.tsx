@@ -28,7 +28,7 @@ export function EmptyState({ title, body, action, secondaryAction, variant = 'sc
         <View style={styles.actions}>
           {action ? (
             <Pressable style={[styles.action, { backgroundColor: tokens.accent }]} onPress={action.onPress} accessibilityRole="button">
-              <Text style={styles.actionLabel}>{action.label}</Text>
+              <Text style={[styles.actionLabel, { color: tokens.onAccent }]}>{action.label}</Text>
             </Pressable>
           ) : null}
           {secondaryAction ? (
@@ -88,7 +88,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   actionLabel: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },

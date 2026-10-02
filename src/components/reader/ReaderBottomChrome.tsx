@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 
 type ReaderBottomChromeProps = {
@@ -61,7 +61,7 @@ export function ReaderBottomChrome({
           accessibilityRole="button"
           accessibilityLabel={t('reader.pageA11y', { page: activeIndex + 1, count: pageCount })}
         >
-          <Text style={[styles.indicatorText, { color: tokens.ink }]}>
+          <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.indicatorText, { color: tokens.ink }]}>
             {t('reader.pageIndicator', { page: activeIndex + 1, count: pageCount })}
           </Text>
         </Pressable>
@@ -73,18 +73,18 @@ export function ReaderBottomChrome({
         {onPages ? (
           <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onPages}>
             <Ionicons name="albums-outline" size={17} color={tokens.ink} />
-            <Text style={[styles.actionLabel, { color: tokens.ink }]}>{t('reader.pages')}</Text>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.actionLabel, { color: tokens.ink }]}>{t('reader.pages')}</Text>
           </Pressable>
         ) : null}
         {showFind && (
           <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onFind}>
             <Ionicons name="search" size={17} color={findOpen ? tokens.accent : tokens.ink} />
-            <Text style={[styles.actionLabel, { color: findOpen ? tokens.accent : tokens.ink }]}>{t('reader.find')}</Text>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.actionLabel, { color: findOpen ? tokens.accentInk : tokens.ink }]}>{t('reader.find')}</Text>
           </Pressable>
         )}
         <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onNight}>
           <Ionicons name="moon-outline" size={17} color={nightOn ? tokens.accent : tokens.ink} />
-          <Text style={[styles.actionLabel, { color: nightOn ? tokens.accent : tokens.ink }]}>{t('reader.night')}</Text>
+          <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.actionLabel, { color: nightOn ? tokens.accentInk : tokens.ink }]}>{t('reader.night')}</Text>
         </Pressable>
       </View>
     </Animated.View>

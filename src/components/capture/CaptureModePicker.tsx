@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useT } from '../../i18n/useT';
-import { spacing } from '../../theme';
+import { spacing, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useCaptureChrome } from '../../theme/captureChrome';
 import { CAPTURE_MODES } from '../../services/capture/captureModes';
 import type { CaptureMode } from '../../types/models';
@@ -32,7 +32,7 @@ export function CaptureModePicker({ value, onChange, disabled }: CaptureModePick
             accessibilityLabel={t('capture.modeA11y', { mode: t(spec.labelKey) })}
             style={styles.item}
           >
-            <Text style={[styles.label, { color: active ? chrome.accent : chrome.textDim }]}>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.label, { color: active ? chrome.accent : chrome.textDim }]}>
               {t(spec.labelKey).toLocaleUpperCase(locale)}
             </Text>
           </Pressable>

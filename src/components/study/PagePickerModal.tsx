@@ -51,7 +51,7 @@ export function PagePickerModal({
             disabled={!picked.length}
             accessibilityRole="button"
           >
-            <Text style={styles.addLabel}>{picked.length ? t('study.addCount', { count: picked.length }) : t('study.add')}</Text>
+            <Text style={[styles.addLabel, { color: tokens.onAccent }]}>{picked.length ? t('study.addCount', { count: picked.length }) : t('study.add')}</Text>
           </Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.body}>
@@ -120,7 +120,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

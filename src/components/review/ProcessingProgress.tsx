@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { announce } from '../../services/a11y/announce';
 import { spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 
@@ -16,12 +18,15 @@ export function ProcessingProgress({ done, total, onCancel }: ProcessingProgress
   const { t } = useT();
   const current = Math.min(done + 1, total);
   const fraction = total > 0 ? done / total : 0;
+  const label = t('review.processingPageShort', { current, total });
+  // iOS has no live regions; Android reads the container's.
+  useEffect(() => announce(label), [label]);
 
   return (
     <View style={styles.container} accessibilityLiveRegion="polite">
       <View style={styles.row}>
         <Text style={[styles.label, { color: tokens.muted }]}>
-          {t('review.processingPageShort', { current, total })}
+          {label}
         </Text>
         <Pressable onPress={onCancel} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('review.stopProcessing')}>
           <Text style={[styles.cancel, { color: tokens.accentInk }]}>{t('common.cancel')}</Text>

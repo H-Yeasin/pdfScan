@@ -49,7 +49,7 @@ export function ProScreen() {
           style={[styles.primary, { backgroundColor: tokens.accent }]}
           onPress={() => showUnavailable(t('pro.unlock'))}
         >
-          <Text style={styles.primaryLabel}>{t('pro.unlock')}</Text>
+          <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('pro.unlock')}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" style={styles.ghost} onPress={() => showUnavailable(t('pro.restore'))}>
           <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('pro.restore')}</Text>
@@ -119,7 +119,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

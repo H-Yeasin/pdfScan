@@ -51,7 +51,7 @@ export function ProfilePromptSheet({ visible, initial, onDone, onCancel }: Profi
             disabled={!filled}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryLabel}>{t('deliver.profilePrompt.saveAndSubmit')}</Text>
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deliver.profilePrompt.saveAndSubmit')}</Text>
           </Pressable>
         </View>
       </View>
@@ -102,7 +102,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

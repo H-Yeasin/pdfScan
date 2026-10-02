@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { spacing, useTheme } from '../../theme';
+import { spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import type { LibraryTab } from '../../store/slices/librarySlice';
 import { useT } from '../../i18n/useT';
 
@@ -20,7 +20,7 @@ export function LibraryTabs({ value, onChange }: LibraryTabsProps) {
         const active = tab === value;
         return (
           <Pressable key={tab} onPress={() => onChange(tab)} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-            <Text style={[styles.label, { color: active ? tokens.accent : tokens.muted }]}>{t(`library.tabs.${tab}`)}</Text>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.label, { color: active ? tokens.accentInk : tokens.muted }]}>{t(`library.tabs.${tab}`)}</Text>
             {active && <View style={[styles.underline, { backgroundColor: tokens.accent }]} />}
           </Pressable>
         );

@@ -93,7 +93,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
             onPress={() => setQuickSetup(true)}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryLabel}>{t('courses.emptyTitle')}</Text>
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('courses.emptyTitle')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -205,7 +205,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },

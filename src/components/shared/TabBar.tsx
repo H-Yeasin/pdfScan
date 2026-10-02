@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from '../../navigation/router';
 import { startScan } from '../../services/courses/startScan';
 import { useAppDispatch, useAppStore } from '../../store/AppStateContext';
-import { radii, spacing, typeScale } from '../../theme';
+import { radii, spacing, typeScale, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { TKey } from '../../i18n';
 
@@ -44,7 +44,7 @@ export function TabBar({ active, background, activeColor, inactiveColor, accent 
     <View style={[styles.container, { backgroundColor: background, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       {TABS.map((tab) => (
         <Pressable key={tab.id} style={styles.tab} onPress={() => open(tab.id)} accessibilityRole="tab" accessibilityState={{ selected: tab.id === active }}>
-          <Text style={[styles.label, { color: active === tab.id ? activeColor : inactiveColor }]}>{t(tab.labelKey)}</Text>
+          <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.label, { color: active === tab.id ? activeColor : inactiveColor }]}>{t(tab.labelKey)}</Text>
           {active === tab.id && <View style={[styles.indicator, { backgroundColor: accent }]} />}
         </Pressable>
       ))}

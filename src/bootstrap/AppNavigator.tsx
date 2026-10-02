@@ -6,7 +6,8 @@ import { resolveBack, type BackContext } from '../navigation/backHandling';
 import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
-import { runSlide, slideTransform } from '../navigation/transitions';
+import { runSlide, transitionStyle } from '../navigation/transitions';
+import { useReducedMotion } from '../theme/useReducedMotion';
 import type { NavDir, ScreenName } from '../types/navigation';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CourseScreen } from '../screens/CourseScreen';
@@ -77,6 +78,7 @@ export function AppNavigator() {
   const { screen, previousScreen, hub, tabHub, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const progress = useRef(new Animated.Value(1)).current;
   const [outgoing, setOutgoing] = useState<{ screen: ScreenName; navDir: NavDir } | null>(null);
   const prevTick = useRef(navTick);
@@ -229,7 +231,7 @@ export function AppNavigator() {
         <Animated.View
           style={[
             styles.layer,
-            { transform: [{ translateX: slideTransform(progress, width, 'outgoing', outgoing.navDir) }] },
+            transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
           ]}
         >
           <Outgoing />
@@ -238,7 +240,7 @@ export function AppNavigator() {
       <Animated.View
         style={[
           styles.layer,
-          { transform: [{ translateX: outgoing ? slideTransform(progress, width, 'incoming', navDir) : 0 }] },
+          outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : null,
         ]}
       >
         <Incoming />

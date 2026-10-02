@@ -103,8 +103,8 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
               onPress={handleMergePress}
               disabled={selectedIds.length !== 2}
             >
-              <Ionicons name="git-merge-outline" size={18} color="#fff" />
-              <Text style={styles.mergeButtonLabel}>{t('review.grid.merge')}</Text>
+              <Ionicons name="git-merge-outline" size={18} color={tokens.onAccent} />
+              <Text style={[styles.mergeButtonLabel, { color: tokens.onAccent }]}>{t('review.grid.merge')}</Text>
             </Pressable>
           </View>
         )}
@@ -149,7 +149,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   mergeButtonLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

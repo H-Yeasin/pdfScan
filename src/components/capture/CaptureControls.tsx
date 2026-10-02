@@ -121,7 +121,7 @@ export function CaptureControls({
             )}
             {pageCount > 0 && (
               <View style={[styles.badge, { backgroundColor: chrome.accent, borderColor: chrome.base }]}>
-                <Animated.Text style={styles.badgeText}>{pageCount}</Animated.Text>
+                <Animated.Text style={[styles.badgeText, { color: chrome.onAccent }]}>{pageCount}</Animated.Text>
               </View>
             )}
           </Pressable>
@@ -183,7 +183,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '700',
   },

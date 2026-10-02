@@ -119,7 +119,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
               onPress={() => setActiveSheet(i)}
               style={[styles.tab, i === activeSheet && { borderBottomColor: tokens.accent, borderBottomWidth: 2 }]}
             >
-              <Text style={{ color: i === activeSheet ? tokens.accent : tokens.muted, fontWeight: '600' }}>
+              <Text style={{ color: i === activeSheet ? tokens.accentInk : tokens.muted, fontWeight: '600' }}>
                 {sheet.name}
               </Text>
             </Pressable>

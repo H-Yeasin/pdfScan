@@ -86,7 +86,7 @@ export function SignatureCaptureModal({ visible, onCancel, onCapture }: Signatur
             onPress={handleDone}
             disabled={empty || saving}
           >
-            <Text style={styles.primaryLabel}>{saving ? t('shared.signature.saving') : t('shared.signature.next')}</Text>
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{saving ? t('shared.signature.saving') : t('shared.signature.next')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>
@@ -143,7 +143,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },

@@ -54,7 +54,7 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
               {t('courses.sort.filedSummary', { filed, total: queue.length })}
             </Text>
             <Pressable style={[styles.primary, { backgroundColor: tokens.accent }]} onPress={onClose} accessibilityRole="button">
-              <Text style={styles.primaryLabel}>{t('courses.sort.done')}</Text>
+              <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('courses.sort.done')}</Text>
             </Pressable>
           </View>
         ) : (
@@ -209,7 +209,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

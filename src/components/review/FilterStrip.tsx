@@ -7,7 +7,7 @@ import { drawFiltered } from '../../services/enhance/filters/drawFiltered';
 import { FILTERS } from '../../services/enhance/filters/registry';
 import { analyzeImage } from '../../services/enhance/filters/stats';
 import { loadThumbImage, THUMB_MAX_DIM } from '../../services/enhance/previewImageCache';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { EnhanceMode, SessionPage } from '../../types/models';
 
@@ -83,8 +83,8 @@ export function FilterStrip({ page, value, onChange }: FilterStripProps) {
                 <FilteredPreview picture={picture} contentWidth={image.width()} contentHeight={image.height()} />
               )}
             </View>
-            <Text
-              style={[styles.label, { color: active ? tokens.accent : tokens.muted }, active && styles.labelActive]}
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}
+              style={[styles.label, { color: active ? tokens.accentInk : tokens.muted }, active && styles.labelActive]}
               numberOfLines={1}
             >
               {t(spec.labelKey)}

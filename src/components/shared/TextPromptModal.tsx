@@ -57,7 +57,7 @@ export function TextPromptModal({
               onPress={() => trimmed && onSubmit(trimmed)}
               disabled={!trimmed}
             >
-              <Text style={styles.primaryLabel}>{submitLabel}</Text>
+              <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{submitLabel}</Text>
             </Pressable>
           </View>
         </View>
@@ -112,7 +112,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   primaryLabel: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },
