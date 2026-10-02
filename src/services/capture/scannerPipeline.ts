@@ -1,9 +1,10 @@
 import type { Dispatch } from 'react';
 import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
+import { t } from '../../i18n';
 import type { AppAction } from '../../store/appReducer';
 import type { CaptureModeSpec } from './captureModes';
 import { ingestBatch } from './ingestBatch';
-import { SCANNER_UNAVAILABLE_MESSAGE, isScannerUnavailableError, runCameraFallback } from './scannerFallback';
+import { isScannerUnavailableError, runCameraFallback, scannerUnavailableMessage } from './scannerFallback';
 import { hapticPagesReceived, hapticWarning } from '../feedback/haptics';
 import type { OcrScript } from '../../types/models';
 
@@ -33,7 +34,7 @@ export async function runNativeScannerPipeline(
 
   dispatch({
     type: 'ui/SHOW_SNACK',
-    msg: 'Align the notebook page inside the camera frame and hold steady for auto-capture.',
+    msg: t('capture.scannerTip'),
   });
 
   let scannedImages: string[];
@@ -62,7 +63,7 @@ export async function runNativeScannerPipeline(
       // Remembered (persisted), so later scans skip the doomed attempt; the explanation shows
       // only this once.
       dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: true });
-      dispatch({ type: 'ui/SHOW_SNACK', msg: SCANNER_UNAVAILABLE_MESSAGE });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: scannerUnavailableMessage() });
       await runCameraFallback(dispatch, script, spec, () => {
         void runNativeScannerPipeline(dispatch, script, spec, { scannerUnavailable: true });
       });

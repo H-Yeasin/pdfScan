@@ -2,7 +2,7 @@ import DocumentScanner from 'react-native-document-scanner-plugin';
 import { getCaptureModeSpec } from '../captureModes';
 import { ingestBatch } from '../ingestBatch';
 import {
-  SCANNER_UNAVAILABLE_MESSAGE,
+  scannerUnavailableMessage,
   collectCameraPhotos,
   isScannerUnavailableError,
   runCameraFallback,
@@ -104,7 +104,7 @@ describe('scanner pipeline fallback', () => {
     await runNativeScannerPipeline(dispatch, 'latin', getCaptureModeSpec('doc'));
     const actions = dispatch.mock.calls.map(([a]) => a);
     expect(actions).toContainEqual({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: true });
-    expect(actions).toContainEqual({ type: 'ui/SHOW_SNACK', msg: SCANNER_UNAVAILABLE_MESSAGE });
+    expect(actions).toContainEqual({ type: 'ui/SHOW_SNACK', msg: scannerUnavailableMessage() });
     expect(actions.some((a) => a.type === 'capture/SET_PROCESSING_STATUS' && a.status === 'error')).toBe(false);
     // Fell through to the camera (permission denied here -> no photos -> back to idle).
     expect(actions.at(-1)).toEqual({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });

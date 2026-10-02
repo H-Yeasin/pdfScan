@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { radii, spacing, fontFamily, typeScale, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
 import { rotationStyle } from '../../utils/rotation';
 
@@ -22,6 +23,7 @@ type GridPagesModalProps = {
 
 export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDelete, onMerge, onClose }: GridPagesModalProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   // Component-local, not store state - this selection is transient to the modal itself (same
   // reasoning as why review.sel is a plain number rather than Library's selMode/selection array).
   const [selectionMode, setSelectionMode] = useState(false);
@@ -69,16 +71,16 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
         {selectionMode ? (
           <View style={styles.header}>
-            <Pressable style={styles.closeButton} onPress={handleCancelSelection}>
+            <Pressable style={styles.closeButton} onPress={handleCancelSelection} accessibilityLabel={t('common.cancel')}>
               <Ionicons name="close" size={22} color={tokens.ink} />
             </Pressable>
             <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>
-              {selectedIds.length} selected
+              {t('review.grid.selected', { count: selectedIds.length })}
             </Text>
           </View>
         ) : (
           <View style={styles.header}>
-            <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>All Pages</Text>
+            <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>{t('review.grid.title')}</Text>
             <Pressable style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={22} color={tokens.ink} />
             </Pressable>
@@ -140,7 +142,7 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
               disabled={selectedIds.length !== 2}
             >
               <Ionicons name="git-merge-outline" size={18} color="#fff" />
-              <Text style={styles.mergeButtonLabel}>Merge</Text>
+              <Text style={styles.mergeButtonLabel}>{t('review.grid.merge')}</Text>
             </Pressable>
           </View>
         )}

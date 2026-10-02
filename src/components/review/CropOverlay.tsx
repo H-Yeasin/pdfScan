@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path, Polygon } from 'react-native-svg';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { Point } from '../../services/enhance/perspective';
 
 const HANDLE_SIZE = 28;
@@ -64,9 +65,10 @@ export function CropOverlay({
   onConfirm,
   onCancel,
   initialQuad,
-  cancelLabel = 'Cancel',
+  cancelLabel,
 }: CropOverlayProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const { displayWidth, displayHeight } = useMemo(() => {
@@ -225,17 +227,17 @@ export function CropOverlay({
         </View>
 
         {stepLabel && <Text style={styles.stepLabel}>{stepLabel}</Text>}
-        <Text style={styles.hint}>Drag each corner to match the page edges</Text>
+        <Text style={styles.hint}>{t('review.crop.hint')}</Text>
 
         <View style={styles.actions}>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
-            <Text style={styles.ghostLabel}>{cancelLabel}</Text>
+            <Text style={styles.ghostLabel}>{cancelLabel ?? t('common.cancel')}</Text>
           </Pressable>
           <Pressable style={styles.ghostButton} onPress={handleReset}>
-            <Text style={styles.ghostLabel}>Reset</Text>
+            <Text style={styles.ghostLabel}>{t('review.crop.reset')}</Text>
           </Pressable>
           <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
-            <Text style={styles.primaryLabel}>Crop</Text>
+            <Text style={styles.primaryLabel}>{t('review.crop.confirm')}</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>

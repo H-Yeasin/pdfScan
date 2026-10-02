@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, typeScale } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type PreviewControlsProps = {
   showCompare: boolean;
@@ -12,6 +13,7 @@ type PreviewControlsProps = {
 // Compare stays as its own bottom-center pill. Page navigation is handled by dragging the
 // preview itself (see PagePeekCarousel) rather than on-screen buttons.
 export function PreviewControls({ showCompare, comparing, onCompareIn, onCompareOut }: PreviewControlsProps) {
+  const { t } = useT();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {showCompare && (
@@ -21,7 +23,7 @@ export function PreviewControls({ showCompare, comparing, onCompareIn, onCompare
           style={[styles.comparePill, comparing && styles.comparePillActive]}
         >
           <Ionicons name="eye-outline" size={15} color="#fff" />
-          <Text style={styles.compareLabel}>Compare</Text>
+          <Text style={styles.compareLabel}>{t('review.compare')}</Text>
         </Pressable>
       )}
     </View>

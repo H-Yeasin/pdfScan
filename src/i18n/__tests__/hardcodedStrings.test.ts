@@ -8,7 +8,8 @@ import { join, relative } from 'path';
 
 const SRC = join(__dirname, '../..');
 
-// Converted so far (L4a). L4b-d add theirs; L4d replaces this with "every file".
+// Converted so far (L4a: Settings, Home; L4b: Capture, Review). L4c-d add theirs; L4d replaces
+// this with "every file".
 const CONVERTED = [
   'screens/SettingsScreen.tsx',
   'screens/HomeScreen.tsx',
@@ -16,6 +17,22 @@ const CONVERTED = [
   'components/settings/NameTemplateSection.tsx',
   'components/settings/ProfileSection.tsx',
   'components/settings/SettingRow.tsx',
+  'screens/CaptureScreen.tsx',
+  'screens/ReviewScreen.tsx',
+  'components/capture/CaptureControls.tsx',
+  'components/capture/CaptureModePicker.tsx',
+  'components/review/AdjustPanel.tsx',
+  'components/review/AdjustSlider.tsx',
+  'components/review/ContextBar.tsx',
+  'components/review/CropOverlay.tsx',
+  'components/review/FilterOptionsPanel.tsx',
+  'components/review/FilterStrip.tsx',
+  'components/review/FilteredPreview.tsx',
+  'components/review/GridPagesModal.tsx',
+  'components/review/PagePeekCarousel.tsx',
+  'components/review/PreviewControls.tsx',
+  'components/review/ProcessingProgress.tsx',
+  'components/review/ThumbnailStrip.tsx',
 ];
 
 // Literals that aren't language: the app's name, example values in a fixed format.

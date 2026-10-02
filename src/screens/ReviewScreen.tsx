@@ -15,6 +15,7 @@ import { ProcessingProgress } from '../components/review/ProcessingProgress';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
+import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../services/enhance/adjust';
 import { recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
@@ -48,6 +49,7 @@ type MergeCropState = {
 
 export function ReviewScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   // §6 L1: re-OCR and ID card sides use the filing course's script, like the original scan.
@@ -159,8 +161,8 @@ export function ReviewScreen() {
       dispatch({ type: 'review/SELECT_PAGE', index: nextSel });
       dispatch({
         type: 'ui/SHOW_SNACK',
-        msg: `Page removed · ${nextLength} left`,
-        action: 'Undo',
+        msg: t('review.pageRemoved', { count: nextLength }),
+        action: t('review.undo'),
         onAction: () => dispatch({ type: 'review/UNDO' }),
       });
     },
@@ -208,8 +210,8 @@ export function ReviewScreen() {
     dispatch({ type: 'settings/SET_DEFAULT_ENHANCE', mode: state.capture.mode, enhance: selectedPage.enhance });
     dispatch({
       type: 'ui/SHOW_SNACK',
-      msg: `Applied to ${pages.length} pages`,
-      action: 'Undo',
+      msg: t('review.appliedToAll', { count: pages.length }),
+      action: t('review.undo'),
       onAction: () => dispatch({ type: 'review/UNDO' }),
     });
     setOfferApplyAll(false);
@@ -237,7 +239,7 @@ export function ReviewScreen() {
     dispatch({ type: 'review/SET_OCR_RUNNING', running: false });
     dispatch({
       type: 'ui/SHOW_SNACK',
-      msg: ocr && !err ? 'OCR finished · text is searchable' : 'OCR finished · little or no text found',
+      msg: ocr && !err ? t('review.ocrDone') : t('review.ocrSparse'),
     });
   }, [dispatch, selectedPage, ocrRunning, ocrScript]);
 
@@ -353,7 +355,7 @@ export function ReviewScreen() {
 
       dispatch({ type: 'capture/REPLACE_PAGES', ids: mergeCrop.ids, page: newPage });
       dispatch({ type: 'review/SELECT_PAGE', index: Math.max(0, insertIndex) });
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Pages merged into 1' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('review.merged') });
       cleanTemporaryCache([firstResult.uri, cropped.uri]);
       setMergeCrop(null);
     },
@@ -390,7 +392,7 @@ export function ReviewScreen() {
       });
       setSignStep(null);
       setCapturedSignature(null);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: `Signed · page ${sel + 1}` });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('review.signed', { page: sel + 1 }) });
     },
     [selectedPage, capturedSignature, dispatch, sel]
   );
@@ -411,7 +413,7 @@ export function ReviewScreen() {
         dispatch({ type: 'ui/SHOW_SNACK', msg: doneMsg });
       } catch (error) {
         console.warn('ReviewScreen: ID card update failed', error);
-        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't update the ID card" });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('review.idCardFailed') });
       } finally {
         setIdCardBusy(false);
       }
@@ -422,7 +424,7 @@ export function ReviewScreen() {
   const handleSwapIdSides = useCallback(() => {
     const card = selectedPage?.idCard;
     if (!card?.back) return;
-    void updateIdCard(async () => ({ front: card.back!, back: card.front }), 'Front and back swapped');
+    void updateIdCard(async () => ({ front: card.back!, back: card.front }), t('review.idCardSwapped'));
   }, [selectedPage, updateIdCard]);
 
   const handleRetakeIdBack = useCallback(() => {
@@ -431,7 +433,7 @@ export function ReviewScreen() {
     void updateIdCard(async () => {
       const back = await scanIdCardSide(ocrScript);
       return back ? { front: card.front, back } : null;
-    }, card.back ? 'Back replaced' : 'Back added');
+    }, card.back ? t('review.idBackReplaced') : t('review.idBackAdded'));
   }, [selectedPage, updateIdCard, ocrScript]);
 
   // Book mode split this page out of a two-page spread; put the pair back together. The halves'
@@ -444,7 +446,7 @@ export function ReviewScreen() {
     dispatch({ type: 'capture/UNSPLIT', groupId, id: createId('page') });
     dispatch({ type: 'review/SELECT_PAGE', index: Math.max(0, firstIndex) });
     cleanTemporaryCache(halves.flatMap((p) => (p.thumbUri ? [p.uri, p.thumbUri] : [p.uri])));
-    dispatch({ type: 'ui/SHOW_SNACK', msg: 'Spread restored as one page' });
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('review.spreadRestored') });
   }, [dispatch, pages, selectedPage]);
 
   if (!selectedPage) {
@@ -454,17 +456,17 @@ export function ReviewScreen() {
           <>
             <ActivityIndicator color={tokens.accent} size="large" />
             <Text style={{ color: tokens.muted, marginTop: spacing.md }}>
-              {progress ? `Processing page ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…` : 'Processing pages…'}
+              {progress ? t('review.processingPage', { current: Math.min(progress.done + 1, progress.total), total: progress.total }) : t('capture.processingPages')}
             </Text>
             {progress ? (
               <Pressable onPress={cancelProcessing} hitSlop={8} style={{ marginTop: spacing.md }} accessibilityRole="button">
-                <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('common.cancel')}</Text>
               </Pressable>
             ) : null}
           </>
         ) : (
           <>
-            <Text style={{ color: tokens.muted }}>No pages captured yet.</Text>
+            <Text style={{ color: tokens.muted }}>{t('review.empty')}</Text>
             <Pressable
               style={[styles.startButton, { backgroundColor: tokens.accent }]}
               onPress={() => {
@@ -474,7 +476,7 @@ export function ReviewScreen() {
               }}
             >
               <Ionicons name="camera" size={18} color="#fff" />
-              <Text style={styles.startButtonLabel}>Start Capture</Text>
+              <Text style={styles.startButtonLabel}>{t('review.startCapture')}</Text>
             </Pressable>
           </>
         )}
@@ -493,16 +495,16 @@ export function ReviewScreen() {
           }}
         >
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>Back</Text>
+          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Review</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('review.title')}</Text>
         <View style={styles.headerRight}>
           <Pressable
             style={styles.historyButton}
             onPress={() => dispatch({ type: 'review/UNDO' })}
             disabled={!canUndo}
             hitSlop={4}
-            accessibilityLabel="Undo"
+            accessibilityLabel={t('review.undo')}
           >
             <Ionicons name="arrow-undo-outline" size={20} color={canUndo ? tokens.ink : tokens.edge} />
           </Pressable>
@@ -511,7 +513,7 @@ export function ReviewScreen() {
             onPress={() => dispatch({ type: 'review/REDO' })}
             disabled={!canRedo}
             hitSlop={4}
-            accessibilityLabel="Redo"
+            accessibilityLabel={t('review.redo')}
           >
             <Ionicons name="arrow-redo-outline" size={20} color={canRedo ? tokens.ink : tokens.edge} />
           </Pressable>
@@ -519,12 +521,14 @@ export function ReviewScreen() {
             <Pressable
               style={[styles.gridToggle, { borderColor: tokens.edge }]}
               onPress={() => setGridOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('review.grid.title')}
             >
               <Ionicons name="grid-outline" size={18} color={tokens.ink} />
             </Pressable>
           )}
           <Pressable style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
-            <Text style={styles.nextLabel}>Next</Text>
+            <Text style={styles.nextLabel}>{t('review.next')}</Text>
             <Ionicons name="chevron-forward" size={18} color="#fff" />
           </Pressable>
         </View>
@@ -595,11 +599,11 @@ export function ReviewScreen() {
       {cropCheckPages.length > 0 && !scanProcessing && (
         <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
-            {cropCheckPages.length === 1 ? "1 page couldn't be cropped automatically" : `${cropCheckPages.length} pages couldn't be cropped automatically`}
+            {t('review.cropCheck', { count: cropCheckPages.length })}
           </Text>
           <Pressable onPress={() => setCheckingCrops(true)} hitSlop={8} accessibilityRole="button">
             <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
-              Check crops ({cropCheckPages.length})
+              {t('review.checkCrops', { count: cropCheckPages.length })}
             </Text>
           </Pressable>
         </View>
@@ -608,16 +612,16 @@ export function ReviewScreen() {
       {selectedPage.idCard && (
         <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
-            {idCardBusy ? 'Updating ID card…' : 'ID card · prints at real size'}
+            {idCardBusy ? t('review.idCardUpdating') : t('review.idCardInfo')}
           </Text>
           {selectedPage.idCard.back && (
             <Pressable onPress={handleSwapIdSides} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
-              <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Swap sides</Text>
+              <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('review.swapSides')}</Text>
             </Pressable>
           )}
           <Pressable onPress={handleRetakeIdBack} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
             <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
-              {selectedPage.idCard.back ? 'Retake back' : 'Add back'}
+              {selectedPage.idCard.back ? t('review.retakeBack') : t('review.addBack')}
             </Text>
           </Pressable>
         </View>
@@ -625,9 +629,9 @@ export function ReviewScreen() {
 
       {selectedPage.splitFrom && (
         <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>Split from a book spread</Text>
+          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>{t('review.splitFrom')}</Text>
           <Pressable onPress={handleUndoSplit} hitSlop={8} accessibilityRole="button">
-            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Undo split</Text>
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('review.undoSplit')}</Text>
           </Pressable>
         </View>
       )}
@@ -635,7 +639,7 @@ export function ReviewScreen() {
       {showErrHint && (
         <View style={[styles.errHint, { backgroundColor: `${tokens.danger}1A` }]}>
           <Text style={{ color: tokens.danger, fontSize: 13, fontWeight: '500' }}>
-            Low contrast on page {sel + 1} — try B&W.
+            {t('review.lowContrast', { page: sel + 1 })}
           </Text>
         </View>
       )}
@@ -650,14 +654,14 @@ export function ReviewScreen() {
                 hitSlop={4}
               >
                 <Ionicons name="copy-outline" size={15} color={tokens.accentInk} />
-                <Text style={[styles.headerToggleLabel, { color: tokens.accentInk }]}>Apply to all pages</Text>
+                <Text style={[styles.headerToggleLabel, { color: tokens.accentInk }]}>{t('review.applyToAll')}</Text>
               </Pressable>
             )}
             {adjustable && (
               <Pressable style={styles.headerToggle} onPress={() => setAdjustOpen((v) => !v)} hitSlop={4}>
                 <Ionicons name="options-outline" size={18} color={adjustOpen ? tokens.accent : tokens.muted} />
                 <Text style={[styles.headerToggleLabel, { color: adjustOpen ? tokens.accent : tokens.muted }]}>
-                  Adjust
+                  {t('review.adjust')}
                 </Text>
               </Pressable>
             )}
@@ -693,8 +697,8 @@ export function ReviewScreen() {
           naturalWidth={cropCheckPage.width}
           naturalHeight={cropCheckPage.height}
           initialQuad={cropCheckPage.cropSuggestion}
-          stepLabel={`Check crop · ${cropCheckPages.length} left`}
-          cancelLabel="Keep as is"
+          stepLabel={t('review.checkCropStep', { count: cropCheckPages.length })}
+          cancelLabel={t('review.keepAsIs')}
           onConfirm={handleCropCheckConfirm}
           onCancel={handleCropCheckKeep}
         />
@@ -705,7 +709,7 @@ export function ReviewScreen() {
           uri={mergeCropPage.uri}
           naturalWidth={mergeCropPage.width}
           naturalHeight={mergeCropPage.height}
-          stepLabel={mergeCrop.stage === 'first' ? 'Page 1 of 2' : 'Page 2 of 2'}
+          stepLabel={t('review.mergeStep', { current: mergeCrop.stage === 'first' ? 1 : 2, total: 2 })}
           onConfirm={handleMergeCropConfirm}
           onCancel={handleMergeCropCancel}
         />

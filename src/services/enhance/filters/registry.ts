@@ -10,6 +10,7 @@ import { DEFAULT_FADE_LINES, DEFAULT_KEEP_INK_COLOR, INK_CEIL, INK_GAMMA, LINE_F
 import { LIGHT_RADIUS, LIGHT_SIGMA, PAPER_WHITE } from './lightCorrect';
 import type { LightCorrectParams } from './lightCorrect';
 import { makeSauvolaShader, SAMPLE_RADIUS_RATIO, SAUVOLA_K, SAUVOLA_R } from './sauvola';
+import type { TKey } from '../../../i18n';
 import type { AdjustValues, EnhanceMode, FilterOptions, ImageStats } from '../../../types/models';
 
 export type FilterContext = {
@@ -37,7 +38,8 @@ export type FilterOutput = { colorFilter: SkColorFilter | null } | { shader: SkS
 
 export type FilterSpec = {
   id: EnhanceMode;
-  label: string;
+  // Catalog key for the filter's name (§6 L4).
+  labelKey: TKey;
   icon: keyof typeof Ionicons.glyphMap;
   // Whether the brightness/contrast/saturation sliders apply (drawFiltered composes them on top).
   adjustable: boolean;
@@ -87,7 +89,7 @@ export function matrixChainFilter(matrices: ColorMatrix[]): SkColorFilter | null
 export const FILTERS: FilterSpec[] = [
   {
     id: 'original',
-    label: 'Original',
+    labelKey: 'review.filters.original',
     icon: 'image-outline',
     adjustable: true,
     lightCorrect: false,
@@ -97,7 +99,7 @@ export const FILTERS: FilterSpec[] = [
   },
   {
     id: 'auto',
-    label: 'Auto',
+    labelKey: 'review.filters.auto',
     icon: 'sparkles-outline',
     adjustable: true,
     lightCorrect: true,
@@ -107,7 +109,7 @@ export const FILTERS: FilterSpec[] = [
   },
   {
     id: 'color',
-    label: 'Color',
+    labelKey: 'review.filters.color',
     icon: 'color-palette-outline',
     adjustable: true,
     lightCorrect: true,
@@ -123,7 +125,7 @@ export const FILTERS: FilterSpec[] = [
   },
   {
     id: 'gray',
-    label: 'Gray',
+    labelKey: 'review.filters.gray',
     icon: 'contrast-outline',
     adjustable: true,
     lightCorrect: true,
@@ -135,7 +137,7 @@ export const FILTERS: FilterSpec[] = [
     // Handwritten notes: a soft tone curve instead of a threshold, so pencil keeps smooth edges;
     // optional ruling-line fade and pen colour (FilterOptions). See inkMath.ts.
     id: 'ink',
-    label: 'Ink',
+    labelKey: 'review.filters.ink',
     icon: 'create-outline',
     adjustable: true,
     lightCorrect: true,
@@ -163,7 +165,7 @@ export const FILTERS: FilterSpec[] = [
   {
     // Whiteboards, blackboards and slides. See boardMath.ts.
     id: 'board',
-    label: 'Board',
+    labelKey: 'review.filters.board',
     icon: 'easel-outline',
     adjustable: true,
     lightCorrect: true,
@@ -204,7 +206,7 @@ export const FILTERS: FilterSpec[] = [
   {
     // A binarized page has no continuous tone for the sliders to act on.
     id: 'bw',
-    label: 'B&W',
+    labelKey: 'review.filters.bw',
     icon: 'document-text-outline',
     adjustable: false,
     lightCorrect: false,

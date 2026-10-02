@@ -8,6 +8,7 @@ import { CaptureControls } from '../components/capture/CaptureControls';
 import { CourseBadge } from '../components/courses/CourseBadge';
 import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { TabBar } from '../components/shared/TabBar';
+import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { ingestGalleryBatch } from '../services/capture/ingestBatch';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
@@ -22,6 +23,7 @@ import type { CaptureMode } from '../types/models';
 
 export function CaptureScreen() {
   const chrome = useCaptureChrome();
+  const { t } = useT();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages, processingStatus, mode, scannerRequested } = state.capture;
@@ -124,12 +126,12 @@ export function CaptureScreen() {
               hitSlop={8}
               style={[styles.savingTo, { backgroundColor: chrome.pillBg, borderColor: chrome.pillBorder }]}
               accessibilityRole="button"
-              accessibilityLabel={`Saving to ${filingCourse?.name ?? 'Unsorted'}. Change`}
+              accessibilityLabel={t('capture.savingToA11y', { name: filingCourse?.name ?? t('common.unsorted') })}
             >
               {filingCourse ? <CourseBadge course={filingCourse} size={22} /> : null}
-              <Text style={[styles.savingToLabel, { color: chrome.textDim }]}>Saving to</Text>
+              <Text style={[styles.savingToLabel, { color: chrome.textDim }]}>{t('capture.savingTo')}</Text>
               <Text style={[styles.savingToCourse, { color: chrome.text }]} numberOfLines={1}>
-                {filingCourse ? filingCourse.code || filingCourse.name : 'Unsorted'}
+                {filingCourse ? filingCourse.code || filingCourse.name : t('common.unsorted')}
               </Text>
               <Ionicons name="chevron-down" size={14} color={chrome.textDim} />
             </Pressable>
@@ -140,6 +142,8 @@ export function CaptureScreen() {
             onPress={() => go('settings')}
             hitSlop={8}
             style={[styles.settingsButton, { backgroundColor: chrome.pillBg, borderColor: chrome.pillBorder }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.settings')}
           >
             <Ionicons name="settings-outline" size={20} color={chrome.text} />
           </Pressable>
@@ -147,8 +151,8 @@ export function CaptureScreen() {
 
         <View style={styles.centerArea}>
           <Ionicons name={spec.icon} size={56} color={chrome.textDim} />
-          <Text style={[styles.title, { color: chrome.text }]}>{spec.label}</Text>
-          <Text style={[styles.subtitle, { color: chrome.textDim }]}>{spec.hint}</Text>
+          <Text style={[styles.title, { color: chrome.text }]}>{t(spec.labelKey)}</Text>
+          <Text style={[styles.subtitle, { color: chrome.textDim }]}>{t(spec.hintKey)}</Text>
         </View>
 
         <View style={styles.controlsArea}>
@@ -190,7 +194,7 @@ export function CaptureScreen() {
         <View style={[StyleSheet.absoluteFill, styles.scanOverlay]}>
           <ActivityIndicator color="#fff" size="large" />
           <Text style={styles.scanOverlayLabel}>
-            {processingStatus === 'scanning' ? 'Opening scanner…' : 'Processing pages…'}
+            {processingStatus === 'scanning' ? t('capture.openingScanner') : t('capture.processingPages')}
           </Text>
         </View>
       )}

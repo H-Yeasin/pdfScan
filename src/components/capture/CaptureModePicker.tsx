@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useT } from '../../i18n/useT';
 import { spacing } from '../../theme';
 import { useCaptureChrome } from '../../theme/captureChrome';
 import { CAPTURE_MODES } from '../../services/capture/captureModes';
@@ -14,6 +15,7 @@ type CaptureModePickerProps = {
 // also wires left/right swipes to the neighbouring mode (see CaptureControls).
 export function CaptureModePicker({ value, onChange, disabled }: CaptureModePickerProps) {
   const chrome = useCaptureChrome();
+  const { t, locale } = useT();
 
   return (
     <View style={styles.row} accessibilityRole="tablist">
@@ -27,11 +29,11 @@ export function CaptureModePicker({ value, onChange, disabled }: CaptureModePick
             hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
             accessibilityRole="tab"
             accessibilityState={{ selected: active, disabled }}
-            accessibilityLabel={`${spec.label} mode`}
+            accessibilityLabel={t('capture.modeA11y', { mode: t(spec.labelKey) })}
             style={styles.item}
           >
             <Text style={[styles.label, { color: active ? chrome.accent : chrome.textDim }]}>
-              {spec.label.toUpperCase()}
+              {t(spec.labelKey).toLocaleUpperCase(locale)}
             </Text>
           </Pressable>
         );

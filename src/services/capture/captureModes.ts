@@ -1,4 +1,5 @@
 import type { Ionicons } from '@expo/vector-icons';
+import type { TKey } from '../../i18n';
 import type { CaptureMode, EnhanceMode } from '../../types/models';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -9,10 +10,10 @@ type IoniconName = keyof typeof Ionicons.glyphMap;
 // default filter, and the document type used for naming.
 export type CaptureModeSpec = {
   id: CaptureMode;
-  label: string;
+  // Catalog keys (§6 L4): the mode's name, and the hint shown under it on the Capture screen.
+  labelKey: TKey;
   icon: IoniconName;
-  // Shown under "Ready to scan" on the Capture screen.
-  hint: string;
+  hintKey: TKey;
   // Filter every new page starts with, unless the user has set their own for this mode
   // (settingsSlice.defaultEnhanceFor).
   defaultEnhance: EnhanceMode;
@@ -28,9 +29,9 @@ export type CaptureModeSpec = {
 export const CAPTURE_MODES: readonly CaptureModeSpec[] = [
   {
     id: 'notes',
-    label: 'Notes',
+    labelKey: 'capture.modes.notes.label',
     icon: 'create-outline',
-    hint: 'Lay the page flat. Pencil works too.',
+    hintKey: 'capture.modes.notes.hint',
     defaultEnhance: 'ink',
     pageLimit: 50,
     postProcess: 'none',
@@ -38,9 +39,9 @@ export const CAPTURE_MODES: readonly CaptureModeSpec[] = [
   },
   {
     id: 'doc',
-    label: 'Document',
+    labelKey: 'capture.modes.doc.label',
     icon: 'document-text-outline',
-    hint: 'Printed pages, handouts and forms.',
+    hintKey: 'capture.modes.doc.hint',
     defaultEnhance: 'auto',
     pageLimit: 50,
     postProcess: 'none',
@@ -48,9 +49,9 @@ export const CAPTURE_MODES: readonly CaptureModeSpec[] = [
   },
   {
     id: 'board',
-    label: 'Board',
+    labelKey: 'capture.modes.board.label',
     icon: 'easel-outline',
-    hint: 'Whiteboards, blackboards and slides on a screen.',
+    hintKey: 'capture.modes.board.hint',
     defaultEnhance: 'board',
     pageLimit: 20,
     postProcess: 'none',
@@ -58,9 +59,9 @@ export const CAPTURE_MODES: readonly CaptureModeSpec[] = [
   },
   {
     id: 'book',
-    label: 'Book',
+    labelKey: 'capture.modes.book.label',
     icon: 'book-outline',
-    hint: 'Open the book flat; both pages fit in one shot.',
+    hintKey: 'capture.modes.book.hint',
     defaultEnhance: 'auto',
     pageLimit: 50,
     postProcess: 'splitSpread',
@@ -68,9 +69,9 @@ export const CAPTURE_MODES: readonly CaptureModeSpec[] = [
   },
   {
     id: 'id',
-    label: 'ID card',
+    labelKey: 'capture.modes.id.label',
     icon: 'card-outline',
-    hint: 'Scan the front, then the back.',
+    hintKey: 'capture.modes.id.hint',
     defaultEnhance: 'color',
     pageLimit: 2,
     postProcess: 'idCard',

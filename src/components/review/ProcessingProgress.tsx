@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type ProcessingProgressProps = {
   done: number;
@@ -12,6 +13,7 @@ type ProcessingProgressProps = {
 // finished pages are kept.
 export function ProcessingProgress({ done, total, onCancel }: ProcessingProgressProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const current = Math.min(done + 1, total);
   const fraction = total > 0 ? done / total : 0;
 
@@ -19,10 +21,10 @@ export function ProcessingProgress({ done, total, onCancel }: ProcessingProgress
     <View style={styles.container} accessibilityLiveRegion="polite">
       <View style={styles.row}>
         <Text style={[styles.label, { color: tokens.muted }]}>
-          Processing page {current} of {total}
+          {t('review.processingPageShort', { current, total })}
         </Text>
-        <Pressable onPress={onCancel} hitSlop={8} accessibilityRole="button" accessibilityLabel="Stop processing">
-          <Text style={[styles.cancel, { color: tokens.accentInk }]}>Cancel</Text>
+        <Pressable onPress={onCancel} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('review.stopProcessing')}>
+          <Text style={[styles.cancel, { color: tokens.accentInk }]}>{t('common.cancel')}</Text>
         </Pressable>
       </View>
       <View

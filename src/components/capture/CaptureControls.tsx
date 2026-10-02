@@ -4,6 +4,7 @@ import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, View } from 
 import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { adjacentCaptureMode } from '../../services/capture/captureModes';
 import { CaptureModePicker } from './CaptureModePicker';
+import { useT } from '../../i18n/useT';
 import { radii, spacing } from '../../theme';
 import { useCaptureChrome } from '../../theme/captureChrome';
 import type { CaptureMode, SessionPage } from '../../types/models';
@@ -34,6 +35,7 @@ export function CaptureControls({
   onModeChange,
 }: CaptureControlsProps) {
   const chrome = useCaptureChrome();
+  const { t } = useT();
   const scale = useRef(new Animated.Value(1)).current;
   const trayEmpty = pageCount === 0;
 
@@ -65,6 +67,8 @@ export function CaptureControls({
             style={[styles.sideButton, { backgroundColor: chrome.pillBg, borderColor: chrome.pillBorder }]}
             onPress={onGalleryPress}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('capture.gallery')}
           >
             <Ionicons name="image-outline" size={22} color={chrome.text} />
           </Pressable>
@@ -74,6 +78,8 @@ export function CaptureControls({
             onPressOut={() => animatePress(1)}
             disabled={busy}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('capture.shutter')}
           >
             <Animated.View
               style={[
@@ -101,6 +107,8 @@ export function CaptureControls({
             onPress={onTrayPress}
             disabled={trayEmpty}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('capture.tray', { count: pageCount })}
           >
             {lastPage ? (
               <Image

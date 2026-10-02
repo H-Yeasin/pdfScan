@@ -1,3 +1,4 @@
+import { t } from '../../../i18n';
 import type { CaptureMode } from '../../../types/models';
 import { captureReducer, initialCaptureState } from '../../../store/slices/captureSlice';
 import { initialSettingsState, settingsReducer } from '../../../store/slices/settingsSlice';
@@ -21,7 +22,7 @@ describe('capture mode registry', () => {
 
   it('matches the planned table, in picker order', () => {
     expect(
-      CAPTURE_MODES.map((s) => [s.label, s.defaultEnhance, s.pageLimit, s.postProcess, s.docType])
+      CAPTURE_MODES.map((s) => [t(s.labelKey), s.defaultEnhance, s.pageLimit, s.postProcess, s.docType])
     ).toEqual([
       ['Notes', 'ink', 50, 'none', 'notes'],
       ['Document', 'auto', 50, 'none', 'document'],
@@ -29,7 +30,7 @@ describe('capture mode registry', () => {
       ['Book', 'auto', 50, 'splitSpread', 'book'],
       ['ID card', 'color', 2, 'idCard', 'id'],
     ]);
-    CAPTURE_MODES.forEach((spec) => expect(spec.hint.length).toBeGreaterThan(0));
+    CAPTURE_MODES.forEach((spec) => expect(t(spec.hintKey).length).toBeGreaterThan(0));
   });
 
   it('falls back to Document for unknown ids', () => {

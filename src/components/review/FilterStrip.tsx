@@ -8,6 +8,7 @@ import { FILTERS } from '../../services/enhance/filters/registry';
 import { analyzeImage } from '../../services/enhance/filters/stats';
 import { loadThumbImage, THUMB_MAX_DIM } from '../../services/enhance/previewImageCache';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { EnhanceMode, SessionPage } from '../../types/models';
 
 const THUMB_WIDTH = 58;
@@ -26,6 +27,7 @@ type FilterStripProps = {
 // Sliders aren't applied to the thumbnails - they compare filters, not adjustments.
 export function FilterStrip({ page, value, onChange }: FilterStripProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [loaded, setLoaded] = useState<{ uri: string; image: SkImage } | null>(null);
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export function FilterStrip({ page, value, onChange }: FilterStripProps) {
               style={[styles.label, { color: active ? tokens.accent : tokens.muted }, active && styles.labelActive]}
               numberOfLines={1}
             >
-              {spec.label}
+              {t(spec.labelKey)}
             </Text>
           </Pressable>
         );

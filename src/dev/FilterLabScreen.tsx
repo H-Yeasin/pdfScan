@@ -1,3 +1,4 @@
+import { t as translate } from '../i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -55,7 +56,7 @@ async function timeExports(uri: string, filterOptions: FilterOptions): Promise<T
     for (const spec of FILTERS) {
       t0 = performance.now();
       const baked = await renderPage(masterFile.uri, { enhance: spec.id, stats, filterOptions }, MASTER_PRESET);
-      timings.push({ label: `Export · ${spec.label}`, ms: performance.now() - t0 });
+      timings.push({ label: `Export · ${translate(spec.labelKey)}`, ms: performance.now() - t0 });
       const out = new File(baked.uri);
       if (out.exists) out.delete();
     }
@@ -111,7 +112,7 @@ async function exportContactSheet(lab: LabImage, overrides: OverridesByFilter, f
     const y = SHEET_GAP + Math.floor(i / SHEET_COLUMNS) * (cellHeight + SHEET_LABEL_HEIGHT + SHEET_GAP);
     const page = { enhance: spec.id, stats: lab.stats, filterOptions };
     drawFiltered(canvas, lab.image, page, Skia.XYWHRect(x, y, SHEET_CELL_WIDTH, cellHeight), overrides[spec.id]);
-    canvas.drawText(spec.available ? spec.label : `${spec.label} (WIP)`, x, y + cellHeight + 30, textPaint, titleFont);
+    canvas.drawText(spec.available ? translate(spec.labelKey) : `${translate(spec.labelKey)} (WIP)`, x, y + cellHeight + 30, textPaint, titleFont);
     canvas.drawText(formatParams(spec, overrides[spec.id]), x, y + cellHeight + 56, textPaint, metaFont);
   });
 
@@ -276,7 +277,7 @@ export function FilterLabScreen() {
                     <FilteredPreview picture={picture} contentWidth={lab.width} contentHeight={lab.height} />
                   </View>
                   <Text style={[styles.cellLabel, { color: active ? tokens.accent : tokens.ink }]}>
-                    {spec.available ? spec.label : `${spec.label} (WIP)`}
+                    {spec.available ? translate(spec.labelKey) : `${translate(spec.labelKey)} (WIP)`}
                   </Text>
                 </Pressable>
               );
@@ -286,7 +287,7 @@ export function FilterLabScreen() {
 
         {lab && (
           <View style={[styles.params, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
-            <Text style={[styles.paramsTitle, { color: tokens.ink }]}>{selectedSpec.label} parameters</Text>
+            <Text style={[styles.paramsTitle, { color: tokens.ink }]}>{translate(selectedSpec.labelKey)} parameters</Text>
             <FilterOptionsPanel
               mode={selectedSpec.id}
               value={filterOptions}

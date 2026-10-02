@@ -1,6 +1,7 @@
 import type { Dispatch } from 'react';
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { t } from '../../i18n';
 import type { AppAction } from '../../store/appReducer';
 import type { OcrScript } from '../../types/models';
 import type { CaptureModeSpec } from './captureModes';
@@ -32,7 +33,8 @@ export function isScannerUnavailableError(error: unknown): boolean {
   return UNAVAILABLE_PATTERNS.some((p) => p.test(message));
 }
 
-export const SCANNER_UNAVAILABLE_MESSAGE = "Your phone doesn't support Google's scanner. Using basic camera mode.";
+// A function, not a constant, so it is read in the language active when it's shown.
+export const scannerUnavailableMessage = () => t('capture.scannerUnavailable');
 
 // --- Basic camera mode -------------------------------------------------------------------------
 
@@ -54,11 +56,11 @@ async function takePhotoWithSystemCamera(): Promise<string | null> {
 function askWithAlert(taken: number): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
-      `${taken} ${taken === 1 ? 'page' : 'pages'} taken`,
-      'Take another?',
+      t('capture.fallback.taken', { count: taken }),
+      t('capture.fallback.takeAnotherQuestion'),
       [
-        { text: 'Done', style: 'cancel', onPress: () => resolve(false) },
-        { text: 'Take another', onPress: () => resolve(true) },
+        { text: t('capture.fallback.done'), style: 'cancel', onPress: () => resolve(false) },
+        { text: t('capture.fallback.takeAnother'), onPress: () => resolve(true) },
       ],
       { cancelable: true, onDismiss: () => resolve(false) }
     );

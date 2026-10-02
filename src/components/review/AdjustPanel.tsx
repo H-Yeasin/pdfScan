@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../../services/enhance/adjust';
 import type { AdjustValues } from '../../types/models';
 import { AdjustSlider } from './AdjustSlider';
@@ -18,6 +19,7 @@ type AdjustPanelProps = {
 // on release/tap (AdjustSlider's contract) or Reset. Re-synced from `value` when the page changes.
 export function AdjustPanel({ value, onCommit, onLive }: AdjustPanelProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [draft, setDraft] = useState(value);
 
   useEffect(() => setDraft(value), [value]);
@@ -44,26 +46,26 @@ export function AdjustPanel({ value, onCommit, onLive }: AdjustPanelProps) {
   return (
     <View style={[styles.panel, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
       <AdjustSlider
-        label="Brightness"
+        label={t('review.adjustPanel.brightness')}
         value={draft.brightness}
         onChange={(v) => liveField('brightness', v)}
         onCommit={(v) => commitField('brightness', v)}
       />
       <AdjustSlider
-        label="Contrast"
+        label={t('review.adjustPanel.contrast')}
         value={draft.contrast}
         onChange={(v) => liveField('contrast', v)}
         onCommit={(v) => commitField('contrast', v)}
       />
       <AdjustSlider
-        label="Saturation"
+        label={t('review.adjustPanel.saturation')}
         value={draft.saturation}
         onChange={(v) => liveField('saturation', v)}
         onCommit={(v) => commitField('saturation', v)}
       />
       <Pressable style={styles.resetRow} onPress={reset} disabled={atDefault} hitSlop={6}>
         <Ionicons name="refresh-outline" size={13} color={atDefault ? tokens.edge : tokens.muted} />
-        <Text style={[styles.resetLabel, { color: atDefault ? tokens.edge : tokens.muted }]}>Reset</Text>
+        <Text style={[styles.resetLabel, { color: atDefault ? tokens.edge : tokens.muted }]}>{t('review.adjustPanel.reset')}</Text>
       </Pressable>
     </View>
   );

@@ -1,4 +1,5 @@
 import type { Dispatch } from 'react';
+import { t } from '../../i18n';
 import type { AppAction } from '../../store/appReducer';
 import type { EnhanceMode, OcrScript, SessionPage } from '../../types/models';
 import { hapticSuccess, hapticWarning } from '../feedback/haptics';
@@ -95,7 +96,7 @@ export async function ingestOne(
 }
 
 function pagesLabel(n: number): string {
-  return `${n} ${n === 1 ? 'page' : 'pages'}`;
+  return t('capture.pages', { count: n });
 }
 
 // Ingests a batch of raw images into the capture session, one page at a time, reporting
@@ -135,15 +136,15 @@ export async function ingestBatch(
       status: 'error',
       errorMessage:
         pages.length > 0
-          ? `Couldn't process page ${failedPage} · kept ${pagesLabel(pages.length)}`
-          : `Couldn't process page ${failedPage}`,
+          ? t('capture.pageFailedKept', { page: failedPage, pages: pagesLabel(pages.length) })
+          : t('capture.pageFailed', { page: failedPage }),
     });
     return;
   }
 
   if (result.cancelled) {
     dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
-    dispatch({ type: 'ui/SHOW_SNACK', msg: `Stopped · kept ${pagesLabel(pages.length)}` });
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('capture.stopped', { pages: pagesLabel(pages.length) }) });
     return;
   }
 
@@ -151,8 +152,8 @@ export async function ingestBatch(
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'success' });
   dispatch({
     type: 'ui/SHOW_SNACK',
-    msg: `Added ${pagesLabel(pages.length)}`,
-    ...(onScanMore ? { action: 'Scan more', onAction: onScanMore } : null),
+    msg: t('capture.added', { pages: pagesLabel(pages.length) }),
+    ...(onScanMore ? { action: t('capture.scanMore'), onAction: onScanMore } : null),
   });
 }
 

@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useRouter } from '../navigation/router';
@@ -92,7 +93,7 @@ export function AppNavigator() {
       // The "Added N pages · Scan more" snack comes from the pipeline itself (ingestBatch.ts).
       dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
     } else if (processingStatus === 'error') {
-      dispatch({ type: 'ui/SHOW_SNACK', msg: errorMessage ?? 'Scan failed' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: errorMessage ?? t('capture.scanFailed') });
       dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'idle' });
     }
   }, [processingStatus, errorMessage, dispatch, go]);

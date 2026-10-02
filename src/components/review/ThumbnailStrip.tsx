@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
 import { rotationStyle } from '../../utils/rotation';
 
@@ -39,6 +40,7 @@ export function ThumbnailStrip({
   onPressCover,
 }: ThumbnailStripProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <ScrollView
@@ -66,7 +68,7 @@ export function ThumbnailStrip({
           />
         )}
         <View style={styles.coverLabel}>
-          <Text style={styles.coverLabelText}>Cover</Text>
+          <Text style={styles.coverLabelText}>{t('review.cover')}</Text>
         </View>
       </Pressable>
 
