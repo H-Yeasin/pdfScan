@@ -1,0 +1,272 @@
+# §8 Backup and portability: step-by-step plan
+
+## How to use this file
+- Implement **one step per session**: "Implement B1 from docs/plan/08-backup.md".
+- Read `AGENTS.md` (auto-loaded), `docs/plan/README.md` (progress), and only the step you are
+  implementing. Open only the files it names unless something unexpected comes up.
+- **Prerequisites:** §0 F3 (SQLite library) and the tables added since (courses, semesters,
+  timetable, submissions, deadlines, annotations, bookmarks). New migrations take **the next
+  free version** in `persistence/migrations.ts` (v16 when this was planned).
+- When you finish a step, update its `Status:` line (`done (commit <sha>)`), add short "As
+  built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
+  `docs/plan/README.md`.
+
+## Context
+Goal from `docs/PLAN.md`: **students never lose a semester of notes.** Everything is on the
+phone only, so a lost, broken or replaced phone loses everything. This section adds safe local
+backups, moving a library to a new phone or a laptop, sharing a course's notes, and keeping
+storage under control. Cloud backup to the student's own Google Drive is a later Pro step.
+
+### What the code looks like today (checked while planning, 2026-10-02)
+- **Where data lives:**
+  - SQLite `pdfscan.db` (expo-sqlite's default folder under `Paths.document`), schema v15:
+    courses, semesters, documents, pages, timetable_slots, submissions, deadlines,
+    annotations, bookmarks, and the `pages_fts` index;
+  - files in `Paths.document/library/<docId>/`: `document.pdf`, `page_N.jpg` (masters),
+    `display_N.jpg`, `thumb_N.jpg`, `submissions/*.pdf`, plus `source.*` for Office files;
+  - `Paths.document/signature/` (saved signature), `Paths.document/external-open/` (recently
+    opened outside files, pruned to 5);
+  - AsyncStorage `app:settings` (profile, templates, preferences);
+  - scheduled deadline notifications (`expo-notifications`) live in the OS, not in the app's
+    files.
+- **Paths are stored relative** to `Paths.document` (`libraryFiles.toStoredPath` /
+  `fromStoredPath`), so a library can move between installs and phones.
+- **No backup, export of the library, import of a backup, or storage report.**
+  `export/deviceExportService` can write single documents to an Android SAF folder;
+  `shareService.shareAs` shares single files.
+- **No zip support** in the dependencies. `expo-document-picker`, `expo-sharing` and
+  `expo-file-system` (new `File`/`Directory`/`Paths` API) are installed.
+- **Android Auto Backup is not configured** in `app.json`, so Expo's template default applies:
+  Android backs up app data to Google Drive only while it is under **25 MB**, and above that it
+  silently backs up nothing. A restore from an old small backup, or a device-to-device
+  transfer, could bring back the database without matching files, or the other way round.
+
+### Key design decisions
+- **One backup format for everything:** a standard `.zip` that a student can also open on a
+  laptop.
+  ```
+  PDF Scan backup 2026-10-02.zip
+    manifest.json        format version, app version, schema version, created, counts, kind
+    library.json         every row the backup covers, as plain JSON (not the raw SQLite file)
+    Courses/<Course>/<Document>.pdf    each document.pdf, under a readable name
+    data/<docId>/page_N.jpg, thumb_N.jpg, display_N.jpg, source.*, submissions/*.pdf
+    signature/…          (full backups only)
+    settings.json        (full backups only; no Sentry or device-specific values)
+  ```
+  PDFs appear **once**, under readable course and document names; `manifest.json` maps each
+  document id to its PDF path.
+- **The zip is written without compression (STORE).** JPEGs and PDFs are already compressed, so
+  deflating them saves almost nothing and costs a lot of time. That makes a small,
+  dependency-free zip writer and reader in TypeScript practical: CRC-32, local headers, central
+  directory, and **Zip64** for backups over 4 GB or 65,535 files. It streams through
+  `expo-file-system` file handles one file at a time, so memory stays flat.
+- **`library.json`, not the database file.** The importer maps a backup's rows into the
+  *current* schema, so an old backup restores into a newer app, and the database's internal
+  state (FTS index, `user_version`) is rebuilt instead of copied.
+- **Two ways in:** *Restore* (a full backup onto this phone; the ids are kept, so restoring
+  twice doesn't duplicate) and *Add* (a shared course or documents from someone else; the items
+  get new ids and land in a new or chosen course).
+- **No network unless the student starts it.** Backups go to the share sheet, an Android
+  folder the student picks (which can be an SD card or a Google Drive folder through Android's
+  file picker), or, later and in Pro, the student's own Google Drive.
+
+---
+
+## Steps
+
+### B1 · Storage health: integrity, clean-up, report, low-space guard *(M)*
+Status: todo
+
+- `src/services/storage/integrity.ts`:
+  - `findOrphans()`: folders in `library/` with no document row (left over from crashes) and
+    document or page rows whose files are missing;
+  - `repair()`: move orphan folders to `library/.trash/` (deleted after 7 days), and mark
+    rows with missing files (`documents.missing_files INTEGER`, migration) so the library shows
+    "Some files are missing" instead of crashing; never deletes rows by itself.
+  - Runs once at start-up after the library loads, in the background, one folder at a time.
+- `src/services/storage/usage.ts`:
+  - `storageReport()` → total app size, size per course (summing each document folder; the
+    per-document size is cached in `documents.disk_bytes`, updated on save and edit), caches,
+    and free space (`Paths.availableDiskSpace`);
+  - `cleanCaches()`: empties `Paths.cache` subfolders the app owns (`share`, `extract`,
+    `pdf-ops`, `pdf-native`, and preview temp files) when no session is active, and prunes
+    `external-open`.
+- **Settings → Storage** screen: a bar of space used per course (course colours), caches with
+  "Clear", "Space left on phone", and the biggest documents (top 10) with "Open" and "Compress".
+- **Low-space guard** (`checkSpaceFor(bytesNeeded)`): before a scan starts and before a save,
+  under 300 MB free shows a warning with a "Free up space" button; under 50 MB, saving stops with
+  a clear message, and the session is kept so nothing is lost.
+- **Android Auto Backup rules** through a small config plugin `plugins/withBackupRules.js`
+  (review it like any config file, see AGENTS.md Security):
+  - `data_extraction_rules.xml` (Android 12+) and `full_backup_content.xml` (older): include the
+    database, `library/`, `signature/` and the shared preferences; exclude caches and
+    `external-open/`.
+  - This keeps device-to-device transfers complete. Cloud Auto Backup still stops at 25 MB, so
+    Settings says: "Android's own backup only covers small libraries. Use Back up to keep
+    everything."
+  - After any restore (Auto Backup, device transfer or B4), the integrity check above runs.
+- Tests: orphan detection both ways; repair moves, never deletes; usage sums; the space guard
+  thresholds; the config plugin output (snapshot of the generated XML).
+
+**Done when:** Settings shows space per course, clearing caches frees space, and a document
+folder deleted by hand shows as "files missing" instead of crashing the Reader.
+
+### B2 · Backup format: zip writer and reader, library export and import mapping *(M)*
+Status: todo
+
+- **Check first:** the `expo-file-system@57` file handle API (`File.open()`, `readBytes`,
+  `writeBytes`, offsets) in the package source; the zip code needs random-access writes for
+  headers or a "data descriptor" layout that only appends.
+- `src/services/backup/zip/`:
+  - `crc32.ts` (table-based, works on chunks);
+  - `zipWriter.ts`: `createZip(destFile)` → `addFile(path, sourceFile)` (streams in 1 MB chunks,
+    computing CRC-32 as it goes, using data descriptors) → `addJson(path, value)` → `finish()`
+    (central directory, Zip64 records when needed). UTF-8 file names (flag bit 11);
+  - `zipReader.ts`: reads the central directory (including Zip64), lists entries, extracts one
+    entry to a file in chunks, and checks its CRC. **STORE entries only**; anything else (a zip
+    made by another program and re-compressed) fails with `UNSUPPORTED_ZIP` and a message
+    ("This zip was changed outside PDF Scan").
+- `src/services/backup/format.ts`:
+  - `BACKUP_FORMAT_VERSION = 1`, `Manifest` and `LibraryJson` types;
+  - `exportRows(db, scope)` → the rows of every table for the scope (whole library, one or more
+    courses, or chosen documents), with file paths rewritten to backup paths (`data/<docId>/…`);
+  - `importPlan(manifest, libraryJson, currentLibrary, mode)` (**pure**): decides, per
+    document, insert, skip (same id and same `updated_at`) or keep both (same id, different
+    content: the incoming one gets a new id and the name gets " (restored)"); in *Add* mode,
+    everything gets new ids, and courses are matched by code and name or created;
+  - `upgradeLibraryJson(json)`: maps older format versions forward (none yet, but the hook and
+    a test exist).
+- Readable names: `Courses/<course name>/<document name>.pdf`, cleaned with `utils/sanitize`;
+  duplicates get " (2)"; documents without a course go in `Unsorted/`.
+- Tests: zip round trip (small files, empty files, UTF-8 names, a file over 4 GB simulated with
+  a fake file handle, more than 65,535 entries simulated); the written zip opens with Node's
+  `unzip`/`yauzl` in the test (as a check that other tools can read it); CRC failure detected;
+  `importPlan` for every case; `exportRows` scopes.
+
+**Done when:** a test library exported to a zip and imported into an empty database gives the
+same rows and files, and the zip opens on a computer with the PDFs under readable names.
+
+### B3 · Back up and export *(M)*
+Status: todo
+
+- `src/services/backup/createBackup.ts`:
+  `createBackup({ scope, kind: 'full' | 'course' | 'documents', include: 'everything' | 'pdfsOnly' }, onProgress)`:
+  - writes the zip to `Paths.cache/backup/` with `processSequentially` (one document at a time),
+    progress in bytes and documents, and cancel;
+  - checks free space first (`checkSpaceFor` with the estimated size from B1's
+    `documents.disk_bytes`);
+  - `pdfsOnly` writes only the readable PDFs plus `manifest.json` and `library.json` (with
+    `restorable: 'pdfs'`): much smaller, opens anywhere, and still imports later as imported
+    PDFs (§7 R1 makes those searchable).
+- Where it goes:
+  - **Share** (`shareAs`) to any app, for example Drive, email or Nearby Share;
+  - **Android: Save to folder** through SAF (reuse `deviceExportService`'s folder picking and
+    writing, streaming the file);
+  - the cache copy is deleted after it was handed over.
+- UI:
+  - **Settings → Backup**: "Back up everything", last backup date and size, the destination
+    folder (Android);
+  - **Course page** overflow: "Export course…" (Everything / PDFs only);
+  - **Library multi-select**: "Export…" for chosen documents.
+- Store `settings.lastBackupAt` and `lastBackupBytes`.
+- Tests: scopes produce the right entries; `pdfsOnly` content; cancel removes the partial file;
+  the space check blocks a backup that can't fit.
+
+**Done when:** a 500-page library backs up to a single zip with progress, memory stays flat
+(profiler), and the zip can be saved to a folder or shared.
+
+### B4 · Restore and import *(M)*
+Status: todo
+
+- Entry points: Settings → Backup → **Restore from backup…** and Library → **Import
+  course or documents…** (both use `expo-document-picker` for `.zip`); add an "Open with" intent
+  filter for `application/zip` that routes PDF Scan zips here.
+- Flow:
+  1. Read `manifest.json` (check `format`, the app version, and that the zip is a PDF Scan
+     backup).
+  2. **Preview:** "3 courses · 120 documents · 450 MB. You have 2.1 GB free." plus the plan
+     from `importPlan` ("118 new, 2 already here"). Mode: Restore (default for full backups) or
+     Add (default for course or document exports).
+  3. Copy the files **first**, one document at a time, into
+     `library/.incoming/<docId>/`, checking each entry's CRC.
+  4. Then, in **one database transaction**, insert the rows from the plan, and move each
+     `.incoming/<docId>` folder into place. If anything fails, roll back the transaction and
+     delete `.incoming/`, so a failed restore leaves the library exactly as it was.
+  5. Afterwards: reload the library (`useLibraryPersistence`), let the FTS triggers index the
+     pages (or run `INSERT INTO pages_fts(pages_fts) VALUES('rebuild')` once), reschedule
+     future deadline notifications (`deadlines.scheduleReminders`), apply `settings.json`
+     only on a full restore and only for fields the user hasn't set on this phone (ask once:
+     "Use the settings from the backup?").
+- Restoring an older backup into a newer app goes through `upgradeLibraryJson`; a backup from
+  a **newer** app version than this one is refused with "Update PDF Scan to restore this
+  backup".
+- Tests: restore into an empty library; restore twice (no duplicates); Add mode (new ids, course
+  matching); rollback on a corrupt entry (the library is unchanged, `.incoming` removed);
+  deadlines rescheduled; a newer-format backup refused.
+
+**Done when:** a full backup made on one phone restores on a fresh install on another phone
+with every course, document, annotation, bookmark, submission and deadline, and a course zip
+from a classmate adds its documents under a matching course without touching the rest.
+
+### B5 · Backup reminders and automatic backups to a folder *(S)*
+Status: todo
+
+- **Reminder:** when the library has changed and the last backup is more than 30 days old (or
+  there was never one and the library has 20+ documents), Home shows a one-line card: "Last
+  backup: never. Back up now?" with "Back up" and "Later" (snoozes 14 days). Also a quiet hint
+  after archiving a semester: "Back up Spring 2026 before you forget?"
+- **Automatic backup (Android):** in Settings → Backup, "Back up automatically to a folder"
+  (weekly or monthly) to the SAF folder the student chose (it can be a Google Drive or SD-card
+  folder). Runs when the app opens and the backup is due, in the background with a small
+  progress chip, only on Wi-Fi if the folder belongs to a cloud provider (can't be detected
+  reliably, so the rule is simply "not while saving or scanning"). Keeps the last 2 automatic
+  backups in that folder (deletes older ones it made itself; never other files).
+- iOS: the reminder only; iOS already includes the app's documents in iCloud device backups,
+  and Settings says so.
+- Tests: reminder conditions and snooze; rotation keeps 2 and only deletes its own files; due
+  dates.
+
+**Done when:** a student who never backed up is reminded once the library matters, and an
+Android student with automatic backups always has a recent zip in their chosen folder.
+
+### B6 · Google Drive backup *(L — later, Pro, phase P3)*
+Status: later
+
+Outline only, so B2–B5 leave the right gaps:
+- Sign-in with `expo-auth-session` (no Google SDK), scope **`drive.appdata`** only (the app's
+  hidden folder in the student's own Drive; it can't see other files). Needs a Google Cloud
+  project and OAuth consent screen; record the client ids in EAS secrets.
+- Incremental, not a whole zip each time: upload `library.json` snapshots plus each document's
+  files, named by document id and `updated_at`; only changed documents are uploaded. Restore
+  reads the latest snapshot and downloads the files it needs, then runs B4's commit step.
+- Only on Wi-Fi by default, resumable uploads, and a clear "Connected as name@gmail.com ·
+  Disconnect" in Settings. The privacy promise stays true: data goes only to the student's own
+  account.
+
+---
+
+## Order and dependencies
+B1 (it gives B3/B4 the space checks and the integrity repair), then B2, then B3, then B4, then
+B5. B6 waits for §10 Pro.
+
+## Critical files
+- `src/services/storage/{integrity,usage}.ts` (new), `plugins/withBackupRules.js` (new), `app.json`
+- `src/services/backup/{zip/crc32,zip/zipWriter,zip/zipReader,format,createBackup,restoreBackup}.ts` (new)
+- `src/services/persistence/{migrations,libraryRepo,libraryFiles,dbService}.ts`,
+  `src/services/export/deviceExportService.ts`, `src/services/sharing/shareService.ts`,
+  `src/services/submit/deadlines.ts`
+- `src/screens/SettingsScreen.tsx` plus new Storage and Backup screens, `src/screens/{HomeScreen,CourseScreen,LibraryScreen}.tsx`
+- `src/i18n/en.ts` (all new UI text goes through the catalog; see AGENTS.md)
+
+## Verification (for the whole of §8)
+1. `npm run typecheck && npm test` pass in CI.
+2. On an Android device (dev build):
+   - Settings → Storage shows space per course; "Clear" frees cache space;
+   - back up a library of about 500 pages; open the zip on a computer and find the PDFs by
+     course;
+   - uninstall, reinstall, restore: everything is back, including annotations, bookmarks,
+     submissions, and deadline reminders;
+   - export one course, import it on a second phone with Add: it lands in a matching course;
+   - fill the phone until under 300 MB is free: the warning appears before a scan;
+   - turn on automatic backups to a Drive folder; after the due date, a new zip appears there.
+3. iOS: backup and restore through the share sheet and the Files app.

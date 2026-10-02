@@ -198,9 +198,17 @@ submitted, and every format the app accepts opens.
 ### §8 Backup and portability
 Goal: students never lose a semester of notes.
 
-- [ ] Export or import the whole library or one course as a `.zip` (PDFs plus metadata JSON). (M)
-- [ ] Optional backup to the user's own Google Drive (Pro). (L)
-- [ ] Warning when storage is low, and a report of "space used per course". (S)
+**Detailed steps:** [`docs/plan/08-backup.md`](plan/08-backup.md)
+
+- [ ] B1 Storage health: integrity check, cache clean-up, space per course, low-space guard, Android backup rules
+- [ ] B2 Backup format: dependency-free zip (store-only, Zip64) with readable PDFs and `library.json`
+- [ ] B3 Back up and export (whole library, one course, chosen documents; everything or PDFs only)
+- [ ] B4 Restore and import (Restore keeps ids; Add for a classmate's course; all-or-nothing)
+- [ ] B5 Backup reminders and automatic backups to a chosen folder (Android)
+- [ ] B6 *(Later, Pro)* Google Drive backup (`drive.appdata`, incremental)
+
+**Done when:** a full backup restores on a new phone with every course, document, annotation and
+deadline, and the zip opens on a laptop with the PDFs under readable names.
 
 ### §9 Onboarding and UX polish
 - [ ] 3-screen onboarding: what it does, set up the profile, add courses (skippable). (M)
@@ -267,4 +275,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. Next to plan: §8 Backup and portability (`docs/plan/08-backup.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. Next to plan: §9 Onboarding and UX polish (`docs/plan/09-onboarding.md`).

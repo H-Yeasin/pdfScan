@@ -17,7 +17,8 @@ code **when the section was planned**, and are kept as history.
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
-| §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
+| §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | Planned (2026-10-02). B1 first; B6 (Google Drive) waits for Pro. |
+| §9 Onboarding and later | — | — | Not planned yet. Next to plan: `docs/plan/09-onboarding.md` (see `docs/PLAN.md` §9). |
 
 ## Phases (from `docs/PLAN.md` §5)
 
