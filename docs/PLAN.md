@@ -173,7 +173,7 @@ Goal: adding a new script or UI language is a configuration change, not a refact
 
 - [x] L1 Script registry v2 (Bangla listed as "coming soon") and per-course recognition language
 - [x] L2 `OcrEngine` interface; ML Kit becomes the first engine; fake-script test
-- [ ] L3 Visible PDF text (covers, footers) in any script via Skia shaping + searchable text layer
+- [x] L3 Visible PDF text (covers, footers) in any script via Skia shaping + searchable text layer
 - [ ] L4 UI translation layer (`t()`, typed English catalog, pseudo-locale), English only
 - [ ] L5 *(Later, P4)* Tesseract engine for Bangla
 - [ ] L6 *(Later, P4)* Downloadable language packs

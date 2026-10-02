@@ -147,7 +147,7 @@ script test passes.
   `engines/mlkit.ts` imports `rn-mlkit-ocr`). L3 should add visible text to the fake-script test.
 
 ### L3 · Visible PDF text in any script *(M — starts with a short spike)*
-Status: todo
+Status: done (commit 9f5689a), **built without the spike**: system fonts assumed, device check open
 
 - **Spike (half a day, results written into this step):** draw "রহিম আহমেদ", "राहुल शर्मा",
   "王芳" and "Łukasz Żółć" with Skia's Paragraph API using system fonts
@@ -177,6 +177,37 @@ Status: todo
 
 **Done when:** a cover and footer with Bangla, Hindi and Chinese names print correctly shaped,
 the names can be found by search in the PDF, and an English-only cover is unchanged.
+
+**As built:**
+- **Spike not run.** The owner chose to build on the assumption that react-native-skia's
+  Paragraph falls back to system fonts. It should: `ParagraphBuilder.Make` without a typeface
+  provider sets the system `FontMgr` as the font collection's default manager (checked in
+  react-native-skia 2.6.2's `JsiSkParagraphBuilder.h`), and Android's system fonts include
+  Bengali, Devanagari and CJK. **Still to check on a device:** the four names from the spike
+  shape correctly (conjuncts), and the PNG size of a 9 pt footer at 300 dpi. If fallback fails
+  on a platform, pass a `TypefaceFontProvider` with one Noto Sans per script in
+  `skiaText.makeParagraph`; nothing else changes.
+- `pdf/skiaText.ts` holds all Skia text code: `measureShaped`, `drawShaped` (canvas, baseline,
+  left/centre) and `rasterizeShaped` (transparent PNG, box = width x (ascent + descent), baseline
+  `ascent` from the top). One line per run; wrapping stays in `coverTemplates.wrapText`.
+- `pdf/visibleText.ts`: `needsShaping`, `measureText(text, size, bold) → width` (the plan's
+  `{ width, height, lines }` isn't needed, since layout already wraps), and
+  `createTextDrawer(pdfDoc, glyphlessFont?)` instead of a free `drawText`. It embeds Helvetica
+  lazily, caches each shaped run's image per PDF, and reuses the OCR layer's glyphless font. The
+  shaper can be swapped with `setTextShaper` (tests use `src/test/fakeShaper.ts`). If shaping
+  throws, the run is drawn as Helvetica with `?` and is **still** searchable.
+- The searchable copy of a shaped run is a single glyphless line over the image box (baseline to
+  ascent).
+- `coverSafe` only collapses whitespace now; `layoutCover`, `layoutContents` and `itemsAsOcr`
+  measure with `measureText`. `toWinAnsiSafe` stays exported (tested against `isWinAnsiSafe`),
+  but nothing draws with it. `helveticaWidth`/`MeasureText` moved to `visibleText.ts`, and
+  `coverTemplates` re-exports them.
+- `academicRasterService` (cover and contents display copies, header/footer stamps, and
+  Review's live stamp preview through `drawAcademicStamp`) draws with `drawShaped`. The exam
+  pack's contents page is a raster from `renderLayoutImage`, so it is covered too.
+- S1's "Cover pages show ?" hint is removed from `ProfileSection`.
+- Tests: `pdf/__tests__/visibleText.test.ts`, the cover/footer case in
+  `ocr/__tests__/fakeScript.test.ts`, and the updated `coverTemplates` script test.
 
 ### L4 · UI translation layer, English only *(M, split into 4 sessions)*
 Status: todo

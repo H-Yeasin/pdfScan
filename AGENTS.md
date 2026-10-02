@@ -19,7 +19,7 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 - **Progress:** `docs/plan/README.md` lists every step's status and commit and what comes next.
   Read it before starting. §0, §1, §2 (except E7's benchmark run), §3, §4 and §5 T1–T6 are done
   in code. **Next:** device checks (each plan file's Verification), E7's benchmark run, and
-  §6 L3 (`docs/plan/06-languages.md`; L1–L2 are done); §5 T7 (flashcards) is for later (P4).
+  §6 L4a (`docs/plan/06-languages.md`; L1–L3 are done, L3 without its device spike); §5 T7 (flashcards) is for later (P4).
 
 ## Commands
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),
@@ -61,7 +61,8 @@ src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, do
    master spec (library) and once at the export preset if different, OCR on the final master,
    optional academic display copies (`pdf/academicRasterService`), then
    `pdf/pdfService.buildPdfFromPages(..., 'as-is' | preset)` (standard or 2-up, academic
-   stamping, invisible OCR text via `pdf/textLayer.ts` glyphless font), then
+   stamping, invisible OCR text via `pdf/textLayer.ts` glyphless font; visible cover/header/footer
+   text in any script via `pdf/visibleText.ts`), then
    `export/imageExportService.saveImagesToLibrary` (page_N / display_N / thumb_N), then
    `library/ADD_FILE`, then optional `export/deviceExportService` (Android SAF).
 4. **Library ops**: `persistence/libraryOperations.ts` (merge, split, compress = PDF-only
