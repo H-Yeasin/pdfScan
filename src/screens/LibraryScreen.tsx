@@ -27,7 +27,7 @@ import { searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
 import { importExternalFile, LegacyWordDocError } from '../services/files/externalFileService';
 import { PICKER_MIME_TYPES } from '../services/documents/formatCapabilities';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 
@@ -35,7 +35,9 @@ export function LibraryScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
+  const store = useAppStore();
   const { loadStatus, files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
@@ -223,7 +225,7 @@ export function LibraryScreen() {
           title={t('library.empty')}
           actionLabel={t('library.scanNow')}
           onAction={() => {
-            startScan(state, dispatch, null, { launch: true });
+            startScan(store.getState(), dispatch, null, { launch: true });
             go('capture');
           }}
         />

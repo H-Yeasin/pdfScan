@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { formatBytes, t } from '../i18n';
 import { useRouter } from '../navigation/router';
 import { checkSpaceFor } from '../services/storage/usage';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch } from './AppStateContext';
 
 // The scan warning is shown once per app run: a student who chose "Continue" knows, and asking
 // before every scan would only teach them to dismiss it.
@@ -15,7 +15,7 @@ let scanWarningShown = false;
 // - beforeSave(bytes): under 50 MB left after the save, stops with a message (the session stays,
 //   so nothing is lost); under 300 MB, a warning with "Free up space", and the save goes ahead.
 export function useSpaceGuard() {
-  const { dispatch } = useAppState();
+  const dispatch = useAppDispatch();
   const { go } = useRouter();
 
   const beforeScan = useCallback((): Promise<boolean> => {

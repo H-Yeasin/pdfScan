@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { NameField } from '../deliver/NameField';
 import type { TKey } from '../../i18n';
 import { useT } from '../../i18n/useT';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { spacing, useTheme } from '../../theme';
 import type { StudentProfile } from '../../types/models';
 
@@ -18,7 +18,8 @@ const FIELDS: { key: keyof StudentProfile; label: TKey; placeholder: TKey }[] = 
 export function ProfileSection() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('settings');
   const { profile } = state.settings;
 
   return (

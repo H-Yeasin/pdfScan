@@ -33,7 +33,7 @@ import { cleanTemporaryCache } from '../services/persistence/libraryFiles';
 import { drawAcademicStamp, hasContentPageStamp } from '../services/pdf/academicRasterService';
 import { applySignatureToPage } from '../services/signature/signatureCompositeService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { useScanOcrScript } from '../store/useScanOcrScript';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
@@ -52,7 +52,8 @@ export function ReviewScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'review', 'signature');
   // §6 L1: re-OCR and ID card sides use the filing course's script, like the original scan.
   const ocrScript = useScanOcrScript();
   const { pages, processingStatus, progress } = state.capture;

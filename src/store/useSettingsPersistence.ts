@@ -3,7 +3,7 @@ import { PSEUDO_LOCALE, isDocumentLanguage, isUiLanguage, setDocumentLanguage, s
 import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings } from '../services/persistence/settingsStorage';
 import { normalizeProfile } from '../services/submit/profile';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { useTheme } from '../theme';
 import { FILTERS } from '../services/enhance/filters/registry';
 import type { CaptureMode, EnhanceMode } from '../types/models';
@@ -18,7 +18,8 @@ function sanitizeDefaultEnhance(raw: Partial<Record<CaptureMode, EnhanceMode>> |
 }
 
 export function useSettingsPersistence() {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('settings');
   const { themePref, setThemePref } = useTheme();
   const { loaded } = state.settings;
 

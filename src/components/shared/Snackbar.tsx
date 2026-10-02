@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing } from '../../theme';
 
 const AUTO_DISMISS_MS = 3200;
 
 export function Snackbar() {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('ui');
   const { snack } = state.ui;
   const insets = useSafeAreaInsets();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

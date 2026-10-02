@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Semester } from '../../types/models';
 import { useT } from '../../i18n/useT';
@@ -21,7 +21,8 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const active = state.library.semesters.filter((s) => !s.archived);
 
   const pick = (semester: Semester) => {

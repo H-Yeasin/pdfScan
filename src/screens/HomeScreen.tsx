@@ -25,7 +25,7 @@ import {
 } from '../services/courses/homeSelectors';
 import { courseColorValue } from '../services/courses/palette';
 import { startScan } from '../services/courses/startScan';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, useTheme } from '../theme';
 import type { Course } from '../types/models';
 import { toLocalDateString } from '../utils/localDate';
@@ -37,7 +37,9 @@ export function HomeScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
+  const store = useAppStore();
   const { files, courses, semesters, homeSemesterId } = state.library;
   const openDocument = useOpenDocument();
 
@@ -63,7 +65,7 @@ export function HomeScreen() {
   };
 
   const handleScan = () => {
-    startScan(state, dispatch, null, { launch: true });
+    startScan(store.getState(), dispatch, null, { launch: true });
     go('capture');
   };
 

@@ -9,7 +9,7 @@ import {
 } from '../services/submit/deadlines';
 import type { Deadline } from '../types/models';
 import { createId } from '../utils/id';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // Reminders show while the app is open too (a banner, not silently in the tray).
 Notifications.setNotificationHandler({
@@ -20,7 +20,8 @@ Notifications.setNotificationHandler({
 // deadline, one deleted with its course, or one marked done loses its reminders - and opens the
 // course page, with the deadline highlighted, when a reminder is tapped (also from a cold start).
 export function useDeadlineReminders(libraryLoaded: boolean) {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { go } = useRouter();
   const { deadlines, courses } = state.library;
 
@@ -49,7 +50,8 @@ export type DeadlineDraft = Pick<Deadline, 'courseId' | 'title' | 'dueAt' | 'doc
 // Saving, deleting and settling deadlines. Saving (re)schedules the reminders; the first save
 // is when notification permission is asked for.
 export function useDeadlineActions() {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { courses } = state.library;
 
   const save = useCallback(

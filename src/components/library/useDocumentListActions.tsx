@@ -20,7 +20,7 @@ import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { canSign, isPasswordProtected, isPdfLevel } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import { usePageImage } from '../shared/usePageImage';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { docTypeOf } from '../../services/courses/docTypes';
 import type { Dispatch } from 'react';
@@ -31,7 +31,7 @@ import { t } from '../../i18n';
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
 export function useOpenDocument() {
   const { go } = useRouter();
-  const { dispatch } = useAppState();
+  const dispatch = useAppDispatch();
   return useCallback(
     (doc: LibraryDocument) => {
       dispatch({ type: 'reader/SET_READER_ID', id: doc.id });
@@ -74,7 +74,8 @@ export async function compressDocuments(
 // (merge, split, compress, sign, set type). Selection lives in state.library, so it's one selection
 // app-wide. Render `overlays` once in the screen: it holds the signing overlays and the type and course pickers.
 export function useDocumentListActions() {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'signature');
   const { files, selection, selMode } = state.library;
   const openDocument = useOpenDocument();
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);

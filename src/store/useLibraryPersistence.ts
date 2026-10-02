@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { backfillPdfInfo } from '../services/documents/pdfInfoBackfill';
 import { getDb } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
 
 // Loads the library from SQLite, then mirrors every later change to state.library.files/courses/
@@ -15,7 +15,8 @@ import { t } from '../i18n';
 // Returns whether the library has loaded, so callers like useExternalFileLinking can sequence
 // their own boot-time work after it.
 export function useLibraryPersistence(): boolean {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { files, courses, semesters, timetable, submissions, deadlines, annotations, bookmarks, loadStatus, loadAttempt } = state.library;
   const loaded = loadStatus === 'ready';
 

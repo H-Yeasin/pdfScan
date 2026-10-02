@@ -28,7 +28,7 @@ import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
 import { useDeadlineReminders } from '../store/useDeadlines';
 import { useStorageIntegrity } from '../store/useStorageIntegrity';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
 import { initCrashReporting } from '../services/telemetry/crash';
 import { useTheme } from '../theme';
@@ -67,7 +67,8 @@ export function AppNavigator() {
   const prevTick = useRef(navTick);
   const prevScreen = useRef<ScreenName>(screen);
 
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'library', 'settings');
   const { crashReportsEnabled } = state.settings;
   useEffect(() => initCrashReporting(crashReportsEnabled), [crashReportsEnabled]);
   const { processingStatus, errorMessage } = state.capture;

@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from '../../navigation/router';
 import { startScan } from '../../services/courses/startScan';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppStore } from '../../store/AppStateContext';
 import { radii, spacing, typeScale } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { TKey } from '../../i18n';
@@ -27,13 +27,15 @@ export function TabBar({ active, background, activeColor, inactiveColor, accent 
   const insets = useSafeAreaInsets();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  // Read at press time: the tab bar doesn't need to re-render on state changes (§9 O5).
+  const store = useAppStore();
 
   const open = (tab: Tab) => {
     if (tab === active) return;
     // The Scan tab only shows Capture; the camera opens when the student taps the shutter. It files
     // into no particular course (the automatic suggestion decides).
-    if (tab === 'capture') startScan(state, dispatch, null, { launch: false });
+    if (tab === 'capture') startScan(store.getState(), dispatch, null, { launch: false });
     const index = (t: Tab) => TABS.findIndex((x) => x.id === t);
     go(tab, index(tab) < index(active) ? 'back' : 'fwd');
   };

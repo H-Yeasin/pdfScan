@@ -7,7 +7,7 @@ import { canUsePageTools } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import { appendDocuments } from '../../services/persistence/libraryOperations';
 import { extractToNewDocument, PagesNotReadyError, savePageEdit, type PageEdit } from '../../services/persistence/pageEdits';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import type { LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
 
@@ -15,7 +15,8 @@ import { t } from '../../i18n';
 // "Add pages from another document", and what each of their actions does. `onChanged` runs after
 // the document's PDF was rewritten (the viewer reloads it). Render `overlays` once.
 export function useEditPages(doc: LibraryDocument | undefined, onChanged: () => void) {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'library');
   const { go } = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);

@@ -8,14 +8,15 @@ import { submitDocument } from '../services/submit/submitDocument';
 import { ensureSubmissionFile, submissionRecord } from '../services/submit/history';
 import { matchDeadline } from '../services/submit/deadlines';
 import type { LibraryDocument, Submission } from '../types/models';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
 // with its course's preset as it is now, then opens the share sheet. Returns false when the
 // document can't be submitted (a DOCX, a sheet, a password-protected PDF).
 export function useSubmitDocument() {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   const { files, courses, deadlines, annotations } = state.library;
   const { profile } = state.settings;
 
@@ -71,7 +72,8 @@ export function useSubmitDocument() {
 // "Share again" for a recorded submission: shares the stored file, rebuilding it first if it's
 // gone (history.ensureSubmissionFile).
 export function useShareSubmission() {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   const { files, courses, annotations } = state.library;
   const { profile } = state.settings;
 

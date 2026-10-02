@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { loadSavedSignature } from '../services/signature/savedSignatureStorage';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch } from './AppStateContext';
 
 export function useSignaturePersistence() {
-  const { dispatch } = useAppState();
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
     loadSavedSignature().then((saved) => {

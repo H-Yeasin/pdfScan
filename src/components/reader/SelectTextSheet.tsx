@@ -8,7 +8,7 @@ import { runOcr } from '../../services/ocr/ocrService';
 import { resolveOcrScript } from '../../services/scripts/registry';
 import { masterToLayer } from '../../services/study/canvasMath';
 import { readingOrderTokens, selectBetween, selectionText, tokenAt, type TextToken } from '../../services/study/textSelection';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { PageCanvas } from './PageCanvas';
@@ -27,7 +27,8 @@ type SelectTextSheetProps = {
 export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSheetProps) {
   const { tokens: theme } = useTheme();
   const { t } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   const page = doc.pages[pageIdx];
   const tokens = useMemo(() => readingOrderTokens(page?.ocr), [page?.ocr]);
   const [anchor, setAnchor] = useState<TextToken | null>(null);

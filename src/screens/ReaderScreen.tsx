@@ -46,7 +46,7 @@ import { createId } from '../utils/id';
 import { writeDocumentText } from '../services/study/textExport';
 import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { spacing, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 
@@ -59,7 +59,8 @@ export function ReaderScreen() {
   const { t } = useT();
   // Back returns to wherever the document was opened from: Home, Library or a course page.
   const { go, hub } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'reader', 'signature');
 
   const external = state.reader.external;
   const doc = state.library.files.find((f) => f.id === state.reader.readerId);

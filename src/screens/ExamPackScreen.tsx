@@ -8,7 +8,7 @@ import { useOpenDocument } from '../components/library/useDocumentListActions';
 import { useRouter } from '../navigation/router';
 import { hasPageMasters } from '../services/documents/formatCapabilities';
 import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 import { rotationStyle } from '../utils/rotation';
@@ -20,7 +20,8 @@ export function ExamPackScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go, previousScreen } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('deliver', 'library', 'pack');
   const openDocument = useOpenDocument();
   const { pack } = state;
   const { files, courses, annotations } = state.library;

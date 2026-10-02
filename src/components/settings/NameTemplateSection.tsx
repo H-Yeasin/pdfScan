@@ -4,7 +4,7 @@ import { NameField } from '../deliver/NameField';
 import { Pill } from '../shared/Pill';
 import { useT } from '../../i18n/useT';
 import { DEFAULT_NAME_TEMPLATE, NAME_TOKENS, suggestName } from '../../services/submit/naming';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { spacing, useTheme } from '../../theme';
 
 
@@ -13,7 +13,8 @@ import { spacing, useTheme } from '../../theme';
 export function NameTemplateSection() {
   const { tokens } = useTheme();
   const { t, locale } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   const { nameTemplate, profile } = state.settings;
   // A stand-in for the live example when there are no courses yet.
   const firstCourse = state.library.courses.find((c) => !c.archived);

@@ -9,7 +9,7 @@ import { annotationAt, NOTE_ICON } from '../../services/annotations/hitTest';
 import { annotationColor, HIGHLIGHT_COLORS, HIGHLIGHTER_THICKNESS, NOTE_COLOR, PEN_COLORS, PEN_WIDTHS } from '../../services/annotations/palette';
 import { updatePdfAnnotations } from '../../services/annotations/pdfAnnotations';
 import { snapHighlight, type Point } from '../../services/annotations/snap';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Annotation, LibraryDocument } from '../../types/models';
 import { createId } from '../../utils/id';
@@ -36,7 +36,8 @@ export function AnnotateSheet({
 }) {
   const { tokens: theme } = useTheme();
   const { t } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const [idx, setIdx] = useState(Math.min(Math.max(0, startIdx), doc.pages.length - 1));
   const [tool, setTool] = useState<Tool>('highlight');
   const [hlColor, setHlColor] = useState<keyof typeof HIGHLIGHT_COLORS>('yellow');

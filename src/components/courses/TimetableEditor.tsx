@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { formatTime, parseSlotTimes, slotChanges, WEEKDAY_ORDER, weekdayName } from '../../services/courses/timetable';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { TimetableSlot } from '../../types/models';
 import { createId } from '../../utils/id';
@@ -25,7 +25,8 @@ type Form = { editingId: string | null; courseId: string; weekday: number; start
 export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorProps) {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { courses, timetable } = state.library;
   const scopeCourses = courseId ? courses.filter((c) => c.id === courseId) : courses.filter((c) => !c.archived);
   const inScope = (slot: TimetableSlot) => scopeCourses.some((c) => c.id === slot.courseId);

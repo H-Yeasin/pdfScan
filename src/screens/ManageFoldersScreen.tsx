@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CourseList } from '../components/courses/CourseList';
 import { useRouter } from '../navigation/router';
-import { useAppState } from '../store/AppStateContext';
+import { useAppSlices } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 
@@ -12,7 +12,7 @@ export function ManageFoldersScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
-  const { state } = useAppState();
+  const state = useAppSlices('library');
   const { files } = state.library;
 
   const counts = useMemo(() => {

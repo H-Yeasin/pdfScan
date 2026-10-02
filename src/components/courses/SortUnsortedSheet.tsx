@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDocType, docTypeOf } from '../../services/courses/docTypes';
 import { courseColorValue } from '../../services/courses/palette';
 import { suggestCourses } from '../../services/courses/suggestCourse';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatRelativeDate } from '../../utils/format';
@@ -18,7 +18,8 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { courses, timetable, files } = state.library;
   // The queue is fixed when the sheet opens, so filing one doesn't reshuffle the rest.
   const [queue, setQueue] = useState<LibraryDocument[]>([]);

@@ -4,14 +4,14 @@ import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes'
 import { coverDefaults, withCoverDefaults, type CoverValues } from '../services/pdf/coverTemplates';
 import type { AcademicConfig } from '../services/pdf/pdfService';
 import { firstLine, renderText, type NamingContext } from '../services/submit/naming';
-import { useAppState } from './AppStateContext';
+import { useAppSlices } from './AppStateContext';
 import { useFilingCourse } from './useFilingCourse';
 
 // The scan in Deliver as §4 sees it: the profile, the course it is filed under, its type and
 // number ("Assignment 3"), today's date and its first OCR line. Feeds the file name (naming.ts),
 // the cover page and the header/footer tokens.
 export function useNamingContext(): NamingContext {
-  const { state } = useAppState();
+  const state = useAppSlices('capture', 'deliver', 'library', 'settings');
   const { courseId } = useFilingCourse();
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses, files } = state.library;
@@ -41,7 +41,7 @@ export function useCoverDefaults(): CoverValues {
 // defaults, and `{name}`, `{roll}`, ... in the header and footer filled in (`{X}`/`{Y}` stay for
 // the PDF builder, per page).
 export function useResolvedAcademicConfig(): AcademicConfig | null {
-  const { state } = useAppState();
+  const state = useAppSlices('capture', 'deliver', 'library', 'settings');
   const stored = state.deliver.academicConfig;
   const ctx = useNamingContext();
   const defaults = useCoverDefaults();

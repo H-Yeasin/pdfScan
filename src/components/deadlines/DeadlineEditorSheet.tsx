@@ -5,7 +5,7 @@ import { DocTypeSelector } from '../courses/DocTypeChips';
 import { NameField } from '../deliver/NameField';
 import { nextTypeNumber } from '../../services/courses/docTypes';
 import { dueAtFrom, formatTime, parseTime, startOfDay, upcomingDays } from '../../services/submit/deadlines';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useDeadlineActions } from '../../store/useDeadlines';
 import { radii, spacing, useTheme } from '../../theme';
 import { formatDate, t, tDoc } from '../../i18n';
@@ -51,7 +51,8 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
   // t is imported (dayLabel uses it too); this re-renders on a language change.
   useT();
   const insets = useSafeAreaInsets();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { save, remove } = useDeadlineActions();
   const activeCourses = useMemo(() => state.library.courses.filter((c) => !c.archived), [state.library.courses]);
 

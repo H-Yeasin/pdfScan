@@ -9,7 +9,7 @@ import {
   type QuickSetupRow,
 } from '../../services/courses/courseSetup';
 import { courseColorValue } from '../../services/courses/palette';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import { createId } from '../../utils/id';
 import { CourseSheet, SheetField, sheetInputStyle } from './CourseSheet';
@@ -31,7 +31,8 @@ const emptyRows = (): QuickSetupRow[] => Array.from({ length: INITIAL_ROWS }, ()
 export function QuickSetupSheet({ visible, onClose }: QuickSetupSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { courses, semesters } = state.library;
 
   const [semesterName, setSemesterName] = useState('');

@@ -42,7 +42,7 @@ import { matchDeadline } from '../services/submit/deadlines';
 import type { Submission } from '../types/models';
 import type { PageSizeId } from '../services/pdf/pageSize';
 import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { useSpaceGuard } from '../store/useSpaceGuard';
@@ -79,7 +79,8 @@ export function DeliverScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'deliver', 'library', 'review', 'settings');
   const { pages } = state.capture;
   const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, layoutMode, pageSize } = state.deliver;
   // The academic options as they will be drawn: cover defaults and header/footer tokens filled in.

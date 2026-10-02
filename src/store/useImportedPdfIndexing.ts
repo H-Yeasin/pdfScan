@@ -3,7 +3,7 @@ import { indexImportedPdf, needsIndexing } from '../services/documents/importedP
 import { isPdfNativeAvailable } from '../services/pdf/pdfNative';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { resolveOcrScript } from '../services/scripts/registry';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // The abort reason when the document itself went away (as opposed to the app closing).
 const REMOVED = 'removed';
@@ -14,7 +14,8 @@ const REMOVED = 'removed';
 // Progress is saved every few pages, so a run cut short by the app closing resumes next launch
 // after the pages it finished.
 export function useImportedPdfIndexing(libraryLoaded: boolean): void {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   const { files, courses } = state.library;
   const settings = state.settings;
 

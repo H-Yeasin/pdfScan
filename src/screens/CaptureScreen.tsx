@@ -13,7 +13,7 @@ import { useRouter } from '../navigation/router';
 import { ingestGalleryBatch } from '../services/capture/ingestBatch';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { resolveOcrScript } from '../services/scripts/registry';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { captureSpecFor } from '../store/slices/settingsSlice';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { useSpaceGuard } from '../store/useSpaceGuard';
@@ -26,7 +26,8 @@ export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'library', 'settings');
   const { pages, processingStatus, mode, scannerRequested } = state.capture;
   const { loaded: settingsLoaded, firstRun, lastCaptureMode, scannerUnavailable } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';

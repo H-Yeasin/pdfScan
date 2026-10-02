@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
@@ -6,7 +7,7 @@ import { formatBytes, formatRelativeDate } from '../../utils/format';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import { FileTypeIcon } from './FileTypeIcon';
 import { useT } from '../../i18n/useT';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppSelector } from '../../store/AppStateContext';
 import { INDEX_MAX_PAGES } from '../../services/documents/importedPdfIndex';
 import { rotationStyle } from '../../utils/rotation';
 
@@ -21,12 +22,23 @@ type FileRowProps = {
   // The course's colour, shown as a dot before the name where rows from several courses mix
   // (Library, search results). Undefined: no dot.
   courseColor?: string;
-  onPress: () => void;
-  onLongPress: () => void;
-  onToggleStar: () => void;
+  // Take the row's document, so the parent can pass one stable handler (`useStableCallback`) to
+  // every row and `memo` can skip rows whose data didn't change (§9 O5).
+  onPress: (doc: LibraryDocument) => void;
+  onLongPress: (doc: LibraryDocument) => void;
+  onToggleStar: (doc: LibraryDocument) => void;
 };
 
-export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColor, onPress, onLongPress, onToggleStar }: FileRowProps) {
+export const FileRow = memo(function FileRow({
+  doc,
+  selected,
+  selectionMode,
+  matchSnippet,
+  courseColor,
+  onPress,
+  onLongPress,
+  onToggleStar,
+}: FileRowProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const cover = doc.pages[0];
@@ -34,8 +46,8 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
 
   return (
     <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={() => onPress(doc)}
+      onLongPress={() => onLongPress(doc)}
       delayLongPress={LONG_PRESS_MS}
       style={[
         styles.row,
@@ -91,7 +103,7 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
       </View>
 
       {!selectionMode && (
-        <Pressable onPress={onToggleStar} hitSlop={8}>
+        <Pressable onPress={() => onToggleStar(doc)} hitSlop={8}>
           <Ionicons
             name={doc.star ? 'star' : 'star-outline'}
             size={19}
@@ -101,7 +113,7 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
       )}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {
@@ -164,11 +176,11 @@ const styles = StyleSheet.create({
 // §7 R1: what search covers in an imported PDF - while it's being read, and when it couldn't be
 // read in full. Nothing for a fully indexed PDF or any other document.
 function useIndexNote(doc: LibraryDocument): string | null {
-  const { state } = useAppState();
+  // Only this document's progress: other documents' ticks don't re-render this row.
+  const progress = useAppSelector((s) => (s.library.indexing?.documentId === doc.id ? s.library.indexing : null));
   const { t } = useT();
   if (doc.sourceKind !== 'imported_pdf') return null;
-  const progress = state.library.indexing;
-  if (progress?.documentId === doc.id) return t('library.index.reading', { done: progress.done, total: progress.total });
+  if (progress) return t('library.index.reading', { done: progress.done, total: progress.total });
   switch (doc.indexState) {
     case 'partial':
       return t('library.index.partial', { count: INDEX_MAX_PAGES });

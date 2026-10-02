@@ -28,7 +28,7 @@ import { useCoverDefaults, useNamingContext, useResolvedAcademicConfig } from '.
 import { footerPresetOf, footerPresetText, type FooterPreset } from '../services/submit/footerPresets';
 import { renderText } from '../services/submit/naming';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
 
@@ -91,7 +91,8 @@ export function AcademicOptionsScreen() {
   // t is imported (the module-level helpers use it too); this re-renders on a language change.
   useT();
   const { go, previousScreen } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'deliver');
   const cfg = state.deliver.academicConfig;
   const [previewing, setPreviewing] = useState(false);
 

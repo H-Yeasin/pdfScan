@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
 import { importExternalFile, LegacyWordDocError, pruneExternalOpens } from '../services/files/externalFileService';
 import { promoteExternalToLibrary } from '../services/persistence/libraryOperations';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch } from './AppStateContext';
 import { useRouter } from '../navigation/router';
 import { t } from '../i18n';
 
@@ -25,7 +25,7 @@ function isFileUri(uri: string): boolean {
 }
 
 export function useExternalFileLinking(libraryLoaded: boolean): void {
-  const { dispatch } = useAppState();
+  const dispatch = useAppDispatch();
   const { go } = useRouter();
   const handledInitial = useRef(false);
 

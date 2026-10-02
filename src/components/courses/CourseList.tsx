@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { fontFamily, radii, spacing, useTheme } from '../../theme';
 import type { Course } from '../../types/models';
 import { CourseBadge } from './CourseBadge';
@@ -32,7 +32,8 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
   const { tokens } = useTheme();
   // t is imported (pluralFiles uses it too); this re-renders on a language change.
   useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const { courses, files } = state.library;
 
   const [editing, setEditing] = useState<{ course?: Course } | null>(null);

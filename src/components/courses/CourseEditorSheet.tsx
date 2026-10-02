@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-nati
 import { COURSE_EMOJIS, defaultSemester, findSemesterByName, hasErrors, validateCourseDraft } from '../../services/courses/courseSetup';
 import { COURSE_COLORS, courseColorValue, nextCourseColor } from '../../services/courses/palette';
 import { READY_SCRIPTS, getScript, resolveOcrScript } from '../../services/scripts/registry';
-import { useAppState } from '../../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
 import type { Course, CourseColor, OcrScript } from '../../types/models';
 import { createId } from '../../utils/id';
@@ -29,7 +29,8 @@ type SemesterChoice = { kind: 'none' } | { kind: 'existing'; id: string } | { ki
 export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseEditorSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   const { courses, semesters } = state.library;
 
   const [name, setName] = useState('');

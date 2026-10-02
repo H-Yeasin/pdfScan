@@ -21,7 +21,7 @@ import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
 import { docTypeOf } from '../services/courses/docTypes';
 import { startScan } from '../services/courses/startScan';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { DocType } from '../types/models';
 import { useT } from '../i18n/useT';
@@ -34,7 +34,9 @@ export function CourseScreen() {
   const { t } = useT();
   const insets = useSafeAreaInsets();
   const { go, tabHub } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'pack', 'settings');
+  const store = useAppStore();
   const { files, courses, activeCourseId, selection, selMode } = state.library;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   const [editing, setEditing] = useState(false);
@@ -106,7 +108,7 @@ export function CourseScreen() {
   };
 
   const handleScan = () => {
-    startScan(state, dispatch, course?.id ?? null, { launch: true });
+    startScan(store.getState(), dispatch, course?.id ?? null, { launch: true });
     go('capture');
   };
 

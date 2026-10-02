@@ -10,7 +10,7 @@ import { useRouter } from '../navigation/router';
 import { courseColorValue } from '../services/courses/palette';
 import { canUsePageTools } from '../services/documents/formatCapabilities';
 import { cleanCaches, storageReport, type StorageReport } from '../services/storage/usage';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 
 const BIGGEST_COUNT = 10;
@@ -21,7 +21,8 @@ export function StorageScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('capture', 'library');
   const { files, courses, annotations } = state.library;
   const openDocument = useOpenDocument();
   const sessionActive = state.capture.pages.length > 0;

@@ -2,14 +2,15 @@ import { useEffect, useRef } from 'react';
 import { getDb } from '../services/persistence/dbService';
 import { documentIdsInDb } from '../services/persistence/libraryRepo';
 import { findOrphans, repair } from '../services/storage/integrity';
-import { useAppState } from './AppStateContext';
+import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // §8 B1: once per launch, after the library has loaded, checks that every document's files are
 // there and that library/ holds no left-over folders (storage/integrity.ts). In the background,
 // one folder at a time. This also covers every kind of restore (Android Auto Backup, a device
 // transfer, B4): each ends with the app starting again.
 export function useStorageIntegrity(libraryLoaded: boolean): void {
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library');
   const files = useRef(state.library.files);
   files.current = state.library.files;
   const ran = useRef(false);

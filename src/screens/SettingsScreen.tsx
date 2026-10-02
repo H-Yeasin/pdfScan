@@ -13,7 +13,7 @@ import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, systemCatalogId, type Do
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 
@@ -30,7 +30,8 @@ export function SettingsScreen() {
   ];
   const [timetableOpen, setTimetableOpen] = useState(false);
   const { go, hub } = useRouter();
-  const { state, dispatch } = useAppState();
+  const dispatch = useAppDispatch();
+  const state = useAppSlices('library', 'settings');
   // Class times of active courses only: an archived course's classes are over.
   const classCount = state.library.timetable.filter((slot) =>
     state.library.courses.some((c) => c.id === slot.courseId && !c.archived)

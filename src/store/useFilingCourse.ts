@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { suggestCourses } from '../services/courses/suggestCourse';
-import { useAppState } from './AppStateContext';
+import { useAppSlices } from './AppStateContext';
 
 // Which course the current scan session will be saved to, and the ranked alternatives (K5).
 // Shared by Capture's "Saving to" chip and Deliver, so both always agree. A course the student
 // picked (or the course page they scanned from) wins; otherwise it's the top suggestion, computed
 // at the time the session started (capture.startedAt) - or now, before the first page.
 export function useFilingCourse(): { courseId: string | null; suggestions: string[]; automatic: boolean } {
-  const { state } = useAppState();
+  const state = useAppSlices('capture', 'deliver', 'library');
   const { courses, timetable, files } = state.library;
   const { mode, startedAt } = state.capture;
   const { courseId, coursePicked } = state.deliver;

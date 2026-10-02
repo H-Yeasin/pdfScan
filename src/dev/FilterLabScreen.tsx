@@ -19,7 +19,7 @@ import { renderPage } from '../services/enhance/skiaEnhance';
 import { MASTER_PRESET } from '../services/capture/imageSpec';
 import { loadPreviewImage } from '../services/enhance/previewImageCache';
 import { shareFileUri } from '../services/sharing/shareService';
-import { useAppState } from '../store/AppStateContext';
+import { useAppDispatch } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { EnhanceMode, FilterOptions, ImageStats } from '../types/models';
 
@@ -128,7 +128,7 @@ async function exportContactSheet(lab: LabImage, overrides: OverridesByFilter, f
 export function FilterLabScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
-  const { dispatch } = useAppState();
+  const dispatch = useAppDispatch();
   const [lab, setLab] = useState<LabImage | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
