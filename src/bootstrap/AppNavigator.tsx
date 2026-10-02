@@ -21,6 +21,7 @@ import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
+import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
 import { useDeadlineReminders } from '../store/useDeadlines';
 import { useAppState } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
@@ -50,6 +51,7 @@ export function AppNavigator() {
   useSignaturePersistence();
   useExternalFileLinking(libraryLoaded);
   useDeadlineReminders(libraryLoaded);
+  useImportedPdfIndexing(libraryLoaded);
   const { screen, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();

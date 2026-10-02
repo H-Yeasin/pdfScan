@@ -17,6 +17,7 @@ module.exports = {
     '^expo-localization$': '<rootDir>/src/test/mocks/expoLocalization.ts',
     '^@shopify/react-native-skia$': '<rootDir>/src/test/mocks/skia.ts',
     '^react-native-document-scanner-plugin$': '<rootDir>/src/test/mocks/documentScanner.ts',
+    '/modules/pdf-native$': '<rootDir>/src/test/mocks/pdfNative.ts',
     '^@react-native-async-storage/async-storage$':
       '@react-native-async-storage/async-storage/jest/async-storage-mock',
   },

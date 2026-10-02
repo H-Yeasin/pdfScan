@@ -202,16 +202,14 @@ export async function applySignedPage(
 
 // Promotes an ephemerally-opened external file (§4 of the PDF-reader plan) into a real, permanent
 // library document. Branches by format:
-//  - PDF: deliberately does NOT rasterize every page into LibraryPage[] the way a scan does -
-//    there's no general PDF-rasterization path in this app (pdf-lib can't do it, and doing it
-//    page-by-page via the reader engine would be slow for a large import) - so `pages` is a
-//    synthetic stub array sized to match the probed page count purely so FileRow's "N pages" meta
-//    text reads correctly; every entry's fileUri is '' (renders a fallback icon, not a broken image).
+//  - PDF: copied as-is, with one placeholder page per PDF page (sized from the import probe) so
+//    FileRow's "N pages" reads correctly. Thumbnails and text come afterwards from the background
+//    indexer (§7 R1, store/useImportedPdfIndexing → documents/importedPdfIndex), which picks up
+//    any imported PDF whose indexedAt is unset - so saving stays instant even for a 300-page file.
 //  - CSV/TXT: a single synthetic page whose ocr.text holds the whole file's decoded text, reusing
 //    the existing OCR-text search plumbing (buildHaystack, dbService's FTS indexing) for free.
 //  - DOCX/DOC/XLSX/XLS: no text-extraction pipeline exists for these - pages stays empty and search
-//    is filename-only, the same accepted MVP gap as the PDF path above (title-LIKE search still
-//    finds it).
+//    is filename-only (title-LIKE search still finds it).
 export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const dir = getDocumentDir(documentId);
@@ -235,6 +233,8 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
       format: 'PDF',
       mode: 'doc',
       sourceKind: 'imported_pdf',
+      // Its pages are the PDF's pages, one each, no cover (documents/pageMap).
+      pdfLayout: 'standard',
       pages,
       pdfUri: dest.uri,
       sizeBytes: dest.size ?? 0,

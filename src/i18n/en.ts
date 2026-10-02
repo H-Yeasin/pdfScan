@@ -305,6 +305,13 @@ export const en = {
     loadFailed: "Couldn't load library",
     importedFile: 'Imported file',
     selectedFolder: 'Selected folder',
+    // §7 R1: an imported PDF's thumbnails and search text.
+    index: {
+      reading: 'Reading pages for search… {done}/{total}',
+      partial: 'Search covers the first {count} pages',
+      encrypted: 'Password-protected: not searchable',
+      failed: "Couldn't read this PDF's pages",
+    },
   },
 
   reader: {

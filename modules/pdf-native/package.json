@@ -1,0 +1,8 @@
+{
+  "name": "pdf-native",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Expo module: PDF page count, size, rendering and text with word boxes (§7 R1)",
+  "main": "index.ts",
+  "license": "MIT"
+}

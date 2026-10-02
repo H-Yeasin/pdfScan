@@ -7,6 +7,7 @@ import type {
   DocFormat,
   DocType,
   CaptureMode,
+  IndexState,
   LibraryDocument,
   LibraryPage,
   PageOcr,
@@ -42,6 +43,8 @@ type DocumentRow = {
   archived: number;
   pdf_layout: string | null;
   pdf_page_size: string | null;
+  indexed_at: number | null;
+  index_state: string | null;
 };
 
 type PageRow = {
@@ -57,6 +60,7 @@ type PageRow = {
   ocr_json: string | null;
   ocr_failed: number;
   layout: string | null;
+  text_source: string | null;
 };
 
 type CourseRow = {
@@ -167,8 +171,11 @@ function rowToPage(row: PageRow): LibraryPage {
     ocr: parseOcr(row.ocr_text, row.ocr_json),
     ocrFailed: row.ocr_failed ? true : undefined,
     layout: row.layout === 'fullPage' ? 'fullPage' : undefined,
+    textSource: row.text_source === 'pdf' || row.text_source === 'ocr' ? row.text_source : undefined,
   };
 }
+
+const INDEX_STATES: readonly IndexState[] = ['done', 'partial', 'encrypted', 'failed'];
 
 function rowToCourse(row: CourseRow): Course {
   return {
@@ -242,6 +249,8 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       archived: row.archived ? true : undefined,
       pdfLayout: row.pdf_layout === '2_in_1' || row.pdf_layout === 'standard' ? row.pdf_layout : undefined,
       pdfPageSize: row.pdf_page_size === 'Letter' || row.pdf_page_size === 'A4' ? row.pdf_page_size : undefined,
+      indexedAt: row.indexed_at ?? undefined,
+      indexState: INDEX_STATES.includes(row.index_state as IndexState) ? (row.index_state as IndexState) : undefined,
     };
   });
 
@@ -427,10 +436,13 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
     doc.archived ? 1 : 0,
     doc.pdfLayout ?? null,
     doc.pdfPageSize ?? null,
+    doc.indexedAt ?? null,
+    doc.indexState ?? null,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
-       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size,
+       indexed_at, index_state)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -441,7 +453,8 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
          size_bytes = excluded.size_bytes, updated_at = excluded.updated_at, star = excluded.star,
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
-         archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size`,
+         archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size,
+         indexed_at = excluded.indexed_at, index_state = excluded.index_state`,
       params
     );
     await db.runAsync('DELETE FROM pages WHERE document_id = ?', [doc.id]);
@@ -449,8 +462,8 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
 
   const pageStmt = await db.prepareAsync(
     `INSERT INTO pages (id, document_id, idx, master_path, display_path, thumb_path, width, height, ocr_text,
-       ocr_json, ocr_failed, layout)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ocr_json, ocr_failed, layout, text_source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   try {
     for (let i = 0; i < doc.pages.length; i++) {
@@ -468,6 +481,7 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
         page.ocr && page.ocr.blocks.length > 0 ? JSON.stringify(page.ocr) : null,
         page.ocrFailed ? 1 : 0,
         page.layout ?? null,
+        page.textSource ?? null,
       ]);
     }
   } finally {

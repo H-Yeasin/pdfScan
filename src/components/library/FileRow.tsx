@@ -6,6 +6,8 @@ import { formatBytes, formatRelativeDate } from '../../utils/format';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import { FileTypeIcon } from './FileTypeIcon';
 import { useT } from '../../i18n/useT';
+import { useAppState } from '../../store/AppStateContext';
+import { INDEX_MAX_PAGES } from '../../services/documents/importedPdfIndex';
 
 
 const LONG_PRESS_MS = 400;
@@ -27,6 +29,7 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
   const { tokens } = useTheme();
   const { t } = useT();
   const cover = doc.pages[0];
+  const indexNote = useIndexNote(doc);
 
   return (
     <Pressable
@@ -39,8 +42,8 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
       ]}
     >
       <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
-        {cover?.fileUri ? (
-          <Image source={{ uri: cover.thumbUri ?? cover.fileUri }} style={styles.coverImage} resizeMode="cover" />
+        {cover?.thumbUri || cover?.fileUri ? (
+          <Image source={{ uri: cover.thumbUri || cover.fileUri }} style={styles.coverImage} resizeMode="cover" />
         ) : (
           <FileTypeIcon format={doc.format} size={18} />
         )}
@@ -69,6 +72,11 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
           · {formatBytes(doc.sizeBytes)} · {formatRelativeDate(doc.createdAt)}
           {doc.archived ? t('library.archivedSuffix') : ''}
         </Text>
+        {indexNote ? (
+          <Text style={[styles.meta, { color: tokens.muted }]} numberOfLines={1}>
+            {indexNote}
+          </Text>
+        ) : null}
         {matchSnippet ? (
           <Text style={[styles.snippet, { color: tokens.accentInk }]} numberOfLines={1}>
             “…{matchSnippet}…”
@@ -146,3 +154,23 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
 });
+
+// §7 R1: what search covers in an imported PDF - while it's being read, and when it couldn't be
+// read in full. Nothing for a fully indexed PDF or any other document.
+function useIndexNote(doc: LibraryDocument): string | null {
+  const { state } = useAppState();
+  const { t } = useT();
+  if (doc.sourceKind !== 'imported_pdf') return null;
+  const progress = state.library.indexing;
+  if (progress?.documentId === doc.id) return t('library.index.reading', { done: progress.done, total: progress.total });
+  switch (doc.indexState) {
+    case 'partial':
+      return t('library.index.partial', { count: INDEX_MAX_PAGES });
+    case 'encrypted':
+      return t('library.index.encrypted');
+    case 'failed':
+      return t('library.index.failed');
+    default:
+      return null;
+  }
+}

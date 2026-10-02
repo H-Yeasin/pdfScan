@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.pdfnative'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.pdfnative"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Text extraction with character boxes (PdfRenderer has none). Pinned to the version
+  // react-native-pdf-jsi already brings in, so the app ships one copy of pdfium's native library.
+  implementation 'io.legere:pdfiumandroid:1.0.32'
+}

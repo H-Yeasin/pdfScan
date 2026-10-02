@@ -253,6 +253,20 @@ export const MIGRATIONS: Migration[] = [
       await db.execAsync('ALTER TABLE courses ADD COLUMN ocr_script TEXT;');
     },
   },
+  {
+    // v13 (§7 R1): imported PDFs get real page rows. pages.text_source says where a page's text
+    // came from ('pdf' text layer | 'ocr'; NULL for scans, which are always OCR).
+    // documents.indexed_at / index_state record that an imported PDF was indexed and how; NULL
+    // means "not yet", which the background indexer picks up (documents saved before R1 included).
+    version: 13,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE pages ADD COLUMN text_source TEXT;
+        ALTER TABLE documents ADD COLUMN indexed_at INTEGER;
+        ALTER TABLE documents ADD COLUMN index_state TEXT;
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

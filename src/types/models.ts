@@ -113,7 +113,16 @@ export type LibraryPage = {
   // True when OCR ran at save time and failed (as opposed to finding no text), so the reader can
   // offer "Retry OCR" later.
   ocrFailed?: boolean;
+  // §7 R1: where `ocr` came from. 'pdf': the text layer of an imported PDF (exact, nothing was
+  // recognised); 'ocr': recognised from pixels. Undefined: a scan (always OCR) or no text yet.
+  textSource?: 'ocr' | 'pdf';
 };
+
+// §7 R1: how far an imported PDF's pages were read for thumbnails and search.
+// 'done': every page. 'partial': only the first INDEX_MAX_PAGES (a very long file). 'encrypted':
+// none - it needs a password (it still opens in the Reader). 'failed': none - the file couldn't
+// be read.
+export type IndexState = 'done' | 'partial' | 'encrypted' | 'failed';
 
 export type LibraryDocument = {
   id: string;
@@ -153,8 +162,9 @@ export type LibraryDocument = {
   coverKind?: 'template' | 'imported_image';
   // undefined ≡ 'scanned' (every document saved before this field existed, or made via the
   // capture pipeline). 'imported_pdf' marks a document promoted from an externally-opened PDF
-  // (see promoteExternalToLibrary in libraryOperations.ts) — its `pages` array is a single
-  // synthetic entry, not one real image per PDF page, so page-count/Sign/etc. must branch on this.
+  // (see promoteExternalToLibrary in libraryOperations.ts). Its pages map 1:1 to the PDF's pages,
+  // but have no master image (fileUri ''): §7 R1 gives them a thumbnail and the page's text, and
+  // masters are rendered on demand. Sign/Submit/etc. must branch on this.
   sourceKind?: 'scanned' | 'imported_pdf';
   // §5 T1: how document.pdf was laid out, written by every build, so a library page can be
   // mapped to its PDF page and rectangle (documents/pageMap.ts). Undefined: not known yet (built
@@ -164,6 +174,11 @@ export type LibraryDocument = {
   // §3 K6: put away. Hidden from lists (behind "Show archived") but still found by search; it
   // stays in its course. Undefined = not archived.
   archived?: boolean;
+  // §7 R1, imported PDFs only: when indexing finished (whatever the outcome) and how it went.
+  // Undefined: not indexed yet - the background indexer (store/useImportedPdfIndexing) picks it
+  // up, resuming after the pages that already have a thumbnail.
+  indexedAt?: number;
+  indexState?: IndexState;
 };
 
 // A file opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —

@@ -42,7 +42,11 @@ export type LibraryState = {
   searchOpen: boolean;
   // null = no active DB-backed search result; fall back to the in-memory haystack filter.
   searchResultIds: string[] | null;
+  // §7 R1: the imported PDF being indexed in the background, and how far it is. UI-only.
+  indexing: IndexingProgress | null;
 };
+
+export type IndexingProgress = { documentId: string; done: number; total: number };
 
 export const initialLibraryState: LibraryState = {
   loadStatus: 'loading',
@@ -64,6 +68,7 @@ export const initialLibraryState: LibraryState = {
   search: '',
   searchOpen: false,
   searchResultIds: null,
+  indexing: null,
 };
 
 export type LibraryAction =
@@ -116,7 +121,8 @@ export type LibraryAction =
   | { type: 'library/REMOVE_SLOT'; id: string }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_DOC_TYPE'; ids: string[]; docType: DocType }
-  | { type: 'library/SET_ACTIVE_COURSE'; id: string | null };
+  | { type: 'library/SET_ACTIVE_COURSE'; id: string | null }
+  | { type: 'library/SET_INDEXING'; progress: IndexingProgress | null };
 
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
 // creation time.
@@ -144,6 +150,8 @@ function reorder(courses: Course[], ids: string[]): Course[] {
 
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
+    case 'library/SET_INDEXING':
+      return { ...state, indexing: action.progress };
     case 'library/SET_LOAD_STATUS':
       return { ...state, loadStatus: action.status };
     case 'library/RETRY_LOAD':
