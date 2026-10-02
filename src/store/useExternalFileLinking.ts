@@ -16,6 +16,14 @@ import { t } from '../i18n';
 // sequencing tidy - opening an external file never touches state.library.files itself, so nothing
 // would actually break by racing ahead of library load; this just avoids a nav jump firing before
 // the rest of the app's state has settled.
+// Only file handoffs are ours to open. Linking also delivers the app's own deep links - in a dev
+// build the launch URL is `exp+<slug>://expo-development-client/?url=...` - and passing those to
+// importExternalFile throws (expo-file-system: 'URI scheme is not "file"') and shows a bogus
+// "couldn't open" snackbar on every boot.
+function isFileUri(uri: string): boolean {
+  return /^(file|content):\/\//i.test(uri);
+}
+
 export function useExternalFileLinking(libraryLoaded: boolean): void {
   const { dispatch } = useAppState();
   const { go } = useRouter();
@@ -23,6 +31,7 @@ export function useExternalFileLinking(libraryLoaded: boolean): void {
 
   const openUri = useCallback(
     async (uri: string) => {
+      if (!isFileUri(uri)) return;
       try {
         const ext = await importExternalFile(uri);
         // Promoted straight to the Library (not left as an ephemeral SET_EXTERNAL view) so a file

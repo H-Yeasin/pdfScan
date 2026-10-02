@@ -1,0 +1,18 @@
+<lint-module
+    format="1"
+    dir="/Users/yeasin/Projects/flutter/pdfScan/modules/pdf-native/android"
+    name=":pdf-native"
+    type="LIBRARY"
+    maven="expo.modules.pdfnative:pdf-native:1.0.0"
+    agpVersion="8.12.0"
+    buildFolder="build"
+    bootClassPath="/Users/yeasin/Library/Android/sdk/platforms/android-36/android.jar:/Users/yeasin/Library/Android/sdk/build-tools/35.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-36"
+    neverShrinking="true">
+  <lintOptions
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>
