@@ -77,4 +77,21 @@ describe('OnboardingScreen', () => {
     act(() => inputWithPlaceholder(root, 'e.g. Rahim Uddin').props.onChangeText('Nusrat'));
     expect(root.root.findAll((n) => n.props.children === '2021331045_Nusrat_CSE101_HW1.pdf').length).toBeGreaterThan(0);
   });
+
+  it('builds the student card as they type', () => {
+    const { root } = render();
+    const texts = () =>
+      root.root.findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string').map((n) => n.props.children as string);
+    expect(texts()).toContain('Your name');
+    expect(texts()).toContain('1 of 4 done');
+
+    act(() => inputWithPlaceholder(root, 'e.g. Rahim Uddin').props.onChangeText('Nusrat Jahan'));
+    expect(texts()).toEqual(expect.arrayContaining(['Nusrat Jahan', 'NJ', '2 of 4 done']));
+
+    press(root, 'Next');
+    press(root, 'Next');
+    const names = root.root.findAll((n) => n.type === TextInput && n.props.autoCapitalize === 'words');
+    act(() => names[names.length - 4].props.onChangeText('Chemistry'));
+    expect(texts()).toEqual(expect.arrayContaining(['Chemistry', '3 of 4 done']));
+  });
 });

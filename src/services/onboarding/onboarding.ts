@@ -35,3 +35,55 @@ export function exampleFileName(profile: Pick<StudentProfile, 'name' | 'roll'>, 
   });
   return `${file}.pdf`;
 }
+
+// The student card on onboarding's "About you" and "Your courses" pages: it fills in as the
+// student types, so setting up feels like making something of their own rather than a form. The
+// semester comes pre-filled, so the card starts a quarter done - a head start makes finishing
+// more likely (the endowed-progress effect).
+export type StudentCardStep = 'semester' | 'name' | 'roll' | 'courses';
+
+export type StudentCard = {
+  initials: string;
+  name: string;
+  roll: string;
+  semester: string;
+  // Labels to show as chips: the code when there is one, else the name.
+  courses: { label: string; color: string }[];
+  steps: Record<StudentCardStep, boolean>;
+  done: number;
+  total: number;
+};
+
+export function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  const first = Array.from(words[0])[0] ?? '';
+  const last = words.length > 1 ? (Array.from(words[words.length - 1])[0] ?? '') : '';
+  return (first + last).toUpperCase();
+}
+
+export function studentCard(input: {
+  profile: Pick<StudentProfile, 'name' | 'roll'>;
+  semester: string;
+  // Course rows as typed (blank rows are skipped) and the colour each will get.
+  rows: readonly { name: string; code: string }[];
+  rowColors: readonly string[];
+}): StudentCard {
+  const name = input.profile.name.trim();
+  const roll = input.profile.roll.trim();
+  const semester = input.semester.trim();
+  const courses = input.rows
+    .map((row, i) => ({ label: row.code.trim() || row.name.trim(), color: input.rowColors[i] }))
+    .filter((c) => c.label);
+  const steps = { semester: !!semester, name: !!name, roll: !!roll, courses: courses.length > 0 };
+  return {
+    initials: initialsOf(name),
+    name,
+    roll,
+    semester,
+    courses,
+    steps,
+    done: Object.values(steps).filter(Boolean).length,
+    total: Object.keys(steps).length,
+  };
+}

@@ -966,6 +966,20 @@ export const en = {
       title: 'Your courses',
       body: "Optional. Add this term's courses, and every scan can be filed under one.",
     },
+    // The student card that fills in as they type (onboarding.studentCard).
+    card: {
+      label: 'PDF Scan · Student card',
+      namePlaceholder: 'Your name',
+      rollPlaceholder: 'Roll number',
+      roll: 'Roll {roll}',
+      coursesPlaceholder: 'Your courses appear here',
+      more: '+{count}',
+      progress: '{done} of {total} done',
+      ready: 'Your card is ready',
+      a11y: 'Student card. {name}. {roll}. {courses}. {progress}.',
+      a11yCourses: { one: '{count} course', other: '{count} courses' },
+      a11yNoCourses: 'No courses yet',
+    },
   },
 
   // §8 B3: backups and exports.

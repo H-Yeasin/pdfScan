@@ -1,5 +1,5 @@
 import { savableQuickSetup } from '../../courses/courseSetup';
-import { afterOnboarding, exampleFileName, onboardingDecision } from '../onboarding';
+import { afterOnboarding, exampleFileName, initialsOf, onboardingDecision, studentCard } from '../onboarding';
 import type { Course } from '../../../types/models';
 
 describe('onboardingDecision', () => {
@@ -59,5 +59,43 @@ describe('savableQuickSetup (what Skip saves)', () => {
   it('a blank semester takes the default, nothing typed saves nothing', () => {
     expect(savableQuickSetup([{ name: 'Art', code: '' }], '  ', [], [], now).semesterName).not.toBe('');
     expect(savableQuickSetup([{ name: '', code: '' }], 'Fall', [], [], now).rows).toEqual([]);
+  });
+});
+
+describe('studentCard', () => {
+  const empty = { profile: { name: '', roll: '' }, semester: 'Fall 2026', rows: [], rowColors: [] };
+
+  it('starts a quarter done: the semester is filled in for them', () => {
+    const card = studentCard(empty);
+    expect(card).toMatchObject({ done: 1, total: 4, initials: '', courses: [] });
+    expect(card.steps).toEqual({ semester: true, name: false, roll: false, courses: false });
+  });
+
+  it('fills in as they type, and is ready with a name, a roll and a course', () => {
+    const card = studentCard({
+      ...empty,
+      profile: { name: '  Nusrat Jahan ', roll: '2021331045' },
+      rows: [
+        { name: 'Programming', code: 'CSE 101' },
+        { name: '', code: '' },
+        { name: 'Physics', code: '' },
+      ],
+      rowColors: ['#111', '#222', '#333'],
+    });
+    expect(card.initials).toBe('NJ');
+    expect(card.name).toBe('Nusrat Jahan');
+    // Blank rows are skipped; each course keeps the colour it'll be saved with.
+    expect(card.courses).toEqual([
+      { label: 'CSE 101', color: '#111' },
+      { label: 'Physics', color: '#333' },
+    ]);
+    expect(card.done).toBe(card.total);
+  });
+
+  it('takes initials from the first and last word, in any script', () => {
+    expect(initialsOf('rahim')).toBe('R');
+    expect(initialsOf('Md. Rahim Uddin')).toBe('MU');
+    expect(initialsOf('রহিম উদ্দিন')).toBe('রউ');
+    expect(initialsOf('   ')).toBe('');
   });
 });

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -19,7 +19,9 @@ import { SettingRow } from '../components/settings/SettingRow';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { useBackHandler } from '../navigation/useBackHandler';
-import { afterOnboarding, exampleFileName } from '../services/onboarding/onboarding';
+import { StudentCard } from '../components/onboarding/StudentCard';
+import { courseColorValue } from '../services/courses/palette';
+import { afterOnboarding, exampleFileName, studentCard } from '../services/onboarding/onboarding';
 import { useAppDispatch, useAppSelector } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, useTheme } from '../theme';
 
@@ -40,6 +42,17 @@ export function OnboardingScreen() {
   const crashReportsEnabled = useAppSelector((s) => s.settings.crashReportsEnabled);
   const hasActiveCourse = useAppSelector((s) => s.library.courses.some((c) => !c.archived));
   const form = useCourseSetupForm();
+  // The card the student builds across "About you" and "Your courses" (studentCard).
+  const card = useMemo(
+    () =>
+      studentCard({
+        profile,
+        semester: form.semesterName,
+        rows: form.rows,
+        rowColors: form.colors.map((color) => courseColorValue(color, tokens)),
+      }),
+    [profile, form.semesterName, form.rows, form.colors, tokens]
+  );
   const [page, setPage] = useState(0);
   const pager = useRef<ScrollView>(null);
 
@@ -114,6 +127,7 @@ export function OnboardingScreen() {
           <ScrollView style={{ width }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, { color: tokens.ink }]}>{t('onboarding.you.title')}</Text>
             <Text style={[styles.body, { color: tokens.muted }]}>{t('onboarding.you.body')}</Text>
+            <StudentCard card={card} />
             <NameField
               label={t('settings.profile.name')}
               placeholder={t('settings.profile.namePlaceholder')}
@@ -137,6 +151,7 @@ export function OnboardingScreen() {
           <ScrollView style={{ width }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
             <Text style={[styles.title, { color: tokens.ink }]}>{t('onboarding.courses.title')}</Text>
             <Text style={[styles.body, { color: tokens.muted }]}>{t('onboarding.courses.body')}</Text>
+            <StudentCard card={card} />
             <CourseSetupFields form={form} autoFocus={false} />
             <SettingRow
               title={t('settings.privacy.crashReports')}
