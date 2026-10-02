@@ -195,7 +195,8 @@ Status: todo
 is two taps away.
 
 ### R5 · Office formats: read-only, safe, honest *(S)*
-Status: todo
+Status: in progress: everything but the SheetJS swap is done in code (commit 2e00ceb). **Open:** the
+`xlsx` 0.20.3 tarball (cdn.sheetjs.com was blocked from the session that built this); device checks
 
 - **Security:** replace `xlsx@0.18.5` (npm) with SheetJS **0.20.3** from
   `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (the official distribution) in
@@ -219,6 +220,36 @@ Status: todo
 
 **Done when:** every format the app accepts can be opened, nothing it advertises fails, and
 `npm audit` shows no `xlsx` advisories.
+
+**As built:**
+- **SheetJS swap not done yet.** `package.json` still has `xlsx@^0.18.5`: the build session
+  couldn't reach `cdn.sheetjs.com`, and pointing `package.json` at the tarball without
+  updating the lockfile would break `npm ci`. To finish, run
+  `npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` with that host reachable,
+  re-run `npm test` (the sheet tests write and read real XLSX/XLS files) and `npm audit`. The
+  code only uses `read`, `utils.sheet_to_json`, `decode_cell` and `encode_range`, which 0.20.3
+  keeps.
+- Parsing moved from `SheetView` to `documents/sheetService.ts` (`loadSheets`, caps
+  `SHEET_MAX_BYTES` / `SHEET_MAX_CELLS`, `PreviewTooLargeError`). The cell cap counts
+  non-empty cells. Rows are built from A1 to the last real cell, so a stray formatted cell at
+  XFD1048576 can't blow up the row list. Cells are read as displayed (`raw: false`), without
+  formulas, styles, HTML or macros.
+- DOCX: `documents/docxService.ts` + `components/reader/DocxView.tsx`. Besides JavaScript off
+  and `originWhitelist` limited to `about:blank`, every navigation is refused
+  (`onShouldStartLoadWithRequest`), file access is off, and the page has a CSP
+  (`default-src 'none'; img-src data:; style-src 'unsafe-inline'`). DOCX gets its own 20 MB
+  cap (embedded photos are inlined, not parsed). No in-reader Find for DOCX (it would need
+  JavaScript in the page). The text goes into a single synthetic page when the file joins the
+  library, like CSV/TXT. mammoth bundles for Android (`expo export`, via its browser build); it
+  hasn't been tried on a device yet.
+- `.doc`: `DocFormat` keeps `'DOC'` only for documents added before; `detectDocFormat` never
+  returns it, `importExternalFile` throws `LegacyWordDocError` (snack: the Google Docs
+  message), and the Reader shows the same message for an old DOC document.
+- Picker and intent filters: `formatCapabilities.OPENABLE_FORMATS` / `PICKER_MIME_TYPES` (plus
+  the `text/comma-separated-values` alias). `app.json` VIEW registers all six formats; SEND
+  registers all of them except `text/plain`, because SEND `text/plain` is how apps share plain
+  text snippets, not files. A test checks the picker list and the VIEW filter against
+  `OPENABLE_FORMATS`.
 
 ### R6 · Real PDF passwords *(L — later, with Pro in §10)*
 Status: later

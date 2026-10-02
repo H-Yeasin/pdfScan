@@ -189,7 +189,7 @@ Goal: fix the gaps and risks in the existing tools; no new tool families.
 - [ ] R2 Page-level tools for imported PDFs (merge, split, sign, submit) without losing vector text
 - [ ] R3 Edit pages after saving (reorder, lossless rotate, delete, extract, add pages)
 - [ ] R4 Reader conveniences (resume at last page, page jump, thumbnail scrubber)
-- [ ] R5 Office formats read-only, safe and honest (fixed SheetJS, DOCX preview, drop .doc)
+- [ ] R5 Office formats read-only, safe and honest (fixed SheetJS, DOCX preview, drop .doc) — in progress: all but the SheetJS 0.20.3 swap
 - [ ] R6 *(Later, with Pro)* Real PDF passwords
 
 **Done when:** a teacher's PDF can be searched, merged with a scanned answer, signed and
