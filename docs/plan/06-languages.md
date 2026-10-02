@@ -210,7 +210,7 @@ the names can be found by search in the PDF, and an English-only cover is unchan
   `ocr/__tests__/fakeScript.test.ts`, and the updated `coverTemplates` script test.
 
 ### L4 · UI translation layer, English only *(M, split into 4 sessions)*
-Status: L4a done (commit 8de31f8), L4b done (commit 519540d); L4c–L4d todo
+Status: L4a done (commit 8de31f8), L4b done (commit 519540d), L4c done (commit 10c1b6b); L4d todo
 
 - **L4a: infrastructure plus Settings and Home.**
   - Add `expo-localization@~57` (check the version in the package source).
@@ -291,6 +291,30 @@ strings, and adding `bn.ts` later only means adding that file (and its registry 
   are L4d.
 - Tests: `i18n/__tests__/serviceStrings.test.ts` (every mode/filter key resolves; service
   messages switch with the language).
+
+**As built (L4c):**
+- Converted: `DeliverScreen`, `AcademicOptionsScreen`, everything in `components/deliver`,
+  `components/submit` and `components/deadlines` (181 strings in 32 files left).
+- **Document text** is under `document.*` and read with `tDoc()` (index.ts) in the document
+  language: cover labels and layout text (`coverTemplates`), the cover date (`{day} {month}
+  {year}`, month from Intl in the document locale), the "Assignment 3" type label, footer
+  presets (`footerPresetText(preset)` replaces `FOOTER_PRESET_TEXT`; `footerPresetOf` also
+  recognises the English text), the `{type}` file name token (`naming.ts`, and the deadline
+  title suggestion), the default `Scan_<date>` name, the exam pack's default title, footer and
+  contents page.
+- `settings.documentLanguage: 'ui' | CatalogId` (default `'ui'`: follows the UI language,
+  pseudo-locale included), stored in `app:settings`, applied by `useSettingsPersistence`
+  (`setDocumentLanguage`), with a "Document language" section in Settings.
+- `formatNumber` / `formatDate` take an optional locale (documents pass `getDocumentLocale()`).
+- Cover templates and fields carry catalog keys (`CoverTemplate.labelKey`,
+  `COVER_FIELD_LABELS` → `TKey`). `DocTypeSpec.label/plural` are still English (UI uses are
+  L4d); documents no longer read them.
+- Services converted: `preset.summarizePreset`, `sizeTarget.formatLimit` / `tooLargeMessage`,
+  `history.submittedSummary`, `deadlines.formatDue` and the reminder notification text and
+  channel name, `submitDocument` progress. The exam pack's progress messages are L4d (with
+  `ExamPackScreen`).
+- Tests: `i18n/__tests__/documentLanguage.test.ts` (document text follows the UI by default and
+  stays English when pinned, under the pseudo-locale UI).
 
 ### L5 · Tesseract engine (for Bangla) *(L — later, phase P4)*
 Status: later (do it when Bangla is scheduled)
