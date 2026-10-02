@@ -63,7 +63,7 @@ all.)
 ## Steps
 
 ### L1 · Script registry v2 and per-course recognition language *(S)*
-Status: todo
+Status: done (commit 8dc13df); device check open
 
 - `services/scripts/registry.ts`:
   - `ScriptEntry = { id, label, nativeName, engine: 'mlkit' | 'tesseract', model, status: 'ready' | 'planned', sampleText, direction: 'ltr' }`.
@@ -85,6 +85,22 @@ Status: todo
 
 **Done when:** a course set to Chinese OCRs its scans with the Chinese model while other courses
 use the default, and Settings shows Bangla as "coming soon".
+
+**As built:**
+- The registry is `SCRIPTS = [...] as const satisfies readonly ScriptDefinition[]`; it doesn't
+  import `types/models.ts` (which re-exports `OcrScript` from it). Also exports
+  `PLANNED_SCRIPTS`, `DEFAULT_OCR_SCRIPT` ('latin'), `getScript`, `parseOcrScript` (DB values;
+  keeps planned ids, drops unknown ones) and `isReadyScript`. `resolveOcrScript` lives there too.
+- Callers: `CaptureScreen` and `DeliverScreen` resolve with the filing course they already have;
+  `ReviewScreen` uses the new `store/useScanOcrScript()` (filing course + settings); the reader's
+  `SelectTextSheet` re-OCR uses the document's own course.
+- `runOcr` returns `undefined` for any script that isn't a ready ML Kit entry, until L2's
+  engine dispatch replaces that guard.
+- Settings: the section is "Recognition language"; rows show native name, then label and sample
+  text; planned scripts are greyed, non-selectable rows marked "Coming soon". The course editor's
+  chips are "App default (<native name>)" plus each ready script's native name.
+- Tests: `scripts/__tests__/registry.test.ts`, `ocr/__tests__/ocrService.test.ts`, and two
+  course-script cases in `libraryRepo.test.ts`.
 
 ### L2 · `OcrEngine` interface *(M)*
 Status: todo
