@@ -226,14 +226,21 @@ Goal: a good first five minutes, and an app that is fast and usable for everyone
 reaches their first scan in under 90 s, and a TalkBack user can scan and submit.
 
 ### §10 Monetization
-Free forever: scan, all filters, OCR, Submit, courses, search, no watermark, no ads.
+Free forever: scan, all filters, OCR in every language, Submit, courses, search, study tools
+(annotations, bookmarks, exam packs), backups to a file or folder. No watermark, no ads.
 
-**Pro** (one-time purchase plus an optional cheap yearly plan, student pricing):
-- Drive backup and sync between devices
-- Unlimited "Exam packs" and annotations export
-- App lock (biometric) and real PDF encryption
-- Extra cover templates and themes
-- *(Later)* Extra OCR language packs
+**Pro** (decided 2026-10-02: a one-time lifetime unlock plus a cheap yearly plan, student
+pricing): Google Drive backup (§8 B6), app lock, real PDF passwords (§7 R6), extra cover
+templates and theme accents.
+
+**Detailed steps:** [`docs/plan/10-monetization.md`](plan/10-monetization.md)
+
+- [ ] M1 Entitlements and the Pro feature registry (a test guards the free list)
+- [ ] M2 Google Play Billing with `expo-iap` (lifetime + yearly, restore, pending payments)
+- [ ] M3 App lock (Pro)
+- [ ] M4 Extra cover templates and theme accents (Pro)
+- [ ] M5 Pro screen with store prices, and gentle entry points only
+- [ ] M6 Launch rules: turn Pro on only with Drive backup or PDF passwords live
 
 Rule: never take away a feature that was free.
 
@@ -277,11 +284,11 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 1. App name and brand (app ID decided: `com.yeasin.pdfscan`): keep "PDF Scan" (generic, hard to rank) or pick a student-flavoured name?
 2. Target region for launch and store listing languages.
 3. iOS: launch with Android first, or both at once?
-4. Pro pricing model: one-time, yearly, or both?
+4. ~~Pro pricing model~~ Decided: one-time lifetime + yearly; study tools stay free.
 5. ~~Crash reporting vendor~~ Decided: Sentry, opt-in.
 
 ---
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. Next to plan: §10 Monetization (`docs/plan/10-monetization.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. Next to plan: §11 Launch and growth (`docs/plan/11-launch.md`).

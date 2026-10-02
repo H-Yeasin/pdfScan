@@ -19,7 +19,8 @@ code **when the section was planned**, and are kept as history.
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
 | §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | Planned (2026-10-02). B1 first; B6 (Google Drive) waits for Pro. |
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | Planned (2026-10-02). O1 first (Android back button exits the app today). |
-| §10 Monetization and later | — | — | Not planned yet. Next to plan: `docs/plan/10-monetization.md` (see `docs/PLAN.md` §10). |
+| §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M6 | Planned (2026-10-02). Pro launches with §8 B6 or §7 R6 (see M6). |
+| §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
 
 ## Phases (from `docs/PLAN.md` §5)
 
