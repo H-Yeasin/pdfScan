@@ -132,7 +132,7 @@ Status: done (commit 6c75dfa); needs a new dev build for `expo-secure-store`.
   grants or ends a 24-hour pass.
 
 ### M4 · Pro features worth a pass: cover templates, accents, app lock *(M)* (the old M3 + M4)
-Status: todo
+Status: done in code (commit 1b97805); needs a new dev build and the device checks.
 
 - 3 Pro cover templates (Formal, University with an institution logo, Minimal) in
   `pdf/coverTemplates.ts`; 4 accent palettes in `theme/tokens.ts` passing the §9 contrast test.
@@ -141,6 +141,38 @@ Status: todo
   "Open with" intents also need the unlock.
 - Free users see them marked with `ProBadge`; choosing one offers the day pass (M6).
 - Tests as in the old M3/M4.
+- **As built:** Status: done in code (commit 1b97805); needs a new dev build
+  (`expo-local-authentication`, `expo-screen-capture`) and the device checks below.
+  - Covers: `formal` (institution + department over a double rule, supervisor row),
+    `university` (logo top centre), `minimal` (large left-aligned title, details on the bottom
+    margin), each `pro: true` with a `freeFallback` (Assignment, Assignment, Simple).
+    `coverTemplateFor` / `allowedCover` apply the fallback when Pro has ended: Deliver
+    (`useResolvedAcademicConfig`) and Submit (`proCovers`) draw the free template; rebuilding a
+    lost submission file (`history.ensureSubmissionFile`) keeps the Pro one, and covers already
+    in documents are page images, so they never change. New cover item `image` (fitted, skipped
+    if unreadable) in `pdfService`, `academicRasterService` and `CoverThumbnail`.
+  - Logo: `services/submit/institutionLogo.ts`, a 600 px PNG in `documents/profile/`,
+    `settings.institutionLogo` = its file name (not a path). Adding one is free (Settings →
+    Profile); it isn't in backup zips.
+  - Accents: `ACCENTS` / `themeTokens` in `theme/tokens.ts` (teal + ocean, plum, rose, amber; only
+    the four accent tokens change). The choice lives in `ThemeProvider` (`accentPref`, persisted
+    in `app:settings` like `themePref`); `accent` falls back to teal without Pro. Settings →
+    Appearance `AccentPicker`.
+  - App lock: rules in `services/security/appLock.ts` (pure), applied by `store/useAppLock.ts`;
+    `components/security/AppLockGate.tsx` wraps AppNavigator's screens and hosts, so nothing
+    (an "Open with" file included) renders until unlocked; Back exits while locked. Settings in
+    `settings.appLock` (`enabled`, `after` 'immediately' | '1min' (default) | '5min',
+    `hideInRecents`, Android only: FLAG_SECURE, which also blocks screenshots). Turning on needs
+    Pro, a screen lock on the phone and a successful unlock; turning off needs the unlock too.
+    A phone with no screen lock any more opens rather than locking the student out. The
+    unlock's own trip to the background (Android's PIN screen) doesn't count. Leaving for the
+    document scanner or a picker does count, so "Right away" asks after each scan (said in the
+    hint).
+  - `useOfferPro` (components/pro): picking a Pro feature without Pro shows an alert that it is
+    part of Pro and that a free way to try it is coming; M6 swaps it for the pass offer.
+    `SettingRow` takes `proBadge`.
+  - Device checks open: unlock with fingerprint and with PIN; lock timing; "Open with" while
+    locked; recent apps card blank with "Hide in recent apps"; University logo in the PDF.
 
 ### M5 · Banner ads, light and safe *(M)*
 Status: todo

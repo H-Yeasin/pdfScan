@@ -244,7 +244,7 @@ exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no
 - [x] M1 Policy and privacy groundwork (target audience 13+, Data safety, privacy policy, toggles)
 - [x] M2 Firebase Remote Config, no login (ads switch, pass length, support contact)
 - [x] M3 Pro feature registry and entitlements (pass / lifetime / yearly; a test guards the free list)
-- [ ] M4 Pro features worth a pass: cover templates, theme accents, app lock
+- [x] M4 Pro features worth a pass: cover templates, theme accents, app lock
 - [ ] M5 Banner ads, light and safe (Home and Library only; consent; cold-start budget kept)
 - [ ] M6 Rewarded "Pro day pass" and the new Pro screen
 - [ ] M7 Help & feedback contact (WhatsApp 01645724080, support only)
