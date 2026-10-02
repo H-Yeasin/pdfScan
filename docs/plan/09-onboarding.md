@@ -150,6 +150,12 @@ As built:
 **Done when:** a new user goes from install to their first scan in under 90 seconds with 4
 courses and a profile set up, or in two taps by skipping.
 
+- **Later addition (after O2 was marked done):** a **student card** on "About you" and "Your courses"
+  (`components/onboarding/StudentCard`, logic in `services/onboarding.studentCard`) that fills in
+  as the student types: semester (pre-filled, so it starts 1 of 4 done), initials, name, roll and
+  course chips in their saved colours, a progress bar, and a small pop per filled step (not with
+  reduce motion). Building something of their own reads as ownership, not a form.
+
 ### O3 · Empty states that teach, and one-time hints *(S)*
 Status: done (commit c4dd4f7). Device checks open (each hint's placement, on a small phone too).
 

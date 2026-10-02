@@ -134,6 +134,9 @@ branch is merged**. If you edit `metro.config.js`, make sure the last line is ju
   Scan, Library's "Scan now", Review's Retake / Add more / Start Capture. The Scan tab, app
   start and Back from Review just show the Capture screen. `startScan(state, dispatch, courseId,
   { launch })` is the entry point for new scans.
+- **Onboarding student card (f554978, §9 O2):** "About you" and "Your courses" show a card that
+  fills in as the student types (initials, name, roll, course chips, progress), for a sense of
+  ownership. `components/onboarding/StudentCard`, `services/onboarding.studentCard`.
 
 ## Device checks still open
 No device check for §0–§3 is recorded as done; the agents that built them could only run
