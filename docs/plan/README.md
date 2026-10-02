@@ -15,7 +15,7 @@ code **when the section was planned**, and are kept as history.
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | All done in code. Device checks open. |
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
-| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1 done in code (device check open). Next: L2. L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
+| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L2 done in code (L1 device check open). Next: L3 (spike first). L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | Planned (2026-10-02). R5 (SheetJS security fix) can go first; R6 waits for Pro. |
 | §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
 
@@ -68,6 +68,7 @@ lines here.
 | T5 Bookmarks | 2a228ad | migration v11, `study/bookmarks.ts`, `BookmarkList` |
 | T6 Exam pack | 5c14baa | `study/buildExamPack.ts`, `packSlice`, `ExamPackScreen` |
 | L1 Script registry v2, per-course script | 8dc13df | migration v12 (`courses.ocr_script`), `resolveOcrScript`, `store/useScanOcrScript.ts` |
+| L2 `OcrEngine` interface | 881af3e | `ocr/engines/*`, `ocrService.recognizePage` (failure reasons), `test/fakeScript.ts` |
 
 ## How the branches came together
 

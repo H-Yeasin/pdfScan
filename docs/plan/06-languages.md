@@ -103,7 +103,7 @@ use the default, and Settings shows Bangla as "coming soon".
   course-script cases in `libraryRepo.test.ts`.
 
 ### L2 · `OcrEngine` interface *(M)*
-Status: todo
+Status: done (commit 881af3e)
 
 - `src/services/ocr/engines/types.ts`:
   ```ts
@@ -128,6 +128,23 @@ Status: todo
 
 **Done when:** no file outside `services/ocr/engines/` imports `rn-mlkit-ocr`, and the fake
 script test passes.
+
+**As built:**
+- `runOcr(uri, script)` is unchanged for callers (`PageOcr | undefined`). The reason lives in the
+  new `ocrService.recognizePage(uri, script) → { ocr } | { ocrFailed: true, reason }` with
+  `reason: 'model-missing' | 'unsupported' | 'error'`; `runOcr` is a thin wrapper over it. No
+  caller stores the reason yet: L6 switches Review/ingest to `recognizePage` when it adds the
+  "Download Bangla" prompt. 'unsupported' = unknown or planned script, or no engine registered.
+- `mlkit.isAvailable` is always true: the models are bundled (`ocrUseBundled`), and the L1
+  app.json test keeps the bundled list equal to the registry.
+- `engines/index.ts` has only ML Kit; there's no Tesseract stub (L5 adds it).
+- Test hooks: `registry.registerScript(entry)` and `engines.registerEngine(engine)`, each
+  returning an undo. `src/test/fakeScript.ts` (`installFakeScript()`) uses them with a
+  Cherokee-text script, engine id `'fake'`.
+- Tests: `ocr/__tests__/ocrService.test.ts` (ML Kit mapping, dispatch, model-missing, errors,
+  planned/unknown scripts) and `ocr/__tests__/fakeScript.test.ts` (Settings list,
+  `resolveOcrScript`, `runOcr` → `buildPdfFromPages` → pdfjs, and a source scan that only
+  `engines/mlkit.ts` imports `rn-mlkit-ocr`). L3 should add visible text to the fake-script test.
 
 ### L3 · Visible PDF text in any script *(M — starts with a short spike)*
 Status: todo
