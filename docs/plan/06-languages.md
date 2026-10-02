@@ -210,7 +210,7 @@ the names can be found by search in the PDF, and an English-only cover is unchan
   `ocr/__tests__/fakeScript.test.ts`, and the updated `coverTemplates` script test.
 
 ### L4 · UI translation layer, English only *(M, split into 4 sessions)*
-Status: todo
+Status: L4a done (commit 8de31f8); L4b–L4d todo
 
 - **L4a: infrastructure plus Settings and Home.**
   - Add `expo-localization@~57` (check the version in the package source).
@@ -243,6 +243,36 @@ Status: todo
 
 **Done when:** every screen reads its text from `en.ts`, the pseudo-locale shows no untranslated
 strings, and adding `bn.ts` later only means adding that file (and its registry line).
+
+**As built (L4a):**
+- `src/i18n/`: `types.ts` (`Plural`, `CatalogMeta { locale, nativeName, plural(count) }`,
+  `DeepKeys`), `en.ts` (`satisfies CatalogShape`; empty areas for L4b–d), `pseudo.ts`
+  (accents, `{param}`s kept, `[… ·····]` padding of 40 % of the length), `index.ts` (`t`,
+  `setUiLanguage`, `subscribeUiLanguage`, `systemCatalogId`, `formatDate` / `formatNumber` /
+  `formatBytes`, `catalogNativeName`, test hook `registerCatalog`), and `useT.ts` (import it from
+  `i18n/useT`, not `i18n`: `useSyncExternalStore` on the language). `t` is one function for every
+  language, so a `useMemo` that uses it depends on `locale` from `useT()`, not on `t`.
+- Adding a language: `xx.ts` typed `Catalog` and one line in `CATALOGS` (index.ts).
+  `{count}` and other number parameters are formatted with `formatNumber`.
+- `settings.uiLanguage: 'system' | 'en' | 'en-XA'`, stored in `app:settings`; a stored
+  `'en-XA'` is ignored outside `__DEV__`. `useSettingsPersistence` applies it. Settings has an
+  "App language" section (phone language, each catalog, and the pseudo-locale in dev).
+- `expo-localization@~57.0.2` (no config plugin needed) gives `getLocales()`; Jest maps it to
+  `src/test/mocks/expoLocalization.ts` (`mockLocales`). **It's a native module: needs a new dev
+  build.**
+- Converted: `SettingsScreen`, `HomeScreen`, `components/settings/*`, and
+  `homeSelectors.relativeDay` (Home's "Today / 3 days ago"). Not yet: the script labels in the
+  recognition list come from the registry in English (move them to the catalog with the other
+  `courses`/`settings` strings in L4d), and the `TabBar` (shared, L4d).
+- Hard-coded string check: `src/i18n/__tests__/hardcodedStrings.test.ts`. JSX text, shown props
+  (`label`, `title`, `placeholder`, `subtitle`, `trailing`, `submitLabel`, a11y), `msg:` /
+  `text:` literals and `Alert.alert('…')`. Files in `CONVERTED` must be clean; the rest are a
+  report (`I18N_REPORT=1 npx jest hardcoded`: 292 strings in 53 files at L4a). Each later
+  session adds its files to `CONVERTED`; L4d drops the list and fails on any file.
+- `HomeScreen.test.tsx` renders Home in the pseudo-locale and fails on any English catalog
+  phrase shown as is (tab bar excluded until L4d).
+- Not done yet: `document.*` strings and the "Document language" setting. They belong with the
+  cover/footer text in **L4c** (Deliver, Submit, Academic options).
 
 ### L5 · Tesseract engine (for Bangla) *(L — later, phase P4)*
 Status: later (do it when Bangla is scheduled)
