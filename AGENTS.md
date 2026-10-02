@@ -21,6 +21,9 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   done in code; §7 R5 is too, except the SheetJS 0.20.3 swap (needs `cdn.sheetjs.com`); §8 B1–B5 are done in code (B6, Google Drive, waits for Pro). §9 O1 and O5's code (selector store, deferred boot) are done; O5's device measurements are open (`docs/qa/performance.md`); §9 O2–O4 and O6's code are done; §9's device work is open (`docs/qa/walkthrough.md`, `docs/qa/performance.md`). **Next:**
   that swap, device checks (each plan file's Verification), E7's benchmark run, and
   §6 device checks (`docs/plan/06-languages.md`; L1–L4 are done, L3 without its device spike; L5–L6 wait for Bangla); §5 T7 (flashcards) is for later (P4).
+  **§10 was revised (2026-10-02):** light ads + a rewarded "Pro day pass" + Firebase Remote Config,
+  no login; paid Pro is parked (no Play payouts in Bangladesh). Never add text that sends users to
+  pay outside Google Play (Play Payments policy); WhatsApp 01645724080 is a support contact only.
 
 ## Commands
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),

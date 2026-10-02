@@ -37,7 +37,9 @@ feature must answer "does this help a student scan, submit, or study?"
 
 1. **Scan quality first.** A blurry or grey scan loses the user, whatever the feature list.
 2. **Three taps to submit.** Scan, check, send. Everything else is optional.
-3. **Offline and private by default.** Network only for actions the user starts (share, backup).
+3. **Offline and private by default.** Documents, OCR text and names never leave the phone. The
+   network is used only for actions the user starts (share, backup), plus the light ads and the
+   Remote Config switches from §10, which never carry document data.
 4. **Honest UI.** No fake features (for example, the current "Protect" button). Hide it until it is real.
 5. **Fast on a $150 phone.** Bound memory, process pages one at a time, no jank on scroll.
 6. **Built for more scripts and languages.** Script, font and UI language are lookups, never
@@ -225,22 +227,29 @@ Goal: a good first five minutes, and an app that is fast and usable for everyone
 **Done when:** cold start under 2 s, library scroll at 60 fps with 500 documents, a new user
 reaches their first scan in under 90 s, and a TalkBack user can scan and submit.
 
-### §10 Monetization
+### §10 Monetization *(revised 2026-10-02: ads now, paid Pro later)*
 Free forever: scan, all filters, OCR in every language, Submit, courses, search, study tools
-(annotations, bookmarks, exam packs), backups to a file or folder. No watermark, no ads.
+(annotations, bookmarks, exam packs), backups to a file or folder. No watermark. **No ads while
+you work:** a small banner on the Home and Library lists only, never in capture, review, saving,
+submitting or reading, and no full-screen ads.
 
-**Pro** (decided 2026-10-02: a one-time lifetime unlock plus a cheap yearly plan, student
-pricing): Google Drive backup (§8 B6), app lock, real PDF passwords (§7 R6), extra cover
-templates and theme accents.
+Google Play can't pay out to developers in Bangladesh, and Play policy forbids sending users to
+pay outside Play (so no "WhatsApp us to buy Pro"). **Pro for now = a rewarded "Pro day pass"**:
+watch one ad, get every Pro feature for 24 hours (extra cover templates and accents, app lock,
+no banners; later PDF passwords and Drive backup). Paid Pro waits until a merchant route
+exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no login yet.
 
 **Detailed steps:** [`docs/plan/10-monetization.md`](plan/10-monetization.md)
 
-- [ ] M1 Entitlements and the Pro feature registry (a test guards the free list)
-- [ ] M2 Google Play Billing with `expo-iap` (lifetime + yearly, restore, pending payments)
-- [ ] M3 App lock (Pro)
-- [ ] M4 Extra cover templates and theme accents (Pro)
-- [ ] M5 Pro screen with store prices, and gentle entry points only
-- [ ] M6 Launch rules: turn Pro on only with Drive backup or PDF passwords live
+- [ ] M1 Policy and privacy groundwork (target audience 13+, Data safety, privacy policy, toggles)
+- [ ] M2 Firebase Remote Config, no login (ads switch, pass length, support contact)
+- [ ] M3 Pro feature registry and entitlements (pass / lifetime / yearly; a test guards the free list)
+- [ ] M4 Pro features worth a pass: cover templates, theme accents, app lock
+- [ ] M5 Banner ads, light and safe (Home and Library only; consent; cold-start budget kept)
+- [ ] M6 Rewarded "Pro day pass" and the new Pro screen
+- [ ] M7 Help & feedback contact (WhatsApp 01645724080, support only)
+- [ ] M8 Opt-in usage counts (Firebase Analytics, off by default, allow-listed events)
+- [ ] M9–M11 *(Later)* Paid Pro, Firebase Auth, launch rules, when a merchant route exists
 
 Rule: never take away a feature that was free.
 
@@ -260,9 +269,9 @@ Rule: never take away a feature that was free.
 | Phase | Sections | Outcome |
 |---|---|---|
 | **P0: Foundation** | §0 | Trustworthy, tested, store-ready core |
-| **P1: Student MVP** | §1 (modes + gallery batch), §2 (Ink + Board filters), §3, §4, §9 onboarding | Play Store closed beta |
+| **P1: Student MVP** | §1 (modes + gallery batch), §2 (Ink + Board filters), §3, §4, §9 onboarding | Play Store closed beta (ads off through Remote Config) |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | Public Android launch |
-| **P3: Grow** | §10 Pro, §8 Drive, §11, iOS parity | Revenue + growth |
+| **P3: Grow** | §10 ads + Pro day pass, §8 Drive, §11, iOS parity | Revenue + growth (paid Pro when a merchant route exists) |
 | **P4: Expand** | Bengali via §6, flashcards, more templates | Regional #1 |
 
 Rule: don't start a phase until the "done when" checks of the previous phase pass.
@@ -284,8 +293,10 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 1. App name and brand (app ID decided: `com.yeasin.pdfscan`): keep "PDF Scan" (generic, hard to rank) or pick a student-flavoured name?
 2. Target region for launch and store listing languages.
 3. iOS: launch with Android first, or both at once?
-4. ~~Pro pricing model~~ Decided: one-time lifetime + yearly; study tools stay free.
+4. ~~Pro pricing model~~ Revised 2026-10-02: no Play payouts in Bangladesh, so revenue = light ads + a rewarded
+   "Pro day pass"; paid Pro (lifetime + yearly) is parked until a merchant route exists. Study tools stay free.
 5. ~~Crash reporting vendor~~ Decided: Sentry, opt-in.
+6. ~~Backend~~ Decided 2026-10-02: Firebase free plan (Remote Config, opt-in Analytics), no login until paid Pro.
 
 ---
 
