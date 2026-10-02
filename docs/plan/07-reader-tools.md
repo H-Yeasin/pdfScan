@@ -67,7 +67,7 @@ plan therefore fixes gaps and risks; it adds no new tool families.
 ## Steps
 
 ### R1 · Imported PDFs become first-class: thumbnails, text and search *(L)*
-Status: todo
+Status: done in code (commit 2b46521); device checks open (needs a new dev build for the module)
 
 - **Native module** `modules/pdf-native` (`npx create-expo-module --local`; read the Expo 57
   module docs or the `expo-modules-core` source first):
@@ -99,6 +99,30 @@ Status: todo
 
 **Done when:** a 40-page lecture PDF from a teacher shows thumbnails, and library search finds a
 word from its page 23 (and opens that page if §5 T2 is there).
+
+**As built:**
+- `modules/pdf-native` (written by hand from the SDK 57 `expo-module-template-local`, autolinked
+  from `./modules`; `requireOptionalNativeModule`, so an older build just doesn't index).
+  `getPageText` also returns the page's `width`/`height` in points, so boxes are scaled with the
+  same size they were measured in. Android text boxes go through pdfium's `FPDF_PageToDevice`
+  (handles `/Rotate`); iOS converts PDFKit's media-box space itself. Errors other than
+  `ENCRYPTED` reject with `READ_FAILED`.
+- Indexing runs after the import, not inside `promoteExternalToLibrary` (which stays instant and
+  now sets `pdfLayout: 'standard'`): `store/useImportedPdfIndexing` indexes every imported PDF
+  with `indexedAt` unset, which covers both fresh imports and the backfill. Progress is committed
+  every 10 pages and a page counts as done once it has its thumbnail, so resuming is per page,
+  not per document.
+- Migration **v13** adds `pages.text_source`, `documents.indexed_at` and also
+  `documents.index_state` (`done` | `partial` | `encrypted` | `failed`), shown as a second meta
+  line in `FileRow` ("Search covers the first 300 pages", "Password-protected: not searchable",
+  and "Reading pages for search… 12/40" while it runs).
+- Large files: only the page limit is enforced (`INDEX_MAX_PAGES` = 300). A file over 60 MB
+  with fewer pages is indexed in full: each page is read on its own, so file size alone
+  doesn't cost memory.
+- A page that fails to render keeps its text and has no thumbnail; it doesn't fail the document.
+- Not done here: `pageMap.pdfRectFor` still places boxes in an A4 margin box, which is wrong for
+  imported pages (they fill their own PDF page). Nothing calls it for imported documents yet
+  (annotations are off for them); R2/R3 need it, along with each page's size in points.
 
 ### R2 · Page-level tools for imported PDFs *(M)*
 Status: todo

@@ -185,7 +185,7 @@ Goal: fix the gaps and risks in the existing tools; no new tool families.
 
 **Detailed steps:** [`docs/plan/07-reader-tools.md`](plan/07-reader-tools.md)
 
-- [ ] R1 Imported PDFs become first-class: thumbnails, text extraction or OCR, search (small native module)
+- [x] R1 Imported PDFs become first-class: thumbnails, text extraction or OCR, search (small native module)
 - [ ] R2 Page-level tools for imported PDFs (merge, split, sign, submit) without losing vector text
 - [ ] R3 Edit pages after saving (reorder, lossless rotate, delete, extract, add pages)
 - [ ] R4 Reader conveniences (resume at last page, page jump, thumbnail scrubber)
