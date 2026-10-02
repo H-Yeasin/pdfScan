@@ -5,6 +5,7 @@ import { DEFAULT_NAME_TEMPLATE } from '../../services/submit/naming';
 import { EMPTY_PROFILE } from '../../services/submit/profile';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 import type { AutoBackupFrequency } from '../../services/backup/schedule';
+import { DEFAULT_APP_LOCK, type AppLockSettings } from '../../services/security/appLock';
 
 export type SettingsState = {
   // False until persisted settings have been read, so first-run-dependent behaviour (like the
@@ -71,6 +72,11 @@ export type SettingsState = {
   onboardingDone: boolean;
   // §9 O3: the one-time hints already shown (services/hints/hints.ts ids).
   hintsSeen: string[];
+  // §10 M4: the institution logo's file name (services/submit/institutionLogo.ts), for the
+  // University cover. null: none.
+  institutionLogo: string | null;
+  // §10 M4: app lock (services/security/appLock.ts). Turning it on needs Pro; it stays on after.
+  appLock: AppLockSettings;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -102,6 +108,8 @@ export const initialSettingsState: SettingsState = {
   autoBackupUris: [],
   onboardingDone: false,
   hintsSeen: [],
+  institutionLogo: null,
+  appLock: DEFAULT_APP_LOCK,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -143,7 +151,10 @@ export type SettingsAction =
   | { type: 'settings/LOAD_AUTO_BACKUP_STATE'; lastAt: number | null; uris: string[] }
   | { type: 'settings/SET_ONBOARDING_DONE'; done: boolean }
   | { type: 'settings/MARK_HINT_SEEN'; id: string }
-  | { type: 'settings/LOAD_HINTS_SEEN'; ids: string[] };
+  | { type: 'settings/LOAD_HINTS_SEEN'; ids: string[] }
+  | { type: 'settings/SET_INSTITUTION_LOGO'; name: string | null }
+  // A partial patch: each app lock option changes on its own.
+  | { type: 'settings/SET_APP_LOCK'; appLock: Partial<AppLockSettings> };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -203,6 +214,10 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, uiLanguage: action.language };
     case 'settings/SET_DOCUMENT_LANGUAGE':
       return { ...state, documentLanguage: action.language };
+    case 'settings/SET_INSTITUTION_LOGO':
+      return { ...state, institutionLogo: action.name };
+    case 'settings/SET_APP_LOCK':
+      return { ...state, appLock: { ...state.appLock, ...action.appLock } };
     default:
       return state;
   }

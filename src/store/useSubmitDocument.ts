@@ -11,6 +11,8 @@ import type { LibraryDocument, Submission } from '../types/models';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
 import { hapticSuccess, hapticWarning } from '../services/feedback/haptics';
+import { useIsPro } from '../services/pro/entitlement';
+import { institutionLogoUri } from '../services/submit/institutionLogo';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
 // with its course's preset as it is now, then opens the share sheet. Returns false when the
@@ -19,7 +21,8 @@ export function useSubmitDocument() {
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const { files, courses, deadlines, annotations } = state.library;
-  const { profile } = state.settings;
+  const { profile, institutionLogo } = state.settings;
+  const isPro = useIsPro();
 
   return useCallback(
     async (doc: LibraryDocument): Promise<boolean> => {
@@ -39,6 +42,8 @@ export function useSubmitDocument() {
           course,
           n,
           annotations: annotations.filter((a) => a.documentId === doc.id),
+          proCovers: isPro,
+          logoUri: institutionLogoUri(institutionLogo),
         });
         const record = submissionRecord(doc, result, preset, n);
         dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
@@ -68,7 +73,7 @@ export function useSubmitDocument() {
         return false;
       }
     },
-    [files, courses, deadlines, annotations, profile, dispatch]
+    [files, courses, deadlines, annotations, profile, isPro, institutionLogo, dispatch]
   );
 }
 
@@ -78,7 +83,7 @@ export function useShareSubmission() {
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const { files, courses, annotations } = state.library;
-  const { profile } = state.settings;
+  const { profile, institutionLogo } = state.settings;
 
   return useCallback(
     async (submission: Submission): Promise<void> => {
@@ -86,7 +91,7 @@ export function useShareSubmission() {
       if (!doc) return;
       try {
         const course = courses.find((c) => c.id === doc.courseId);
-        const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files, annotations });
+        const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files, annotations, logoUri: institutionLogoUri(institutionLogo) });
         if (rebuilt) dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.rebuilt', { file: submission.fileName }) });
         await shareAs(uri, submission.fileName, 'application/pdf');
       } catch (error) {
@@ -94,6 +99,6 @@ export function useShareSubmission() {
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.shareFailed') });
       }
     },
-    [files, courses, annotations, profile, dispatch]
+    [files, courses, annotations, profile, institutionLogo, dispatch]
   );
 }

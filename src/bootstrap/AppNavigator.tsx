@@ -28,6 +28,7 @@ import { BackupScreen } from '../screens/BackupScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
+import { AppLockGate } from '../components/security/AppLockGate';
 import { ExportHost } from '../components/backup/ExportHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
 import { useAutoBackup } from '../store/useAutoBackup';
@@ -256,29 +257,32 @@ export function AppNavigator() {
     <View style={styles.container}>
       {/* §9 O6: follows the app's theme setting, not the system's (Capture sets its own). */}
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      {outgoing && (
+      {/* §10 M4: with the app lock on, nothing below renders until it's unlocked. */}
+      <AppLockGate>
+        {outgoing && (
+          <Animated.View
+            style={[
+              styles.layer,
+              transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
+            ]}
+          >
+            <ScreenFrame name={outgoing.screen} background={tokens.bg} />
+          </Animated.View>
+        )}
         <Animated.View
           style={[
             styles.layer,
-            transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
+            outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : RESTING_STYLE,
           ]}
         >
-          <ScreenFrame name={outgoing.screen} background={tokens.bg} />
+          <ScreenFrame name={screen} background={tokens.bg} />
         </Animated.View>
-      )}
-      <Animated.View
-        style={[
-          styles.layer,
-          outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : RESTING_STYLE,
-        ]}
-      >
-        <ScreenFrame name={screen} background={tokens.bg} />
-      </Animated.View>
-      {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
-      <RestoreHost />
-      {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
-      <ExportHost />
-      <AutoBackupChip />
+        {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
+        <RestoreHost />
+        {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
+        <ExportHost />
+        <AutoBackupChip />
+      </AppLockGate>
     </View>
   );
 }

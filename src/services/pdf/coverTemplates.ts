@@ -8,7 +8,8 @@ import type { Course, DocType, PageOcr, StudentProfile } from '../../types/model
 // are decided here, once, with visibleText.measureText - Helvetica's metrics for text it can draw,
 // Skia's shaped width for any other script (§6 L3) - so both come out the same.
 
-export type CoverTemplateId = 'simple' | 'assignment' | 'lab';
+// §10 M4: Formal, University and Minimal are Pro (see `pro` below).
+export type CoverTemplateId = 'simple' | 'assignment' | 'lab' | 'formal' | 'university' | 'minimal';
 
 export type CoverFieldKey =
   | 'institution'
@@ -22,12 +23,23 @@ export type CoverFieldKey =
   | 'section'
   | 'date'
   | 'experimentNo'
-  | 'experimentName';
+  | 'experimentName'
+  | 'department'
+  | 'supervisor';
 
-export type CoverValues = Partial<Record<CoverFieldKey, string>>;
+// `logo` isn't a typed field: it is the institution logo's file URI (submit/institutionLogo.ts),
+// filled in by coverDefaults and drawn only by the University template.
+export type CoverValues = Partial<Record<CoverFieldKey, string>> & { logo?: string };
 
-// labelKey: the template's name in the picker (UI language).
-export type CoverTemplate = { id: CoverTemplateId; labelKey: TKey; fields: readonly CoverFieldKey[] };
+// labelKey: the template's name in the picker (UI language). `pro` templates need Pro for a new
+// cover (§10 M4); `freeFallback` is the free template drawn instead when Pro has ended.
+export type CoverTemplate = {
+  id: CoverTemplateId;
+  labelKey: TKey;
+  fields: readonly CoverFieldKey[];
+  pro?: boolean;
+  freeFallback?: CoverTemplateId;
+};
 
 export const COVER_TEMPLATES: readonly CoverTemplate[] = [
   { id: 'simple', labelKey: 'deliver.cover.templates.simple', fields: ['title', 'docLabel', 'name', 'roll', 'courseCode', 'courseName', 'date'] },
@@ -41,7 +53,30 @@ export const COVER_TEMPLATES: readonly CoverTemplate[] = [
     labelKey: 'deliver.cover.templates.lab',
     fields: ['institution', 'experimentNo', 'experimentName', 'courseCode', 'courseName', 'name', 'roll', 'section', 'teacher', 'date'],
   },
+  {
+    id: 'formal',
+    labelKey: 'deliver.cover.templates.formal',
+    fields: ['institution', 'department', 'docLabel', 'title', 'courseCode', 'courseName', 'name', 'roll', 'section', 'teacher', 'supervisor', 'date'],
+    pro: true,
+    freeFallback: 'assignment',
+  },
+  {
+    id: 'university',
+    labelKey: 'deliver.cover.templates.university',
+    fields: ['institution', 'department', 'docLabel', 'title', 'courseCode', 'courseName', 'name', 'roll', 'section', 'teacher', 'date'],
+    pro: true,
+    freeFallback: 'assignment',
+  },
+  {
+    id: 'minimal',
+    labelKey: 'deliver.cover.templates.minimal',
+    fields: ['title', 'docLabel', 'courseCode', 'courseName', 'name', 'roll', 'date'],
+    pro: true,
+    freeFallback: 'simple',
+  },
 ];
+
+export const COVER_TEMPLATE_IDS: readonly CoverTemplateId[] = COVER_TEMPLATES.map((t) => t.id);
 
 // The field editor's labels (UI language).
 export const COVER_FIELD_LABELS: Record<CoverFieldKey, TKey> = {
@@ -57,10 +92,27 @@ export const COVER_FIELD_LABELS: Record<CoverFieldKey, TKey> = {
   date: 'deliver.cover.fields.date',
   experimentNo: 'deliver.cover.fields.experimentNo',
   experimentName: 'deliver.cover.fields.experimentName',
+  department: 'deliver.cover.fields.department',
+  supervisor: 'deliver.cover.fields.supervisor',
 };
 
 export function getCoverTemplate(id: string | undefined): CoverTemplate {
   return COVER_TEMPLATES.find((t) => t.id === id) ?? COVER_TEMPLATES[0];
+}
+
+// The template a new cover is drawn with: a Pro template only while Pro is active, otherwise its
+// free fallback (§10 M4's lapse rule: covers already in documents stay as they are, since a
+// document's cover is a page image, never redrawn; only new covers need Pro).
+export function coverTemplateFor(id: CoverTemplateId, isPro: boolean): CoverTemplateId {
+  const template = getCoverTemplate(id);
+  return template.pro && !isPro ? (template.freeFallback ?? 'simple') : template.id;
+}
+
+// A cover config with coverTemplateFor applied.
+export function allowedCover(cover: CoverPageConfig | undefined, isPro: boolean): CoverPageConfig | undefined {
+  if (cover?.mode !== 'template') return cover;
+  const templateId = coverTemplateFor(cover.templateId, isPro);
+  return templateId === cover.templateId ? cover : { ...cover, templateId };
 }
 
 // A cover page: a template with its values, or a photo of a printed cover sheet. In
@@ -109,6 +161,8 @@ export type CoverContext = {
   // The number this document gets for its course and type (docTypes.nextTypeNumber).
   n: number;
   date: Date;
+  // The institution logo's file URI, when the student added one (§10 M4, University cover).
+  logoUri?: string;
 };
 
 // What a cover shows before the student types anything: profile, course, "Assignment 3", today.
@@ -125,6 +179,7 @@ export function coverDefaults(ctx: CoverContext): CoverValues {
     docLabel: tDoc('document.docLabel', { type: tDoc(`document.docTypes.${ctx.docType}`), n: ctx.n }),
     date: formatCoverDate(ctx.date),
     experimentNo: ctx.docType === 'lab' ? String(ctx.n) : '',
+    ...(ctx.logoUri ? { logo: ctx.logoUri } : {}),
   };
 }
 
@@ -148,7 +203,10 @@ export type PageSizePt = { width: number; height: number };
 export type CoverItem =
   | { kind: 'text'; text: string; x: number; y: number; size: number; bold: boolean; align: 'left' | 'center' }
   | { kind: 'line'; x1: number; y1: number; x2: number; y2: number; width: number }
-  | { kind: 'box'; x: number; y: number; width: number; height: number; borderWidth: number };
+  | { kind: 'box'; x: number; y: number; width: number; height: number; borderWidth: number }
+  // An image (the institution logo) fitted inside this box, keeping its aspect ratio and centred.
+  // A file that can't be read is left out by every renderer.
+  | { kind: 'image'; uri: string; x: number; y: number; width: number; height: number };
 
 export type { MeasureText } from './visibleText';
 export { helveticaWidth } from './visibleText';
@@ -225,10 +283,28 @@ class Layout {
     }
     this.y += gapAfter;
   }
+  // Wrapped lines from the left margin, for the Minimal cover.
+  left(raw: string | undefined, size: number, bold: boolean, maxLines = 2, gapAfter = 0) {
+    const text = coverSafe(raw ?? '');
+    if (!text) return;
+    for (const line of wrapText(text, size, bold, this.contentWidth, maxLines, this.measure)) {
+      this.y += size;
+      this.items.push({ kind: 'text', text: line, x: MARGIN_PT, y: this.y, size, bold, align: 'left' });
+      this.y += size * (LINE_GAP - 1);
+    }
+    this.y += gapAfter;
+  }
   rule(gapAfter: number) {
     this.y += 6;
     this.items.push({ kind: 'line', x1: MARGIN_PT, y1: this.y, x2: this.page.width - MARGIN_PT, y2: this.y, width: RULE_WIDTH_PT });
     this.y += gapAfter;
+  }
+  // A thick rule over a thin one (Formal).
+  doubleRule(gapAfter: number) {
+    this.y += 6;
+    const [x1, x2] = [MARGIN_PT, this.page.width - MARGIN_PT];
+    this.items.push({ kind: 'line', x1, y1: this.y, x2, y2: this.y, width: 2 }, { kind: 'line', x1, y1: this.y + 4, x2, y2: this.y + 4, width: 0.75 });
+    this.y += 4 + gapAfter;
   }
 }
 
@@ -255,8 +331,9 @@ function column(heading: string, rows: Row[], x: number, top: number, width: num
   return { items, height: y - top };
 }
 
-// "Submitted by" (the student) and "Submitted to" (the teacher) side by side in a box.
-function submissionBox(layout: Layout, v: CoverValues) {
+// "Submitted by" (the student) and "Submitted to" (the teacher) side by side in a box. Formal
+// adds the supervisor under the teacher.
+function submissionBox(layout: Layout, v: CoverValues, withSupervisor = false) {
   const x = MARGIN_PT;
   const width = layout.contentWidth;
   const columnWidth = (width - BOX_PADDING_PT * 3) / 2;
@@ -277,6 +354,7 @@ function submissionBox(layout: Layout, v: CoverValues) {
     tDoc('document.submittedTo'),
     [
       { label: tDoc('document.row.teacher'), value: v.teacher },
+      ...(withSupervisor ? [{ label: tDoc('document.row.supervisor'), value: v.supervisor }] : []),
       { label: tDoc('document.row.course'), value: v.courseCode || v.courseName },
     ],
     x + BOX_PADDING_PT * 2 + columnWidth,
@@ -311,6 +389,9 @@ export function layoutCover(
     layout.centered(v.date, 12, false, 1);
     return layout.items;
   }
+  if (templateId === 'formal') return layoutFormal(v, page, measure);
+  if (templateId === 'university') return layoutUniversity(v, page, measure);
+  if (templateId === 'minimal') return layoutMinimal(v, page, measure);
 
   const layout = new Layout(page, measure, MARGIN_PT + 40);
   if (coverSafe(v.institution ?? '')) {
@@ -334,6 +415,82 @@ export function layoutCover(
     layout.y += 28;
     layout.centered(tDoc('document.dateOfSubmission', { date: v.date ?? '' }), 12, false, 1);
   }
+  return layout.items;
+}
+
+// The date line and the submission box shared by Formal and University: the box from 60 % down
+// the page, the date under it.
+function submissionFooter(layout: Layout, v: CoverValues, withSupervisor: boolean) {
+  layout.y = Math.max(layout.y + 40, layout.page.height * 0.6);
+  submissionBox(layout, v, withSupervisor);
+  if (coverSafe(v.date ?? '')) {
+    layout.y += 28;
+    layout.centered(tDoc('document.dateOfSubmission', { date: v.date ?? '' }), 12, false, 1);
+  }
+}
+
+// §10 M4, Pro. Formal: institution and department over a double rule, the type and title in the
+// middle, room for a supervisor, and a double rule closing the page.
+function layoutFormal(v: CoverValues, page: PageSizePt, measure: MeasureText): CoverItem[] {
+  const layout = new Layout(page, measure, MARGIN_PT + 32);
+  layout.centered(v.institution, 18, true, 2, 2);
+  layout.centered(v.department, 13, false, 1);
+  if (coverSafe(v.institution ?? '') || coverSafe(v.department ?? '')) layout.doubleRule(0);
+  layout.y = Math.max(layout.y, page.height * 0.26);
+  layout.centered(v.docLabel, 26, true, 1, 12);
+  layout.centered(v.title, 17, false, 3, 18);
+  layout.centered(courseLine(v), 14, false, 2);
+  submissionFooter(layout, v, true);
+  const bottom = page.height - MARGIN_PT - 10;
+  if (layout.y < bottom) {
+    layout.y = bottom;
+    layout.doubleRule(0);
+  }
+  return layout.items;
+}
+
+const LOGO_PT = 84;
+
+// §10 M4, Pro. University: the institution's logo at the top centre (from Settings → Profile),
+// its name and department under it, then the type, title and course, and the submission box.
+function layoutUniversity(v: CoverValues, page: PageSizePt, measure: MeasureText): CoverItem[] {
+  const layout = new Layout(page, measure, MARGIN_PT);
+  if (v.logo) {
+    layout.items.push({ kind: 'image', uri: v.logo, x: (page.width - LOGO_PT) / 2, y: layout.y, width: LOGO_PT, height: LOGO_PT });
+    layout.y += LOGO_PT + 14;
+  } else {
+    layout.y += 32;
+  }
+  layout.centered(v.institution, 18, true, 2, 2);
+  layout.centered(v.department, 13, false, 1);
+  if (coverSafe(v.institution ?? '') || coverSafe(v.department ?? '')) layout.rule(0);
+  layout.y = Math.max(layout.y + 28, page.height * 0.3);
+  layout.centered(v.docLabel, 26, true, 1, 14);
+  layout.centered(courseLine(v), 15, false, 2, 18);
+  layout.centered(v.title, 16, false, 3);
+  submissionFooter(layout, v, false);
+  return layout.items;
+}
+
+// §10 M4, Pro. Minimal: a large title from the left margin a third of the way down, and the
+// details in small type at the bottom. No boxes, no rules but one short line.
+function layoutMinimal(v: CoverValues, page: PageSizePt, measure: MeasureText): CoverItem[] {
+  const layout = new Layout(page, measure, page.height * 0.3);
+  const heading = v.title?.trim() || v.docLabel;
+  if (coverSafe(heading ?? '')) {
+    layout.items.push({ kind: 'line', x1: MARGIN_PT, y1: layout.y, x2: MARGIN_PT + 48, y2: layout.y, width: 3 });
+    layout.y += 18;
+  }
+  layout.left(heading, 34, true, 4, 10);
+  if (v.title?.trim()) layout.left(v.docLabel, 15, false, 1);
+  // The details sit on the bottom margin: laid out first to know their height, then moved down.
+  const details = new Layout(page, measure, 0);
+  details.left(v.name, 12, true, 2, 2);
+  details.left(v.roll ? tDoc('document.roll', { roll: v.roll }) : '', 11, false, 1, 2);
+  details.left(courseLine(v), 11, false, 2, 2);
+  details.left(v.date, 11, false, 1);
+  const shift = Math.max(layout.y + 40, page.height - MARGIN_PT - details.y);
+  for (const item of details.items) if (item.kind === 'text') layout.items.push({ ...item, y: item.y + shift });
   return layout.items;
 }
 

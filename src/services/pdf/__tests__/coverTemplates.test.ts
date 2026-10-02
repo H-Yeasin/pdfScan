@@ -3,7 +3,10 @@ import { installFakeShaper } from '../../../test/fakeShaper';
 import { makePng } from '../../../test/png';
 import {
   COVER_TEMPLATES,
+  allowedCover,
   coverDefaults,
+  coverTemplateFor,
+  getCoverTemplate,
   helveticaWidth,
   layoutCover,
   normalizeCoverConfig,
@@ -34,6 +37,8 @@ const FULL: CoverValues = {
   date: '2 October 2026',
   experimentNo: '2',
   experimentName: "Verification of Ohm's law",
+  department: 'Department of Computer Science and Engineering',
+  supervisor: 'Prof. Nasreen Akter',
 };
 
 type Text = Extract<CoverItem, { kind: 'text' }>;
@@ -73,6 +78,11 @@ describe('layoutCover', () => {
     if (id === 'simple') {
       // The name is the only 14 pt regular line on the Simple cover.
       expect(all.filter((t) => t.size === 14 && !t.bold).length).toBe(2);
+    } else if (id === 'minimal') {
+      // Minimal's name is its only 12 pt bold text: the full width, so it fits whole.
+      const name = all.filter((t) => t.size === 12 && t.bold);
+      expect(name.length).toBeLessThanOrEqual(2);
+      expect(name.map((t) => t.text).join(' ')).toBe(long);
     } else {
       const nameAt = all.findIndex((t) => t.text.startsWith('Name:'));
       const rollAt = all.findIndex((t) => t.text.startsWith('Roll:'));
@@ -112,6 +122,59 @@ describe('layoutCover', () => {
   });
 });
 
+describe('Pro cover templates (§10 M4)', () => {
+  it('marks Formal, University and Minimal as Pro, each with a free fallback', () => {
+    const pro = COVER_TEMPLATES.filter((t) => t.pro);
+    expect(pro.map((t) => t.id)).toEqual(['formal', 'university', 'minimal']);
+    pro.forEach((t) => expect(getCoverTemplate(t.freeFallback).pro).toBeFalsy());
+  });
+
+  it('draws a Pro template only with Pro; covers already chosen fall back without it', () => {
+    expect(coverTemplateFor('formal', true)).toBe('formal');
+    expect(coverTemplateFor('formal', false)).toBe('assignment');
+    expect(coverTemplateFor('minimal', false)).toBe('simple');
+    expect(coverTemplateFor('lab', false)).toBe('lab');
+    const cover = { mode: 'template' as const, templateId: 'university' as const, values: { title: 'Trees' } };
+    expect(allowedCover(cover, true)).toBe(cover);
+    expect(allowedCover(cover, false)).toEqual({ ...cover, templateId: 'assignment' });
+    expect(allowedCover({ mode: 'imported_image', importedUri: 'file:///a.jpg' }, false)).toMatchObject({ mode: 'imported_image' });
+    expect(allowedCover(undefined, false)).toBeUndefined();
+  });
+
+  it('Formal has a supervisor row and double rules', () => {
+    const items = layoutCover('formal', FULL, A4);
+    expect(texts(items).some((t) => t.text === 'Supervisor: Prof. Nasreen Akter')).toBe(true);
+    expect(texts(items).some((t) => t.text === 'Department of Computer Science and Engineering')).toBe(true);
+    // Two under the institution and two closing the page.
+    expect(items.filter((i) => i.kind === 'line')).toHaveLength(4);
+  });
+
+  it('University draws the logo at the top centre, and leaves room without one', () => {
+    const withLogo = layoutCover('university', { ...FULL, logo: 'file:///logo.png' }, A4);
+    const logo = withLogo.find((i) => i.kind === 'image');
+    expect(logo).toMatchObject({ uri: 'file:///logo.png' });
+    if (logo?.kind !== 'image') throw new Error('no logo');
+    expect(logo.x + logo.width / 2).toBeCloseTo(A4.width / 2);
+    // The logo sits above every text line.
+    texts(withLogo).forEach((t) => expect(t.y - t.size).toBeGreaterThan(logo.y + logo.height));
+    expect(layoutCover('university', FULL, A4).some((i) => i.kind === 'image')).toBe(false);
+  });
+
+  it('Minimal puts the title high and the details on the bottom margin', () => {
+    const all = texts(layoutCover('minimal', FULL, A4));
+    expect(all[0]).toMatchObject({ text: 'Binary search trees', size: 34, bold: true, align: 'left' });
+    const last = all[all.length - 1];
+    expect(last.text).toBe('2 October 2026');
+    expect(last.y).toBeGreaterThan(A4.height - 80);
+  });
+
+  it('fills the logo from the context into the defaults', () => {
+    const ctx = { profile: { name: '', roll: '', section: '', institution: '' }, docType: 'assignment' as const, n: 1, date: new Date(2026, 9, 2) };
+    expect(coverDefaults(ctx).logo).toBeUndefined();
+    expect(coverDefaults({ ...ctx, logoUri: 'file:///logo.png' }).logo).toBe('file:///logo.png');
+  });
+});
+
 describe('wrapText', () => {
   it('breaks a word wider than the line and ends an overflow with an ellipsis', () => {
     const lines = wrapText('x'.repeat(200), 12, false, 100, 2, helveticaWidth);
@@ -147,6 +210,35 @@ describe('cover config', () => {
     expect(defaults).toMatchObject({ docLabel: 'Assignment 3', courseCode: 'CSE 101', teacher: 'Dr. Karim', date: '2 October 2026' });
     const cover = withCoverDefaults({ mode: 'template', templateId: 'assignment', values: { teacher: '', title: 'Trees' } }, defaults);
     expect(cover).toMatchObject({ values: { name: 'Rahim', teacher: '', title: 'Trees', docLabel: 'Assignment 3' } });
+  });
+});
+
+describe('University cover in the PDF (§10 M4)', () => {
+  const build = (logo: string) => {
+    const image = new File(Paths.cache, 'uni_page.png');
+    image.write(makePng(20, 28));
+    return buildPdfFromPages('doc_uni', [{ uri: image.uri, width: 20, height: 28 }], 'as-is', {
+      enableBorder: false,
+      coverPage: { mode: 'template', templateId: 'university', values: { ...FULL, logo } },
+    });
+  };
+
+  it('embeds the logo and keeps the text real', async () => {
+    const logo = new File(Paths.document, 'profile_logo.png');
+    logo.write(makePng(40, 40));
+    const { uri } = await build(logo.uri);
+    const bytes = await new File(uri).bytes();
+    const doc = await pdfjs.getDocument({ data: bytes, verbosity: 0, disableFontFace: true }).promise;
+    const content = await (await doc.getPage(1)).getTextContent();
+    const text = (content.items as { str: string }[]).map((i) => i.str).join(' ');
+    expect(text).toContain('Shahjalal University');
+    const ops = await (await doc.getPage(1)).getOperatorList();
+    expect(ops.fnArray).toContain(pdfjs.OPS.paintImageXObject);
+  });
+
+  it('still builds when the logo file is gone', async () => {
+    const { uri } = await build(new File(Paths.document, 'missing_logo.png').uri);
+    expect(new File(uri).exists).toBe(true);
   });
 });
 

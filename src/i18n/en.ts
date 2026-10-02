@@ -13,6 +13,7 @@ export const en = {
 
   common: {
     cancel: 'Cancel',
+    ok: 'OK',
     edit: 'Edit',
     notSet: 'Not set',
     unsorted: 'Unsorted',
@@ -84,6 +85,14 @@ export const en = {
       institution: 'Institution',
       institutionPlaceholder: 'e.g. SUST',
       footnote: 'Stored only on this phone. Used for file names, cover pages and footers.',
+      // §10 M4: the University cover's logo.
+      logo: 'Institution logo',
+      logoSubtitle: 'Shown at the top of the University cover page.',
+      logoAdd: 'Add',
+      logoChange: 'Change',
+      logoRemove: 'Remove logo',
+      logoFailed: "Couldn't use that image. Try another one.",
+      logoA11y: 'Institution logo',
     },
     fileNames: {
       section: 'File names',
@@ -99,6 +108,27 @@ export const en = {
     },
     appearance: 'Appearance',
     theme: { system: 'System', light: 'Light', dark: 'Dark' },
+    // §10 M4: theme accents (Pro).
+    accent: {
+      label: 'Accent colour',
+      names: { teal: 'Teal', ocean: 'Ocean', plum: 'Plum', rose: 'Rose', amber: 'Amber' },
+      a11y: '{name} accent',
+      lapsed: 'Your accent comes back with Pro. Teal for now.',
+    },
+    // §10 M4: app lock (Pro). Lives in the Privacy section.
+    appLock: {
+      title: 'Lock PDF Scan',
+      subtitle: "Ask for your fingerprint, face or the phone's PIN when the app opens.",
+      lockAfter: 'Lock after',
+      after: { immediately: 'Right away', '1min': '1 minute', '5min': '5 minutes' },
+      lockAfterHint: 'How long PDF Scan can be in the background before it asks again. Scanning with the camera counts as background.',
+      hideInRecents: 'Hide in recent apps',
+      hideInRecentsSubtitle: 'Shows a blank card in the app switcher. This also blocks screenshots of PDF Scan.',
+      noDeviceLock: 'Set a screen lock (PIN, pattern or fingerprint) on your phone first.',
+      confirmPrompt: 'Confirm to turn on the lock',
+      turnOffPrompt: 'Confirm to turn off the lock',
+      keptAfterPro: 'Your lock stays on after Pro ends, until you turn it off.',
+    },
     language: {
       section: 'App language',
       system: 'Phone language ({name})',
@@ -553,6 +583,20 @@ export const en = {
     },
     badge: 'PRO',
     badgeLabel: 'Pro feature',
+    // §10 M4: picking a Pro feature without Pro. M6 turns this into the day-pass offer.
+    offer: {
+      title: 'Part of PDF Scan Pro',
+      body: '{feature} is part of PDF Scan Pro. A free way to try Pro is coming soon. Everything else stays free.',
+      see: 'See Pro',
+    },
+  },
+
+  // §10 M4: the app lock screen.
+  lock: {
+    title: 'PDF Scan is locked',
+    body: 'Unlock with your fingerprint, face or phone PIN.',
+    unlock: 'Unlock',
+    prompt: 'Unlock PDF Scan',
   },
 
   // Text that goes into documents, in the document language (tDoc), not the UI's.
@@ -574,7 +618,7 @@ export const en = {
     roll: 'Roll: {roll}',
     submittedBy: 'Submitted by',
     submittedTo: 'Submitted to',
-    row: { name: 'Name', roll: 'Roll', section: 'Section', teacher: 'Teacher', course: 'Course' },
+    row: { name: 'Name', roll: 'Roll', section: 'Section', teacher: 'Teacher', supervisor: 'Supervisor', course: 'Course' },
     rowValue: '{label}: {value}',
     dateOfSubmission: 'Date of submission: {date}',
     docLabel: '{type} {n}',
@@ -722,7 +766,7 @@ export const en = {
       preview: 'Preview PDF',
     },
     cover: {
-      templates: { simple: 'Simple', assignment: 'Assignment', lab: 'Lab report' },
+      templates: { simple: 'Simple', assignment: 'Assignment', lab: 'Lab report', formal: 'Formal', university: 'University', minimal: 'Minimal' },
       fields: {
         institution: 'Institution',
         title: 'Title',
@@ -736,6 +780,8 @@ export const en = {
         date: 'Date',
         experimentNo: 'Experiment no.',
         experimentName: 'Experiment name',
+        department: 'Department',
+        supervisor: 'Supervisor',
       },
     },
   },

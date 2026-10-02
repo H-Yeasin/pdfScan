@@ -1,9 +1,9 @@
-import { tokens, type ThemeName, type ThemeTokens } from '../tokens';
+import { ACCENT_IDS, themeTokens, type AccentId, type ThemeName, type ThemeTokens } from '../tokens';
 import { AA_LARGE, AA_TEXT, contrastRatio } from '../contrast';
 
 // §9 O4b: text and icon colours stay readable in both themes. Text pairs need 4.5:1; icons and
 // state indicators (an accent icon or border) need 3:1 (WCAG 2.1 AA, 1.4.3 and 1.4.11).
-// edge is translucent and decorative, so it isn't checked.
+// edge is translucent and decorative, so it isn't checked. §10 M4: every accent, in both themes.
 
 type Key = Exclude<keyof ThemeTokens, 'courseColors' | 'edge'>;
 const TEXT_ON: Key[] = ['bg', 'surface', 'surface2'];
@@ -24,8 +24,10 @@ const iconPairs: [Key, Key][] = [
   // Danger icons (a delete badge's ×) on the danger fill are white.
 ];
 
-describe.each<ThemeName>(['light', 'dark'])('%s theme contrast', (name) => {
-  const t = tokens[name];
+const CASES: [ThemeName, AccentId][] = (['light', 'dark'] as ThemeName[]).flatMap((theme) => ACCENT_IDS.map((accent) => [theme, accent] as [ThemeName, AccentId]));
+
+describe.each(CASES)('%s theme, %s accent: contrast', (name, accent) => {
+  const t = themeTokens(name, accent);
 
   it.each(textPairs)('%s text on %s reaches 4.5:1', (fg, bg) => {
     expect(contrastRatio(t[fg], t[bg])).toBeGreaterThanOrEqual(AA_TEXT);

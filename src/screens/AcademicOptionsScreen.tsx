@@ -5,6 +5,9 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CoverThumbnail } from '../components/deliver/CoverThumbnail';
+import { ProBadge } from '../components/pro/ProBadge';
+import { useOfferPro } from '../components/pro/useOfferPro';
+import { useIsPro } from '../services/pro/entitlement';
 import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
 import { t } from '../i18n';
@@ -18,6 +21,7 @@ import type { AcademicConfig } from '../services/pdf/pdfService';
 import {
   COVER_FIELD_LABELS,
   COVER_TEMPLATES,
+  coverTemplateFor,
   getCoverTemplate,
   resolveCoverValues,
   type CoverPageConfig,
@@ -106,7 +110,11 @@ export function AcademicOptionsScreen() {
     templateId: 'assignment',
     coverValues: {},
   });
-  const templateId = cover?.mode === 'template' ? cover.templateId : lastTemplate.templateId;
+  const isPro = useIsPro();
+  const offerPro = useOfferPro();
+  // A Pro template stored while Pro was active (a course preset) shows as the free template it is
+  // drawn with now (§10 M4); choosing it again needs Pro.
+  const templateId = coverTemplateFor(cover?.mode === 'template' ? cover.templateId : lastTemplate.templateId, isPro);
   const coverValues = cover?.mode === 'template' ? cover.values : lastTemplate.coverValues;
   const importedUri = cover?.mode === 'imported_image' ? cover.importedUri : undefined;
   const coverDefaults = useCoverDefaults();
@@ -275,26 +283,29 @@ export function AcademicOptionsScreen() {
 
         {coverMode === 'template' && (
           <>
-            <View style={styles.templateRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
               {COVER_TEMPLATES.map((template) => {
                 const selected = template.id === templateId;
+                const locked = template.pro && !isPro;
                 return (
                   <Pressable
                     key={template.id}
                     style={styles.templateOption}
-                    onPress={() => commit({ templateId: template.id })}
+                    onPress={() => (locked ? offerPro('coverTemplates') : commit({ templateId: template.id }))}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     accessibilityLabel={t('deliver.academic.templateA11y', { template: t(template.labelKey) })}
+                    accessibilityHint={locked ? t('pro.badgeLabel') : undefined}
                   >
                     <View style={[styles.templateFrame, { borderColor: selected ? tokens.accent : 'transparent' }]}>
                       <CoverThumbnail templateId={template.id} values={shownValues} width={92} />
                     </View>
                     <Text style={[styles.templateLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{t(template.labelKey)}</Text>
+                    {locked ? <ProBadge /> : null}
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
             <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.templateHint')}</Text>
             {getCoverTemplate(templateId).fields.map((key) => (
               <NameField
@@ -404,7 +415,7 @@ const styles = StyleSheet.create({
   },
   templateRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.md,
   },
   templateOption: {
     alignItems: 'center',

@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { ImageFormat, PaintStyle, Skia } from '@shopify/react-native-skia';
 import type { SkCanvas } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
+import { fitBox } from '../../utils/fitBox';
 import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
 import { fillPageNumbers, pageDimensions, type AcademicConfig, type PageSizeId } from './pdfService';
 import { drawShaped } from './skiaText';
@@ -97,6 +98,17 @@ export async function renderLayoutImage(
   for (const item of items) {
     if (item.kind === 'text') {
       drawShaped(canvas, item.text, item.x * scale, item.y * scale, item.size * scale, item.bold, item.align, STAMP_TEXT_COLOR);
+    } else if (item.kind === 'image') {
+      // §10 M4: the University cover's logo, fitted like the PDF does; skipped if unreadable.
+      try {
+        const image = Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(item.uri));
+        if (image) {
+          const fit = fitBox(image.width(), image.height(), item.x * scale, item.y * scale, item.width * scale, item.height * scale);
+          canvas.drawImageRect(image, Skia.XYWHRect(0, 0, image.width(), image.height()), Skia.XYWHRect(fit.origin.x, fit.origin.y, fit.width, fit.height), Skia.Paint());
+        }
+      } catch (error) {
+        console.warn('academicRasterService: could not draw the cover logo', error);
+      }
     } else if (item.kind === 'line') {
       strokePaint.setStrokeWidth(item.width * scale);
       canvas.drawLine(item.x1 * scale, item.y1 * scale, item.x2 * scale, item.y2 * scale, strokePaint);

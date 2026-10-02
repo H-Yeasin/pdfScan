@@ -1,5 +1,5 @@
 import { t, type TKey } from '../../i18n';
-import { getCoverTemplate, type CoverTemplateId } from '../pdf/coverTemplates';
+import { COVER_TEMPLATE_IDS, getCoverTemplate, type CoverTemplateId } from '../pdf/coverTemplates';
 import { defaultPageSize, type PageSizeId } from '../pdf/pageSize';
 import type { AcademicConfig, LayoutMode } from '../pdf/pdfService';
 import { footerPresetOf, footerPresetText, type FooterPreset } from './footerPresets';
@@ -38,7 +38,7 @@ export function defaultSubmitPreset(courseId: string | null): SubmitPreset {
 }
 
 const FOOTER_PRESETS: readonly FooterPreset[] = ['none', 'pages', 'namePages', 'custom'];
-const COVER_IDS: readonly CoverTemplateId[] = ['simple', 'assignment', 'lab'];
+const COVER_IDS = COVER_TEMPLATE_IDS;
 
 // Reads courses.submit_preset. Each field is checked on its own and falls back to the default,
 // so a preset written by a later version, or a damaged one, still loads. null/invalid JSON:

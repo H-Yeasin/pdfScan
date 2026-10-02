@@ -5,18 +5,22 @@ import { loadSettings, persistSettings, sanitizeDefaultEnhance } from '../servic
 import { normalizeProfile } from '../services/submit/profile';
 import { isAutoBackupFrequency } from '../services/backup/schedule';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
-import { useTheme } from '../theme';
+import { isAccentId, useTheme } from '../theme';
+import { normalizeAppLock } from '../services/security/appLock';
 
 export function useSettingsPersistence() {
   const dispatch = useAppDispatch();
   const state = useAppSlices('settings');
-  const { themePref, setThemePref } = useTheme();
+  const { themePref, setThemePref, accentPref, setAccentPref } = useTheme();
   const { loaded } = state.settings;
 
   useEffect(() => {
     loadSettings().then((settings) => {
       if (settings) {
         setThemePref(settings.themePref);
+        if (isAccentId(settings.accent)) setAccentPref(settings.accent);
+        if (typeof settings.institutionLogo === 'string') dispatch({ type: 'settings/SET_INSTITUTION_LOGO', name: settings.institutionLogo });
+        dispatch({ type: 'settings/SET_APP_LOCK', appLock: normalizeAppLock(settings.appLock) });
         dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: settings.firstRun });
         dispatch({ type: 'settings/SET_OCR_SCRIPT', script: settings.ocrScript });
         dispatch({
@@ -79,12 +83,13 @@ export function useSettingsPersistence() {
       // defaults over them.
       dispatch({ type: 'settings/SET_LOADED' });
     });
-  }, [dispatch, setThemePref]);
+  }, [dispatch, setThemePref, setAccentPref]);
 
   useEffect(() => {
     if (!loaded) return;
     persistSettings({
       themePref,
+      accent: accentPref,
       firstRun: state.settings.firstRun,
       ocrScript: state.settings.ocrScript,
       androidExportFolderUri: state.settings.androidExportFolderUri,
@@ -112,10 +117,13 @@ export function useSettingsPersistence() {
       autoBackupUris: state.settings.autoBackupUris,
       onboardingDone: state.settings.onboardingDone,
       hintsSeen: state.settings.hintsSeen,
+      institutionLogo: state.settings.institutionLogo,
+      appLock: state.settings.appLock,
     });
   }, [
     loaded,
     themePref,
+    accentPref,
     state.settings.firstRun,
     state.settings.ocrScript,
     state.settings.androidExportFolderUri,
@@ -143,6 +151,8 @@ export function useSettingsPersistence() {
     state.settings.autoBackupUris,
     state.settings.onboardingDone,
     state.settings.hintsSeen,
+    state.settings.institutionLogo,
+    state.settings.appLock,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.

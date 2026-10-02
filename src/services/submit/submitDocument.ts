@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { Directory, File } from 'expo-file-system';
 import { docTypeOf } from '../courses/docTypes';
-import { coverDefaults, withCoverDefaults, type CoverValues } from '../pdf/coverTemplates';
+import { allowedCover, coverDefaults, withCoverDefaults, type CoverValues } from '../pdf/coverTemplates';
 import { buildPdfFromPages, decoratePdf, encodingForQuality, type AcademicConfig, type PdfSourcePage, toSourcePage } from '../pdf/pdfService';
 import { loadPdf, savePdf } from '../pdf/pdfOps';
 import { buildRasterPdf, renderedPageBytes } from '../pdf/rasterPdf';
@@ -37,6 +37,11 @@ export type SubmitInput = {
   onProgress?: (text: string) => void;
   // The document's annotations; written only when the preset says includeAnnotations.
   annotations?: readonly Annotation[];
+  // §10 M4: whether the preset's Pro cover template may be drawn (Pro is active, or the file
+  // being rebuilt was made with it). Otherwise its free fallback is. Default false.
+  proCovers?: boolean;
+  // §10 M4: the institution logo's URI for the University cover (institutionLogoUri).
+  logoUri?: string;
 };
 
 export type SubmitResult = {
@@ -65,10 +70,11 @@ export function submissionPages(doc: LibraryDocument): PdfSourcePage[] {
 // The academic options a submission is drawn with: the preset's, with the cover filled from the
 // profile and course and the header/footer tokens filled in.
 export function submissionAcademicConfig(
-  input: Pick<SubmitInput, 'preset' | 'coverValues' | 'headerText' | 'coverPhotoUri'>,
+  input: Pick<SubmitInput, 'preset' | 'coverValues' | 'headerText' | 'coverPhotoUri' | 'proCovers' | 'logoUri'>,
   ctx: NamingContext
 ): AcademicConfig | null {
-  const base = presetAcademicConfig(input.preset);
+  const preset = presetAcademicConfig(input.preset);
+  const base = preset && { ...preset, coverPage: allowedCover(preset.coverPage, input.proCovers === true) };
   const headerText = input.headerText ? renderText(input.headerText, ctx) || undefined : undefined;
   if (!base && !headerText && !input.coverPhotoUri) return null;
   const footer = presetFooterText(input.preset);
@@ -79,7 +85,7 @@ export function submissionAcademicConfig(
     coverPage: input.coverPhotoUri
       ? { mode: 'imported_image', importedUri: input.coverPhotoUri }
       : base?.coverPage?.mode === 'template'
-        ? withCoverDefaults({ ...base.coverPage, values: input.coverValues ?? {} }, coverDefaults(ctx))
+        ? withCoverDefaults({ ...base.coverPage, values: input.coverValues ?? {} }, coverDefaults({ ...ctx, logoUri: input.logoUri }))
         : undefined,
   };
 }

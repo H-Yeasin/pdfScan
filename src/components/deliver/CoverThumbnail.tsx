@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { layoutCover, type CoverTemplateId, type CoverValues } from '../../services/pdf/coverTemplates';
 import { useTheme } from '../../theme';
 
@@ -33,6 +33,16 @@ export function CoverThumbnail({ templateId, values, width }: { templateId: Cove
             >
               {item.text}
             </Text>
+          );
+        }
+        if (item.kind === 'image') {
+          return (
+            <Image
+              key={i}
+              source={{ uri: item.uri }}
+              resizeMode="contain"
+              style={[styles.abs, { left: item.x * scale, top: item.y * scale, width: item.width * scale, height: item.height * scale }]}
+            />
           );
         }
         if (item.kind === 'line') {

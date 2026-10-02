@@ -38,6 +38,8 @@ import { defaultSubmitPreset, presetFromDeliver, presetsEqual, summarizePreset }
 import { isProfileComplete } from '../services/submit/profile';
 import { submitDocument, type SubmitResult } from '../services/submit/submitDocument';
 import { submissionRecord } from '../services/submit/history';
+import { institutionLogoUri } from '../services/submit/institutionLogo';
+import { useIsPro } from '../services/pro/entitlement';
 import { matchDeadline } from '../services/submit/deadlines';
 import type { Submission } from '../types/models';
 import type { PageSizeId } from '../services/pdf/pageSize';
@@ -95,7 +97,8 @@ export function DeliverScreen() {
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel, profile, profilePrompted } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, profile, profilePrompted, institutionLogo } = state.settings;
+  const isPro = useIsPro();
   const { presetCourseId, rememberPreset } = state.deliver;
   // §7 R3: the saved document these pages are being added to, if any.
   const appendTarget = useMemo(
@@ -374,6 +377,8 @@ export function DeliverScreen() {
               quality,
               fileName: doc.name,
               onProgress: setProgress,
+              proCovers: isPro,
+              logoUri: institutionLogoUri(institutionLogo),
             });
             record = submissionRecord(doc, submission, currentPreset, typeNumber);
             dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
@@ -459,6 +464,8 @@ export function DeliverScreen() {
       suggestedName,
       currentPreset,
       profile,
+      isPro,
+      institutionLogo,
       course,
       state.deliver.academicConfig,
       state.library.files,

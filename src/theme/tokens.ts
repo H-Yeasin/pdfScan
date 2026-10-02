@@ -77,3 +77,42 @@ const dark: ThemeTokens = {
 };
 
 export const tokens: Record<ThemeName, ThemeTokens> = { light, dark };
+
+// §10 M4: theme accents (Pro). 'teal' is the default above; each other accent swaps only the four
+// accent tokens, in both themes, and passes the same contrast rules (theme/__tests__/contrast.test.ts).
+export type AccentId = 'teal' | 'ocean' | 'plum' | 'rose' | 'amber';
+export type AccentTokens = Pick<ThemeTokens, 'accent' | 'accentInk' | 'onAccent' | 'accentSoft'>;
+
+const pickAccent = (t: ThemeTokens): AccentTokens => ({ accent: t.accent, accentInk: t.accentInk, onAccent: t.onAccent, accentSoft: t.accentSoft });
+
+export const ACCENTS: Record<AccentId, Record<ThemeName, AccentTokens>> = {
+  teal: { light: pickAccent(light), dark: pickAccent(dark) },
+  ocean: {
+    light: { accent: '#1d5fbf', accentInk: '#1a4f9c', onAccent: '#ffffff', accentSoft: '#e1eaf7' },
+    dark: { accent: '#6aa7f5', accentInk: '#a9cbfa', onAccent: '#0b1626', accentSoft: '#1b2638' },
+  },
+  plum: {
+    light: { accent: '#7b3fa8', accentInk: '#6a3591', onAccent: '#ffffff', accentSoft: '#efe3f6' },
+    dark: { accent: '#c49af0', accentInk: '#dcc2f7', onAccent: '#1d0f2a', accentSoft: '#2a2133' },
+  },
+  rose: {
+    light: { accent: '#b8325a', accentInk: '#9e2a4d', onAccent: '#ffffff', accentSoft: '#f7e1e7' },
+    dark: { accent: '#f07a9a', accentInk: '#f7b3c5', onAccent: '#2a0b14', accentSoft: '#33202a' },
+  },
+  amber: {
+    light: { accent: '#8a5a00', accentInk: '#7a4f00', onAccent: '#ffffff', accentSoft: '#f6e8c9' },
+    dark: { accent: '#e8a838', accentInk: '#f3cd85', onAccent: '#241700', accentSoft: '#30271a' },
+  },
+};
+
+export const DEFAULT_ACCENT: AccentId = 'teal';
+export const ACCENT_IDS = Object.keys(ACCENTS) as AccentId[];
+
+export function isAccentId(value: unknown): value is AccentId {
+  return typeof value === 'string' && value in ACCENTS;
+}
+
+// A theme's tokens with an accent applied.
+export function themeTokens(theme: ThemeName, accent: AccentId): ThemeTokens {
+  return accent === DEFAULT_ACCENT ? tokens[theme] : { ...tokens[theme], ...ACCENTS[accent][theme] };
+}

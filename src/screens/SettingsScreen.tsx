@@ -4,6 +4,8 @@ import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-n
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TimetableEditor } from '../components/courses/TimetableEditor';
+import { AccentPicker } from '../components/settings/AccentPicker';
+import { AppLockSection } from '../components/settings/AppLockSection';
 import { LanguageRow } from '../components/settings/LanguageRow';
 import { NameTemplateSection } from '../components/settings/NameTemplateSection';
 import { ProfileSection } from '../components/settings/ProfileSection';
@@ -82,6 +84,7 @@ export function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.appearance')}</Text>
           <SegmentedControl segments={themeSegments} value={themePref} onChange={setThemePref} />
+          <AccentPicker />
         </View>
 
         <View style={styles.section}>
@@ -227,6 +230,7 @@ export function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.privacy.section')}</Text>
+          <AppLockSection />
           <Text style={[styles.aboutText, { color: tokens.muted }]}>{t('settings.privacy.adsNote')}</Text>
           <SettingRow
             title={t('settings.privacy.personalizedAds')}

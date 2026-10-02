@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
 import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes';
-import { coverDefaults, withCoverDefaults, type CoverValues } from '../services/pdf/coverTemplates';
+import { allowedCover, coverDefaults, withCoverDefaults, type CoverValues } from '../services/pdf/coverTemplates';
+import { useIsPro } from '../services/pro/entitlement';
+import { institutionLogoUri } from '../services/submit/institutionLogo';
 import type { AcademicConfig } from '../services/pdf/pdfService';
 import { firstLine, renderText, type NamingContext } from '../services/submit/naming';
 import { useAppSlices } from './AppStateContext';
@@ -34,24 +36,28 @@ export function useNamingContext(): NamingContext {
 // cover) and Academic options (which shows the fields).
 export function useCoverDefaults(): CoverValues {
   const ctx = useNamingContext();
-  return useMemo(() => coverDefaults(ctx), [ctx]);
+  const logoName = useAppSlices('settings').settings.institutionLogo;
+  return useMemo(() => coverDefaults({ ...ctx, logoUri: institutionLogoUri(logoName) }), [ctx, logoName]);
 }
 
 // deliver.academicConfig as it will be drawn: a template cover's stored edits on top of its
 // defaults, and `{name}`, `{roll}`, ... in the header and footer filled in (`{X}`/`{Y}` stay for
-// the PDF builder, per page).
+// the PDF builder, per page). A Pro cover template (a course preset made while Pro was active)
+// is drawn as its free fallback once Pro has ended (§10 M4).
 export function useResolvedAcademicConfig(): AcademicConfig | null {
   const state = useAppSlices('capture', 'deliver', 'library', 'settings');
   const stored = state.deliver.academicConfig;
   const ctx = useNamingContext();
   const defaults = useCoverDefaults();
+  const isPro = useIsPro();
   return useMemo(() => {
     if (!stored) return null;
+    const cover = allowedCover(stored.coverPage, isPro);
     return {
       ...stored,
       headerText: stored.headerText ? renderText(stored.headerText, ctx) || undefined : undefined,
       footerText: stored.footerText ? renderText(stored.footerText, ctx) || undefined : undefined,
-      coverPage: stored.coverPage ? withCoverDefaults(stored.coverPage, defaults) : undefined,
+      coverPage: cover ? withCoverDefaults(cover, defaults) : undefined,
     };
-  }, [stored, ctx, defaults]);
+  }, [stored, ctx, defaults, isPro]);
 }

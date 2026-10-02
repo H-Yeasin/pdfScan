@@ -1,5 +1,5 @@
-export { tokens } from './tokens';
-export type { ThemeName, ThemeTokens } from './tokens';
+export { ACCENT_IDS, ACCENTS, DEFAULT_ACCENT, isAccentId, themeTokens, tokens } from './tokens';
+export type { AccentId, ThemeName, ThemeTokens } from './tokens';
 export { ThemeProvider, useTheme } from './ThemeProvider';
 export type { ThemePref } from './ThemeProvider';
 export { captureChromeStatic, useCaptureChrome } from './captureChrome';

@@ -41,7 +41,7 @@ const PDF_EXTENSION = /\.pdf$/i;
 export async function ensureSubmissionFile(
   submission: Submission,
   doc: LibraryDocument,
-  ctx: { profile: StudentProfile; course?: Course; docs: readonly LibraryDocument[]; annotations?: readonly Annotation[] }
+  ctx: { profile: StudentProfile; course?: Course; docs: readonly LibraryDocument[]; annotations?: readonly Annotation[]; logoUri?: string }
 ): Promise<{ uri: string; rebuilt: boolean }> {
   const file = submissionFile(submission);
   if (file.exists) return { uri: file.uri, rebuilt: false };
@@ -54,6 +54,10 @@ export async function ensureSubmissionFile(
     fileName: submission.fileName.replace(PDF_EXTENSION, ''),
     date: new Date(submission.createdAt),
     annotations: ctx.annotations?.filter((a) => a.documentId === doc.id),
+    // The file was made before, with its cover: rebuilding it isn't a new use of a Pro cover
+    // (§10 M4 lapse rule 'keepExisting').
+    proCovers: true,
+    logoUri: ctx.logoUri,
   });
   return { uri: result.uri, rebuilt: true };
 }

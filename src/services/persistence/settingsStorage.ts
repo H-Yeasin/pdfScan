@@ -55,6 +55,10 @@ export type PersistedSettings = {
   onboardingDone?: boolean;
   // Optional: added in §9 O3.
   hintsSeen?: string[];
+  // Optional: added in §10 M4 (accent: an AccentId; appLock: read by normalizeAppLock).
+  accent?: string;
+  institutionLogo?: string | null;
+  appLock?: unknown;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

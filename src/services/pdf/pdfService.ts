@@ -239,16 +239,26 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig, pageD
 
   // mode === 'template': coverTemplates.layoutCover places everything; this only draws it.
   const page = pdfDoc.addPage([pageDims.width, pageDims.height]);
-  await drawCoverItems(page, layoutCover(cover.templateId, cover.values, pageDims), text);
+  await drawCoverItems(pdfDoc, page, layoutCover(cover.templateId, cover.values, pageDims), text);
 }
 
 // layoutCover's items are top-down; pdf-lib's y axis points up. Text in any script (§6 L3).
-async function drawCoverItems(page: PDFPage, items: CoverItem[], text: TextDrawer): Promise<void> {
+async function drawCoverItems(pdfDoc: PDFDocument, page: PDFPage, items: CoverItem[], text: TextDrawer): Promise<void> {
   const pageHeight = page.getHeight();
   const ink = rgb(0.1, 0.1, 0.1);
   for (const item of items) {
     if (item.kind === 'text') {
       await text.draw(page, item.text, { x: item.x, y: pageHeight - item.y, size: item.size, bold: item.bold, align: item.align });
+    } else if (item.kind === 'image') {
+      // §10 M4: the University cover's logo. A missing or unreadable file leaves just the text.
+      try {
+        const bytes = await new File(item.uri).bytes();
+        const image = sniffImageKind(bytes) === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+        const fit = fitBox(image.width, image.height, item.x, pageHeight - item.y - item.height, item.width, item.height);
+        page.drawImage(image, { x: fit.origin.x, y: fit.origin.y, width: fit.width, height: fit.height });
+      } catch (error) {
+        console.warn('pdfService: could not draw the cover logo', error);
+      }
     } else if (item.kind === 'line') {
       page.drawLine({
         start: { x: item.x1, y: pageHeight - item.y1 },

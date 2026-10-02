@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { ProBadge } from '../pro/ProBadge';
 
 type SettingRowProps = {
   title: string;
@@ -10,9 +11,11 @@ type SettingRowProps = {
   chevron?: boolean;
   // Renders a switch on the right; the whole row toggles it.
   toggle?: { value: boolean; onChange: (value: boolean) => void };
+  // §10 M4: a ProBadge after the title (for students without Pro).
+  proBadge?: boolean;
 };
 
-export function SettingRow({ title, subtitle, trailing, onPress, chevron, toggle }: SettingRowProps) {
+export function SettingRow({ title, subtitle, trailing, onPress, chevron, toggle, proBadge }: SettingRowProps) {
   const { tokens } = useTheme();
 
   return (
@@ -24,7 +27,10 @@ export function SettingRow({ title, subtitle, trailing, onPress, chevron, toggle
       accessibilityState={toggle ? { checked: toggle.value } : undefined}
     >
       <View style={styles.textWrap}>
-        <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
+          {proBadge ? <ProBadge /> : null}
+        </View>
         {subtitle ? <Text style={[styles.subtitle, { color: tokens.muted }]}>{subtitle}</Text> : null}
       </View>
       {trailing ? <Text style={[styles.trailing, { color: tokens.muted }]}>{trailing}</Text> : null}
@@ -53,6 +59,12 @@ const styles = StyleSheet.create({
   textWrap: {
     flex: 1,
     gap: 4,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   title: {
     fontSize: 15.5,

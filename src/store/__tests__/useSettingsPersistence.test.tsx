@@ -62,6 +62,26 @@ describe('useSettingsPersistence', () => {
   });
 });
 
+describe('§10 M4 settings', () => {
+  it('keeps the app lock and the logo across a restart, and reads a bad lock as off', async () => {
+    const first = await mount();
+    expect(first().state.settings.appLock).toEqual({ enabled: false, after: '1min', hideInRecents: false });
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_APP_LOCK', appLock: { enabled: true } });
+      first().dispatch({ type: 'settings/SET_APP_LOCK', appLock: { after: '5min' } });
+      first().dispatch({ type: 'settings/SET_INSTITUTION_LOGO', name: 'logo_1.png' });
+    });
+    await flush();
+    const second = await mount();
+    expect(second().state.settings.appLock).toEqual({ enabled: true, after: '5min', hideInRecents: false });
+    expect(second().state.settings.institutionLogo).toBe('logo_1.png');
+
+    await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin', appLock: 'on' }));
+    const third = await mount();
+    expect(third().state.settings.appLock.enabled).toBe(false);
+  });
+});
+
 describe('student profile', () => {
   it('patches one field at a time and survives a restart', async () => {
     const first = await mount();
