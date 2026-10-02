@@ -23,6 +23,9 @@ export type PersistedSettings = {
   // Optional: settings saved before E6 don't have it.
   defaultEnhanceByMode?: Partial<Record<CaptureMode, EnhanceMode>>;
   crashReportsEnabled?: boolean;
+  // Optional: settings saved before §10 M1 don't have them.
+  personalizedAdsEnabled?: boolean;
+  usageStatsEnabled?: boolean;
   lastCaptureMode?: CaptureMode;
   scannerUnavailable?: boolean;
   lastOpened?: { id: string; at: number } | null;

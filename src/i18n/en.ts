@@ -175,6 +175,13 @@ export const en = {
       section: 'Privacy',
       crashReports: 'Send anonymous crash reports',
       crashReportsSubtitle: 'Never includes your documents, names or scanned text.',
+      // §10 M1: the two lines that explain ads, then their toggles.
+      adsNote:
+        'PDF Scan stays free with a small ad on Home and Library. There are no ads while you scan, edit, save, submit or read.\nAds never see your documents or their text; those stay on your phone.',
+      personalizedAds: 'Personalised ads',
+      personalizedAdsSubtitle: 'Off: ads still show, but are not based on your advertising ID.',
+      usageStats: 'Help improve PDF Scan',
+      usageStatsSubtitle: 'Send anonymous usage counts, like how many pages were scanned. Never names or text.',
     },
     about: {
       showIntro: 'Show the introduction again',

@@ -36,7 +36,7 @@ export function SettingsScreen() {
   const classCount = state.library.timetable.filter((slot) =>
     state.library.courses.some((c) => c.id === slot.courseId && !c.archived)
   ).length;
-  const { ocrScript, uiLanguage, documentLanguage, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
+  const { ocrScript, uiLanguage, documentLanguage, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable, personalizedAdsEnabled, usageStatsEnabled } =
     state.settings;
   // 'system' first, then each language with a catalog, then (development builds) the pseudo-locale.
   const languageOptions: { id: UiLanguage; name: string }[] = [
@@ -215,6 +215,23 @@ export function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.privacy.section')}</Text>
+          <Text style={[styles.aboutText, { color: tokens.muted }]}>{t('settings.privacy.adsNote')}</Text>
+          <SettingRow
+            title={t('settings.privacy.personalizedAds')}
+            subtitle={t('settings.privacy.personalizedAdsSubtitle')}
+            toggle={{
+              value: personalizedAdsEnabled,
+              onChange: (enabled) => dispatch({ type: 'settings/SET_PERSONALIZED_ADS', enabled }),
+            }}
+          />
+          <SettingRow
+            title={t('settings.privacy.usageStats')}
+            subtitle={t('settings.privacy.usageStatsSubtitle')}
+            toggle={{
+              value: usageStatsEnabled,
+              onChange: (enabled) => dispatch({ type: 'settings/SET_USAGE_STATS', enabled }),
+            }}
+          />
           <SettingRow
             title={t('settings.privacy.crashReports')}
             subtitle={t('settings.privacy.crashReportsSubtitle')}

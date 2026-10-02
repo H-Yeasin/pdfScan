@@ -122,3 +122,25 @@ describe('app language (§6 L4a)', () => {
     expect((await mount())().state.settings.uiLanguage).toBe('system');
   });
 });
+
+describe('privacy choices (§10 M1)', () => {
+  it('defaults to personalised ads on and usage counts off', async () => {
+    const ctx = await mount();
+    expect(ctx().state.settings).toMatchObject({ personalizedAdsEnabled: true, usageStatsEnabled: false });
+  });
+
+  it('keeps both choices across a restart', async () => {
+    const first = await mount();
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_PERSONALIZED_ADS', enabled: false });
+      first().dispatch({ type: 'settings/SET_USAGE_STATS', enabled: true });
+    });
+    await flush();
+    expect((await mount())().state.settings).toMatchObject({ personalizedAdsEnabled: false, usageStatsEnabled: true });
+  });
+
+  it('reads settings saved before M1 as the defaults', async () => {
+    await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin' }));
+    expect((await mount())().state.settings).toMatchObject({ personalizedAdsEnabled: true, usageStatsEnabled: false });
+  });
+});

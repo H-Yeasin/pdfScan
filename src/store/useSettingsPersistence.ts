@@ -26,6 +26,9 @@ export function useSettingsPersistence() {
         });
         dispatch({ type: 'settings/LOAD_DEFAULT_ENHANCE', byMode: sanitizeDefaultEnhance(settings.defaultEnhanceByMode) });
         dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled: settings.crashReportsEnabled === true });
+        // Personalised ads default to on (missing = never turned off); usage counts to off.
+        dispatch({ type: 'settings/SET_PERSONALIZED_ADS', enabled: settings.personalizedAdsEnabled !== false });
+        dispatch({ type: 'settings/SET_USAGE_STATS', enabled: settings.usageStatsEnabled === true });
         dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: settings.scannerUnavailable === true });
         const opened = settings.lastOpened;
         if (opened && typeof opened.id === 'string' && typeof opened.at === 'number') {
@@ -88,6 +91,8 @@ export function useSettingsPersistence() {
       androidExportFolderLabel: state.settings.androidExportFolderLabel,
       defaultEnhanceByMode: state.settings.defaultEnhanceByMode,
       crashReportsEnabled: state.settings.crashReportsEnabled,
+      personalizedAdsEnabled: state.settings.personalizedAdsEnabled,
+      usageStatsEnabled: state.settings.usageStatsEnabled,
       scannerUnavailable: state.settings.scannerUnavailable,
       lastCaptureMode: state.settings.lastCaptureMode,
       lastOpened: state.settings.lastOpened,
@@ -117,6 +122,8 @@ export function useSettingsPersistence() {
     state.settings.androidExportFolderLabel,
     state.settings.defaultEnhanceByMode,
     state.settings.crashReportsEnabled,
+    state.settings.personalizedAdsEnabled,
+    state.settings.usageStatsEnabled,
     state.settings.scannerUnavailable,
     state.settings.lastCaptureMode,
     state.settings.lastOpened,

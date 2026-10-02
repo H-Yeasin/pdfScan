@@ -23,6 +23,13 @@ export type SettingsState = {
   defaultEnhanceByMode: Partial<Record<CaptureMode, EnhanceMode>>;
   // Opt-in, off by default: see services/telemetry/crash.ts.
   crashReportsEnabled: boolean;
+  // §10 M1: ads get the advertising ID only for personalised ads. On by default; where the law
+  // needs consent (EEA, UK) M5's consent form decides instead, and this stays the student's own
+  // choice everywhere else (off = requestNonPersonalizedAdsOnly).
+  personalizedAdsEnabled: boolean;
+  // §10 M1: opt-in usage counts (M8's allow-listed Firebase Analytics events). Off by default,
+  // like crash reports.
+  usageStatsEnabled: boolean;
   // Google's document scanner failed in a way that means it can't run on this phone (no or
   // outdated Play services); scans go straight to the basic camera fallback (scannerFallback.ts).
   scannerUnavailable: boolean;
@@ -75,6 +82,8 @@ export const initialSettingsState: SettingsState = {
   androidExportFolderLabel: null,
   defaultEnhanceByMode: {},
   crashReportsEnabled: false,
+  personalizedAdsEnabled: true,
+  usageStatsEnabled: false,
   scannerUnavailable: false,
   lastOpened: null,
   profile: EMPTY_PROFILE,
@@ -115,6 +124,8 @@ export type SettingsAction =
   | { type: 'settings/SET_DEFAULT_ENHANCE'; mode: CaptureMode; enhance: EnhanceMode }
   | { type: 'settings/LOAD_DEFAULT_ENHANCE'; byMode: Partial<Record<CaptureMode, EnhanceMode>> }
   | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean }
+  | { type: 'settings/SET_PERSONALIZED_ADS'; enabled: boolean }
+  | { type: 'settings/SET_USAGE_STATS'; enabled: boolean }
   | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
   | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
   // A partial patch, so each profile field can be edited on its own.
@@ -172,6 +183,10 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, defaultEnhanceByMode: action.byMode };
     case 'settings/SET_CRASH_REPORTS':
       return { ...state, crashReportsEnabled: action.enabled };
+    case 'settings/SET_PERSONALIZED_ADS':
+      return { ...state, personalizedAdsEnabled: action.enabled };
+    case 'settings/SET_USAGE_STATS':
+      return { ...state, usageStatsEnabled: action.enabled };
     case 'settings/SET_SCANNER_UNAVAILABLE':
       return { ...state, scannerUnavailable: action.unavailable };
     case 'settings/SET_LAST_OPENED':

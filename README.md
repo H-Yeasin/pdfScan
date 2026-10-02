@@ -14,8 +14,8 @@
 <p align="center">
   A privacy-first document scanner for React Native: point-and-shoot capture with auto edge
   detection, on-device OCR, a full PDF toolkit (merge / split / compress / sign), and a
-  built-in reader for PDFs, Office files and images — no accounts, no watermark, nothing
-  ever leaves the phone.
+  built-in reader for PDFs, Office files and images — no accounts, no watermark, no ads while
+  you work, and your documents never leave the phone.
 </p>
 
 ---
@@ -109,7 +109,10 @@ so scanned documents never touch a server.
 
 ### Privacy by design
 - No account, no cloud upload, no watermark on exports. Scanning, OCR, and PDF assembly all
-  happen on-device; the only network-free promise the app makes, it keeps.
+  happen on-device; documents and their text never leave the phone unless you share them.
+- No ads while you work: at most a small banner on Home and Library (never in capture, review,
+  saving, submitting or reading). Personalised ads can be turned off in Settings ▸ Privacy.
+  See the [privacy policy](docs/policy/privacy-policy.md).
 - Crash reporting is opt-in (off by default) and scrubbed of document names, paths and text —
   see [docs/crash-reporting.md](docs/crash-reporting.md).
 
