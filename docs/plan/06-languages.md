@@ -210,7 +210,7 @@ the names can be found by search in the PDF, and an English-only cover is unchan
   `ocr/__tests__/fakeScript.test.ts`, and the updated `coverTemplates` script test.
 
 ### L4 · UI translation layer, English only *(M, split into 4 sessions)*
-Status: L4a done (commit 8de31f8); L4b–L4d todo
+Status: L4a done (commit 8de31f8), L4b done (commit 519540d); L4c–L4d todo
 
 - **L4a: infrastructure plus Settings and Home.**
   - Add `expo-localization@~57` (check the version in the package source).
@@ -273,6 +273,24 @@ strings, and adding `bn.ts` later only means adding that file (and its registry 
   phrase shown as is (tab bar excluded until L4d).
 - Not done yet: `document.*` strings and the "Document language" setting. They belong with the
   cover/footer text in **L4c** (Deliver, Submit, Academic options).
+
+**As built (L4b):**
+- Converted: `CaptureScreen`, `ReviewScreen`, everything in `components/capture` and
+  `components/review` (all now in the hard-coded check's `CONVERTED` list; 256 strings in 44
+  files left).
+- `CaptureModeSpec` has `labelKey`/`hintKey` and `FilterSpec` has `labelKey` (catalog keys) in
+  place of English `label`/`hint`; UI calls `t(spec.labelKey)`. The Filter Lab (dev) translates
+  them too; its tuning-parameter labels stay English (developer tool).
+- Service messages shown during capture go through `t()` when shown: `ingestBatch` snacks and
+  errors, the scanner tip, the camera fallback's "Take another?" alert, AppNavigator's "Scan
+  failed". `SCANNER_UNAVAILABLE_MESSAGE` became `scannerUnavailableMessage()`, so it isn't fixed
+  at import time. A native scanner error's own message is still shown as the OS gives it.
+- Added missing accessibility labels (capture gallery/shutter/tray, Capture's settings button,
+  Review's grid button, the action bar buttons).
+- Shared pieces Review uses (`SignatureCaptureModal`, `SignaturePlacementOverlay`, `TabBar`)
+  are L4d.
+- Tests: `i18n/__tests__/serviceStrings.test.ts` (every mode/filter key resolves; service
+  messages switch with the language).
 
 ### L5 · Tesseract engine (for Bangla) *(L — later, phase P4)*
 Status: later (do it when Bangla is scheduled)

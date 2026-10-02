@@ -15,7 +15,7 @@ code **when the section was planned**, and are kept as history.
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | All done in code. Device checks open. |
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
-| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L3 and L4a done in code (device checks open; L3's spike was skipped, system fonts assumed). Next: L4b. L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
+| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L3 and L4a–L4b done in code (device checks open; L3's spike was skipped, system fonts assumed). Next: L4c. L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | Planned (2026-10-02). R5 (SheetJS security fix) can go first; R6 waits for Pro. |
 | §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
 
@@ -71,6 +71,7 @@ lines here.
 | L2 `OcrEngine` interface | 881af3e | `ocr/engines/*`, `ocrService.recognizePage` (failure reasons), `test/fakeScript.ts` |
 | L3 Visible PDF text in any script | 9f5689a | `pdf/skiaText.ts`, `pdf/visibleText.ts`, `test/fakeShaper.ts`; **spike not run** (system fonts assumed) |
 | L4a i18n layer, Settings + Home | 8de31f8 | `src/i18n/*`, `settings.uiLanguage`, `expo-localization` (new dev build), hard-coded string scan |
+| L4b Capture + Review converted | 519540d | mode/filter specs carry `labelKey`/`hintKey`; capture service messages via `t()` |
 
 ## How the branches came together
 
