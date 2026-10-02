@@ -75,7 +75,8 @@ Status: done in code (commit 076c8c7); the Play Console checklist is open (owner
   shows only the crash-report toggle.
 
 ### M2 · Firebase Remote Config (no login) *(S)*
-Status: todo
+Status: done in code (commit a034bb4); the Firebase project, the EAS file variables and the
+console check are open (owner, `docs/firebase.md`).
 
 - Add `@react-native-firebase/app` and `@react-native-firebase/remote-config` (v26.x; check the
   Expo config plugin and SDK 57 support in the package source, see AGENTS.md).
@@ -89,6 +90,19 @@ Status: todo
 - Tests: defaults when offline; type coercion; unknown keys ignored.
 - Done when: changing `ads_enabled` in the Firebase console turns ads on or off on a phone
   after the next start, with no update.
+- **As built:** `getRemoteConfig()` / `useRemoteConfig()` (module state with
+  `useSyncExternalStore`, not a store slice; Firebase caches on disk). `loadRemoteConfig()` runs
+  in `AppNavigator` once `afterBoot`: `ensureInitialized` + the cached values first, then
+  `fetchAndActivate` (1 h minimum interval, 0 in dev) and those are applied in the same session.
+  It returns early when `getApps()` is empty (no config files) and the SDK is `require`d lazily.
+  Ranges: `pass_hours` 1–168, `pass_max_per_day` 0–10; `support_whatsapp` must be 8–15 digits
+  (never empty); `ads_banner_screens` is a JSON array. `isVersionBelow()` is ready for the
+  `min_supported_version` message, which has no UI yet. `app.config.js` adds the
+  `@react-native-firebase/app` plugin only when `GOOGLE_SERVICES_JSON` /
+  `GOOGLE_SERVICE_INFO_PLIST` are set. `remote-config` has `analytics` as a peer, so npm
+  installed `@react-native-firebase/analytics@26.4.0` too (in the lockfile, not
+  `package.json`); `firebase.json` switches off its automatic collection, advertising ID, SSAID
+  and screen reporting until M8. New dev build needed.
 
 ### M3 · Pro feature registry and entitlements *(S)* (the old M1, adapted)
 Status: todo
