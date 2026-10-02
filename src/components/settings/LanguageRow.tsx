@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useT } from '../../i18n/useT';
 import { spacing, useTheme } from '../../theme';
 
 type LanguageRowProps = {
@@ -14,6 +15,7 @@ type LanguageRowProps = {
 
 export function LanguageRow({ name, subtitle, sample, selected, comingSoon, onPress }: LanguageRowProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <Pressable
@@ -22,7 +24,7 @@ export function LanguageRow({ name, subtitle, sample, selected, comingSoon, onPr
       disabled={comingSoon}
       accessibilityRole="radio"
       accessibilityState={{ selected, disabled: comingSoon }}
-      accessibilityLabel={comingSoon ? `Coming soon: ${name}${subtitle ? ` (${subtitle})` : ''}` : undefined}
+      accessibilityLabel={comingSoon ? t('common.comingSoonA11y', { name: subtitle ? `${name} (${subtitle})` : name }) : undefined}
     >
       <View style={styles.text}>
         <Text style={[styles.name, { color: comingSoon ? tokens.muted : tokens.ink }]}>{name}</Text>
@@ -33,7 +35,7 @@ export function LanguageRow({ name, subtitle, sample, selected, comingSoon, onPr
         ) : null}
       </View>
       <Text style={[styles.status, { color: selected ? tokens.accentInk : tokens.muted }]}>
-        {comingSoon ? 'Coming soon' : selected ? 'Active' : 'Select'}
+        {comingSoon ? t('common.comingSoon') : selected ? t('common.active') : t('common.select')}
       </Text>
     </Pressable>
   );

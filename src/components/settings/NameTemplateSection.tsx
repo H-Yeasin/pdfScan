@@ -2,20 +2,27 @@ import { useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NameField } from '../deliver/NameField';
 import { Pill } from '../shared/Pill';
+import { useT } from '../../i18n/useT';
 import { DEFAULT_NAME_TEMPLATE, NAME_TOKENS, suggestName } from '../../services/submit/naming';
 import { useAppState } from '../../store/AppStateContext';
 import { spacing, useTheme } from '../../theme';
 
-// A stand-in for the live example when there are no courses yet.
-const SAMPLE_COURSE = { name: 'Physics', code: 'PHY 101' };
 
 // Settings editor for settings.nameTemplate: the template itself, chips that insert a token at
 // the cursor, and the name it gives right now, with the real profile and the first course.
 export function NameTemplateSection() {
   const { tokens } = useTheme();
+  const { t, locale } = useT();
   const { state, dispatch } = useAppState();
   const { nameTemplate, profile } = state.settings;
-  const course = state.library.courses.find((c) => !c.archived) ?? SAMPLE_COURSE;
+  // A stand-in for the live example when there are no courses yet.
+  const firstCourse = state.library.courses.find((c) => !c.archived);
+  const course = useMemo(
+    () => firstCourse ?? { name: t('settings.fileNames.sampleCourse'), code: 'PHY 101' },
+    // `locale`: t is one function for every language, so the language is the dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [firstCourse, locale]
+  );
   // Where a token chip inserts; the end until the field reports a cursor.
   const cursor = useRef<number | null>(null);
 
@@ -36,16 +43,17 @@ export function NameTemplateSection() {
         docType: 'assignment',
         n: 3,
         date: new Date(),
-        title: "Ohm's law",
+        title: t('settings.fileNames.sampleTitle'),
       }),
-    [nameTemplate, profile, course]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nameTemplate, profile, course, locale]
   );
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionLabel, { color: tokens.muted }]}>File names</Text>
+      <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.fileNames.section')}</Text>
       <NameField
-        label="Naming template"
+        label={t('settings.fileNames.template')}
         placeholder={DEFAULT_NAME_TEMPLATE}
         value={nameTemplate}
         onChange={setTemplate}
@@ -55,22 +63,21 @@ export function NameTemplateSection() {
       />
       <View style={styles.chips}>
         {NAME_TOKENS.map((token) => (
-          <Pressable key={token} onPress={() => insertToken(token)} accessibilityRole="button" accessibilityLabel={`Insert ${token}`}>
+          <Pressable key={token} onPress={() => insertToken(token)} accessibilityRole="button" accessibilityLabel={t('settings.fileNames.insertToken', { token })}>
             <Pill backgroundColor={tokens.surface} borderColor={tokens.edge} textColor={tokens.ink}>{`{${token}}`}</Pill>
           </Pressable>
         ))}
       </View>
       <Text style={[styles.footnote, { color: tokens.ink }]} selectable>
-        Example: {example ? `${example}.pdf` : '(empty: scans are named Scan_<date>)'}
+        {example ? t('settings.fileNames.example', { name: `${example}.pdf` }) : t('settings.fileNames.exampleEmpty')}
       </Text>
       {nameTemplate !== DEFAULT_NAME_TEMPLATE ? (
         <Pressable onPress={() => setTemplate(DEFAULT_NAME_TEMPLATE)} accessibilityRole="button" hitSlop={8}>
-          <Text style={[styles.link, { color: tokens.accentInk }]}>Reset to {DEFAULT_NAME_TEMPLATE}</Text>
+          <Text style={[styles.link, { color: tokens.accentInk }]}>{t('settings.fileNames.reset', { template: DEFAULT_NAME_TEMPLATE })}</Text>
         </Pressable>
       ) : null}
       <Text style={[styles.footnote, { color: tokens.muted }]}>
-        Used to name new scans in Deliver. Without a name and roll in your profile, the default
-        becomes {'{course}_{type}{n}_{date}'}. Empty parts are left out.
+        {t('settings.fileNames.footnote', { fallback: '{course}_{type}{n}_{date}' })}
       </Text>
     </View>
   );

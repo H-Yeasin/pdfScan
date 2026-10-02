@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, create } from 'react-test-renderer';
+import { getUiLanguage, setUiLanguage } from '../../i18n';
 import { ThemeProvider } from '../../theme';
 import { AppStateProvider, useAppState } from '../AppStateContext';
 import { useSettingsPersistence } from '../useSettingsPersistence';
@@ -96,5 +97,28 @@ describe('naming template', () => {
 
     await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin', nameTemplate: ' ' }));
     expect((await mount())().state.settings.nameTemplate).toBe('{roll}_{name}_{course}_{type}{n}');
+  });
+});
+
+describe('app language (§6 L4a)', () => {
+  afterEach(() => setUiLanguage('system'));
+
+  it('survives a restart and is applied to the i18n layer', async () => {
+    const first = await mount();
+    expect(first().state.settings.uiLanguage).toBe('system');
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_UI_LANGUAGE', language: 'en-XA' });
+    });
+    expect(getUiLanguage()).toBe('en-XA');
+    await flush();
+    setUiLanguage('system');
+
+    expect((await mount())().state.settings.uiLanguage).toBe('en-XA');
+    expect(getUiLanguage()).toBe('en-XA');
+  });
+
+  it('reads an unknown stored language as the phone language', async () => {
+    await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin', uiLanguage: 'tlh' }));
+    expect((await mount())().state.settings.uiLanguage).toBe('system');
   });
 });

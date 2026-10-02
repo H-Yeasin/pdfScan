@@ -1,3 +1,4 @@
+import { formatDate, t } from '../../i18n';
 import type { Course, LibraryDocument, Semester } from '../../types/models';
 
 // Everything Home derives from the library, as pure functions of state + today, so the rules are
@@ -74,10 +75,10 @@ export function relativeDay(at: number, now: number): string {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
   const days = Math.round((startOfDay(now) - startOfDay(at)) / 86_400_000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
-  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (days <= 0) return t('common.today');
+  if (days === 1) return t('common.yesterday');
+  if (days < 7) return t('common.daysAgo', { count: days });
+  return formatDate(at, { month: 'short', day: 'numeric' });
 }
 
 // Home's "Move earlier/later": swaps a course with its neighbour among the courses Home shows,

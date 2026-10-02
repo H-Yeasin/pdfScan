@@ -9,21 +9,25 @@ import { NameTemplateSection } from '../components/settings/NameTemplateSection'
 import { ProfileSection } from '../components/settings/ProfileSection';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
+import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, systemCatalogId, type UiLanguage } from '../i18n';
+import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 
-const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
-  { id: 'system', label: 'System' },
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
-];
 
+const APP_VERSION = '1.0';
 
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
+  const { t } = useT();
+  const themeSegments: { id: ThemePref; label: string }[] = [
+    { id: 'system', label: t('settings.theme.system') },
+    { id: 'light', label: t('settings.theme.light') },
+    { id: 'dark', label: t('settings.theme.dark') },
+  ];
   const [timetableOpen, setTimetableOpen] = useState(false);
   const { go, hub } = useRouter();
   const { state, dispatch } = useAppState();
@@ -31,13 +35,19 @@ export function SettingsScreen() {
   const classCount = state.library.timetable.filter((slot) =>
     state.library.courses.some((c) => c.id === slot.courseId && !c.archived)
   ).length;
-  const { ocrScript, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
+  const { ocrScript, uiLanguage, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
     state.settings;
+  // 'system' first, then each language with a catalog, then (development builds) the pseudo-locale.
+  const languageOptions: { id: UiLanguage; name: string }[] = [
+    { id: 'system', name: t('settings.language.system', { name: catalogNativeName(systemCatalogId()) }) },
+    ...CATALOG_IDS.map((id): { id: UiLanguage; name: string } => ({ id, name: catalogNativeName(id) })),
+    ...(__DEV__ ? [{ id: PSEUDO_LOCALE as UiLanguage, name: t('settings.language.pseudo') }] : []),
+  ];
 
   const handlePickExportFolder = useCallback(async () => {
     const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!result.granted) {
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'No folder selected' });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('settings.export.noFolder') });
       return;
     }
     dispatch({
@@ -45,15 +55,15 @@ export function SettingsScreen() {
       uri: result.directoryUri,
       label: deriveFolderLabel(result.directoryUri),
     });
-  }, [dispatch]);
+  }, [dispatch, t]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go(hub, 'back')}>
+        <Pressable style={styles.headerButton} onPress={() => go(hub, 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Settings</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('settings.title')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -62,12 +72,26 @@ export function SettingsScreen() {
         <NameTemplateSection />
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Appearance</Text>
-          <SegmentedControl segments={THEME_SEGMENTS} value={themePref} onChange={setThemePref} />
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.appearance')}</Text>
+          <SegmentedControl segments={themeSegments} value={themePref} onChange={setThemePref} />
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Recognition language</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.language.section')}</Text>
+          <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+            {languageOptions.map((option) => (
+              <LanguageRow
+                key={option.id}
+                name={option.name}
+                selected={uiLanguage === option.id}
+                onPress={() => dispatch({ type: 'settings/SET_UI_LANGUAGE', language: option.id })}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.recognition.section')}</Text>
           <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
             {READY_SCRIPTS.map((script) => (
               <LanguageRow
@@ -89,55 +113,49 @@ export function SettingsScreen() {
               />
             ))}
           </View>
-          <Text style={[styles.footnote, { color: tokens.muted }]}>
-            Recognition runs fully on-device and makes your scans searchable. Pick the script your
-            documents are written in; a course can use its own (edit the course). Devanagari also
-            covers Sanskrit.
-          </Text>
+          <Text style={[styles.footnote, { color: tokens.muted }]}>{t('settings.recognition.footnote')}</Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Organization</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.organization.section')}</Text>
           <SettingRow
-            title="Manage courses"
-            subtitle="Create, rename, and organize your courses"
+            title={t('settings.organization.manageCourses')}
+            subtitle={t('settings.organization.manageCoursesSubtitle')}
             chevron
             onPress={() => go('manageFolders')}
           />
           <SettingRow
-            title="Class times"
-            subtitle="Scans during a class are saved to that course"
-            trailing={classCount === 0 ? 'Not set' : `${classCount} ${classCount === 1 ? 'class' : 'classes'}`}
+            title={t('settings.organization.classTimes')}
+            subtitle={t('settings.organization.classTimesSubtitle')}
+            trailing={classCount === 0 ? t('common.notSet') : t('settings.organization.classCount', { count: classCount })}
             onPress={() => setTimetableOpen(true)}
           />
         </View>
 
         {Platform.OS === 'android' && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Export</Text>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.export.section')}</Text>
             <SettingRow
-              title="Default export folder"
-              subtitle="Copy exported files here automatically"
-              trailing={androidExportFolderLabel ?? 'Not set'}
+              title={t('settings.export.folder')}
+              subtitle={t('settings.export.folderSubtitle')}
+              trailing={androidExportFolderLabel ?? t('common.notSet')}
               onPress={handlePickExportFolder}
             />
             {androidExportFolderUri ? (
-              <Text style={[styles.footnote, { color: tokens.muted }]}>
-                Turn on "Also save a copy" in Deliver to write exports here too.
-              </Text>
+              <Text style={[styles.footnote, { color: tokens.muted }]}>{t('settings.export.folderHint')}</Text>
             ) : null}
           </View>
         )}
 
         {scannerUnavailable && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Scanner</Text>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.scanner.section')}</Text>
             <SettingRow
-              title="Basic camera mode"
-              subtitle="Google's scanner wasn't available on this phone. Tap to try it again (e.g. after updating Google Play services)."
+              title={t('settings.scanner.basicMode')}
+              subtitle={t('settings.scanner.basicModeSubtitle')}
               onPress={() => {
                 dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: false });
-                dispatch({ type: 'ui/SHOW_SNACK', msg: "The next scan will try Google's scanner" });
+                dispatch({ type: 'ui/SHOW_SNACK', msg: t('settings.scanner.retrySnack') });
               }}
             />
           </View>
@@ -145,10 +163,10 @@ export function SettingsScreen() {
 
         {__DEV__ && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Developer</Text>
+            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.developer.section')}</Text>
             <SettingRow
-              title="Filter Lab"
-              subtitle="Compare every filter and tune its constants"
+              title={t('settings.developer.filterLab')}
+              subtitle={t('settings.developer.filterLabSubtitle')}
               chevron
               onPress={() => go('filterLab')}
             />
@@ -156,10 +174,10 @@ export function SettingsScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Privacy</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.privacy.section')}</Text>
           <SettingRow
-            title="Send anonymous crash reports"
-            subtitle="Never includes your documents, names or scanned text."
+            title={t('settings.privacy.crashReports')}
+            subtitle={t('settings.privacy.crashReportsSubtitle')}
             toggle={{
               value: crashReportsEnabled,
               onChange: (enabled) => dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled }),
@@ -168,10 +186,8 @@ export function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>About</Text>
-          <Text style={[styles.aboutText, { color: tokens.muted }]}>
-            Version 1.0 · Documents never leave your phone unless you share them.
-          </Text>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.about.section')}</Text>
+          <Text style={[styles.aboutText, { color: tokens.muted }]}>{t('settings.about.text', { version: APP_VERSION })}</Text>
         </View>
       </ScrollView>
       <TimetableEditor visible={timetableOpen} onClose={() => setTimetableOpen(false)} />

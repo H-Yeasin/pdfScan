@@ -1,3 +1,4 @@
+import type { UiLanguage } from '../../i18n';
 import { getCaptureModeSpec } from '../../services/capture/captureModes';
 import type { CaptureModeSpec } from '../../services/capture/captureModes';
 import { DEFAULT_NAME_TEMPLATE } from '../../services/submit/naming';
@@ -37,6 +38,9 @@ export type SettingsState = {
   // §3 K6: the Unsorted page's "n documents have no course. Sort them now?" banner was answered
   // or dismissed, so it isn't shown again.
   unsortedPromptDone: boolean;
+  // §6 L4: the app's language. 'system' follows the phone (the first of its languages that has a
+  // catalog, else English); 'en-XA' is the developer pseudo-locale (dev builds only).
+  uiLanguage: UiLanguage;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -54,6 +58,7 @@ export const initialSettingsState: SettingsState = {
   nameTemplate: DEFAULT_NAME_TEMPLATE,
   profilePrompted: false,
   unsortedPromptDone: false,
+  uiLanguage: 'system',
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -82,7 +87,8 @@ export type SettingsAction =
   | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> }
   | { type: 'settings/SET_NAME_TEMPLATE'; template: string }
   | { type: 'settings/SET_PROFILE_PROMPTED' }
-  | { type: 'settings/SET_UNSORTED_PROMPT_DONE' };
+  | { type: 'settings/SET_UNSORTED_PROMPT_DONE' }
+  | { type: 'settings/SET_UI_LANGUAGE'; language: UiLanguage };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -114,6 +120,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, profilePrompted: true };
     case 'settings/SET_NAME_TEMPLATE':
       return { ...state, nameTemplate: action.template };
+    case 'settings/SET_UI_LANGUAGE':
+      return { ...state, uiLanguage: action.language };
     default:
       return state;
   }

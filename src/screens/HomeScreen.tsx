@@ -12,6 +12,7 @@ import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet
 import { DeadlineList } from '../components/deadlines/DeadlineList';
 import { dueSoon } from '../services/submit/deadlines';
 import { TabBar } from '../components/shared/TabBar';
+import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import {
   continueDocument,
@@ -34,6 +35,7 @@ import { toLocalDateString } from '../utils/localDate';
 // All derived data comes from homeSelectors.ts.
 export function HomeScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { files, courses, semesters, homeSemesterId } = state.library;
@@ -73,21 +75,21 @@ export function HomeScreen() {
     };
     const index = shownIds.indexOf(course.id);
     Alert.alert(course.name, undefined, [
-      { text: 'Edit', onPress: () => setEditing({ course }) },
-      ...(index > 0 ? [{ text: 'Move earlier', onPress: () => move(-1) }] : []),
-      ...(index < shownIds.length - 1 ? [{ text: 'Move later', onPress: () => move(1) }] : []),
+      { text: t('common.edit'), onPress: () => setEditing({ course }) },
+      ...(index > 0 ? [{ text: t('home.moveEarlier'), onPress: () => move(-1) }] : []),
+      ...(index < shownIds.length - 1 ? [{ text: t('home.moveLater'), onPress: () => move(1) }] : []),
       {
-        text: 'Archive',
+        text: t('home.archive'),
         onPress: () => {
           dispatch({ type: 'library/UPDATE_COURSE', id: course.id, patch: { archived: true } });
-          dispatch({ type: 'ui/SHOW_SNACK', msg: `${course.name} archived` });
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('home.archived', { name: course.name }) });
         },
       },
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
-  const courseName = (id: string | undefined) => (id ? courses.find((c) => c.id === id)?.name : undefined) ?? 'Unsorted';
+  const courseName = (id: string | undefined) => (id ? courses.find((c) => c.id === id)?.name : undefined) ?? t('common.unsorted');
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
@@ -97,14 +99,14 @@ export function HomeScreen() {
           onPress={() => setSwitcherOpen(true)}
           disabled={!shown}
           accessibilityRole="button"
-          accessibilityLabel={shown ? `Semester: ${shown.name}. Change` : undefined}
+          accessibilityLabel={shown ? t('home.semesterA11y', { name: shown.name }) : undefined}
         >
           <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
-            {shown?.name ?? 'Your courses'}
+            {shown?.name ?? t('home.yourCourses')}
           </Text>
           {shown ? <Ionicons name="chevron-down" size={18} color={tokens.muted} /> : null}
         </Pressable>
-        <Pressable style={styles.iconButton} onPress={() => go('settings')} accessibilityLabel="Settings">
+        <Pressable style={styles.iconButton} onPress={() => go('settings')} accessibilityLabel={t('common.settings')}>
           <Ionicons name="settings-outline" size={21} color={tokens.ink} />
         </Pressable>
       </View>
@@ -119,7 +121,7 @@ export function HomeScreen() {
             <Ionicons name={resume.reason === 'opened' ? 'book-outline' : 'document-text-outline'} size={22} color={tokens.accentInk} />
             <View style={styles.flex}>
               <Text style={[styles.overline, { color: tokens.muted }]}>
-                {resume.reason === 'opened' ? 'Continue reading' : 'Latest scan'}
+                {resume.reason === 'opened' ? t('home.continueReading') : t('home.latestScan')}
               </Text>
               <Text style={[styles.cardTitle, { color: tokens.ink }]} numberOfLines={1}>
                 {resume.doc.name}
@@ -135,9 +137,9 @@ export function HomeScreen() {
         {hasActiveCourse ? (
           <View style={styles.dueSoon}>
             <View style={styles.dueSoonHeader}>
-              <Text style={[styles.overline, { color: tokens.muted }]}>Due soon</Text>
+              <Text style={[styles.overline, { color: tokens.muted }]}>{t('home.dueSoon')}</Text>
               <Pressable onPress={() => setAddingDeadline(true)} accessibilityRole="button" hitSlop={8}>
-                <Text style={[styles.addDeadline, { color: tokens.accentInk }]}>+ Add deadline</Text>
+                <Text style={[styles.addDeadline, { color: tokens.accentInk }]}>{t('home.addDeadline')}</Text>
               </Pressable>
             </View>
             {soon.length > 0 ? (
@@ -154,19 +156,17 @@ export function HomeScreen() {
                 }}
               />
             ) : (
-              <Text style={[styles.meta, { color: tokens.muted }]}>Nothing due in the next 7 days.</Text>
+              <Text style={[styles.meta, { color: tokens.muted }]}>{t('home.nothingDue')}</Text>
             )}
           </View>
         ) : null}
 
         {!hasActiveCourse ? (
           <View style={[styles.emptyCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-            <Text style={[styles.emptyTitle, { color: tokens.ink }]}>Add your courses</Text>
-            <Text style={[styles.meta, styles.center, { color: tokens.muted }]}>
-              Each scan gets filed under a course, so a subject's notes and handouts stay together.
-            </Text>
+            <Text style={[styles.emptyTitle, { color: tokens.ink }]}>{t('home.emptyTitle')}</Text>
+            <Text style={[styles.meta, styles.center, { color: tokens.muted }]}>{t('home.emptyBody')}</Text>
             <Pressable style={[styles.pill, { backgroundColor: tokens.accent }]} onPress={() => setQuickSetup(true)}>
-              <Text style={styles.pillLabel}>Add your courses</Text>
+              <Text style={styles.pillLabel}>{t('home.emptyButton')}</Text>
             </Pressable>
           </View>
         ) : (
@@ -182,7 +182,7 @@ export function HomeScreen() {
                   onLongPress={() => handleCourseMenu(course)}
                   delayLongPress={400}
                   accessibilityRole="button"
-                  accessibilityHint="Long-press to edit, reorder or archive"
+                  accessibilityHint={t('home.courseHint')}
                 >
                   <CourseBadge course={course} size={36} />
                   {course.code ? (
@@ -194,7 +194,7 @@ export function HomeScreen() {
                     {course.name}
                   </Text>
                   <Text style={[styles.meta, { color: tokens.muted }]} numberOfLines={1}>
-                    {stats ? `${stats.count} ${stats.count === 1 ? 'doc' : 'docs'} · ${relativeDay(stats.lastScanAt!, now)}` : 'No scans yet'}
+                    {stats ? `${t('home.docCount', { count: stats.count })} · ${relativeDay(stats.lastScanAt!, now)}` : t('home.noScansYet')}
                   </Text>
                 </Pressable>
               );
@@ -205,7 +205,7 @@ export function HomeScreen() {
               accessibilityRole="button"
             >
               <Ionicons name="add" size={24} color={tokens.accentInk} />
-              <Text style={[styles.addLabel, { color: tokens.accentInk }]}>Add course</Text>
+              <Text style={[styles.addLabel, { color: tokens.accentInk }]}>{t('home.addCourse')}</Text>
             </Pressable>
           </View>
         )}
@@ -217,7 +217,7 @@ export function HomeScreen() {
             accessibilityRole="button"
           >
             <Ionicons name="file-tray-outline" size={20} color={tokens.muted} />
-            <Text style={[styles.cardTitle, styles.flex, { color: tokens.ink }]}>Unsorted ({activity.unsorted.count})</Text>
+            <Text style={[styles.cardTitle, styles.flex, { color: tokens.ink }]}>{t('home.unsortedCount', { count: activity.unsorted.count })}</Text>
             <Ionicons name="chevron-forward" size={18} color={tokens.muted} />
           </Pressable>
         ) : null}
@@ -229,10 +229,10 @@ export function HomeScreen() {
         style={[styles.scanButton, { backgroundColor: tokens.accent }]}
         onPress={handleScan}
         accessibilityRole="button"
-        accessibilityLabel="Scan"
+        accessibilityLabel={t('common.scan')}
       >
         <Ionicons name="scan" size={22} color="#fff" />
-        <Text style={styles.scanLabel}>Scan</Text>
+        <Text style={styles.scanLabel}>{t('common.scan')}</Text>
       </Pressable>
 
       <TabBar active="home" background={tokens.surface} activeColor={tokens.ink} inactiveColor={tokens.muted} accent={tokens.accent} />

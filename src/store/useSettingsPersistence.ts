@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { PSEUDO_LOCALE, isUiLanguage, setUiLanguage } from '../i18n';
 import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings } from '../services/persistence/settingsStorage';
 import { normalizeProfile } from '../services/submit/profile';
@@ -46,6 +47,10 @@ export function useSettingsPersistence() {
         if (typeof settings.nameTemplate === 'string' && settings.nameTemplate.trim()) {
           dispatch({ type: 'settings/SET_NAME_TEMPLATE', template: settings.nameTemplate });
         }
+        // The pseudo-locale only exists in development builds.
+        if (isUiLanguage(settings.uiLanguage) && (settings.uiLanguage !== PSEUDO_LOCALE || __DEV__)) {
+          dispatch({ type: 'settings/SET_UI_LANGUAGE', language: settings.uiLanguage });
+        }
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -73,6 +78,7 @@ export function useSettingsPersistence() {
       nameTemplate: state.settings.nameTemplate,
       profilePrompted: state.settings.profilePrompted,
       unsortedPromptDone: state.settings.unsortedPromptDone,
+      uiLanguage: state.settings.uiLanguage,
     });
   }, [
     loaded,
@@ -90,5 +96,11 @@ export function useSettingsPersistence() {
     state.settings.nameTemplate,
     state.settings.profilePrompted,
     state.settings.unsortedPromptDone,
+    state.settings.uiLanguage,
   ]);
+
+  // The i18n layer follows the setting; screens re-render through useT.
+  useEffect(() => {
+    setUiLanguage(state.settings.uiLanguage);
+  }, [state.settings.uiLanguage]);
 }

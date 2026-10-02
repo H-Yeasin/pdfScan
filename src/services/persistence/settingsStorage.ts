@@ -24,6 +24,8 @@ export type PersistedSettings = {
   profilePrompted?: boolean;
   // Optional: added in §3 K6.
   unsortedPromptDone?: boolean;
+  // Optional: added in §6 L4a. Unknown values read as 'system'.
+  uiLanguage?: string;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {
