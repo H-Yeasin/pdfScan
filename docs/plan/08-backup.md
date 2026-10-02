@@ -281,7 +281,51 @@ As built:
 (profiler), and the zip can be saved to a folder or shared.
 
 ### B4 · Restore and import *(M)*
-Status: todo
+Status: done (commit de148e2)
+
+As built:
+- `backup/restoreBackup.ts`: `readBackup(file)` (sync; `NOT_A_BACKUP`/`TOO_NEW`/zip errors),
+  `previewRestore(backup, mode)` (`importPlan` + bytes needed + `checkSpaceFor`), and
+  `applyRestore(backup, preview, { onProgress, signal, restoreSignature })`. A restore below
+  B1's 50 MB floor is refused (`RestoreSpaceError`). A folder already sitting at a target id
+  with no row (crash leftovers) goes to `library/.trash/` first. If anything fails after moves
+  began, the moved folders are deleted along with the rollback.
+- **Write lock:** `dbService.withWriteLock` puts the library sync (`useLibraryPersistence`) and
+  the restore's transaction in a queue. Both use the one connection, and overlapping
+  transactions would interleave.
+- **Reload:** after a restore the UI dispatches `library/RETRY_LOAD`. `useStorageIntegrity` now
+  runs once per `loadAttempt` (not once per launch), so the integrity check runs after every
+  B4 restore.
+- **FTS:** the insert triggers index the pages, so no rebuild is needed (covered by B2's round
+  trip test). **Deadlines:** open deadlines still ahead get new reminders through
+  `scheduleReminders` (asking for notification permission once), and their ids are written
+  back.
+- **"PDFs only" backups** (`restorable: 'pdfs'`) are converted by `asImportedPdfs`: PDF
+  documents become `imported_pdf` with no pages (the R1 indexer makes them again). Office files
+  keep their row. Pages, annotations, bookmarks and submissions are dropped, and documents
+  whose file isn't in the zip are skipped.
+- **Settings** (`backup/restoreSettings.ts`, pure): a field counts as "set on this phone" when
+  it differs from `initialSettingsState`. Theme only applies over `system`. The profile goes
+  field by field, filling only empty fields. Unknown values are ignored. After a full restore,
+  one alert ("Use the settings from the backup?") applies them. The saved signature comes back
+  only when this phone has none. `sanitizeDefaultEnhance` moved to `settingsStorage.ts`.
+- **UI:** `components/backup/RestoreHost.tsx`, always mounted in `AppNavigator` and opened by
+  `ui/OPEN_BACKUP` (`ui.backupToOpen`). It shows a preview (counts, date and version, Restore /
+  Add switch, what's new / already here / kept both, free space), then progress with Cancel.
+  Errors say plainly that nothing was changed.
+- **Entry points:**
+  - Settings → Backup: "Restore from backup…" and "Import course or documents…". Both open the
+    picker; the mode defaults by backup kind and can be switched in the preview.
+  - The Library's existing "Open a file" picker now also accepts zips, instead of a separate
+    Library button.
+  - Android "Open with" for `application/zip` / `application/x-zip-compressed` (`app.json`;
+    needs a new dev build).
+  Incoming zips are copied to `cache/restore/` first (`backup/incomingZip.ts`,
+  `store/backupIntake.ts`), because provider `content://` URIs can't be opened as a seekable
+  handle. The copy is removed when the dialog closes, and Storage → Clear also empties it.
+- **Still open from B2:** `updated_at` changes on every write, including the Reader's last
+  page, so a document only *read* after a backup is "kept both" on a second restore. It hasn't
+  been seen in practice yet.
 
 - Entry points: Settings → Backup → **Restore from backup…** and Library → **Import
   course or documents…** (both use `expo-document-picker` for `.zip`); add an "Open with" intent
