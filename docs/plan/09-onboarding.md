@@ -186,7 +186,29 @@ help (tested by hand), the app is usable at the largest font size, and the a11y 
 tests are in CI.
 
 ### O5 · Performance budget *(M)*
-Status: todo
+Status: in progress: done in code (commits ffc68d3, 35016b8); the device measurements and the
+budgets in `docs/qa/performance.md` are open, and decide the FlashList/expo-image and pdf-lib
+questions below.
+
+As built:
+- Store: `createStore` + `useAppSelector(selector, isEqual?)`, `useAppSlices(...keys)` (the usual
+  way to read: re-renders only when one of the named slices changes), `useAppDispatch()`,
+  `useAppStore()` (for handlers that need the whole state, e.g. `startScan`), `shallowEqual`,
+  `createSelector`. **Every** `useAppState()` caller was moved to slices (not only the hot
+  screens: AppNavigator renders the screens, so it had to move too); `useAppState()` is kept.
+- `FileRow` and Review's `DraggableThumbnail` are `memo` with stable handlers
+  (`utils/useStableCallback`); FileRow's handlers now take the document. Rows vary in height, so
+  no `getItemLayout`; `components/library/docListTuning.ts` has the window settings.
+- `bootstrap/useDeferredBoot.ts`: integrity check, imported-PDF indexing, stale reminder clean-up
+  (`useDeadlineReminders`' new `cleanupReady`) and Sentry init start 1.5 s after the first screen.
+  A timeout, because `InteractionManager` is deprecated in RN 0.86. There was no boot-time
+  pruning to defer.
+- Lazy on first use: `xlsx` (`sheetService`), `mammoth` (`docxService`). pdf-lib is not lazy yet
+  (about ten services import it); Expo's Metro config has `inlineRequires: false`. The zip code is
+  small and only reached from backup screens (B3), so it stays as is.
+- Seed tool: `src/dev/seedLibrary.ts`, a button on the dev-only Filter Lab screen (no new UI
+  strings), not a separate dev menu.
+- Tests: `store/__tests__/selectorStore.test.tsx`, `bootstrap/__tests__/useDeferredBoot.test.tsx`.
 
 - **Measure first** (`src/dev/` tools, `__DEV__` only, and `docs/qa/performance.md` for the
   numbers):
