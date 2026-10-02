@@ -19,7 +19,7 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 - **Progress:** `docs/plan/README.md` lists every step's status and commit and what comes next.
   Read it before starting. §0, §1, §2 (except E7's benchmark run), §3, §4 and §5 T1–T6 are done
   in code. **Next:** device checks (each plan file's Verification), E7's benchmark run, and
-  §6 L4d (`docs/plan/06-languages.md`; L1–L3 and L4a–L4c are done, L3 without its device spike); §5 T7 (flashcards) is for later (P4).
+  §6 device checks (`docs/plan/06-languages.md`; L1–L4 are done, L3 without its device spike; L5–L6 wait for Bangla); §5 T7 (flashcards) is for later (P4).
 
 ## Commands
 - `npm install` (runs `patch-package`), `npm run android` / `npm run ios` (dev build),
@@ -97,8 +97,9 @@ src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, do
   Redux.
 - Comments explain *why* (often long); match that density and the existing names.
 - Colors, spacing and type always come from `src/theme`.
-- UI text comes from `src/i18n/en.ts` through `useT()` / `t()` (§6 L4); converted files are
-  listed in `src/i18n/__tests__/hardcodedStrings.test.ts` and must stay free of literals.
+- UI text comes from `src/i18n/en.ts` through `useT()` / `t()` (§6 L4); text that goes into
+  documents uses `tDoc()` and `document.*`. `src/i18n/__tests__/hardcodedStrings.test.ts` fails on
+  any UI literal in a `.tsx` outside `src/dev`.
 
 ## Patched dependencies
 `patches/` is applied by `patch-package` on every `npm install`. When upgrading a patched

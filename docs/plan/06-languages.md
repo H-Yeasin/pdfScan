@@ -210,7 +210,7 @@ the names can be found by search in the PDF, and an English-only cover is unchan
   `ocr/__tests__/fakeScript.test.ts`, and the updated `coverTemplates` script test.
 
 ### L4 · UI translation layer, English only *(M, split into 4 sessions)*
-Status: L4a done (commit 8de31f8), L4b done (commit 519540d), L4c done (commit 10c1b6b); L4d todo
+Status: done (L4a 8de31f8, L4b 519540d, L4c 10c1b6b, L4d 2854eb4); device check (pseudo-locale walk-through) open
 
 - **L4a: infrastructure plus Settings and Home.**
   - Add `expo-localization@~57` (check the version in the package source).
@@ -315,6 +315,29 @@ strings, and adding `bn.ts` later only means adding that file (and its registry 
   `ExamPackScreen`).
 - Tests: `i18n/__tests__/documentLanguage.test.ts` (document text follows the UI by default and
   stays English when pinned, under the pseudo-locale UI).
+
+**As built (L4d):**
+- Converted everything else: Library, Reader, Course, Exam pack, Manage courses and Pro screens;
+  components under `library`, `reader`, `courses`, `bookmarks`, `study`, `shared` (tab bar,
+  signature screens, `TextPromptModal`) and `pro`; `ErrorBoundary`. New catalog areas `shared`,
+  `library`, `reader`, `study`, `pro`.
+- Services and hooks: `DocTypeSpec` has `labelKey`/`pluralKey` (its `short` is gone: the
+  `{type}` token is `document.docTypeShort`); `ScriptEntry.label` → `labelKey`
+  (`settings.scripts.*`); `timetable.WEEKDAYS` → `weekdayName(day)` (Intl, UI language);
+  course, semester and class-time validation errors; default semester names ("Fall 2026" is
+  stored as typed, in the UI language at creation); `utils/format` delegates to i18n; exam pack
+  progress; snacks in `useSubmitDocument`, `useExternalFileLinking`, `useLibraryPersistence`;
+  "Imported file" / "Selected folder" fallbacks.
+- **Exempt:** `src/dev/` (the Filter Lab and its filter-tuning parameter labels) stays English;
+  it is a developer tool that never ships to students.
+- The hard-coded check (`hardcodedStrings.test.ts`) now runs on every `.tsx` outside `src/dev`
+  and fails on any hit. It also catches JSX text next to an expression, shown object fields
+  (`label:`, `title:`…), capitalised strings picked by a condition, sentence arrays, and
+  progress/error setters; it ignores comments and catalog keys. Format names (PDF, JPG, A4…) are
+  allow-listed.
+- `HomeScreen.test.tsx`'s pseudo-locale check now includes the tab bar.
+- **Device check still open:** walk every screen in the pseudo-locale (Settings → App language,
+  dev build) for untranslated or cut-off text.
 
 ### L5 · Tesseract engine (for Bangla) *(L — later, phase P4)*
 Status: later (do it when Bangla is scheduled)
