@@ -126,15 +126,15 @@ export function SignaturePlacementOverlay({
         <Text style={styles.hint}>{t('shared.signature.placeHint')}</Text>
 
         <View style={styles.actions}>
-          <Pressable style={styles.ghostButton} onPress={onCancel}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
             <Text style={styles.ghostLabel}>{t('common.cancel')}</Text>
           </Pressable>
           {onRedraw && (
-            <Pressable style={styles.ghostButton} onPress={onRedraw}>
+            <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onRedraw}>
               <Text style={styles.ghostLabel}>{t('shared.signature.redraw')}</Text>
             </Pressable>
           )}
-          <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
+          <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
             <Text style={styles.primaryLabel}>{t('shared.signature.place')}</Text>
           </Pressable>
         </View>

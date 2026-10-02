@@ -68,8 +68,8 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
+        <Pressable accessible={false}
           style={[
             styles.sheet,
             { backgroundColor: tokens.surface, borderColor: tokens.edge, paddingBottom: spacing.md + insets.bottom },
@@ -78,7 +78,7 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
           <Text style={[styles.title, { color: tokens.ink }]}>{t('courses.semesterSwitcher.title')}</Text>
           <ScrollView style={styles.list}>
             {active.map((semester) => (
-              <Pressable key={semester.id} style={styles.row} onPress={() => pick(semester)}>
+              <Pressable accessibilityRole="button" key={semester.id} style={styles.row} onPress={() => pick(semester)}>
                 <Text style={[styles.rowLabel, { color: tokens.ink }]} numberOfLines={1}>
                   {semester.name}
                   {semester.id === current?.id ? <Text style={{ color: tokens.muted }}>{t('courses.semesterSwitcher.current')}</Text> : null}

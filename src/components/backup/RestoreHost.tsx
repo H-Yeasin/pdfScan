@@ -243,11 +243,11 @@ export function RestoreHost() {
           <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
           {body}
           <View style={styles.actions}>
-            <Pressable style={styles.ghostButton} onPress={cancel}>
+            <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={cancel}>
               <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{tr('common.cancel')}</Text>
             </Pressable>
             {phase.kind === 'preview' ? (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: canStart ? 1 : 0.5 }]}
                 onPress={start}
                 disabled={!canStart}

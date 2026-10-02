@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import { rotationStyle } from '../../utils/rotation';
 
 const COLUMNS = 3;
@@ -26,6 +27,7 @@ type PageGridProps = {
 // "Edit pages" (§7 R3). Each thumbnail shows its page's turn as a transform.
 export function PageGrid({ pages, highlightedIndex, selecting, selectedIds, onPress, onLongPress, onDelete }: PageGridProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   return (
     <FlatList
       data={pages}
@@ -36,7 +38,7 @@ export function PageGrid({ pages, highlightedIndex, selecting, selectedIds, onPr
       renderItem={({ item, index }) => {
         const chosen = selectedIds.includes(item.id);
         return (
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[
               styles.tile,
               {
@@ -59,7 +61,13 @@ export function PageGrid({ pages, highlightedIndex, selecting, selectedIds, onPr
                 {chosen && <Ionicons name="checkmark" size={13} color="#fff" />}
               </View>
             ) : onDelete ? (
-              <Pressable hitSlop={8} style={[styles.deleteBadge, { backgroundColor: tokens.danger }]} onPress={() => onDelete(item)}>
+              <Pressable
+                hitSlop={8}
+                style={[styles.deleteBadge, { backgroundColor: tokens.danger }]}
+                onPress={() => onDelete(item)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.removePage', { n: index + 1 })}
+              >
                 <Ionicons name="close" size={13} color="#fff" />
               </Pressable>
             ) : null}

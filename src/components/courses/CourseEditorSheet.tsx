@@ -195,11 +195,11 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
 
       <SheetField label={t('courses.emoji')}>
         <View style={styles.wrap}>
-          <Pressable style={[...chip(!emoji), styles.emojiChip]} onPress={() => setEmoji(undefined)} accessibilityLabel={t('courses.noEmoji')}>
+          <Pressable accessibilityRole="button" style={[...chip(!emoji), styles.emojiChip]} onPress={() => setEmoji(undefined)} accessibilityLabel={t('courses.noEmoji')}>
             <Ionicons name="close" size={16} color={tokens.muted} />
           </Pressable>
           {COURSE_EMOJIS.map((e) => (
-            <Pressable key={e} style={[...chip(emoji === e), styles.emojiChip]} onPress={() => setEmoji(e)}>
+            <Pressable accessibilityRole="button" key={e} style={[...chip(emoji === e), styles.emojiChip]} onPress={() => setEmoji(e)}>
               <Text style={styles.emoji}>{e}</Text>
             </Pressable>
           ))}
@@ -208,11 +208,11 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
 
       <SheetField label={t('courses.semester')}>
         <View style={styles.wrap}>
-          <Pressable style={chip(semester.kind === 'none')} onPress={() => setSemester({ kind: 'none' })}>
+          <Pressable accessibilityRole="button" style={chip(semester.kind === 'none')} onPress={() => setSemester({ kind: 'none' })}>
             <Text style={[styles.chipLabel, { color: tokens.ink }]}>{t('courses.none')}</Text>
           </Pressable>
           {semesterChips.map((s) => (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={s.id}
               style={chip(semester.kind === 'existing' && semester.id === s.id)}
               onPress={() => setSemester({ kind: 'existing', id: s.id })}
@@ -221,7 +221,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
             </Pressable>
           ))}
           {!todaySemester ? (
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={chip(semester.kind === 'new')}
               onPress={() => setSemester({ kind: 'new', name: todayTerm.name })}
             >

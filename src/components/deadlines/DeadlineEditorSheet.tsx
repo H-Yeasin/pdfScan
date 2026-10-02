@@ -119,7 +119,7 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
         <Text style={[styles.title, { color: tokens.ink }]}>{deadline ? t('deadlines.edit') : t('deadlines.add')}</Text>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">

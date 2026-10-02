@@ -61,7 +61,7 @@ function Toggle({ label, on, onPress }: { label: string; on: boolean; onPress: (
   const { tokens } = useTheme();
   const color = on ? tokens.accent : tokens.muted;
   return (
-    <Pressable style={styles.toggle} onPress={onPress} hitSlop={4}>
+    <Pressable accessibilityRole="button" style={styles.toggle} onPress={onPress} hitSlop={4}>
       <Ionicons name={on ? 'checkbox' : 'square-outline'} size={18} color={color} />
       <Text style={[styles.label, { color }]}>{label}</Text>
     </Pressable>

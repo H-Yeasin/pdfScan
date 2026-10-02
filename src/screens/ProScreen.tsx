@@ -3,7 +3,7 @@ import { Alert, ScrollView, StyleSheet, Pressable, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeatureList } from '../components/pro/FeatureList';
 import { useRouter } from '../navigation/router';
-import { fontFamily, radii, spacing, useTheme } from '../theme';
+import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
 
 export function ProScreen() {
@@ -20,7 +20,7 @@ export function ProScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
       </View>
@@ -45,13 +45,13 @@ export function ProScreen() {
           </Text>
         </View>
 
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.primary, { backgroundColor: tokens.accent }]}
           onPress={() => showUnavailable(t('pro.unlock'))}
         >
           <Text style={styles.primaryLabel}>{t('pro.unlock')}</Text>
         </Pressable>
-        <Pressable style={styles.ghost} onPress={() => showUnavailable(t('pro.restore'))}>
+        <Pressable accessibilityRole="button" style={styles.ghost} onPress={() => showUnavailable(t('pro.restore'))}>
           <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('pro.restore')}</Text>
         </Pressable>
       </ScrollView>

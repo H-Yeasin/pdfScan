@@ -18,7 +18,7 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
-      <Pressable
+      <Pressable accessibilityRole="button"
         style={[styles.primary, { backgroundColor: tokens.accent, opacity: saving ? 0.7 : 1 }]}
         onPress={onSubmit}
         disabled={saving}
@@ -32,10 +32,10 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
         </Text>
       ) : null}
       <View style={styles.secondaryRow}>
-        <Pressable style={styles.ghost} onPress={onSave} disabled={saving}>
+        <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSave} disabled={saving}>
           <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.save')}</Text>
         </Pressable>
-        <Pressable style={styles.ghost} onPress={onSaveShare} disabled={saving}>
+        <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSaveShare} disabled={saving}>
           <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.saveShare')}</Text>
         </Pressable>
       </View>

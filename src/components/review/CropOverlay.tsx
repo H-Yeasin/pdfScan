@@ -230,13 +230,13 @@ export function CropOverlay({
         <Text style={styles.hint}>{t('review.crop.hint')}</Text>
 
         <View style={styles.actions}>
-          <Pressable style={styles.ghostButton} onPress={onCancel}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
             <Text style={styles.ghostLabel}>{cancelLabel ?? t('common.cancel')}</Text>
           </Pressable>
-          <Pressable style={styles.ghostButton} onPress={handleReset}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={handleReset}>
             <Text style={styles.ghostLabel}>{t('review.crop.reset')}</Text>
           </Pressable>
-          <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
+          <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
             <Text style={styles.primaryLabel}>{t('review.crop.confirm')}</Text>
           </Pressable>
         </View>

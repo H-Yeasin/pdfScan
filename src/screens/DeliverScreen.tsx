@@ -48,7 +48,7 @@ import { useFilingCourse } from '../store/useFilingCourse';
 import { useSpaceGuard } from '../store/useSpaceGuard';
 import { BYTES_PER_SAVED_PAGE } from '../services/storage/usage';
 import { resolveOcrScript } from '../services/scripts/registry';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { createId } from '../utils/id';
 
@@ -498,7 +498,7 @@ export function DeliverScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('review', 'back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('review', 'back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
           <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
         </Pressable>
@@ -564,7 +564,7 @@ export function DeliverScreen() {
               onMore={() => setFolderPickerOpen(true)}
             />
           ) : (
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
               onPress={() => setFolderPickerOpen(true)}
             >
@@ -632,7 +632,7 @@ export function DeliverScreen() {
                 />
               </View>
 
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[styles.saveToRow, { backgroundColor: tokens.bg, borderColor: tokens.edge }]}
                 onPress={() => go('academicOptions')}
               >

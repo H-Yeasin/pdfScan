@@ -5,6 +5,8 @@ import { runOnJS } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 export const INK_COLORS = ['#1a1a1a', '#1d4ed8', '#b91c1c'];
+// §9 O4: what a screen reader calls each swatch (a11y.inkColor.*).
+export const INK_COLOR_NAMES: Record<string, 'black' | 'blue' | 'red'> = { '#1a1a1a': 'black', '#1d4ed8': 'blue', '#b91c1c': 'red' };
 
 type SignaturePadProps = {
   strokeColor?: string;

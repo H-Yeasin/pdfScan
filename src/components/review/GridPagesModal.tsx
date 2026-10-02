@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { radii, spacing, fontFamily, typeScale, useTheme } from '../../theme';
+import { radii, spacing, fontFamily, typeScale, useTheme, touchSlop } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
 import { PageGrid } from '../shared/PageGrid';
@@ -67,7 +67,7 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
         {selectionMode ? (
           <View style={styles.header}>
-            <Pressable style={styles.closeButton} onPress={handleCancelSelection} accessibilityLabel={t('common.cancel')}>
+            <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.closeButton} onPress={handleCancelSelection} accessibilityLabel={t('common.cancel')}>
               <Ionicons name="close" size={22} color={tokens.ink} />
             </Pressable>
             <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>
@@ -77,7 +77,7 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
         ) : (
           <View style={styles.header}>
             <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>{t('review.grid.title')}</Text>
-            <Pressable style={styles.closeButton} onPress={onClose}>
+            <Pressable hitSlop={touchSlop(36)} style={styles.closeButton} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={22} color={tokens.ink} />
             </Pressable>
           </View>
@@ -95,7 +95,7 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
 
         {selectionMode && (
           <View style={[styles.mergeBar, { backgroundColor: tokens.surface, borderTopColor: tokens.edge }]}>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={[
                 styles.mergeButton,
                 { backgroundColor: tokens.accent, opacity: selectedIds.length === 2 ? 1 : 0.38 },

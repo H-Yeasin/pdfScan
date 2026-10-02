@@ -13,11 +13,17 @@ export function SegmentedControl<T extends string>({ segments, value, onChange }
   const { tokens } = useTheme();
 
   return (
-    <View style={[styles.track, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
+    <View accessibilityRole="radiogroup" style={[styles.track, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
       {segments.map((segment) => {
         const active = segment.id === value;
         return (
-          <Pressable key={segment.id} style={styles.segment} onPress={() => onChange(segment.id)}>
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active }}
+            key={segment.id}
+            style={styles.segment}
+            onPress={() => onChange(segment.id)}
+          >
             {active && (
               <View style={[StyleSheet.absoluteFill, styles.activeFill, { backgroundColor: tokens.accent }]} />
             )}

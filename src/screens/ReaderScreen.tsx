@@ -466,7 +466,7 @@ export function ReaderScreen() {
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         <Text style={[styles.passwordTitle, { color: tokens.ink }]}>{t('reader.filesMissing')}</Text>
         <Text style={{ color: tokens.muted, textAlign: 'center' }}>{t('reader.filesMissingBody')}</Text>
-        <Pressable onPress={() => go(hub, 'back')} hitSlop={8}>
+        <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')} hitSlop={8}>
           <Text style={{ color: tokens.accent, fontWeight: '600' }}>{t('common.back')}</Text>
         </Pressable>
       </View>
@@ -541,7 +541,7 @@ export function ReaderScreen() {
             <Text style={[styles.passwordTitle, { color: tokens.ink }]}>{t('reader.cantOpen')}</Text>
             <Text style={{ color: tokens.muted }}>{t('reader.cantOpenBody')}</Text>
             <View style={styles.passwordActions}>
-              <Pressable onPress={() => go(hub, 'back')}>
+              <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')}>
                 <Text style={{ color: tokens.accent, fontWeight: '600' }}>{t('common.back')}</Text>
               </Pressable>
             </View>
@@ -568,10 +568,10 @@ export function ReaderScreen() {
               onSubmitEditing={handleSubmitPassword}
             />
             <View style={styles.passwordActions}>
-              <Pressable onPress={() => go(hub, 'back')}>
+              <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')}>
                 <Text style={{ color: tokens.muted }}>{t('common.cancel')}</Text>
               </Pressable>
-              <Pressable onPress={handleSubmitPassword}>
+              <Pressable accessibilityRole="button" onPress={handleSubmitPassword}>
                 <Text style={{ color: tokens.accent, fontWeight: '600' }}>{t('reader.unlock')}</Text>
               </Pressable>
             </View>

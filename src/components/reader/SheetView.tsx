@@ -114,7 +114,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
       {sheets.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabStrip}>
           {sheets.map((sheet, i) => (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={sheet.name}
               onPress={() => setActiveSheet(i)}
               style={[styles.tab, i === activeSheet && { borderBottomColor: tokens.accent, borderBottomWidth: 2 }]}
@@ -135,7 +135,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
           data={rows}
           keyExtractor={(_, i) => String(i)}
           renderItem={({ item: row }) => (
-            <Pressable style={styles.row} onPress={onTap}>
+            <Pressable accessibilityRole="button" style={styles.row} onPress={onTap}>
               {columnWidths.map((width, i) => (
                 <Text
                   key={i}

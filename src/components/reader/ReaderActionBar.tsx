@@ -45,7 +45,7 @@ export function ReaderActionBar({ visible, onPress, hiddenIds }: ReaderActionBar
     >
       <View style={styles.row}>
         {items.map((item) => (
-          <Pressable key={item.id} style={styles.item} onPress={() => onPress(item.id)}>
+          <Pressable accessibilityRole="button" key={item.id} style={styles.item} onPress={() => onPress(item.id)}>
             <Ionicons name={item.icon} size={21} color={tokens.ink} />
             <Text style={[styles.label, { color: tokens.ink }]}>{t(`reader.actions.${item.id}`)}</Text>
           </Pressable>

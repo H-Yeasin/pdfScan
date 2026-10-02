@@ -60,7 +60,7 @@ export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
       {TOOLS.map((tool) => {
         const isDisabled = disabled(tool.id);
         return (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={tool.id}
             style={[styles.item, (isDisabled || blocked(tool.id)) && styles.disabled]}
             onPress={() => onPress(tool.id)}

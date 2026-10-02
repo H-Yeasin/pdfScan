@@ -47,7 +47,7 @@ export function BookmarkList({
               ) : null}
             </View>
             {onRemove ? (
-              <Pressable onPress={() => onRemove(item)} hitSlop={10} accessibilityLabel={t('study.removeBookmark')} style={styles.remove}>
+              <Pressable accessibilityRole="button" onPress={() => onRemove(item)} hitSlop={10} accessibilityLabel={t('study.removeBookmark')} style={styles.remove}>
                 <Ionicons name="close" size={18} color={tokens.muted} />
               </Pressable>
             ) : (
@@ -79,7 +79,7 @@ export function BookmarksSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
         <Text style={[styles.sheetTitle, { color: tokens.ink }]}>{t('study.bookmarks')}</Text>
         <ScrollView contentContainerStyle={styles.sheetBody}>

@@ -9,7 +9,7 @@ import { useRouter } from '../navigation/router';
 import { hasPageMasters } from '../services/documents/formatCapabilities';
 import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
 import { rotationStyle } from '../utils/rotation';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -93,7 +93,7 @@ export function ExamPackScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable style={styles.iconButton} onPress={() => go(previousScreen ?? 'course', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={() => go(previousScreen ?? 'course', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={22} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('study.pack.title')}</Text>
@@ -132,13 +132,13 @@ export function ExamPackScreen() {
               <Text style={[styles.rowText, { color: row.doc ? tokens.ink : tokens.muted }]} numberOfLines={2}>
                 {row.doc && row.idx >= 0 ? t('study.pack.rowLabel', { name: row.doc.name, page: row.idx + 1 }) : t('study.pack.missing')}
               </Text>
-              <Pressable onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i - 1 })} disabled={i === 0} hitSlop={6} accessibilityLabel={t('study.pack.moveUp')}>
+              <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i - 1 })} disabled={i === 0} accessibilityState={{ disabled: i === 0 }} hitSlop={6} accessibilityLabel={t('study.pack.moveUp')}>
                 <Ionicons name="arrow-up" size={18} color={i === 0 ? tokens.edge : tokens.ink} />
               </Pressable>
-              <Pressable onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i + 1 })} disabled={i === rows.length - 1} hitSlop={6} accessibilityLabel={t('study.pack.moveDown')}>
+              <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i + 1 })} disabled={i === rows.length - 1} accessibilityState={{ disabled: i === rows.length - 1 }} hitSlop={6} accessibilityLabel={t('study.pack.moveDown')}>
                 <Ionicons name="arrow-down" size={18} color={i === rows.length - 1 ? tokens.edge : tokens.ink} />
               </Pressable>
-              <Pressable onPress={() => dispatch({ type: 'pack/REMOVE', index: i })} hitSlop={6} accessibilityLabel={t('study.pack.remove')}>
+              <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'pack/REMOVE', index: i })} hitSlop={6} accessibilityLabel={t('study.pack.remove')}>
                 <Ionicons name="close" size={18} color={tokens.muted} />
               </Pressable>
             </View>

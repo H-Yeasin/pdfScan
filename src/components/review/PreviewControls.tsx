@@ -17,7 +17,7 @@ export function PreviewControls({ showCompare, comparing, onCompareIn, onCompare
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {showCompare && (
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPressIn={onCompareIn}
           onPressOut={onCompareOut}
           style={[styles.comparePill, comparing && styles.comparePillActive]}

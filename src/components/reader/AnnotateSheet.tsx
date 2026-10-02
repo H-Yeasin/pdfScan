@@ -10,7 +10,7 @@ import { annotationColor, HIGHLIGHT_COLORS, HIGHLIGHTER_THICKNESS, NOTE_COLOR, P
 import { updatePdfAnnotations } from '../../services/annotations/pdfAnnotations';
 import { snapHighlight, type Point } from '../../services/annotations/snap';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, touchSlop } from '../../theme';
 import type { Annotation, LibraryDocument } from '../../types/models';
 import { createId } from '../../utils/id';
 import { PageCanvas, type MasterPoint } from './PageCanvas';
@@ -137,16 +137,16 @@ export function AnnotateSheet({
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]}>
           <View style={styles.header}>
-            <Pressable style={styles.iconButton} onPress={undo} disabled={undoCount === 0} accessibilityLabel={t('reader.annotate.undo')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={undo} disabled={undoCount === 0} accessibilityLabel={t('reader.annotate.undo')}>
               <Ionicons name="arrow-undo" size={21} color={undoCount ? theme.ink : theme.muted} />
             </Pressable>
-            <Pressable style={styles.iconButton} onPress={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0} accessibilityLabel={t('reader.annotate.previousPage')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0} accessibilityLabel={t('reader.annotate.previousPage')}>
               <Ionicons name="chevron-back" size={21} color={idx === 0 ? theme.muted : theme.ink} />
             </Pressable>
             <Text style={[styles.title, { color: theme.ink }]}>
               {t('reader.annotate.pageOf', { page: idx + 1, total: doc.pages.length })}
             </Text>
-            <Pressable
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button"
               style={styles.iconButton}
               onPress={() => setIdx((i) => Math.min(doc.pages.length - 1, i + 1))}
               disabled={idx === doc.pages.length - 1}

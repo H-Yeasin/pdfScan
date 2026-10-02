@@ -45,7 +45,7 @@ export const FileRow = memo(function FileRow({
   const indexNote = useIndexNote(doc);
 
   return (
-    <Pressable
+    <Pressable accessibilityRole="button"
       onPress={() => onPress(doc)}
       onLongPress={() => onLongPress(doc)}
       delayLongPress={LONG_PRESS_MS}
@@ -65,6 +65,8 @@ export const FileRow = memo(function FileRow({
             style={styles.lockOverlay}
             onPress={() => Alert.alert(t('library.notEncrypted'), t('library.lockDisclosure'))}
             hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.lockInfo')}
           >
             <Ionicons name="lock-closed-outline" size={16} color="#fff" />
           </Pressable>
@@ -103,7 +105,13 @@ export const FileRow = memo(function FileRow({
       </View>
 
       {!selectionMode && (
-        <Pressable onPress={() => onToggleStar(doc)} hitSlop={8}>
+        <Pressable
+          onPress={() => onToggleStar(doc)}
+          hitSlop={12}
+          accessibilityRole="switch"
+          accessibilityLabel={t('a11y.star')}
+          accessibilityState={{ checked: !!doc.star }}
+        >
           <Ionicons
             name={doc.star ? 'star' : 'star-outline'}
             size={19}

@@ -127,7 +127,7 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
         data={chunks}
         keyExtractor={(_, i) => String(i)}
         renderItem={({ item }) => (
-          <Pressable onPress={onTap}>
+          <Pressable accessibilityRole="button" onPress={onTap}>
             <Text style={[styles.text, { color: night ? '#f2eade' : tokens.ink }]}>{item}</Text>
           </Pressable>
         )}

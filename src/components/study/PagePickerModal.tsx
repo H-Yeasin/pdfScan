@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, touchSlop } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import type { PackItem } from '../../store/slices/packSlice';
 import { useT } from '../../i18n/useT';
@@ -38,7 +38,7 @@ export function PagePickerModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
+          <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
             <Ionicons name="close" size={22} color={tokens.ink} />
           </Pressable>
           <Text style={[styles.title, { color: tokens.ink }]}>{t('study.addPages')}</Text>

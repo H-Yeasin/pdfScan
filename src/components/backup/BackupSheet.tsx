@@ -114,20 +114,20 @@ export function BackupSheet({ phase, canSaveToFolder, onChoose, onShare, onSave,
           <View style={styles.actions}>
             {phase.kind === 'ready' ? (
               <>
-                <Pressable style={styles.ghostButton} onPress={onDone}>
+                <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onDone}>
                   <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('backup.done')}</Text>
                 </Pressable>
                 {canSaveToFolder && (
-                  <Pressable style={[styles.secondaryButton, { borderColor: tokens.edge }]} onPress={onSave}>
+                  <Pressable accessibilityRole="button" style={[styles.secondaryButton, { borderColor: tokens.edge }]} onPress={onSave}>
                     <Text style={[styles.ghostLabel, { color: tokens.ink }]}>{t('backup.saveToFolder')}</Text>
                   </Pressable>
                 )}
-                <Pressable style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={onShare}>
+                <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={onShare}>
                   <Text style={styles.primaryLabel}>{t('backup.share')}</Text>
                 </Pressable>
               </>
             ) : (
-              <Pressable style={styles.ghostButton} onPress={onCancel}>
+              <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
                 <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
               </Pressable>
             )}

@@ -11,7 +11,7 @@ import { courseColorValue } from '../services/courses/palette';
 import { canUsePageTools } from '../services/documents/formatCapabilities';
 import { cleanCaches, storageReport, type StorageReport } from '../services/storage/usage';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 
 const BIGGEST_COUNT = 10;
 
@@ -101,7 +101,7 @@ export function StorageScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('settings.storage.title')}</Text>
@@ -191,11 +191,11 @@ export function StorageScreen() {
                       </Text>
                       <Text style={[styles.listMeta, { color: tokens.muted }]}>{formatBytes(usage.bytes)}</Text>
                     </View>
-                    <Pressable onPress={() => openDocument(doc)} style={[styles.pill, { borderColor: tokens.edge }]} hitSlop={6}>
+                    <Pressable accessibilityRole="button" onPress={() => openDocument(doc)} style={[styles.pill, { borderColor: tokens.edge }]} hitSlop={6}>
                       <Text style={[styles.pillText, { color: tokens.ink }]}>{t('settings.storage.open')}</Text>
                     </Pressable>
                     {canUsePageTools(doc) && !doc.missingFiles ? (
-                      <Pressable
+                      <Pressable accessibilityRole="button"
                         onPress={() => handleCompress(doc.id)}
                         disabled={compressingId !== null}
                         style={[styles.pill, { borderColor: tokens.edge, opacity: compressingId && compressingId !== doc.id ? 0.5 : 1 }]}

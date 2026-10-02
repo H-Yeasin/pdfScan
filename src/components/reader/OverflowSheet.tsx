@@ -84,14 +84,14 @@ export function OverflowSheet({
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
         <View
           style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.md }]}
         >
           <View style={[styles.handle, { backgroundColor: tokens.edge }]} />
           {items.map((item) => (
             <Fragment key={item.id}>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={styles.item}
                 onPress={() => {
                   onClose();

@@ -35,7 +35,7 @@ import { applySignatureToPage } from '../services/signature/signatureCompositeSe
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { useScanOcrScript } from '../store/useScanOcrScript';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { createId } from '../utils/id';
 import { useResolvedAcademicConfig } from '../store/useDeliverContext';
 import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage, SourceImage } from '../types/models';
@@ -502,7 +502,7 @@ export function ReviewScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button"
           style={styles.headerButton}
           onPress={() => {
             dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
@@ -514,7 +514,7 @@ export function ReviewScreen() {
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('review.title')}</Text>
         <View style={styles.headerRight}>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.historyButton}
             onPress={() => dispatch({ type: 'review/UNDO' })}
             disabled={!canUndo}
@@ -523,7 +523,7 @@ export function ReviewScreen() {
           >
             <Ionicons name="arrow-undo-outline" size={20} color={canUndo ? tokens.ink : tokens.edge} />
           </Pressable>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.historyButton}
             onPress={() => dispatch({ type: 'review/REDO' })}
             disabled={!canRedo}
@@ -542,7 +542,7 @@ export function ReviewScreen() {
               <Ionicons name="grid-outline" size={18} color={tokens.ink} />
             </Pressable>
           )}
-          <Pressable style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
+          <Pressable accessibilityRole="button" style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
             <Text style={styles.nextLabel}>{t('review.next')}</Text>
             <Ionicons name="chevron-forward" size={18} color="#fff" />
           </Pressable>
@@ -663,7 +663,7 @@ export function ReviewScreen() {
         {(offerApplyAll || adjustable) && (
           <View style={styles.enhanceHeaderRow}>
             {offerApplyAll && (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[styles.applyAllButton, { backgroundColor: tokens.accentSoft }]}
                 onPress={handleApplyToAll}
                 hitSlop={4}
@@ -673,7 +673,7 @@ export function ReviewScreen() {
               </Pressable>
             )}
             {adjustable && (
-              <Pressable style={styles.headerToggle} onPress={() => setAdjustOpen((v) => !v)} hitSlop={4}>
+              <Pressable accessibilityRole="button" style={styles.headerToggle} onPress={() => setAdjustOpen((v) => !v)} hitSlop={4}>
                 <Ionicons name="options-outline" size={18} color={adjustOpen ? tokens.accent : tokens.muted} />
                 <Text style={[styles.headerToggleLabel, { color: adjustOpen ? tokens.accent : tokens.muted }]}>
                   {t('review.adjust')}

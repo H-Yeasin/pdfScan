@@ -33,7 +33,7 @@ export function ProfilePromptSheet({ visible, initial, onDone, onCancel }: Profi
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel} accessibilityLabel={t('deliver.profilePrompt.close')} />
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onCancel} accessibilityLabel={t('deliver.profilePrompt.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.lg }]}>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.profilePrompt.title')}</Text>
         <Text style={[styles.body, { color: tokens.muted }]}>

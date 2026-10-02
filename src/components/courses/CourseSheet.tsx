@@ -24,7 +24,7 @@ export function CourseSheet({ visible, title, submitLabel, submitDisabled, onSub
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
+        <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
         <View
           style={[
             styles.sheet,

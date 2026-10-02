@@ -49,10 +49,10 @@ export function TextPromptModal({
             style={[styles.input, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
           />
           <View style={styles.actions}>
-            <Pressable style={styles.ghostButton} onPress={onCancel}>
+            <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
               <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: trimmed ? 1 : 0.5 }]}
               onPress={() => trimmed && onSubmit(trimmed)}
               disabled={!trimmed}

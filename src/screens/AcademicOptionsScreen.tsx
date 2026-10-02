@@ -29,7 +29,7 @@ import { footerPresetOf, footerPresetText, type FooterPreset } from '../services
 import { renderText } from '../services/submit/naming';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { createId } from '../utils/id';
 
 type CoverMode = CoverPageConfig['mode'] | 'none';
@@ -211,7 +211,7 @@ export function AcademicOptionsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go(previousScreen ?? 'deliver', 'back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go(previousScreen ?? 'deliver', 'back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
           <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
         </Pressable>
@@ -323,7 +323,7 @@ export function AcademicOptionsScreen() {
                 <Text style={{ color: tokens.muted, fontSize: 13 }}>{t('deliver.academic.noPhoto')}</Text>
               </View>
             )}
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={[styles.pickButton, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
               onPress={handlePickCoverImage}
             >
@@ -334,7 +334,7 @@ export function AcademicOptionsScreen() {
           </View>
         )}
 
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.previewButton, { backgroundColor: tokens.accent, opacity: previewing ? 0.7 : 1 }]}
           onPress={handlePreview}
           disabled={previewing || pages.length === 0}

@@ -71,18 +71,18 @@ export function ReaderBottomChrome({
 
       <View style={styles.actions}>
         {onPages ? (
-          <Pressable style={styles.actionButton} onPress={onPages}>
+          <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onPages}>
             <Ionicons name="albums-outline" size={17} color={tokens.ink} />
             <Text style={[styles.actionLabel, { color: tokens.ink }]}>{t('reader.pages')}</Text>
           </Pressable>
         ) : null}
         {showFind && (
-          <Pressable style={styles.actionButton} onPress={onFind}>
+          <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onFind}>
             <Ionicons name="search" size={17} color={findOpen ? tokens.accent : tokens.ink} />
             <Text style={[styles.actionLabel, { color: findOpen ? tokens.accent : tokens.ink }]}>{t('reader.find')}</Text>
           </Pressable>
         )}
-        <Pressable style={styles.actionButton} onPress={onNight}>
+        <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onNight}>
           <Ionicons name="moon-outline" size={17} color={nightOn ? tokens.accent : tokens.ink} />
           <Text style={[styles.actionLabel, { color: nightOn ? tokens.accent : tokens.ink }]}>{t('reader.night')}</Text>
         </Pressable>

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fontFamily, spacing, useTheme } from '../../theme';
+import { fontFamily, spacing, useTheme, touchSlop } from '../../theme';
 import { useT } from '../../i18n/useT';
 
 type ReaderTopChromeProps = {
@@ -57,7 +57,7 @@ export function ReaderTopChrome({
       pointerEvents="box-none"
     >
       <View style={styles.row}>
-        <Pressable style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         {findOpen ? (
@@ -88,7 +88,7 @@ export function ReaderTopChrome({
         ) : (
           <>
             {bookmarked !== undefined && onBookmark ? (
-              <Pressable
+              <Pressable hitSlop={touchSlop(44)}
                 style={styles.iconButton}
                 onPress={onBookmark}
                 onLongPress={onBookmarkLongPress}
@@ -99,7 +99,7 @@ export function ReaderTopChrome({
                 <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={19} color={bookmarked ? tokens.accentInk : tokens.ink} />
               </Pressable>
             ) : null}
-            <Pressable style={styles.iconButton} onPress={onOverflow}>
+            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onOverflow} accessibilityRole="button" accessibilityLabel={t('a11y.moreActions')}>
               <Ionicons name="ellipsis-vertical" size={18} color={tokens.ink} />
             </Pressable>
           </>

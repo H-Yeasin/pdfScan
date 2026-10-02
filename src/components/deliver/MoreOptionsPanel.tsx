@@ -27,7 +27,7 @@ export function MoreOptionsPanel({
 
   return (
     <View style={[styles.container, { borderTopColor: tokens.edge }]}>
-      <Pressable style={styles.header} onPress={onToggleOpen}>
+      <Pressable accessibilityRole="button" style={styles.header} onPress={onToggleOpen}>
         <Ionicons
           name="chevron-forward"
           size={18}
@@ -60,7 +60,7 @@ export function MoreOptionsPanel({
                   trackColor={{ true: tokens.accent, false: tokens.surface2 }}
                 />
               ) : (
-                <Pressable onPress={exportCopy.onSetup}>
+                <Pressable accessibilityRole="button" onPress={exportCopy.onSetup}>
                   <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('deliver.more.setUp')}</Text>
                 </Pressable>
               )}

@@ -34,7 +34,7 @@ export function PageScrubberSheet({ visible, pages, currentIdx, onPick, onClose 
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose}>
         <View style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.md }]}>
           <View style={[styles.handle, { backgroundColor: tokens.edge }]} />
           <Text style={[styles.title, { color: tokens.ink }]}>{t('reader.pages')}</Text>
@@ -50,7 +50,7 @@ export function PageScrubberSheet({ visible, pages, currentIdx, onPick, onClose 
             renderItem={({ item, index }) => {
               const uri = item.thumbUri || item.fileUri;
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={() => onPick(index)}
                   style={[styles.thumb, { borderColor: index === currentIdx ? tokens.accent : tokens.edge, backgroundColor: tokens.surface2 }]}
                   accessibilityLabel={t('reader.pageIndicator', { page: index + 1, count: pages.length })}

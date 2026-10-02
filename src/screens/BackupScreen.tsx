@@ -13,7 +13,7 @@ import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppDispatch, useAppSelector } from '../store/AppStateContext';
-import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../theme';
 
 // §8 B3: Settings → Backup. "Back up everything", when the last backup was, and (Android) the
 // folder "Save to folder" writes to.
@@ -69,7 +69,7 @@ export function BackupScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('backup.title')}</Text>

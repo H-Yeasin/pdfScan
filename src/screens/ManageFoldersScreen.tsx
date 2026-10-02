@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CourseList } from '../components/courses/CourseList';
 import { useRouter } from '../navigation/router';
 import { useAppSlices } from '../store/AppStateContext';
-import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
 
 export function ManageFoldersScreen() {
@@ -28,7 +28,7 @@ export function ManageFoldersScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('library.manageCourses')}</Text>

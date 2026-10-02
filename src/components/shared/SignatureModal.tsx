@@ -3,7 +3,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureSignedPage } from '../../services/signature/signatureService';
 import { radii, spacing, useTheme } from '../../theme';
-import { INK_COLORS, SignaturePad } from './SignaturePad';
+import { INK_COLOR_NAMES, INK_COLORS, SignaturePad } from './SignaturePad';
 import { useT } from '../../i18n/useT';
 
 type SignatureModalProps = {
@@ -64,6 +64,9 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
             <Pressable
               key={color}
               onPress={() => setStrokeColor(color)}
+              accessibilityRole="radio"
+              accessibilityLabel={t(`a11y.inkColor.${INK_COLOR_NAMES[color] ?? 'black'}`)}
+              accessibilityState={{ selected: strokeColor === color }}
               style={[
                 styles.swatch,
                 { backgroundColor: color },
@@ -76,13 +79,13 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
         <Text style={styles.hint}>{t('shared.signature.hint')}</Text>
 
         <View style={styles.actions}>
-          <Pressable style={styles.ghostButton} onPress={onCancel}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
             <Text style={styles.ghostLabel}>{t('common.cancel')}</Text>
           </Pressable>
-          <Pressable style={styles.ghostButton} onPress={handleClear}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={handleClear}>
             <Text style={styles.ghostLabel}>{t('shared.signature.clear')}</Text>
           </Pressable>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[styles.primaryButton, { backgroundColor: tokens.accent, opacity: empty || saving ? 0.5 : 1 }]}
             onPress={handleDone}
             disabled={empty || saving}

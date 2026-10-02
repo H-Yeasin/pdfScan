@@ -30,6 +30,22 @@ export const en = {
     bytes: { kb: '{size} KB', mb: '{size} MB', gb: '{size} GB' },
   },
 
+  // §9 O4: names and announcements for screen readers (TalkBack, VoiceOver).
+  a11y: {
+    moreActions: 'More actions',
+    star: 'Star',
+    lockInfo: 'Locked. About this lock',
+    removePage: 'Remove page {n}',
+    pageOf: 'Page {n} of {total}',
+    inkColor: { black: 'Black ink', blue: 'Blue ink', red: 'Red ink' },
+    moveEarlier: 'Move earlier',
+    moveLater: 'Move later',
+    moved: 'Moved to position {n}',
+    documents: { one: '{count} document', other: '{count} documents' },
+    courseCard: '{name}, {documents}, last scan {when}',
+    courseCardEmpty: '{name}, no scans yet',
+  },
+
   home: {
     yourCourses: 'Your courses',
     semesterA11y: 'Semester: {name}. Change',

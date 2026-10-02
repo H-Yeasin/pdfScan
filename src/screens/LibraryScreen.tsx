@@ -33,7 +33,7 @@ import { useStableCallback } from '../utils/useStableCallback';
 import { DOC_LIST_TUNING } from '../components/library/docListTuning';
 import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
-import { fontFamily, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
 
 export function LibraryScreen() {
@@ -181,10 +181,10 @@ export function LibraryScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: tokens.ink }]}>{t('library.title')}</Text>
           <View style={styles.headerIcons}>
-            <Pressable style={styles.iconButton} onPress={handleOpenFile} accessibilityRole="button" accessibilityLabel={t('library.openFile')}>
+            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={handleOpenFile} accessibilityRole="button" accessibilityLabel={t('library.openFile')}>
               <Ionicons name="document-outline" size={21} color={tokens.ink} />
             </Pressable>
-            <Pressable
+            <Pressable hitSlop={touchSlop(44)}
               style={styles.iconButton}
               onPress={() => dispatch({ type: 'library/TOGGLE_SEARCH_OPEN' })}
               accessibilityRole="button"
@@ -192,7 +192,7 @@ export function LibraryScreen() {
             >
               <Ionicons name="search" size={21} color={tokens.ink} />
             </Pressable>
-            <Pressable style={styles.iconButton} onPress={() => go('settings')} accessibilityRole="button" accessibilityLabel={t('common.settings')}>
+            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={() => go('settings')} accessibilityRole="button" accessibilityLabel={t('common.settings')}>
               <Ionicons name="settings-outline" size={21} color={tokens.ink} />
             </Pressable>
           </View>

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { LibraryDocument } from '../../types/models';
 import {
@@ -88,13 +88,13 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.cancel')} disabled={busy}>
+          <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.cancel')} disabled={busy}>
             <Ionicons name="close" size={22} color={tokens.ink} />
           </Pressable>
           <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>
             {selected.length ? t('review.grid.selected', { count: selected.length }) : t('reader.edit.title')}
           </Text>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[styles.saveButton, { backgroundColor: tokens.accent, opacity: dirty && !busy ? 1 : 0.38 }]}
             onPress={() => onSave(edit)}
             disabled={!dirty || busy}
@@ -111,7 +111,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
         {beforeDelete ? (
           <View style={[styles.undoBar, { backgroundColor: tokens.surface2 }]}>
             <Text style={{ color: tokens.ink }}>{t('reader.edit.removed', { count: beforeDelete.count })}</Text>
-            <Pressable
+            <Pressable accessibilityRole="button"
               onPress={() => {
                 setEdit(beforeDelete.edit);
                 setBeforeDelete(null);
@@ -127,7 +127,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
           {selected.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
               {TOOLS.map((tool) => (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={tool.id}
                   style={[styles.tool, disabled(tool.id) && styles.off]}
                   onPress={() => handleTool(tool.id)}
@@ -143,11 +143,11 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
           ) : (
             <View style={styles.addRow}>
               <Text style={[styles.addTitle, { color: tokens.muted }]}>{dirty ? t('reader.edit.saveFirst') : t('reader.edit.addPages')}</Text>
-              <Pressable style={[styles.addButton, { borderColor: tokens.edge }, (dirty || busy) && styles.off]} onPress={onAddFromScan} disabled={dirty || busy}>
+              <Pressable accessibilityRole="button" style={[styles.addButton, { borderColor: tokens.edge }, (dirty || busy) && styles.off]} onPress={onAddFromScan} disabled={dirty || busy}>
                 <Ionicons name="scan-outline" size={18} color={tokens.ink} />
                 <Text style={{ color: tokens.ink }}>{t('reader.edit.fromScan')}</Text>
               </Pressable>
-              <Pressable style={[styles.addButton, { borderColor: tokens.edge }, (dirty || busy) && styles.off]} onPress={onAddFromDocument} disabled={dirty || busy}>
+              <Pressable accessibilityRole="button" style={[styles.addButton, { borderColor: tokens.edge }, (dirty || busy) && styles.off]} onPress={onAddFromDocument} disabled={dirty || busy}>
                 <Ionicons name="documents-outline" size={18} color={tokens.ink} />
                 <Text style={{ color: tokens.ink }}>{t('reader.edit.fromDocument')}</Text>
               </Pressable>

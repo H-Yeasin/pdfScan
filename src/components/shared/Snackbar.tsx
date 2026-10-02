@@ -29,7 +29,7 @@ export function Snackbar() {
           {snack.msg}
         </Text>
         {snack.action ? (
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => {
               snack.onAction?.();
               dispatch({ type: 'ui/CLEAR_SNACK' });

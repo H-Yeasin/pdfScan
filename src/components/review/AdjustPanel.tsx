@@ -63,7 +63,7 @@ export function AdjustPanel({ value, onCommit, onLive }: AdjustPanelProps) {
         onChange={(v) => liveField('saturation', v)}
         onCommit={(v) => commitField('saturation', v)}
       />
-      <Pressable style={styles.resetRow} onPress={reset} disabled={atDefault} hitSlop={6}>
+      <Pressable accessibilityRole="button" style={styles.resetRow} onPress={reset} disabled={atDefault} hitSlop={6}>
         <Ionicons name="refresh-outline" size={13} color={atDefault ? tokens.edge : tokens.muted} />
         <Text style={[styles.resetLabel, { color: atDefault ? tokens.edge : tokens.muted }]}>{t('review.adjustPanel.reset')}</Text>
       </Pressable>

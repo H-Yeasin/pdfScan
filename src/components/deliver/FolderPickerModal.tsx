@@ -32,11 +32,11 @@ export function FolderPickerModal({
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
+        <Pressable accessible={false} style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.picker.title')}</Text>
           <ScrollView style={styles.list} contentContainerStyle={{ gap: spacing.xs }}>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={styles.row}
               onPress={() => {
                 onSelect(null);
@@ -47,7 +47,7 @@ export function FolderPickerModal({
               {selectedCourseId === null && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
             </Pressable>
             {pickable.map((course) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={course.id}
                 style={styles.row}
                 onPress={() => {
@@ -64,12 +64,12 @@ export function FolderPickerModal({
             ))}
           </ScrollView>
 
-          <Pressable style={styles.newRow} onPress={() => setCreating(true)}>
+          <Pressable accessibilityRole="button" style={styles.newRow} onPress={() => setCreating(true)}>
             <Ionicons name="add" size={18} color={tokens.accentInk} />
             <Text style={[styles.newLabel, { color: tokens.accentInk }]}>{t('deliver.picker.newCourse')}</Text>
           </Pressable>
 
-          <Pressable style={styles.cancelRow} onPress={onClose}>
+          <Pressable accessibilityRole="button" style={styles.cancelRow} onPress={onClose}>
             <Text style={[styles.cancelLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
           </Pressable>
         </Pressable>

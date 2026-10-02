@@ -9,7 +9,7 @@ import { resolveOcrScript } from '../../services/scripts/registry';
 import { masterToLayer } from '../../services/study/canvasMath';
 import { readingOrderTokens, selectBetween, selectionText, tokenAt, type TextToken } from '../../services/study/textSelection';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
-import { radii, spacing, useTheme } from '../../theme';
+import { radii, spacing, useTheme, touchSlop } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { PageCanvas } from './PageCanvas';
 import { useT } from '../../i18n/useT';
@@ -93,7 +93,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]}>
           <View style={styles.header}>
-            <Pressable style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={22} color={theme.ink} />
             </Pressable>
             <Text style={[styles.title, { color: theme.ink }]}>{t('reader.select.title', { page: pageIdx + 1 })}</Text>

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
@@ -56,7 +56,7 @@ export function ThumbnailStrip({
       style={styles.scrollView}
       contentContainerStyle={styles.content}
     >
-      <Pressable
+      <Pressable accessibilityRole="button"
         onPress={onPressCover}
         style={[
           styles.thumb,
@@ -91,7 +91,7 @@ export function ThumbnailStrip({
           onDelete={remove}
         />
       ))}
-      <Pressable
+      <Pressable accessibilityRole="button"
         onPress={onAddMore}
         style={[styles.addTile, { borderColor: tokens.edge }]}
       >
@@ -121,6 +121,7 @@ const DraggableThumbnail = memo(function DraggableThumbnail({
   onDelete,
 }: DraggableThumbnailProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const translateX = useSharedValue(0);
   const dragging = useSharedValue(0);
 
@@ -155,6 +156,28 @@ const DraggableThumbnail = memo(function DraggableThumbnail({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
+        // §9 O4: one element for screen readers. Drag-to-reorder and the delete badge have
+        // actions instead ("Move earlier", "Move later", "Remove page").
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={t('a11y.pageOf', { n: index + 1, total })}
+        accessibilityState={{ selected }}
+        accessibilityActions={[
+          { name: 'activate' },
+          ...(index > 0 ? [{ name: 'moveEarlier', label: t('a11y.moveEarlier') }] : []),
+          ...(index < total - 1 ? [{ name: 'moveLater', label: t('a11y.moveLater') }] : []),
+          { name: 'remove', label: t('a11y.removePage', { n: index + 1 }) },
+        ]}
+        onAccessibilityAction={(e) => {
+          const action = e.nativeEvent.actionName;
+          if (action === 'activate') onSelect(index);
+          else if (action === 'remove') onDelete(page.id);
+          else if (action === 'moveEarlier' || action === 'moveLater') {
+            const to = index + (action === 'moveEarlier' ? -1 : 1);
+            onDropAt(index, to);
+            AccessibilityInfo.announceForAccessibility(t('a11y.moved', { n: to + 1 }));
+          }
+        }}
         style={[
           styles.thumb,
           { backgroundColor: tokens.surface, borderColor: selected ? tokens.accent : 'transparent' },
@@ -174,6 +197,8 @@ const DraggableThumbnail = memo(function DraggableThumbnail({
           hitSlop={8}
           style={[styles.deleteBadge, { backgroundColor: tokens.danger }]}
           onPress={() => onDelete(page.id)}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.removePage', { n: index + 1 })}
         >
           <Ionicons name="close" size={11} color="#fff" />
         </Pressable>

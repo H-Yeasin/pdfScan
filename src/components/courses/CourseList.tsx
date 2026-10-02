@@ -99,7 +99,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
       ) : null}
 
       {unsortedCount > 0 && (
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.row, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
           onPress={() => onOpenCourse?.(UNSORTED_COURSE_ID)}
           disabled={!onOpenCourse}
@@ -116,7 +116,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
       )}
 
       {shown.map((course) => (
-        <Pressable
+        <Pressable accessibilityRole="button"
           key={course.id}
           style={[
             styles.row,
@@ -136,7 +136,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
               {subtitle(course)}
             </Text>
           </View>
-          <Pressable onPress={() => handleMenu(course)} hitSlop={8} accessibilityLabel={t('courses.options', { name: course.name })}>
+          <Pressable accessibilityRole="button" onPress={() => handleMenu(course)} hitSlop={8} accessibilityLabel={t('courses.options', { name: course.name })}>
             <Ionicons name="ellipsis-horizontal" size={18} color={tokens.muted} />
           </Pressable>
         </Pressable>

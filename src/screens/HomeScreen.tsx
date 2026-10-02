@@ -26,7 +26,7 @@ import {
 import { courseColorValue } from '../services/courses/palette';
 import { startScan } from '../services/courses/startScan';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, useTheme } from '../theme';
+import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
 import type { Course } from '../types/models';
 import { toLocalDateString } from '../utils/localDate';
 import { formatShortDate } from '../utils/format';
@@ -117,7 +117,7 @@ export function HomeScreen() {
           </Text>
           {shown ? <Ionicons name="chevron-down" size={18} color={tokens.muted} /> : null}
         </Pressable>
-        <Pressable style={styles.iconButton} onPress={() => go('settings')} accessibilityLabel={t('common.settings')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={() => go('settings')} accessibilityLabel={t('common.settings')}>
           <Ionicons name="settings-outline" size={21} color={tokens.ink} />
         </Pressable>
       </View>
@@ -214,6 +214,15 @@ export function HomeScreen() {
                   onLongPress={() => handleCourseMenu(course)}
                   delayLongPress={400}
                   accessibilityRole="button"
+                  accessibilityLabel={
+                    stats
+                      ? t('a11y.courseCard', {
+                          name: [course.code, course.name].filter(Boolean).join(', '),
+                          documents: t('a11y.documents', { count: stats.count }),
+                          when: relativeDay(stats.lastScanAt!, now),
+                        })
+                      : t('a11y.courseCardEmpty', { name: [course.code, course.name].filter(Boolean).join(', ') })
+                  }
                   accessibilityHint={t('home.courseHint')}
                 >
                   <CourseBadge course={course} size={36} />

@@ -108,7 +108,7 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
                   {formatTime(slot.startMin)}–{formatTime(slot.endMin)}
                 </Text>
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 onPress={() => setDraft((prev) => prev.filter((s) => s.id !== slot.id))}
                 hitSlop={8}
                 accessibilityLabel={t('courses.timetable.remove', { day: weekdayName(slot.weekday), time: formatTime(slot.startMin) })}
@@ -122,7 +122,7 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
             <View style={[styles.form, { borderColor: tokens.edge }]}>
               <View style={styles.days}>
                 {WEEKDAY_ORDER.map((day) => (
-                  <Pressable key={day} style={chip(form.weekday === day)} onPress={() => setForm({ ...form, weekday: day })}>
+                  <Pressable accessibilityRole="button" key={day} style={chip(form.weekday === day)} onPress={() => setForm({ ...form, weekday: day })}>
                     <Text style={[styles.chipLabel, { color: tokens.ink }]}>{weekdayName(day)}</Text>
                   </Pressable>
                 ))}
@@ -155,10 +155,10 @@ export function TimetableEditor({ visible, courseId, onClose }: TimetableEditorP
               </View>
               {form.error ? <Text style={{ color: tokens.danger, fontSize: 13 }}>{form.error}</Text> : null}
               <View style={styles.formActions}>
-                <Pressable onPress={() => setForm(null)} style={styles.formButton}>
+                <Pressable accessibilityRole="button" onPress={() => setForm(null)} style={styles.formButton}>
                   <Text style={[styles.formButtonLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
                 </Pressable>
-                <Pressable onPress={saveForm} style={[styles.formButton, { backgroundColor: tokens.accentSoft, borderRadius: radii.full }]}>
+                <Pressable accessibilityRole="button" onPress={saveForm} style={[styles.formButton, { backgroundColor: tokens.accentSoft, borderRadius: radii.full }]}>
                   <Text style={[styles.formButtonLabel, { color: tokens.accentInk }]}>{form.editingId ? t('courses.timetable.update') : t('courses.timetable.add')}</Text>
                 </Pressable>
               </View>

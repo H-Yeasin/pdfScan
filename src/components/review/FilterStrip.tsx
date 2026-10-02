@@ -64,7 +64,14 @@ export function FilterStrip({ page, value, onChange }: FilterStripProps) {
         const active = spec.id === value;
         const picture = pictures?.get(spec.id);
         return (
-          <Pressable key={spec.id} style={styles.item} onPress={() => onChange(spec.id)} hitSlop={4}>
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active }}
+            key={spec.id}
+            style={styles.item}
+            onPress={() => onChange(spec.id)}
+            hitSlop={4}
+          >
             <View
               style={[
                 styles.thumb,

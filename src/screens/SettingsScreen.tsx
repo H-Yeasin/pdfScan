@@ -14,7 +14,7 @@ import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
+import { fontFamily, spacing, typeScale, useTheme, type ThemePref, touchSlop } from '../theme';
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 
 
@@ -65,7 +65,7 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go(hub, 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go(hub, 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('settings.title')}</Text>

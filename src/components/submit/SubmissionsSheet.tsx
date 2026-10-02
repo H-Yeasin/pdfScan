@@ -22,7 +22,7 @@ export function SubmissionsSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
+      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('submit.submitted')}</Text>
         <ScrollView contentContainerStyle={styles.body}>

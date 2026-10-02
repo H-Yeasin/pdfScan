@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fontFamily, spacing, typeScale, useTheme } from '../../theme';
+import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { LibraryDocument } from '../../types/models';
 
@@ -22,7 +22,7 @@ export function DocumentPickerModal({ visible, title, docs, onPick, onClose }: D
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>{title}</Text>
-          <Pressable style={styles.closeButton} onPress={onClose} accessibilityLabel={t('common.cancel')}>
+          <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.closeButton} onPress={onClose} accessibilityLabel={t('common.cancel')}>
             <Ionicons name="close" size={22} color={tokens.ink} />
           </Pressable>
         </View>
@@ -31,7 +31,7 @@ export function DocumentPickerModal({ visible, title, docs, onPick, onClose }: D
           keyExtractor={(doc) => doc.id}
           ListEmptyComponent={<Text style={[styles.empty, { color: tokens.muted }]}>{t('reader.edit.noDocuments')}</Text>}
           renderItem={({ item }) => (
-            <Pressable style={[styles.row, { borderBottomColor: tokens.edge }]} onPress={() => onPick(item)}>
+            <Pressable accessibilityRole="button" style={[styles.row, { borderBottomColor: tokens.edge }]} onPress={() => onPick(item)}>
               <Text style={{ color: tokens.ink }} numberOfLines={1}>
                 {item.name}
               </Text>

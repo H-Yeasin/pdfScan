@@ -26,7 +26,7 @@ import { useStableCallback } from '../utils/useStableCallback';
 import { DOC_LIST_TUNING } from '../components/library/docListTuning';
 import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import type { DocType } from '../types/models';
 import { useT } from '../i18n/useT';
 
@@ -130,7 +130,7 @@ export function CourseScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       {selMode ? (
         <View style={styles.header}>
-          <Pressable
+          <Pressable hitSlop={touchSlop(44)} accessibilityRole="button"
             style={[styles.iconButton, { backgroundColor: tokens.surface2, borderRadius: 22 }]}
             onPress={() => dispatch({ type: 'library/CLEAR_SELECTION' })}
             accessibilityLabel={t('library.clearSelection')}
@@ -141,7 +141,7 @@ export function CourseScreen() {
         </View>
       ) : (
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={goBack} accessibilityLabel={t('common.back')}>
+          <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={goBack} accessibilityLabel={t('common.back')}>
             <Ionicons name="chevron-back" size={22} color={tokens.ink} />
           </Pressable>
           {course ? <CourseBadge course={course} size={40} /> : null}
@@ -156,7 +156,7 @@ export function CourseScreen() {
             ) : null}
           </View>
           {docs.length > 0 ? (
-            <Pressable style={styles.iconButton} onPress={openPack} accessibilityLabel={packCount ? t('courses.page.examPackCountA11y', { count: packCount }) : t('courses.page.examPackA11y')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={openPack} accessibilityLabel={packCount ? t('courses.page.examPackCountA11y', { count: packCount }) : t('courses.page.examPackA11y')}>
               <Ionicons name="layers-outline" size={21} color={tokens.ink} />
               {packCount ? (
                 <View style={[styles.badge, { backgroundColor: tokens.accent }]}>
@@ -166,7 +166,7 @@ export function CourseScreen() {
             </Pressable>
           ) : null}
           {docs.length > 0 ? (
-            <Pressable
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button"
               style={styles.iconButton}
               onPress={() =>
                 course
@@ -179,11 +179,11 @@ export function CourseScreen() {
             </Pressable>
           ) : null}
           {course ? (
-            <Pressable style={styles.iconButton} onPress={() => setEditing(true)} accessibilityLabel={t('courses.editCourse')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={() => setEditing(true)} accessibilityLabel={t('courses.editCourse')}>
               <Ionicons name="create-outline" size={21} color={tokens.ink} />
             </Pressable>
           ) : toSort.length > 0 && state.library.courses.some((c) => !c.archived) ? (
-            <Pressable style={styles.iconButton} onPress={startSorting} accessibilityLabel={t('courses.page.sortInto')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={startSorting} accessibilityLabel={t('courses.page.sortInto')}>
               <Ionicons name="git-pull-request-outline" size={21} color={tokens.ink} />
             </Pressable>
           ) : null}
