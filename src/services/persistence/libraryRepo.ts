@@ -597,8 +597,8 @@ export async function saveDiskBytes(db: SQLiteDatabase, id: string, bytes: numbe
 }
 
 // §8 B5: when the library last changed - the newest document saved or edited, or course made -
-// for the backup reminder and automatic backups. null: nothing in it. (A document's updated_at
-// also moves when the Reader saves the page it's on, so reading counts as a change.)
+// for the backup reminder and automatic backups. null: nothing in it. Reading a document doesn't
+// move its updated_at (documentEdited), so it isn't a change.
 export async function libraryChangedAt(db: SQLiteDatabase): Promise<number | null> {
   const row = await db.getFirstAsync<{ at: number | null }>(
     `SELECT MAX(at) AS at FROM (

@@ -181,10 +181,11 @@ As built:
   or a new one. Also for B4: `loadCurrentLibrary(db)`, `targetPathForEntry(plan, manifest,
   entry)` (refuses `..`), and `insertRows(db, tables)` (only the current schema's columns; run
   it inside B4's transaction).
-- **For B4:** `updated_at` changes on *every* document write, including the Reader saving the
-  last page (§7 R4). So a document that was only *read* after a backup counts as changed and
-  gets "keep both" on a second restore. If that shows up in practice, compare content columns
-  instead of `updated_at` in `importPlan`.
+- **Fixed later (766edc3):** `updated_at` used to change on every document write, including
+  the Reader saving the last page (§7 R4), so a document only *read* after a backup got "keep
+  both" on a second restore. Now `syncLibrary` keeps the stored `updated_at` when only
+  bookkeeping changed: `lastPage`, `missingFiles` or `searchHaystack`
+  (`libraryRepo.documentEdited`). Any other change, starring included, is an edit.
 - Test mock: `File.open()` and `FileMode` in `src/test/mocks/expoFileSystem.ts`.
 
 - **Check first:** the `expo-file-system@57` file handle API (`File.open()`, `readBytes`,
@@ -323,9 +324,9 @@ As built:
   Incoming zips are copied to `cache/restore/` first (`backup/incomingZip.ts`,
   `store/backupIntake.ts`), because provider `content://` URIs can't be opened as a seekable
   handle. The copy is removed when the dialog closes, and Storage → Clear also empties it.
-- **Still open from B2:** `updated_at` changes on every write, including the Reader's last
-  page, so a document only *read* after a backup is "kept both" on a second restore. It hasn't
-  been seen in practice yet.
+- **B2's `updated_at` issue is fixed** (766edc3): reading a document no longer moves it, so
+  restoring the same backup twice skips documents that were only read. This is tested in
+  `restoreBackup.test.ts`.
 
 - Entry points: Settings → Backup → **Restore from backup…** and Library → **Import
   course or documents…** (both use `expo-document-picker` for `.zip`); add an "Open with" intent
@@ -363,9 +364,9 @@ Status: done (commit 956c5d5)
 As built:
 - `backup/schedule.ts` (pure): `backupReminderDue`, `autoBackupDue`, `rotateAutoBackups`.
   "The library has changed" means `libraryRepo.libraryChangedAt`, the newest
-  `documents.updated_at` or `courses.created_at`. Since `updated_at` also moves when the Reader
-  saves the page it's on, reading counts as a change. An automatic backup is skipped when
-  nothing changed since the last one.
+  `documents.updated_at` or `courses.created_at`. Since 766edc3, reading a document (the
+  Reader's last page) doesn't move `updated_at`, so reading isn't a change. An automatic backup
+  is skipped when nothing changed since the last one.
 - **Home card:** `store/useBackupReminder.ts`, a one-line card on top of Home with "Later" and
   "Back up". "Back up" goes through `ui/REQUEST_EXPORT` to `components/backup/ExportHost.tsx`
   (always mounted), which runs B3's dialog.

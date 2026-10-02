@@ -104,6 +104,7 @@ lines here.
 | B3 Back up and export | ac0eee5 | `backup/createBackup.ts`, `components/backup/{useBackupExport,BackupSheet}.tsx`, `BackupScreen`, `deviceExportService.saveFileToFolder` (streamed SAF), `settings.lastBackup*`/`backupFolder*` |
 | B4 Restore and import | de148e2 | `backup/{restoreBackup,restoreSettings,incomingZip}.ts`, `RestoreHost` (`ui/OPEN_BACKUP`), `dbService.withWriteLock`, zip intent filter (new dev build) |
 | B5 Reminders, automatic backups | 956c5d5 | `backup/{schedule,autoBackup}.ts`, `useBackupReminder`, `useAutoBackup`, `ExportHost`, `AutoBackupChip`, `settings.autoBackup*` |
+| B2 leftover: reading isn't an edit | 766edc3 | `libraryRepo.documentEdited`: `updated_at` only moves on real edits (restore twice after reading adds nothing) |
 | O1 Android back, start screen, splash | 1e998dc | `navigation/{backHandling,useBackHandler}.ts`, `bootstrap/{splash,startScreen}.ts`, `expo-splash-screen` (new dev build) |
 | O5 Performance (code) | ffc68d3, 35016b8 | selector store (`useAppSlices`/`useAppSelector`), memo'd rows, `useDeferredBoot`, lazy xlsx/mammoth, `src/dev/seedLibrary.ts`; measurements open (`docs/qa/performance.md`) |
 
