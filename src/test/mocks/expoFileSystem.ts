@@ -36,6 +36,17 @@ export class Directory {
   create(options?: { intermediates?: boolean; idempotent?: boolean }): void {
     fs.mkdirSync(toPath(this.uri), { recursive: options?.intermediates ?? false });
   }
+  // Recursive, like the native getter; null when the directory doesn't exist.
+  get size(): number | null {
+    if (!this.exists) return null;
+    const sum = (p: string): number =>
+      fs.readdirSync(p).reduce((total, entry) => {
+        const full = path.join(p, entry);
+        const stat = fs.statSync(full);
+        return total + (stat.isDirectory() ? sum(full) : stat.size);
+      }, 0);
+    return sum(toPath(this.uri));
+  }
   delete(): void {
     fs.rmSync(toPath(this.uri), { recursive: true, force: true });
   }
@@ -71,6 +82,9 @@ export class File {
   }
   get size(): number {
     return this.exists ? fs.statSync(toPath(this.uri)).size : 0;
+  }
+  get lastModified(): number | null {
+    return this.exists ? fs.statSync(toPath(this.uri)).mtimeMs : null;
   }
   async bytes(): Promise<Uint8Array> {
     return new Uint8Array(fs.readFileSync(toPath(this.uri)));
@@ -118,6 +132,8 @@ export class File {
 export const Paths = {
   document: new Directory(root, 'document'),
   cache: new Directory(root, 'cache'),
+  // Settable by tests (§8 B1 space checks); plenty by default.
+  availableDiskSpace: 64 * 1024 * 1024 * 1024,
 };
 fs.mkdirSync(path.join(root, 'document'), { recursive: true });
 fs.mkdirSync(path.join(root, 'cache'), { recursive: true });

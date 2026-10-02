@@ -47,6 +47,8 @@ type DocumentRow = {
   indexed_at: number | null;
   index_state: string | null;
   last_page: number | null;
+  missing_files: number;
+  disk_bytes: number | null;
 };
 
 type PageRow = {
@@ -261,6 +263,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       indexedAt: row.indexed_at ?? undefined,
       indexState: INDEX_STATES.includes(row.index_state as IndexState) ? (row.index_state as IndexState) : undefined,
       lastPage: row.last_page && row.last_page > 0 ? row.last_page : undefined,
+      missingFiles: row.missing_files ? true : undefined,
     };
   });
 
@@ -428,6 +431,9 @@ export async function listSubmissions(
 // `pagesUnchanged`: the caller knows the pages are the ones already stored (the reducer kept the
 // same array), so only the document row is written - a rename, a star, or the Reader saving the
 // page it's on (§7 R4) mustn't rewrite every page row.
+// §8 B1: disk_bytes (the measured folder size) survives only a write that can't have changed the
+// files - same pages, same PDF, same size; any save or edit clears it for the storage report to
+// measure again. It isn't part of LibraryDocument, so a spread `...doc` can't carry a stale value.
 async function writeDocument(
   db: SQLiteDatabase,
   doc: LibraryDocument,
@@ -457,11 +463,12 @@ async function writeDocument(
     doc.indexedAt ?? null,
     doc.indexState ?? null,
     doc.lastPage ?? null,
+    doc.missingFiles ? 1 : 0,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
        updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size,
-       indexed_at, index_state, last_page)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       indexed_at, index_state, last_page, missing_files)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -473,7 +480,10 @@ async function writeDocument(
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
          archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size,
-         indexed_at = excluded.indexed_at, index_state = excluded.index_state, last_page = excluded.last_page`,
+         indexed_at = excluded.indexed_at, index_state = excluded.index_state, last_page = excluded.last_page,
+         missing_files = excluded.missing_files,
+         disk_bytes = CASE WHEN ${pagesUnchanged ? 1 : 0} AND documents.size_bytes = excluded.size_bytes
+           AND documents.pdf_path IS excluded.pdf_path THEN documents.disk_bytes ELSE NULL END`,
       params
     );
     if (pagesUnchanged) return;
@@ -570,6 +580,24 @@ export async function insertIfMissing(db: SQLiteDatabase, library: LoadedLibrary
     for (const course of library.courses) await writeCourse(db, course, 'ignore');
     for (const doc of library.documents) await writeDocument(db, doc, 'ignore');
   });
+}
+
+// §8 B1: the storage report's cache of each document folder's size. null: not measured since the
+// document was last saved or edited.
+export async function loadDiskBytes(db: SQLiteDatabase): Promise<Map<string, number | null>> {
+  const rows = await db.getAllAsync<{ id: string; disk_bytes: number | null }>('SELECT id, disk_bytes FROM documents');
+  return new Map(rows.map((row) => [row.id, row.disk_bytes]));
+}
+
+export async function saveDiskBytes(db: SQLiteDatabase, id: string, bytes: number): Promise<void> {
+  await db.runAsync('UPDATE documents SET disk_bytes = ? WHERE id = ?', [bytes, id]);
+}
+
+// §8 B1: ids that have a document row. The integrity check asks the database (not the in-memory
+// state) before treating a folder as left over, so a document saved a moment ago isn't moved.
+export async function documentIdsInDb(db: SQLiteDatabase): Promise<Set<string>> {
+  const rows = await db.getAllAsync<{ id: string }>('SELECT id FROM documents');
+  return new Set(rows.map((row) => row.id));
 }
 
 export async function upsertDocuments(db: SQLiteDatabase, docs: LibraryDocument[]): Promise<void> {

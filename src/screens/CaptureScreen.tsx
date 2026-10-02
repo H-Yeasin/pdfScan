@@ -16,6 +16,7 @@ import { resolveOcrScript } from '../services/scripts/registry';
 import { useAppState } from '../store/AppStateContext';
 import { captureSpecFor } from '../store/slices/settingsSlice';
 import { useFilingCourse } from '../store/useFilingCourse';
+import { useSpaceGuard } from '../store/useSpaceGuard';
 import { createId } from '../utils/id';
 import { radii, spacing } from '../theme';
 import { useCaptureChrome } from '../theme/captureChrome';
@@ -38,6 +39,7 @@ export function CaptureScreen() {
   const hasCourses = state.library.courses.some((c) => !c.archived);
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const restoredMode = useRef(false);
+  const { beforeScan } = useSpaceGuard();
 
   // Restore the last-used mode once settings are in. Only on the first visit with an empty
   // session: mid-session (e.g. "Add more") the mode the user is already scanning in wins.
@@ -68,6 +70,7 @@ export function CaptureScreen() {
   // eventual 'success'/'error' that lands after the slow downscale/OCR loop finishes.
 
   const handleImport = useCallback(async () => {
+    if (!(await beforeScan())) return;
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) return;
 
@@ -89,13 +92,14 @@ export function CaptureScreen() {
       ocrScript,
       spec
     );
-  }, [dispatch, go, markPickerSeen, ocrScript, spec]);
+  }, [dispatch, go, markPickerSeen, ocrScript, spec, beforeScan]);
 
-  const handleScan = useCallback(() => {
+  const handleScan = useCallback(async () => {
     if (busyScanning) return;
     markPickerSeen();
+    if (!(await beforeScan())) return;
     runNativeScannerPipeline(dispatch, ocrScript, spec, { scannerUnavailable });
-  }, [busyScanning, dispatch, ocrScript, spec, markPickerSeen, scannerUnavailable]);
+  }, [busyScanning, dispatch, ocrScript, spec, markPickerSeen, scannerUnavailable, beforeScan]);
 
   // Opens the scanner on arrival only when asked to (capture.scannerRequested: a "scan now" button
   // like Home's Scan, a course's Scan, Retake or Add more). Arriving any other way - the Scan tab,
@@ -109,7 +113,10 @@ export function CaptureScreen() {
     dispatch({ type: 'capture/REQUEST_SCANNER', requested: false });
     if (firstRun || busyScanning) return;
     const launchMode = pages.length === 0 ? lastCaptureMode : mode;
-    runNativeScannerPipeline(dispatch, ocrScript, captureSpecFor(state.settings, launchMode), { scannerUnavailable });
+    const launchSpec = captureSpecFor(state.settings, launchMode);
+    void beforeScan().then((proceed) => {
+      if (proceed) runNativeScannerPipeline(dispatch, ocrScript, launchSpec, { scannerUnavailable });
+    });
     // Runs when a request is pending; the request is consumed first, so it launches once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsLoaded, scannerRequested]);

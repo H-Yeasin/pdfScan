@@ -45,6 +45,8 @@ import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/su
 import { useAppState } from '../store/AppStateContext';
 import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
 import { useFilingCourse } from '../store/useFilingCourse';
+import { useSpaceGuard } from '../store/useSpaceGuard';
+import { BYTES_PER_SAVED_PAGE } from '../services/storage/usage';
 import { resolveOcrScript } from '../services/scripts/registry';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
@@ -87,6 +89,7 @@ export function DeliverScreen() {
   const sizeLimit = format === 'PDF' ? sizeLimitBytes : null;
   // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
   const { courseId, suggestions, automatic } = useFilingCourse();
+  const { beforeSave } = useSpaceGuard();
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
@@ -164,6 +167,8 @@ export function DeliverScreen() {
   const handleSaveInternal = useCallback(
     async (requestedMode: SaveMode) => {
       if (pages.length === 0 || saving) return;
+      // §8 B1: stop before writing anything when the phone is too full; the session is untouched.
+      if (!beforeSave(pages.length * BYTES_PER_SAVED_PAGE)) return;
       // §7 R3: pages going to the end of a saved document are plain pages - no cover, stamps,
       // 2-in-1 layout or size target (the document is rebuilt with its own pages) - and aren't
       // submitted on their own.
@@ -467,6 +472,7 @@ export function DeliverScreen() {
       androidExportFolderUri,
       androidExportFolderLabel,
       state.capture.mode,
+      beforeSave,
       dispatch,
       go,
     ]

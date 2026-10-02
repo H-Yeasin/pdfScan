@@ -109,7 +109,8 @@
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#16a085"
         }
-      ]
+      ],
+      "./plugins/withBackupRules"
     ],
     "extra": {
       "eas": {

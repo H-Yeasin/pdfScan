@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { searchTextDirect, type PDFSearchResultItem } from 'react-native-pdf-jsi';
+import { File } from 'expo-file-system';
 import { DocTypePickerModal } from '../components/courses/DocTypeChips';
 import { OverflowSheet, type OverflowItemId } from '../components/reader/OverflowSheet';
 import { docTypeOf, getDocType } from '../services/courses/docTypes';
@@ -134,6 +135,18 @@ export function ReaderScreen() {
   const title = external?.name ?? doc?.name ?? '';
   const pdfId = external?.uri ?? doc?.id ?? '';
   const contentKey = pdfUri ?? nativeUri;
+  // §8 B1: the file to show was deleted outside the app (or a restore didn't bring it back). Said
+  // plainly here, rather than left to the viewer to fail on. Re-checked when the integrity check
+  // changes the document's flag.
+  const fileMissing = useMemo(() => {
+    if (!doc || external || !contentKey) return false;
+    try {
+      return !new File(contentKey).exists;
+    } catch {
+      return true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentKey, doc?.missingFiles, external]);
 
   useEffect(() => {
     Animated.timing(chromeVisible, { toValue: chrome ? 1 : 0, duration: 180, useNativeDriver: true }).start();
@@ -427,6 +440,18 @@ export function ReaderScreen() {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         <Text style={{ color: tokens.muted }}>{t('reader.notFound')}</Text>
+      </View>
+    );
+  }
+
+  if (fileMissing) {
+    return (
+      <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
+        <Text style={[styles.passwordTitle, { color: tokens.ink }]}>{t('reader.filesMissing')}</Text>
+        <Text style={{ color: tokens.muted, textAlign: 'center' }}>{t('reader.filesMissingBody')}</Text>
+        <Pressable onPress={() => go(hub, 'back')} hitSlop={8}>
+          <Text style={{ color: tokens.accent, fontWeight: '600' }}>{t('common.back')}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -726,6 +751,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.xl,
   },
   passwordOverlay: {
     position: 'absolute',

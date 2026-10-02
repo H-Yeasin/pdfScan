@@ -191,6 +191,11 @@ export type LibraryDocument = {
   // §7 R4: the PDF page (1-based) the Reader was last on, so reopening resumes there. Undefined:
   // never read (opens at page 1).
   lastPage?: number;
+  // §8 B1: the start-up integrity check (storage/integrity.ts) found its PDF, source file or a
+  // page master missing (deleted by hand, or a partial Android restore). The library says so and
+  // the Reader shows a message instead of failing. Cleared when the files are back. Undefined:
+  // everything was there.
+  missingFiles?: boolean;
 };
 
 // A file opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —

@@ -27,7 +27,7 @@ export const en = {
     today: 'Today',
     yesterday: 'Yesterday',
     daysAgo: { one: '{count} day ago', other: '{count} days ago' },
-    bytes: { kb: '{size} KB', mb: '{size} MB' },
+    bytes: { kb: '{size} KB', mb: '{size} MB', gb: '{size} GB' },
   },
 
   home: {
@@ -128,6 +128,30 @@ export const en = {
       filterLab: 'Filter Lab',
       filterLabSubtitle: 'Compare every filter and tune its constants',
     },
+    // §8 B1: Settings → Storage.
+    storage: {
+      section: 'Storage',
+      row: 'Storage',
+      rowSubtitle: 'Space used per course, temporary files, biggest documents',
+      title: 'Storage',
+      measuring: 'Measuring…',
+      total: 'PDF Scan uses {size}',
+      byCourse: 'By course',
+      docCount: { one: '{count} document', other: '{count} documents' },
+      other: 'Trash and other files',
+      caches: 'Temporary files',
+      cachesSubtitle: 'Previews, shared copies and other files the app can make again',
+      clear: 'Clear',
+      cleared: 'Freed {size}',
+      sessionKept: 'Pages of the scan you have open are kept.',
+      freeSpace: 'Space left on phone',
+      unknown: 'Unknown',
+      biggest: 'Biggest documents',
+      open: 'Open',
+      compress: 'Compress',
+      compressing: 'Compressing…',
+      androidBackupNote: "Android's own backup only covers small libraries (up to 25 MB), so it may not include your documents.",
+    },
     privacy: {
       section: 'Privacy',
       crashReports: 'Send anonymous crash reports',
@@ -155,6 +179,14 @@ export const en = {
       signedPage: 'Signed · page {page}',
     },
     crash: { title: 'Something went wrong.', body: 'Your documents are safe.', restart: 'Restart' },
+    // §8 B1: the low-space guard before a scan or a save.
+    space: {
+      title: 'Phone almost full',
+      continue: 'Continue',
+      low: 'Your phone is almost full ({size} left).',
+      freeUp: 'Free up space',
+      tooFullToSave: 'Not enough space to save ({size} left). Your pages are kept: free up space and try again.',
+    },
   },
 
   capture: {
@@ -259,6 +291,7 @@ export const en = {
     searchPlaceholder: 'Search names and text inside scans',
     pages: { one: '{count} page', other: '{count} pages' },
     archivedSuffix: ' · Archived',
+    filesMissing: 'Some files are missing',
     notEncrypted: 'Not actually encrypted',
     lockDisclosure: "This marks the file as protected in your library — it doesn't encrypt the PDF itself.",
     pageResults: 'Pages',
@@ -378,6 +411,8 @@ export const en = {
     pageA11y: 'Page {page} of {count}. Tap to go to a page.',
     cantOpen: "Can't open this file",
     cantOpenBody: 'It may be damaged, or not really a PDF.',
+    filesMissing: 'Some files are missing',
+    filesMissingBody: "This document's files aren't on this phone any more. Restore a backup to bring them back, or delete it.",
     wrongPassword: "That password didn't work.",
     // §7 R3.
     edit: {

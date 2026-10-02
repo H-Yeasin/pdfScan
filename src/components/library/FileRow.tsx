@@ -73,6 +73,11 @@ export function FileRow({ doc, selected, selectionMode, matchSnippet, courseColo
           · {formatBytes(doc.sizeBytes)} · {formatRelativeDate(doc.createdAt)}
           {doc.archived ? t('library.archivedSuffix') : ''}
         </Text>
+        {doc.missingFiles ? (
+          <Text style={[styles.meta, { color: tokens.danger }]} numberOfLines={1}>
+            {t('library.filesMissing')}
+          </Text>
+        ) : null}
         {indexNote ? (
           <Text style={[styles.meta, { color: tokens.muted }]} numberOfLines={1}>
             {indexNote}

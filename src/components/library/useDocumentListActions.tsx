@@ -23,7 +23,9 @@ import { usePageImage } from '../shared/usePageImage';
 import { useAppState } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { docTypeOf } from '../../services/courses/docTypes';
-import type { LibraryDocument } from '../../types/models';
+import type { Dispatch } from 'react';
+import type { AppAction } from '../../store/appReducer';
+import type { Annotation, LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
@@ -38,6 +40,33 @@ export function useOpenDocument() {
     },
     [dispatch, go]
   );
+}
+
+// Compresses each document, one at a time, and returns the message to show. Shared by the
+// selection bar and Settings → Storage's biggest documents (§8 B1). An imported PDF can only get
+// smaller by becoming images; the message says when that happened, and when it wouldn't have helped.
+export async function compressDocuments(
+  docs: readonly LibraryDocument[],
+  annotations: readonly Annotation[],
+  dispatch: Dispatch<AppAction>
+): Promise<string> {
+  let rasterized = 0;
+  let notSmaller = 0;
+  for (const doc of docs) {
+    if (isPdfLevel(doc)) {
+      const result = await compressImportedPdf(doc);
+      if (result.smaller) {
+        rasterized += 1;
+        dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: result.doc });
+      } else {
+        notSmaller += 1;
+      }
+    } else {
+      const compressed = await compressDocument(doc, undefined, annotations.filter((a) => a.documentId === doc.id));
+      dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
+    }
+  }
+  return rasterized ? t('library.compressedAsImages') : notSmaller ? t('library.alreadySmall') : t('library.compressed');
 }
 
 // What a document list does with its rows, shared by the Library and Course screens: tap opens
@@ -141,26 +170,8 @@ export function useDocumentListActions() {
           dispatch({ type: 'library/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.splitInto', { count: split.length }) });
         } else if (tool === 'compress') {
-          // An imported PDF can only get smaller by becoming images; tell the student when that
-          // happened, and when it wouldn't have helped.
-          let rasterized = 0;
-          let notSmaller = 0;
-          for (const doc of selectedDocs) {
-            if (isPdfLevel(doc)) {
-              const result = await compressImportedPdf(doc);
-              if (result.smaller) {
-                rasterized += 1;
-                dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: result.doc });
-              } else {
-                notSmaller += 1;
-              }
-            } else {
-              const compressed = await compressDocument(doc, undefined, annotationsOf([doc]));
-              dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
-            }
-          }
+          const msg = await compressDocuments(selectedDocs, state.library.annotations, dispatch);
           dispatch({ type: 'library/CLEAR_SELECTION' });
-          const msg = rasterized ? t('library.compressedAsImages') : notSmaller ? t('library.alreadySmall') : t('library.compressed');
           dispatch({ type: 'ui/SHOW_SNACK', msg });
         }
       }

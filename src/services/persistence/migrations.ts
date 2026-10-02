@@ -282,6 +282,19 @@ export const MIGRATIONS: Migration[] = [
       await db.execAsync('ALTER TABLE documents ADD COLUMN last_page INTEGER;');
     },
   },
+  {
+    // v16 (§8 B1): documents.missing_files flags a document whose files the start-up integrity
+    // check couldn't find (storage/integrity.ts), so the library says so instead of crashing.
+    // documents.disk_bytes caches the size of its library/<id>/ folder for the storage report
+    // (storage/usage.ts); NULL means "not measured since the last save or edit".
+    version: 16,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE documents ADD COLUMN missing_files INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE documents ADD COLUMN disk_bytes INTEGER;
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

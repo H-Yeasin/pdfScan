@@ -166,6 +166,16 @@ export function SettingsScreen() {
           </View>
         )}
 
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.storage.section')}</Text>
+          <SettingRow
+            title={t('settings.storage.row')}
+            subtitle={t('settings.storage.rowSubtitle')}
+            chevron
+            onPress={() => go('storage')}
+          />
+        </View>
+
         {scannerUnavailable && (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.scanner.section')}</Text>

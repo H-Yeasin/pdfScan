@@ -16,6 +16,7 @@ import { ProScreen } from '../screens/ProScreen';
 import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
 import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { ExamPackScreen } from '../screens/ExamPackScreen';
+import { StorageScreen } from '../screens/StorageScreen';
 import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
@@ -23,6 +24,7 @@ import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
 import { useDeadlineReminders } from '../store/useDeadlines';
+import { useStorageIntegrity } from '../store/useStorageIntegrity';
 import { useAppState } from '../store/AppStateContext';
 import { FEATURES } from '../config/features';
 import { initCrashReporting } from '../services/telemetry/crash';
@@ -42,6 +44,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   manageFolders: ManageFoldersScreen,
   academicOptions: AcademicOptionsScreen,
   examPack: ExamPackScreen,
+  storage: StorageScreen,
   filterLab: FilterLabScreen,
 };
 
@@ -52,6 +55,7 @@ export function AppNavigator() {
   useExternalFileLinking(libraryLoaded);
   useDeadlineReminders(libraryLoaded);
   useImportedPdfIndexing(libraryLoaded);
+  useStorageIntegrity(libraryLoaded);
   const { screen, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();

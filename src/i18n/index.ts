@@ -197,5 +197,9 @@ export function formatDate(date: Date | number, options?: Intl.DateTimeFormatOpt
 export function formatBytes(bytes: number): string {
   if (bytes <= 0) return t('common.bytes.kb', { size: formatNumber(0) });
   if (bytes < 1024 * 1024) return t('common.bytes.kb', { size: formatNumber(Math.max(1, Math.round(bytes / 1024))) });
-  return t('common.bytes.mb', { size: formatNumber(bytes / (1024 * 1024), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
+  if (bytes < 1024 * 1024 * 1024) {
+    return t('common.bytes.mb', { size: formatNumber(bytes / (1024 * 1024), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
+  }
+  // §8 B1: free space on the phone and big libraries.
+  return t('common.bytes.gb', { size: formatNumber(bytes / (1024 * 1024 * 1024), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) });
 }

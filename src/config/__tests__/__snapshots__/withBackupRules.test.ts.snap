@@ -1,0 +1,40 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`withBackupRules writes the full backup rules (Android 11 and older) 1`] = `
+"<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+  <include domain="file" path="SQLite/" />
+  <include domain="file" path="library/" />
+  <include domain="file" path="signature/" />
+  <include domain="database" path="." />
+  <include domain="sharedpref" path="." />
+  <exclude domain="file" path="library/.trash/" />
+  <exclude domain="file" path="library/.incoming/" />
+</full-backup-content>
+"
+`;
+
+exports[`withBackupRules writes the same rules for cloud backup and device transfer (Android 12+) 1`] = `
+"<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+  <cloud-backup>
+    <include domain="file" path="SQLite/" />
+    <include domain="file" path="library/" />
+    <include domain="file" path="signature/" />
+    <include domain="database" path="." />
+    <include domain="sharedpref" path="." />
+    <exclude domain="file" path="library/.trash/" />
+    <exclude domain="file" path="library/.incoming/" />
+  </cloud-backup>
+  <device-transfer>
+    <include domain="file" path="SQLite/" />
+    <include domain="file" path="library/" />
+    <include domain="file" path="signature/" />
+    <include domain="database" path="." />
+    <include domain="sharedpref" path="." />
+    <exclude domain="file" path="library/.trash/" />
+    <exclude domain="file" path="library/.incoming/" />
+  </device-transfer>
+</data-extraction-rules>
+"
+`;
