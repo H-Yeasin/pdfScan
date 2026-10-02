@@ -1,10 +1,18 @@
 import { File } from 'expo-file-system';
-import mammoth from 'mammoth';
+import type MammothTypes from 'mammoth';
 import { PreviewTooLargeError } from './sheetService';
 
 // §7 R5: DOCX is preview-only - mammoth turns it into plain semantic HTML (headings, lists,
 // tables, bold/italic) shown in a locked-down WebView (components/reader/DocxView), and its text
 // goes into the page text so library search finds it. No editing, no conversion to PDF.
+
+// §9 O5: loaded on first use - only the DOCX preview and its text extraction need mammoth.
+let mammothModule: typeof MammothTypes | null = null;
+function mammoth(): typeof MammothTypes {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  mammothModule ??= (require('mammoth') as { default?: typeof MammothTypes }).default ?? (require('mammoth') as typeof MammothTypes);
+  return mammothModule;
+}
 
 // Higher than the sheet cap: a DOCX is mostly its embedded photos, which are inlined, not parsed.
 export const DOCX_MAX_BYTES = 20 * 1024 * 1024;
@@ -25,14 +33,14 @@ function input(bytes: ArrayBuffer): { arrayBuffer: ArrayBuffer } {
 // The document body as HTML. Images become data: URIs (the WebView loads nothing from anywhere).
 export async function docxToHtml(uri: string): Promise<string> {
   const bytes = await readDocx(uri);
-  const result = await mammoth.convertToHtml(input(bytes), { convertImage: mammoth.images.dataUri });
+  const result = await mammoth().convertToHtml(input(bytes), { convertImage: mammoth().images.dataUri });
   return result.value;
 }
 
 // The document's plain text, for search.
 export async function extractDocxText(uri: string): Promise<string> {
   const bytes = await readDocx(uri);
-  const result = await mammoth.extractRawText(input(bytes));
+  const result = await mammoth().extractRawText(input(bytes));
   return result.value.replace(/\n{3,}/g, '\n\n').trim();
 }
 

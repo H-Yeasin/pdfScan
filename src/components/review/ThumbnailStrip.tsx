@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -6,6 +7,7 @@ import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
 import { rotationStyle } from '../../utils/rotation';
+import { useStableCallback } from '../../utils/useStableCallback';
 
 const THUMB_WIDTH = 60;
 const THUMB_HEIGHT = (THUMB_WIDTH * 4) / 3;
@@ -41,6 +43,11 @@ export function ThumbnailStrip({
 }: ThumbnailStripProps) {
   const { tokens } = useTheme();
   const { t } = useT();
+  // §9 O5: stable handlers, so a progress tick or a filter change on one page re-renders only the
+  // thumbnails whose page or position changed.
+  const select = useStableCallback(onSelect);
+  const reorder = useStableCallback(onReorder);
+  const remove = useStableCallback(onDelete);
 
   return (
     <ScrollView
@@ -79,9 +86,9 @@ export function ThumbnailStrip({
           index={index}
           total={pages.length}
           selected={index === selectedIndex}
-          onSelect={onSelect}
-          onDropAt={onReorder}
-          onDelete={onDelete}
+          onSelect={select}
+          onDropAt={reorder}
+          onDelete={remove}
         />
       ))}
       <Pressable
@@ -104,7 +111,15 @@ type DraggableThumbnailProps = {
   onDelete: (id: string) => void;
 };
 
-function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt, onDelete }: DraggableThumbnailProps) {
+const DraggableThumbnail = memo(function DraggableThumbnail({
+  page,
+  index,
+  total,
+  selected,
+  onSelect,
+  onDropAt,
+  onDelete,
+}: DraggableThumbnailProps) {
   const { tokens } = useTheme();
   const translateX = useSharedValue(0);
   const dragging = useSharedValue(0);
@@ -165,7 +180,7 @@ function DraggableThumbnail({ page, index, total, selected, onSelect, onDropAt, 
       </Animated.View>
     </GestureDetector>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // Without an explicit height, a horizontal ScrollView with no `style` can end up stretching to

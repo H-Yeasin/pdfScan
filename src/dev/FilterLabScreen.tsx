@@ -22,6 +22,7 @@ import { shareFileUri } from '../services/sharing/shareService';
 import { useAppDispatch } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { EnhanceMode, FilterOptions, ImageStats } from '../types/models';
+import { seedLibrary, SEED_DOCUMENTS } from './seedLibrary';
 
 // Dev-only (reachable from Settings when __DEV__): every filter side by side on one image, with a
 // slider per tunable constant (FilterSpec.params). E3-E5 tune their parameters here before
@@ -133,6 +134,20 @@ export function FilterLabScreen() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [timing, setTiming] = useState(false);
+  // §9 O5: the dev menu's "Seed library" for the performance budget (docs/qa/performance.md).
+  const [seeded, setSeeded] = useState<number | null>(null);
+  const handleSeed = useCallback(async () => {
+    setSeeded(0);
+    try {
+      await seedLibrary(dispatch, setSeeded);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: `Seeded ${SEED_DOCUMENTS} documents` });
+    } catch (e) {
+      console.warn('seedLibrary failed', e);
+      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Seeding failed' });
+    } finally {
+      setSeeded(null);
+    }
+  }, [dispatch]);
   const [timings, setTimings] = useState<Timing[] | null>(null);
   const [selected, setSelected] = useState<EnhanceMode>('auto');
   const [overrides, setOverrides] = useState<OverridesByFilter>({});
@@ -203,6 +218,16 @@ export function FilterLabScreen() {
 
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.actions}>
+          <Pressable
+            style={[styles.button, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
+            onPress={handleSeed}
+            disabled={seeded !== null}
+          >
+            <Ionicons name="library-outline" size={16} color={tokens.ink} />
+            <Text style={[styles.buttonLabel, { color: tokens.ink }]}>
+              {seeded === null ? `Seed library (${SEED_DOCUMENTS} docs)` : `Seeding ${seeded}/${SEED_DOCUMENTS}…`}
+            </Text>
+          </Pressable>
           <Pressable style={[styles.button, { backgroundColor: tokens.accent }]} onPress={handlePick}>
             <Ionicons name="image-outline" size={16} color={tokens.surface} />
             <Text style={[styles.buttonLabel, { color: tokens.surface }]}>{lab ? 'Change image' : 'Pick image'}</Text>

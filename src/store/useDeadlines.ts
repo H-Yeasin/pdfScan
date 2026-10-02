@@ -19,16 +19,18 @@ Notifications.setNotificationHandler({
 // Always mounted (AppNavigator). Keeps scheduled reminders in step with the deadlines - a deleted
 // deadline, one deleted with its course, or one marked done loses its reminders - and opens the
 // course page, with the deadline highlighted, when a reminder is tapped (also from a cold start).
-export function useDeadlineReminders(libraryLoaded: boolean) {
+// `cleanupReady` (§9 O5): the stale-reminder clean-up waits until after boot; opening a tapped
+// reminder only needs the library.
+export function useDeadlineReminders(libraryLoaded: boolean, cleanupReady = libraryLoaded) {
   const dispatch = useAppDispatch();
   const state = useAppSlices('library');
   const { go } = useRouter();
   const { deadlines, courses } = state.library;
 
   useEffect(() => {
-    if (!libraryLoaded) return;
+    if (!cleanupReady) return;
     cancelStaleReminders(deadlines).catch((error) => console.warn('useDeadlineReminders: cleanup failed', error));
-  }, [libraryLoaded, deadlines]);
+  }, [cleanupReady, deadlines]);
 
   const response = Notifications.useLastNotificationResponse();
   const handled = useRef<string | null>(null);

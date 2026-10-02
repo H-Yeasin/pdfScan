@@ -27,6 +27,9 @@ import { searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
 import { importExternalFile, LegacyWordDocError } from '../services/files/externalFileService';
 import { PICKER_MIME_TYPES } from '../services/documents/formatCapabilities';
+import { useStableCallback } from '../utils/useStableCallback';
+import { DOC_LIST_TUNING } from '../components/library/docListTuning';
+import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
@@ -40,6 +43,10 @@ export function LibraryScreen() {
   const store = useAppStore();
   const { loadStatus, files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
+  // Stable, so the memo'd FileRows only re-render when their own data changes (§9 O5).
+  const onRowPress = useStableCallback(handlePressRow);
+  const onRowLongPress = useStableCallback(handleLongPress);
+  const onRowStar = useStableCallback((doc: LibraryDocument) => dispatch({ type: 'library/TOGGLE_STAR', id: doc.id }));
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
   const [submittedFilter, setSubmittedFilter] = useState<SubmittedFilter>('all');
   // K6: search results by course; archived documents are hidden from the lists (not from search).
@@ -251,6 +258,7 @@ export function LibraryScreen() {
           <FlatList
             data={visibleFiles}
             keyExtractor={(doc) => doc.id}
+            {...DOC_LIST_TUNING}
             contentContainerStyle={styles.listContent}
             ListFooterComponent={
               searching ? (
@@ -291,9 +299,9 @@ export function LibraryScreen() {
                 selectionMode={selMode}
                 matchSnippet={getMatchSnippet(item, search)}
                 courseColor={courseColorOf(item.courseId)}
-                onPress={() => handlePressRow(item)}
-                onLongPress={() => handleLongPress(item)}
-                onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
+                onPress={onRowPress}
+                onLongPress={onRowLongPress}
+                onToggleStar={onRowStar}
               />
             )}
           />

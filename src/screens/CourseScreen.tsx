@@ -22,6 +22,9 @@ import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
 import { docTypeOf } from '../services/courses/docTypes';
 import { startScan } from '../services/courses/startScan';
+import { useStableCallback } from '../utils/useStableCallback';
+import { DOC_LIST_TUNING } from '../components/library/docListTuning';
+import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import type { DocType } from '../types/models';
@@ -42,6 +45,10 @@ export function CourseScreen() {
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   // §8 B3: "Export course…" (Unsorted: its documents).
   const { exportScope, overlay: exportOverlay } = useBackupExport();
+  // Stable, so the memo'd FileRows only re-render when their own data changes (§9 O5).
+  const onRowPress = useStableCallback(handlePressRow);
+  const onRowLongPress = useStableCallback(handleLongPress);
+  const onRowStar = useStableCallback((doc: LibraryDocument) => dispatch({ type: 'library/TOGGLE_STAR', id: doc.id }));
   const [editing, setEditing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
 
@@ -255,6 +262,7 @@ export function CourseScreen() {
           <FlatList
             data={shownDocs}
             keyExtractor={(doc) => doc.id}
+            {...DOC_LIST_TUNING}
             contentContainerStyle={[styles.listContent, { paddingBottom: 96 + insets.bottom }]}
             ListFooterComponent={
               <>
@@ -285,9 +293,9 @@ export function CourseScreen() {
                 doc={item}
                 selected={selection.includes(item.id)}
                 selectionMode={selMode}
-                onPress={() => handlePressRow(item)}
-                onLongPress={() => handleLongPress(item)}
-                onToggleStar={() => dispatch({ type: 'library/TOGGLE_STAR', id: item.id })}
+                onPress={onRowPress}
+                onLongPress={onRowLongPress}
+                onToggleStar={onRowStar}
               />
             )}
           />

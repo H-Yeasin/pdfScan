@@ -1,7 +1,17 @@
 import { File } from 'expo-file-system';
-import * as XLSX from 'xlsx';
+import type * as XLSXTypes from 'xlsx';
 import Papa from 'papaparse';
 import { readTextWithEncodingFallback } from './txtService';
+
+// §9 O5: SheetJS is large and only the sheet preview uses it, so it's loaded on first use rather
+// than at app start (Expo's Metro config doesn't inline requires).
+type XLSXModule = typeof XLSXTypes;
+let xlsx: XLSXModule | null = null;
+function XLSX(): XLSXModule {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  xlsx ??= require('xlsx') as XLSXModule;
+  return xlsx;
+}
 
 // §7 R5: CSV, XLSX and XLS are preview-only. These files come from outside the app (WhatsApp,
 // email, a teacher's drive), so parsing is capped before it can take the phone down: the file
@@ -37,7 +47,7 @@ export async function loadSheets(uri: string, format: SheetFormat, limits: Sheet
 
   const arrayBuffer = await new File(uri).arrayBuffer();
   // Values only: no formulas, styles, HTML or macros are read - nothing here needs them.
-  const workbook = XLSX.read(arrayBuffer, {
+  const workbook = XLSX().read(arrayBuffer, {
     type: 'array',
     cellFormula: false,
     cellHTML: false,
@@ -59,24 +69,24 @@ export async function loadSheets(uri: string, format: SheetFormat, limits: Sheet
     if (!ref) return { name, rows: [] };
     // Array-of-arrays (header: 1) avoids SheetJS guessing header-row keys; raw: false gives the
     // cells as the spreadsheet shows them (dates, percentages), which is what a preview wants.
-    const rows = XLSX.utils.sheet_to_json<string[]>({ ...sheet, '!ref': ref }, { header: 1, raw: false, defval: '' });
+    const rows = XLSX().utils.sheet_to_json<string[]>({ ...sheet, '!ref': ref }, { header: 1, raw: false, defval: '' });
     return { name, rows };
   });
 }
 
-function cellKeys(sheet: XLSX.WorkSheet): string[] {
+function cellKeys(sheet: XLSXTypes.WorkSheet): string[] {
   return Object.keys(sheet).filter((key) => key[0] !== '!');
 }
 
-function usedRange(sheet: XLSX.WorkSheet): string | null {
+function usedRange(sheet: XLSXTypes.WorkSheet): string | null {
   const keys = cellKeys(sheet);
   if (keys.length === 0) return null;
   const end = { r: 0, c: 0 };
   for (const key of keys) {
-    const { r, c } = XLSX.utils.decode_cell(key);
+    const { r, c } = XLSX().utils.decode_cell(key);
     end.r = Math.max(end.r, r);
     end.c = Math.max(end.c, c);
   }
   // From A1, so row and column positions in the preview match the spreadsheet's.
-  return XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: end });
+  return XLSX().utils.encode_range({ s: { r: 0, c: 0 }, e: end });
 }

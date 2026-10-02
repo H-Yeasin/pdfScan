@@ -5,6 +5,7 @@ import { useRouter } from '../navigation/router';
 import { resolveBack, type BackContext } from '../navigation/backHandling';
 import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
+import { useDeferredBoot } from './useDeferredBoot';
 import { runSlide, slideTransform } from '../navigation/transitions';
 import type { NavDir, ScreenName } from '../types/navigation';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -55,12 +56,16 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
 
 export function AppNavigator() {
   const libraryLoaded = useLibraryPersistence();
+  const [booting, setBooting] = useState(true);
+  // §9 O5: true a moment after the start screen is up; work the first screen doesn't need waits.
+  const afterBoot = useDeferredBoot(!booting);
+  const libraryAfterBoot = afterBoot && libraryLoaded;
   useSettingsPersistence();
   useSignaturePersistence();
   useExternalFileLinking(libraryLoaded);
-  useDeadlineReminders(libraryLoaded);
-  useImportedPdfIndexing(libraryLoaded);
-  useStorageIntegrity(libraryLoaded);
+  useDeadlineReminders(libraryLoaded, libraryAfterBoot);
+  useImportedPdfIndexing(libraryAfterBoot);
+  useStorageIntegrity(libraryAfterBoot);
   const { screen, previousScreen, hub, tabHub, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();
@@ -72,7 +77,11 @@ export function AppNavigator() {
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library', 'settings');
   const { crashReportsEnabled } = state.settings;
-  useEffect(() => initCrashReporting(crashReportsEnabled), [crashReportsEnabled]);
+  // Deferred too (§9 O5): Sentry's init isn't free, and a crash before it still reaches the
+  // ErrorBoundary.
+  useEffect(() => {
+    if (afterBoot) initCrashReporting(crashReportsEnabled);
+  }, [afterBoot, crashReportsEnabled]);
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 
@@ -82,7 +91,6 @@ export function AppNavigator() {
   // load-error state on the Library); anything that already navigated (e.g. "Open with") wins.
   // If loading takes longer than SPLASH_TIMEOUT_MS the app shows anyway, and the start screen is
   // still corrected once loading finishes, as long as the user hasn't navigated yet.
-  const [booting, setBooting] = useState(true);
   const startChosen = useRef(false);
   const libraryStatus = state.library.loadStatus;
   const hasActiveCourse = state.library.courses.some((c) => !c.archived);
