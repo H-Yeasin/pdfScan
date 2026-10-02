@@ -18,7 +18,7 @@ code **when the section was planned**, and are kept as history.
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
 | §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | B1–B5 done in code (device checks open; B1's backup rules and B4's zip "Open with" need a new dev build). B6 (Google Drive) waits for Pro. |
-| §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2 done in code (84b2252). **O5 in progress:** done in code; the measurements in `docs/qa/performance.md` are open. **Next: O3.** |
+| §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2 and O3 done in code. **O5 in progress:** done in code; the measurements in `docs/qa/performance.md` are open. **Next: O4** (accessibility), then O6. |
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M6 | Planned (2026-10-02). Pro launches with §8 B6 or §7 R6 (see M6). |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
 
@@ -108,6 +108,7 @@ lines here.
 | O1 Android back, start screen, splash | 1e998dc | `navigation/{backHandling,useBackHandler}.ts`, `bootstrap/{splash,startScreen}.ts`, `expo-splash-screen` (new dev build) |
 | O5 Performance (code) | ffc68d3, 35016b8 | selector store (`useAppSlices`/`useAppSelector`), memo'd rows, `useDeferredBoot`, lazy xlsx/mammoth, `src/dev/seedLibrary.ts`; measurements open (`docs/qa/performance.md`) |
 | O2 Onboarding | 84b2252 | `OnboardingScreen`, `services/onboarding/onboarding.ts`, `CourseSetupForm` (shared with `QuickSetupSheet`), `settings.onboardingDone` |
+| O3 Empty states, hints | c4dd4f7 | `components/shared/{EmptyState,Hint,useHint}`, `services/hints/hints.ts`, `settings.hintsSeen`, `store/useGalleryImport` |
 
 ## How the branches came together
 

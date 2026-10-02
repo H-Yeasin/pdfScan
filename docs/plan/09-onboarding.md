@@ -151,7 +151,41 @@ As built:
 courses and a profile set up, or in two taps by skipping.
 
 ### O3 · Empty states that teach, and one-time hints *(S)*
-Status: todo
+Status: done (commit c4dd4f7). Device checks open (each hint's placement, on a small phone too).
+
+As built:
+- `components/shared/EmptyState` (moved from `components/library`): `title`, `body`, `action`,
+  `secondaryAction`, `variant: 'screen' | 'inline'`. Inventory of empty places:
+
+  | Place | Says | Action |
+  |---|---|---|
+  | Home, no courses | "Add your courses to file scans automatically." | Add courses |
+  | Home, nothing due | "Nothing due in the next 7 days." + how to add one | (the "+ Add deadline" link above) |
+  | Course, no documents | "Scan your first assignment for {code}." | Scan into this course |
+  | Unsorted, empty | what lands there | none |
+  | Course, no deadlines | how to add one | (the "+ Add deadline" link above) |
+  | Library, empty | "Scan or import your first document. A backup (.zip) opens here too." | Scan now / Open a file |
+  | Library, no match with a course filter | "…Check the spelling or search all courses." | Search all courses |
+  | Library, no match | what search covers | none (the query is the action) |
+  | Library, Starred tab empty | how to star | none |
+  | Library, load failed (F3) | documents are safe | Try again |
+  | Bookmarks sheet (Reader, T5) | how to bookmark | none (the button is in the top bar) |
+  | Exam pack, empty | where pages come from | Add pages |
+  | Review, no pages | "Scan pages, or pick photos from your gallery." | Start Capture / Import from gallery |
+
+  No submissions: there's no empty submissions list (the course's "Submitted" section and the
+  Reader's sheet only appear when there is one), so nothing to add. Where a header link already
+  adds the thing (deadlines), the empty state explains instead of repeating the button.
+- Hints: `services/hints/hints.ts` (`createHintScheduler`, pure: unseen, not busy, not blocked,
+  one per `navTick`), `components/shared/useHint(id, enabled)` (waits for settings; marks the hint
+  seen as soon as it appears, so leaving without "Got it" counts) and `Hint` (callout with an
+  arrow, laid out next to its anchor, not measured). `settings.hintsSeen` (merged on load).
+  Hints: `scan` (Home's Scan button or Capture's shutter, whichever comes first), `reviewFilters`
+  (above the filter strip), `submit` (inside the Reader's overflow sheet, under Submit: the
+  sheet is the dialog, so it's never over one), `readerBookmark` (under the top bar's button).
+- `store/useGalleryImport` (moved out of `CaptureScreen`) so Review's empty state can import.
+- Tests: `services/hints/__tests__/hints.test.ts`,
+  `components/shared/__tests__/emptyStatesAndHints.test.tsx`.
 
 - An inventory in this step's "As built" notes of every empty place, each with **one
   sentence and one action**, all using `EmptyState` (move it to `components/shared/`):

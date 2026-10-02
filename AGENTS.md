@@ -18,7 +18,7 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   in `docs/PLAN.md`.
 - **Progress:** `docs/plan/README.md` lists every step's status and commit and what comes next.
   Read it before starting. §0, §1, §2 (except E7's benchmark run), §3, §4, §5 T1–T6 and §7 R1–R4 are
-  done in code; §7 R5 is too, except the SheetJS 0.20.3 swap (needs `cdn.sheetjs.com`); §8 B1–B5 are done in code (B6, Google Drive, waits for Pro). §9 O1 and O5's code (selector store, deferred boot) are done; O5's device measurements are open (`docs/qa/performance.md`); §9 O2 is done in code and O3 is next in that section. **Next:**
+  done in code; §7 R5 is too, except the SheetJS 0.20.3 swap (needs `cdn.sheetjs.com`); §8 B1–B5 are done in code (B6, Google Drive, waits for Pro). §9 O1 and O5's code (selector store, deferred boot) are done; O5's device measurements are open (`docs/qa/performance.md`); §9 O2 and O3 are done in code and O4 is next in that section. **Next:**
   that swap, device checks (each plan file's Verification), E7's benchmark run, and
   §6 device checks (`docs/plan/06-languages.md`; L1–L4 are done, L3 without its device spike; L5–L6 wait for Bangla); §5 T7 (flashcards) is for later (P4).
 
