@@ -220,7 +220,39 @@ As built:
 same rows and files, and the zip opens on a computer with the PDFs under readable names.
 
 ### B3 · Back up and export *(M)*
-Status: todo
+Status: done (commit ac0eee5)
+
+As built:
+- **Space check:** `createBackup` checks space with the exact file sizes that `exportRows` lists, plus
+  the JSON and zip overhead, instead of `documents.disk_bytes`. It throws `BackupSpaceError`
+  only below B1's 50 MB floor. The snack offers "Free up space".
+- **Full backups** (`scope: all`, Everything) also carry `settings.json` and `signature/…`,
+  which B2's format had planned but not added. `settings.json` is an allow-list
+  (`BACKED_UP_SETTINGS`): theme, OCR script, default filters, last mode, profile, name
+  template, the two prompts and the languages. Left out: crash reporting, folder permissions,
+  first run, scanner availability, last opened and backup history. B4 applies it.
+- **Hand-over** (`components/backup/useBackupExport.tsx` + `BackupSheet.tsx`, one dialog for
+  choose, progress with Cancel, then Share / Save to folder / Done):
+  - **Share** hands the zip over as it is (it already has its readable name, so no copy). The
+    cache copy is **not** deleted right after, because the receiving app (an email draft, say)
+    may read it later. The next backup empties `cache/backup/`, and so does Storage → Clear
+    (`backup` is now one of B1's owned cache folders).
+  - **Save to folder** streams the zip (`deviceExportService.saveFileToFolder`). The SAF file
+    is made by the legacy `createFileAsync`, then written through the new `File(contentUri)
+    .open(FileMode.WriteOnly)` handle (checked in expo-file-system 57's Android source:
+    `forContentURI`). It goes in 1 MB chunks, with no whole-file base64. The cache copy is
+    deleted afterwards. A failed save clears the folder setting, so the next save asks again.
+  - A full backup that was shared or saved sets `lastBackupAt` / `lastBackupBytes`. Course and
+    document exports don't.
+- **Backup folder:** `settings.backupFolderUri` / `backupFolderLabel` are kept separate from the
+  §0 export folder, so B5's rotation only ever touches a folder chosen for backups.
+- **Course page:** there is no overflow menu, so "Export course…" is a header icon. On Unsorted
+  it exports that page's documents. **Selection bar:** an `export` tool for any format
+  (Library and Course pages, through `useDocumentListActions`).
+- **Settings → Backup** is `screens/BackupScreen.tsx` (screen `backup`; Android Back goes to
+  Settings). The app version comes from `config/appInfo.ts` (app.json). B1's Storage note now
+  ends "Use Back up to keep everything."
+- **Not done:** the profiler run in "Done when" (needs a device).
 
 - `src/services/backup/createBackup.ts`:
   `createBackup({ scope, kind: 'full' | 'course' | 'documents', include: 'everything' | 'pdfsOnly' }, onProgress)`:
