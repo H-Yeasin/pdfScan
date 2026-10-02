@@ -15,9 +15,26 @@ code **when the section was planned**, and are kept as history.
 | §3 Courses | [03-courses.md](03-courses.md) | K1–K6 | All done in code. Device checks open. |
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
-| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 done in code (device checks open; L3's spike was skipped, system fonts assumed). L5–L6 wait for Bangla (P4). L1–L4 are P2 groundwork; L5–L6 (Tesseract, packs) wait for Bangla (P4). |
+| §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | Planned (2026-10-02). R5 (SheetJS security fix) can go first; R6 waits for Pro. |
 | §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
+
+## Phases (from `docs/PLAN.md` §5)
+
+"Done in code" means every step is implemented, typechecked and covered by Jest; the device checks
+in each plan file's Verification are still open. A phase is **complete** only when its "done when"
+checks pass on a device.
+
+| Phase | Sections | Code status | Phase status |
+|---|---|---|---|
+| **P0: Foundation** | §0 | §0 F1–F8 done in code | **Done in code**, device checks open (upgrade from an AsyncStorage-era build keeps every document) |
+| **P1: Student MVP** | §1, §2 (Ink + Board), §3, §4, §9 onboarding | §1, §2 (E1–E6), §3, §4 done in code; E7 benchmark run open | **Not complete**: §9 onboarding (onboarding screens, teaching empty states, accessibility, performance budget) is not planned yet; device checks open |
+| **P2: Study** | §5, §6 groundwork, §8 zip export | §5 T1–T6 and §6 L1–L4 done in code | **Not complete**: §8 zip export is not planned yet; device checks open (L3's font spike included) |
+| **P3: Grow** | §10 Pro, §8 Drive, §11, iOS parity | — | Not started (§7 R1–R6 planned; R6 waits for Pro) |
+| **P4: Expand** | Bengali (§6 L5–L6), flashcards (§5 T7), more templates | Groundwork in place (script registry, OCR engines, any-script PDF text, i18n) | Not started |
+
+**Next to unblock the phases:** plan and build §9 (finishes P1 in code) and §8's zip export
+(finishes P2 in code), then the device checks for P0–P2.
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
 lines here.
