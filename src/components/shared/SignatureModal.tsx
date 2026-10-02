@@ -52,7 +52,7 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade">
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
       <GestureHandlerRootView style={styles.backdrop}>
         <View ref={shotRef} collapsable={false} style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />

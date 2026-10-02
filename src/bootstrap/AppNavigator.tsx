@@ -1,7 +1,10 @@
 import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, Animated, BackHandler, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useRouter } from '../navigation/router';
+import { resolveBack, type BackContext } from '../navigation/backHandling';
+import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
+import { chooseStartScreen } from './startScreen';
 import { runSlide, slideTransform } from '../navigation/transitions';
 import type { NavDir, ScreenName } from '../types/navigation';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -56,7 +59,7 @@ export function AppNavigator() {
   useDeadlineReminders(libraryLoaded);
   useImportedPdfIndexing(libraryLoaded);
   useStorageIntegrity(libraryLoaded);
-  const { screen, navDir, navTick, go, replace } = useRouter();
+  const { screen, previousScreen, hub, tabHub, navDir, navTick, go, replace } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(1)).current;
@@ -70,18 +73,86 @@ export function AppNavigator() {
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 
-  // Start screen: Home once the student has at least one course, otherwise Capture as before.
-  // Nothing renders until the library and settings are in, so Capture doesn't flash up on the way
-  // to Home. A failed library load
-  // falls through to Capture; anything that already navigated (e.g. "Open with") wins.
+  // Start screen (§9 O1, `chooseStartScreen`): picked once settings and the library index are in,
+  // before the first real render, while the native splash still covers the app - so Capture never
+  // flashes up on the way to Home. A failed library load falls through to Capture (with F3's
+  // load-error state on the Library); anything that already navigated (e.g. "Open with") wins.
+  // If loading takes longer than SPLASH_TIMEOUT_MS the app shows anyway, and the start screen is
+  // still corrected once loading finishes, as long as the user hasn't navigated yet.
   const [booting, setBooting] = useState(true);
+  const startChosen = useRef(false);
   const libraryStatus = state.library.loadStatus;
   const hasActiveCourse = state.library.courses.some((c) => !c.archived);
+  const bootReady = libraryStatus !== 'loading' && state.settings.loaded;
   useEffect(() => {
-    if (!booting || libraryStatus === 'loading' || !state.settings.loaded) return;
-    if (hasActiveCourse && screen === 'capture' && navTick === 0) replace('home');
+    if (startChosen.current || !bootReady) return;
+    startChosen.current = true;
+    if (screen === 'capture' && navTick === 0) {
+      const start = chooseStartScreen({ hasActiveCourse });
+      if (start !== screen) replace(start);
+    }
     setBooting(false);
-  }, [booting, libraryStatus, hasActiveCourse, state.settings.loaded, screen, navTick, replace]);
+  }, [bootReady, hasActiveCourse, screen, navTick, replace]);
+  useEffect(() => {
+    if (!booting) return;
+    const id = setTimeout(() => setBooting(false), SPLASH_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, [booting]);
+  // Hide the splash only once the chosen screen has had a frame to draw.
+  useEffect(() => {
+    if (booting) return;
+    const id = requestAnimationFrame(releaseSplash);
+    return () => cancelAnimationFrame(id);
+  }, [booting]);
+
+  // §9 O1: Android back. Open RN Modals and inline overlays (`useBackHandler`) get the press first;
+  // this handles the rest by `resolveBack`'s order. Registered once, at boot, so every overlay's
+  // listener is newer and runs first; it reads the latest state through a ref.
+  const backCtx = useRef<BackContext | null>(null);
+  backCtx.current = {
+    screen,
+    previousScreen,
+    hub,
+    tabHub,
+    hasCourses: hasActiveCourse,
+    selMode: state.library.selMode,
+    searchOpen: state.library.searchOpen,
+    sessionPageCount: state.capture.pages.length,
+    retakeTargetId: state.capture.retakeTargetId,
+    highlightDeadlineId: state.library.highlightDeadlineId,
+  };
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!backCtx.current) return false;
+      const step = resolveBack(backCtx.current);
+      switch (step.kind) {
+        case 'dispatch':
+          step.actions.forEach(dispatch);
+          return true;
+        case 'go':
+          step.actions.forEach(dispatch);
+          go(step.to, 'back');
+          return true;
+        case 'confirmDiscard':
+          Alert.alert(t('shared.discardScan.title', { count: step.count }), t('shared.discardScan.body'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('shared.discardScan.discard'),
+              style: 'destructive',
+              onPress: () => {
+                dispatch({ type: 'capture/CLEAR_PAGES' });
+                BackHandler.exitApp();
+              },
+            },
+          ]);
+          return true;
+        case 'exit':
+          // Android's default: the app goes to the background.
+          return false;
+      }
+    });
+    return () => sub.remove();
+  }, [dispatch, go]);
 
   // Lives here (always mounted) rather than on CaptureScreen/ReviewScreen, because both of those
   // unmount/remount as the user navigates between tabs. Navigating to Review as soon as the raw

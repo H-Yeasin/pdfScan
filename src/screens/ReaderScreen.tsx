@@ -20,6 +20,7 @@ import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModa
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
+import { useBackHandler } from '../navigation/useBackHandler';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import {
   applySignedPage,
@@ -79,6 +80,8 @@ export function ReaderScreen() {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
+  // §9 O1: Android back closes the find bar before leaving the Reader.
+  useBackHandler(() => setFindOpen(false), findOpen);
   const [findQuery, setFindQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PDFSearchResultItem[]>([]);
   const [pageCount, setPageCount] = useState(0);

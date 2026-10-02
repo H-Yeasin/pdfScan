@@ -29,7 +29,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
+      "predictiveBackGestureEnabled": true,
       "package": "com.yeasin.pdfscan",
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO"],
@@ -110,7 +110,17 @@
           "color": "#16a085"
         }
       ],
-      "./plugins/withBackupRules"
+      "./plugins/withBackupRules",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#f5ead8",
+          "dark": { "backgroundColor": "#14120f" }
+        }
+      ]
     ],
     "extra": {
       "eas": {

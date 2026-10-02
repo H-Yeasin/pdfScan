@@ -192,7 +192,7 @@ export function CropOverlay({
   };
 
   return (
-    <Modal transparent animationType="fade">
+    <Modal transparent animationType="fade" onRequestClose={onCancel}>
       <GestureHandlerRootView style={styles.backdrop}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />

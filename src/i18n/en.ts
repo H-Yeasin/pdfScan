@@ -187,6 +187,12 @@ export const en = {
       freeUp: 'Free up space',
       tooFullToSave: 'Not enough space to save ({size} left). Your pages are kept: free up space and try again.',
     },
+    // §9 O1: Android back on the start screen with an unsaved scan.
+    discardScan: {
+      title: { one: 'Discard {count} page?', other: 'Discard {count} pages?' },
+      body: "This scan hasn't been saved yet.",
+      discard: 'Discard',
+    },
   },
 
   capture: {

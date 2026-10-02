@@ -107,7 +107,7 @@ export function SignaturePlacementOverlay({
   };
 
   return (
-    <Modal transparent animationType="fade">
+    <Modal transparent animationType="fade" onRequestClose={onCancel}>
       <GestureHandlerRootView style={styles.backdrop}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri: pageUri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />

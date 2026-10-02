@@ -47,7 +47,7 @@ export function SignatureCaptureModal({ visible, onCancel, onCapture }: Signatur
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade">
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
       <GestureHandlerRootView style={styles.backdrop}>
         <View style={[styles.frame, { width: canvasWidth, height: canvasHeight, borderColor: tokens.accent }]}>
           <View ref={shotRef} collapsable={false} style={{ width: canvasWidth, height: canvasHeight }}>

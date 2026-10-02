@@ -17,6 +17,7 @@ import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModa
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
+import { useBackHandler } from '../navigation/useBackHandler';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../services/enhance/adjust';
 import { recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
 import { cancelProcessing } from '../services/capture/processingSession';
@@ -70,6 +71,8 @@ export function ReviewScreen() {
   const [offerApplyAll, setOfferApplyAll] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  // §9 O1: Android back closes the Adjust panel before leaving Review.
+  useBackHandler(() => setAdjustOpen(false), adjustOpen);
   const [mergeCrop, setMergeCrop] = useState<MergeCropState>(null);
 
   const selectedPage = pages[sel] ?? pages[0];
