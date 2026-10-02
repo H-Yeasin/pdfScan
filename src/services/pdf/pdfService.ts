@@ -481,6 +481,33 @@ export async function buildPdfFromPages(
   return { uri: dest.uri, sizeBytes: dest.size ?? 0 };
 }
 
+// §7 R2: the preset's cover, border, header and footer on a PDF that wasn't built from page
+// images (an imported PDF, or one rasterized from it): every existing page is a content page and
+// is stamped at its own size; the cover, on the preset's paper, goes in front. `glyphlessFont`
+// is reused if the caller already embedded it (a rasterized build's text layer).
+export async function decoratePdf(
+  pdfDoc: PDFDocument,
+  config: AcademicConfig,
+  pageSize: PageSizeId = 'A4',
+  glyphlessFont?: PDFRef
+): Promise<void> {
+  const text = createTextDrawer(pdfDoc, glyphlessFont ?? (await embedGlyphlessFont(pdfDoc)));
+  const pages = pdfDoc.getPages();
+  for (let i = 0; i < pages.length; i++) {
+    await stampAcademicPage(pages[i], pages[i].getWidth(), pages[i].getHeight(), text, config, i + 1, pages.length);
+  }
+  if (config.coverPage) {
+    const before = pdfDoc.getPageCount();
+    await buildCoverPage(pdfDoc, config.coverPage, pageDimensions(pageSize), text);
+    // buildCoverPage appends (and skips a cover it can't draw); move it to the front.
+    if (pdfDoc.getPageCount() > before) {
+      const cover = pdfDoc.getPage(before);
+      pdfDoc.removePage(before);
+      pdfDoc.insertPage(0, cover);
+    }
+  }
+}
+
 // Burns a captured signature PNG onto one page of an already-compiled PDF, in place.
 // `pageNaturalWidth`/`pageNaturalHeight` must be the natural pixel dimensions of the SOURCE PAGE
 // IMAGE that page was built from (LibraryPage.width/height), not the PDF's own point-space size —

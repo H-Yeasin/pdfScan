@@ -6,7 +6,7 @@ import { NameField } from '../components/deliver/NameField';
 import { PagePickerModal } from '../components/study/PagePickerModal';
 import { useOpenDocument } from '../components/library/useDocumentListActions';
 import { useRouter } from '../navigation/router';
-import { canSubmit } from '../services/documents/formatCapabilities';
+import { hasPageMasters } from '../services/documents/formatCapabilities';
 import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
@@ -39,7 +39,7 @@ export function ExamPackScreen() {
     [pack.items, files]
   );
   const pickable = useMemo(
-    () => files.filter((d) => (d.courseId ?? null) === pack.courseId && !d.archived && canSubmit(d)),
+    () => files.filter((d) => (d.courseId ?? null) === pack.courseId && !d.archived && hasPageMasters(d)),
     [files, pack.courseId]
   );
 

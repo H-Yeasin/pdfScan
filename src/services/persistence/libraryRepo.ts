@@ -626,7 +626,8 @@ export function diffById<T extends { id: string }>(prev: readonly T[], next: rea
 
 // Applies the difference between two in-memory snapshots in one transaction (so the reducer's
 // ARCHIVE_SEMESTER lands all-or-nothing, like archiveSemester above). Parents are written before
-// children (semester -> course -> document/slot, since each may reference a new one) and deleted after.
+// children (semester -> course -> document/slot, since each may reference a new one) and deleted
+// after - except documents, which are deleted first (see below).
 export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next: LoadedLibrary): Promise<void> {
   const semesters = diffById(prev.semesters, next.semesters);
   const courses = diffById(prev.courses, next.courses);
@@ -639,6 +640,11 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
   const diffs = [semesters, courses, documents, slots, submissions, deadlines, annotations, bookmarks];
   if (diffs.every((d) => d.changed.length + d.removedIds.length === 0)) return;
   await db.withTransactionAsync(async () => {
+    // Removed documents go first: a merge or split (§7 R2) gives its new documents the removed
+    // ones' page ids, which must be free again before the new page rows are written. Their
+    // submissions, annotations and bookmarks go with them (ON DELETE CASCADE); the ones that moved
+    // to a new document are written again below.
+    await deleteRows(db, 'documents', documents.removedIds);
     for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
     for (const doc of documents.changed) await writeDocument(db, doc, 'upsert');
@@ -653,7 +659,6 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
     for (const bookmark of bookmarks.changed) await writeBookmark(db, bookmark);
     await deleteRows(db, 'bookmarks', bookmarks.removedIds);
     await deleteRows(db, 'timetable_slots', slots.removedIds);
-    await deleteRows(db, 'documents', documents.removedIds);
     await deleteRows(db, 'courses', courses.removedIds);
     await deleteRows(db, 'semesters', semesters.removedIds);
   });

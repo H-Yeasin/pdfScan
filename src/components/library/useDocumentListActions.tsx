@@ -12,11 +12,14 @@ import {
   applySignedPage,
   applySignatureToDocument,
   compressDocument,
+  compressImportedPdf,
   mergeDocuments,
   splitDocument,
 } from '../../services/persistence/libraryOperations';
 import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
-import { canSign } from '../../services/documents/formatCapabilities';
+import { canSign, isPasswordProtected, isPdfLevel } from '../../services/documents/formatCapabilities';
+import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
+import { usePageImage } from '../shared/usePageImage';
 import { useAppState } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { docTypeOf } from '../../services/courses/docTypes';
@@ -108,27 +111,61 @@ export function useDocumentListActions() {
         return;
       }
 
-      if (id === 'merge' && selectedDocs.length >= 2) {
-        const merged = await mergeDocuments(selectedDocs);
-        selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
-        dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
-        dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.merged', { count: selectedDocs.length }) });
-      } else if (id === 'split' && selectedDocs.length === 1) {
-        const [doc] = selectedDocs;
-        const split = await splitDocument(doc);
-        deleteDocumentFiles(doc.id);
-        dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
-        dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.splitInto', { count: split.length }) });
-      } else if (id === 'compress') {
-        for (const doc of selectedDocs) {
-          const compressed = await compressDocument(doc, undefined, state.library.annotations.filter((a) => a.documentId === doc.id));
-          dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
+      // Page tools (§7 R2) can't open a password-protected PDF; say so instead of failing.
+      const pageTools: SelectionToolId[] = ['merge', 'split', 'compress', 'sign'];
+      if (pageTools.includes(id) && selectedDocs.some(isPasswordProtected)) {
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.passwordProtected') });
+        return;
+      }
+      const annotationsOf = (docs: LibraryDocument[]) => state.library.annotations.filter((a) => docs.some((d) => d.id === a.documentId));
+
+      try {
+        await runPageTool(id);
+      } catch (error) {
+        console.warn('useDocumentListActions: page tool failed', id, error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: error instanceof PdfEncryptedError ? t('library.passwordProtected') : t('library.toolFailed') });
+      }
+
+      async function runPageTool(tool: SelectionToolId) {
+        if (tool === 'merge' && selectedDocs.length >= 2) {
+          const merged = await mergeDocuments(selectedDocs, annotationsOf(selectedDocs));
+          selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
+          dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
+          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.merged', { count: selectedDocs.length }) });
+        } else if (tool === 'split' && selectedDocs.length === 1) {
+          const [doc] = selectedDocs;
+          const split = await splitDocument(doc, annotationsOf([doc]));
+          deleteDocumentFiles(doc.id);
+          dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
+          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.splitInto', { count: split.length }) });
+        } else if (tool === 'compress') {
+          // An imported PDF can only get smaller by becoming images; tell the student when that
+          // happened, and when it wouldn't have helped.
+          let rasterized = 0;
+          let notSmaller = 0;
+          for (const doc of selectedDocs) {
+            if (isPdfLevel(doc)) {
+              const result = await compressImportedPdf(doc);
+              if (result.smaller) {
+                rasterized += 1;
+                dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: result.doc });
+              } else {
+                notSmaller += 1;
+              }
+            } else {
+              const compressed = await compressDocument(doc, undefined, annotationsOf([doc]));
+              dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
+            }
+          }
+          dispatch({ type: 'library/CLEAR_SELECTION' });
+          const msg = rasterized ? t('library.compressedAsImages') : notSmaller ? t('library.alreadySmall') : t('library.compressed');
+          dispatch({ type: 'ui/SHOW_SNACK', msg });
         }
-        dispatch({ type: 'library/CLEAR_SELECTION' });
-        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.compressed') });
-      } else if (id === 'sign' && selectedDocs.length === 1 && canSign(selectedDocs[0])) {
+      }
+
+      if (id === 'sign' && selectedDocs.length === 1 && canSign(selectedDocs[0])) {
         const [target] = selectedDocs;
         setSignTarget(target);
         if (target.format === 'PDF') {
@@ -177,10 +214,13 @@ export function useDocumentListActions() {
     setSignTarget(null);
   }, []);
 
+  // Page 1 to place the signature on: its master, or for an imported PDF the page rendered now.
+  const signPage = usePageImage(signTarget, 0, signStep === 'place');
+
   const handlePlacementConfirm = useCallback(
     async (placement: { originX: number; originY: number; width: number; height: number }) => {
-      if (!signTarget || !capturedSignature) return;
-      const updated = await applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement);
+      if (!signTarget || !capturedSignature || !signPage) return;
+      const updated = await applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement, signPage);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignStep(null);
@@ -188,7 +228,7 @@ export function useDocumentListActions() {
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.added') });
     },
-    [signTarget, capturedSignature, dispatch]
+    [signTarget, capturedSignature, signPage, dispatch]
   );
 
   // The picker marks a type only when every selected document already has it.
@@ -248,11 +288,11 @@ export function useDocumentListActions() {
         <SignatureCaptureModal visible onCancel={handlePlacementCancel} onCapture={handleSignatureCaptured} />
       )}
 
-      {signStep === 'place' && signTarget && capturedSignature && (
+      {signStep === 'place' && signTarget && capturedSignature && signPage && (
         <SignaturePlacementOverlay
-          pageUri={signTarget.pages[0].fileUri}
-          pageNaturalWidth={signTarget.pages[0].width}
-          pageNaturalHeight={signTarget.pages[0].height}
+          pageUri={signPage.uri}
+          pageNaturalWidth={signPage.width}
+          pageNaturalHeight={signPage.height}
           signatureUri={capturedSignature.uri}
           signatureAspectRatio={capturedSignature.aspectRatio}
           onCancel={handlePlacementCancel}

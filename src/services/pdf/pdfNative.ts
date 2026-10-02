@@ -1,20 +1,13 @@
 import PdfNative, { type PdfPageSize, type PdfPageText, type PdfRenderedPage, type PdfWord } from '../../../modules/pdf-native';
+import { PdfEncryptedError } from './pdfErrors';
 
 export type { PdfPageSize, PdfPageText, PdfRenderedPage, PdfWord };
+export { PdfEncryptedError };
 
 // §7 R1: the app's only door to modules/pdf-native (page count and size, rendering a page to a
 // JPEG, a page's text with word boxes). Pages are 0-based everywhere in this API - unlike the
 // Reader and pageMap, which count PDF pages from 1. Sizes and word boxes are PDF points as the
 // page is shown (its /Rotate applied), origin top-left.
-
-// The PDF needs a password. The file is still kept and opens in the Reader's password prompt; it
-// just can't be read here.
-export class PdfEncryptedError extends Error {
-  constructor() {
-    super('The PDF is password-protected');
-    this.name = 'PdfEncryptedError';
-  }
-}
 
 export class PdfNativeUnavailableError extends Error {
   constructor() {

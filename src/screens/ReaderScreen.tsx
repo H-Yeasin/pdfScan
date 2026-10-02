@@ -11,6 +11,7 @@ import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
 import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
+import { usePageImage } from '../components/shared/usePageImage';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
@@ -24,7 +25,7 @@ import {
 import { ensureDocumentPdf } from '../services/pdf/pdfService';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { canFindInDoc, canSign, canSubmit, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { canFindInDoc, canSign, canSubmit, hasPageMasters, isPageRasterFormat } from '../services/documents/formatCapabilities';
 import { useShareSubmission, useSubmitDocument } from '../store/useSubmitDocument';
 import { SubmissionsSheet } from '../components/submit/SubmissionsSheet';
 import { submittedSummary } from '../services/submit/history';
@@ -345,16 +346,19 @@ export function ReaderScreen() {
     setCapturedSignature(null);
   }, []);
 
+  // The page the signature is placed on: its master, or for an imported PDF the page rendered now.
+  const signPage = usePageImage(doc, activeIndex, signStep === 'place');
+
   const handlePlacementConfirm = useCallback(
     async (placement: { originX: number; originY: number; width: number; height: number }) => {
-      if (!doc || !capturedSignature) return;
-      const updated = await applySignatureToDocument(doc, activeIndex, capturedSignature.uri, placement);
+      if (!doc || !capturedSignature || !signPage) return;
+      const updated = await applySignatureToDocument(doc, activeIndex, capturedSignature.uri, placement, signPage);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSignStep(null);
       setCapturedSignature(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.added') });
     },
-    [doc, activeIndex, capturedSignature, dispatch]
+    [doc, activeIndex, capturedSignature, signPage, dispatch]
   );
 
   if (!doc && !external) {
@@ -523,7 +527,7 @@ export function ReaderScreen() {
         showDelete={!external}
         showAddToLibrary={!!external}
         showSubmit={!external && !!doc && canSubmit(doc)}
-        showText={!external && !!doc && canSubmit(doc)}
+        showText={!external && !!doc && hasPageMasters(doc)}
       />
 
       <BookmarksSheet
@@ -582,11 +586,11 @@ export function ReaderScreen() {
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />
       )}
 
-      {signStep === 'place' && capturedSignature && doc && doc.pages[activeIndex] && (
+      {signStep === 'place' && capturedSignature && signPage && (
         <SignaturePlacementOverlay
-          pageUri={doc.pages[activeIndex].fileUri}
-          pageNaturalWidth={doc.pages[activeIndex].width}
-          pageNaturalHeight={doc.pages[activeIndex].height}
+          pageUri={signPage.uri}
+          pageNaturalWidth={signPage.width}
+          pageNaturalHeight={signPage.height}
           signatureUri={capturedSignature.uri}
           signatureAspectRatio={capturedSignature.aspectRatio}
           onCancel={handlePlacementCancel}

@@ -148,6 +148,20 @@ function reorder(courses: Course[], ids: string[]): Course[] {
   return [...listed, ...rest].map((c, i) => (c.sortOrder === i ? c : { ...c, sortOrder: i }));
 }
 
+function followPages<T extends { documentId: string; pageId: string }>(
+  items: T[],
+  replacedIds: string[],
+  files: LibraryDocument[]
+): T[] {
+  const docByPage = new Map<string, string>();
+  for (const file of files) for (const page of file.pages) docByPage.set(page.id, file.id);
+  return items.flatMap((item) => {
+    if (!replacedIds.includes(item.documentId) || files.some((f) => f.id === item.documentId)) return [item];
+    const documentId = docByPage.get(item.pageId);
+    return documentId ? [{ ...item, documentId }] : [];
+  });
+}
+
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
     case 'library/SET_INDEXING':
@@ -206,12 +220,10 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         submissions: state.submissions.filter(
           (s) => !action.ids.includes(s.documentId) || action.files.some((f) => f.id === s.documentId)
         ),
-        annotations: state.annotations.filter(
-          (a) => !action.ids.includes(a.documentId) || action.files.some((f) => f.id === a.documentId)
-        ),
-        bookmarks: state.bookmarks.filter(
-          (b) => !action.ids.includes(b.documentId) || action.files.some((f) => f.id === b.documentId)
-        ),
+        // §7 R2: merge and split keep page ids, so a replaced document's bookmarks and annotations
+        // move to the new document that has their page; the rest go with it.
+        annotations: followPages(state.annotations, action.ids, action.files),
+        bookmarks: followPages(state.bookmarks, action.ids, action.files),
       };
     case 'library/TOGGLE_SELECTION': {
       const selected = state.selection.includes(action.id);

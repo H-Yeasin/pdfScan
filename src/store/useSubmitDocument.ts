@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { canSubmit } from '../services/documents/formatCapabilities';
+import { canSubmit, isPasswordProtected } from '../services/documents/formatCapabilities';
 import { typeNumberOf } from '../services/courses/docTypes';
 import { shareAs } from '../services/sharing/shareService';
 import { defaultSubmitPreset } from '../services/submit/preset';
@@ -13,7 +13,7 @@ import { t } from '../i18n';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
 // with its course's preset as it is now, then opens the share sheet. Returns false when the
-// document can't be submitted (no page images, e.g. an imported PDF or a DOCX).
+// document can't be submitted (a DOCX, a sheet, a password-protected PDF).
 export function useSubmitDocument() {
   const { state, dispatch } = useAppState();
   const { files, courses, deadlines, annotations } = state.library;
@@ -22,7 +22,7 @@ export function useSubmitDocument() {
   return useCallback(
     async (doc: LibraryDocument): Promise<boolean> => {
       if (!canSubmit(doc)) {
-        dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.onlyScanned') });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: isPasswordProtected(doc) ? t('library.passwordProtected') : t('submit.onlyScanned') });
         return false;
       }
       const course = courses.find((c) => c.id === doc.courseId);
@@ -40,9 +40,11 @@ export function useSubmitDocument() {
         });
         const record = submissionRecord(doc, result, preset, n);
         dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
-        const msg = result.fits
-          ? t('deliver.snack.submitting', { file: result.fileName, size: formatLimit(result.sizeBytes) })
-          : tooLargeMessage(result, preset.sizeLimitBytes ?? 0);
+        const msg = !result.fits
+          ? tooLargeMessage(result, preset.sizeLimitBytes ?? 0)
+          : result.rasterized
+            ? t('submit.rasterized', { limit: formatLimit(preset.sizeLimitBytes ?? result.sizeBytes) })
+            : t('deliver.snack.submitting', { file: result.fileName, size: formatLimit(result.sizeBytes) });
         const deadline = matchDeadline(doc, deadlines);
         dispatch(
           deadline

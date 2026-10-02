@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { spacing, useTheme } from '../../theme';
-import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
+import { isPageRasterFormat, isPasswordProtected } from '../../services/documents/formatCapabilities';
 import type { LibraryDocument } from '../../types/models';
 import { useT } from '../../i18n/useT';
 
@@ -20,8 +20,8 @@ const TOOLS: Tool[] = [
   { id: 'sign', icon: 'create-outline' },
 ];
 
-// Merge/Split/Compress/Sign all rebuild a PDF from doc.pages' raster images - meaningless (and, for
-// Compress/Sign, actively corrupting) for a format with no real page images.
+// Merge/Split/Compress/Sign/Submit work on PDF pages (rebuilt from scans' masters, or copied from
+// an imported PDF, §7 R2) - meaningless for a format read by its own viewer.
 const RASTER_ONLY_TOOLS: SelectionToolId[] = ['merge', 'split', 'compress', 'sign', 'submit'];
 
 type SelectionBarProps = {
@@ -36,6 +36,10 @@ export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
   const allRaster = selectedDocs.every((doc) => isPageRasterFormat(doc.format));
   // Archive turns into Unarchive when everything selected is already archived.
   const allArchived = selectionCount > 0 && selectedDocs.every((doc) => doc.archived);
+  // A password-protected PDF: its page tools look off but stay tappable, to say why (the handler
+  // shows "This PDF is password-protected").
+  const anyProtected = selectedDocs.some(isPasswordProtected);
+  const blocked = (id: SelectionToolId) => anyProtected && RASTER_ONLY_TOOLS.includes(id);
 
   const disabled = (id: SelectionToolId) => {
     if (RASTER_ONLY_TOOLS.includes(id) && !allRaster) return true;
@@ -56,7 +60,7 @@ export function SelectionBar({ selectedDocs, onPress }: SelectionBarProps) {
         return (
           <Pressable
             key={tool.id}
-            style={[styles.item, isDisabled && styles.disabled]}
+            style={[styles.item, (isDisabled || blocked(tool.id)) && styles.disabled]}
             onPress={() => onPress(tool.id)}
             disabled={isDisabled}
           >

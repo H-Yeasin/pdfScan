@@ -2,14 +2,18 @@ import { t } from '../../i18n';
 import { Directory, File } from 'expo-file-system';
 import { docTypeOf } from '../courses/docTypes';
 import { coverDefaults, withCoverDefaults, type CoverValues } from '../pdf/coverTemplates';
-import { buildPdfFromPages, encodingForQuality, type AcademicConfig, type PdfSourcePage } from '../pdf/pdfService';
+import { buildPdfFromPages, decoratePdf, encodingForQuality, type AcademicConfig, type PdfSourcePage } from '../pdf/pdfService';
+import { loadPdf, savePdf } from '../pdf/pdfOps';
+import { buildRasterPdf, renderedPageBytes } from '../pdf/rasterPdf';
+import { isPdfLevel } from '../documents/formatCapabilities';
+import { SIZE_LADDER } from '../capture/imageSpec';
 import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { sanitizeFileName } from '../../utils/sanitize';
 import type { Annotation, Course, LibraryDocument, LibraryPage, StudentProfile } from '../../types/models';
 import { firstLine, renderText, type NamingContext } from './naming';
 import { presetAcademicConfig, presetFooterText, type SubmitPreset } from './preset';
-import { buildPdfUnderLimit, formatLimit } from './sizeTarget';
+import { buildPdfUnderLimit, buildUnderLimit, findLevel, formatLimit, pdfOverheadBytes, type SizedBuild } from './sizeTarget';
 
 export type SubmitInput = {
   doc: LibraryDocument;
@@ -44,6 +48,9 @@ export type SubmitResult = {
   fits: boolean;
   // The SIZE_LADDER level used with a size limit (for sizeTarget.tooLargeMessage); 0 without one.
   level: number;
+  // §7 R2: an imported PDF's pages had to be turned into images to fit the limit (the text stays
+  // searchable). The caller tells the student.
+  rasterized?: boolean;
 };
 
 const FALLBACK_FILE_NAME = 'submission';
@@ -104,6 +111,8 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
   // §5 T4: the submission's own layout for mapping annotations - its content pages, after the
   // preset's cover if it has one (a stand-in page, so the offset is right). An annotation on the
   // document's old cover page has no place here and is left out.
+  if (isPdfLevel(doc)) return submitPdfLevel(input, academicConfig, dest, fileName, onPage);
+
   const contentPages: LibraryPage[] = doc.coverKind ? doc.pages.slice(1) : doc.pages;
   const hasCover = !!academicConfig?.coverPage;
   const coverStandIn: LibraryPage = { id: '__submission_cover__', fileUri: '', width: 1, height: 1 };
@@ -137,4 +146,44 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
     beforeSave,
   });
   return { uri: built.uri, fileName, sizeBytes: built.sizeBytes, fits: true, level: 0 };
+}
+
+// §7 R2: a submission of an imported PDF (or a merge containing one). The original file is sent
+// as it is - vector text, links and all - with the preset's cover put in front and its
+// border/header/footer stamped on every page. Only when that is over the size limit are the pages
+// turned into images, through the same ladder as scans (S3): sampled renders pick the starting
+// level, then build and step down. The 2-in-1 layout and annotations don't apply here: the pages
+// stay as the PDF has them (annotations on scanned parts are already in it).
+async function submitPdfLevel(
+  input: SubmitInput,
+  academicConfig: AcademicConfig | undefined,
+  dest: File,
+  fileName: string,
+  onPage: (done: number, total: number) => void
+): Promise<SubmitResult> {
+  const { doc, preset, onProgress } = input;
+  const uri = doc.pdfUri;
+  if (!uri) throw new Error(`submitDocument: ${doc.id} has no PDF`);
+
+  const original = await loadPdf(uri);
+  if (academicConfig) await decoratePdf(original, academicConfig, preset.pageSize);
+  const asIs = await savePdf(original, dest);
+  const limit = preset.sizeLimitBytes;
+  if (limit === null || asIs.sizeBytes <= limit) return { uri: asIs.uri, fileName, sizeBytes: asIs.sizeBytes, fits: true, level: 0 };
+
+  onProgress?.(t('deliver.progress.fitting', { size: formatLimit(limit) }));
+  const pageCount = doc.pages.length;
+  const sampled = [...new Set([0, Math.floor((pageCount - 1) / 2), pageCount - 1])].filter((i) => i >= 0);
+  const measure = async (level: number) => {
+    const sizes: number[] = [];
+    for (const i of sampled) sizes.push(await renderedPageBytes(uri, i, SIZE_LADDER[level]));
+    return sizes;
+  };
+  const start = await findLevel(measure, pageCount, pdfOverheadBytes(pageCount), limit);
+  const sized: SizedBuild = await buildUnderLimit(
+    (level) => buildRasterPdf(uri, doc.pages, SIZE_LADDER[level], { dest, academicConfig, pageSize: preset.pageSize, onPage }),
+    start,
+    limit
+  );
+  return { uri: sized.uri, fileName, sizeBytes: sized.sizeBytes, fits: sized.fits, level: sized.level, rasterized: true };
 }
