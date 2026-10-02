@@ -37,7 +37,15 @@
         {
           "action": "VIEW",
           "category": ["DEFAULT", "BROWSABLE"],
-          "data": [{ "mimeType": "application/pdf" }]
+          "data": [
+            { "mimeType": "application/pdf" },
+            { "mimeType": "text/plain" },
+            { "mimeType": "text/csv" },
+            { "mimeType": "text/comma-separated-values" },
+            { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+            { "mimeType": "application/vnd.ms-excel" },
+            { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+          ]
         },
         {
           "action": "VIEW",
@@ -47,7 +55,14 @@
         {
           "action": "SEND",
           "category": ["DEFAULT"],
-          "data": [{ "mimeType": "application/pdf" }]
+          "data": [
+            { "mimeType": "application/pdf" },
+            { "mimeType": "text/csv" },
+            { "mimeType": "text/comma-separated-values" },
+            { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+            { "mimeType": "application/vnd.ms-excel" },
+            { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+          ]
         }
       ]
     },

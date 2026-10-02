@@ -75,6 +75,10 @@ export class File {
   async bytes(): Promise<Uint8Array> {
     return new Uint8Array(fs.readFileSync(toPath(this.uri)));
   }
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    const bytes = fs.readFileSync(toPath(this.uri));
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  }
   async text(): Promise<string> {
     return fs.readFileSync(toPath(this.uri), 'utf8');
   }

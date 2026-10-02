@@ -1,0 +1,58 @@
+import { File } from 'expo-file-system';
+import mammoth from 'mammoth';
+import { PreviewTooLargeError } from './sheetService';
+
+// §7 R5: DOCX is preview-only - mammoth turns it into plain semantic HTML (headings, lists,
+// tables, bold/italic) shown in a locked-down WebView (components/reader/DocxView), and its text
+// goes into the page text so library search finds it. No editing, no conversion to PDF.
+
+// Higher than the sheet cap: a DOCX is mostly its embedded photos, which are inlined, not parsed.
+export const DOCX_MAX_BYTES = 20 * 1024 * 1024;
+
+async function readDocx(uri: string): Promise<ArrayBuffer> {
+  const file = new File(uri);
+  if ((file.size ?? 0) > DOCX_MAX_BYTES) throw new PreviewTooLargeError(`${file.size} bytes`);
+  return file.arrayBuffer();
+}
+
+// mammoth's browser build (what Metro bundles, via its package.json "browser" field) reads
+// `arrayBuffer`; its Node build (Jest) reads `buffer`. Both hand the bytes to JSZip, which takes
+// an ArrayBuffer either way (React Native has no Buffer).
+function input(bytes: ArrayBuffer): { arrayBuffer: ArrayBuffer } {
+  return { arrayBuffer: bytes, buffer: bytes } as { arrayBuffer: ArrayBuffer };
+}
+
+// The document body as HTML. Images become data: URIs (the WebView loads nothing from anywhere).
+export async function docxToHtml(uri: string): Promise<string> {
+  const bytes = await readDocx(uri);
+  const result = await mammoth.convertToHtml(input(bytes), { convertImage: mammoth.images.dataUri });
+  return result.value;
+}
+
+// The document's plain text, for search.
+export async function extractDocxText(uri: string): Promise<string> {
+  const bytes = await readDocx(uri);
+  const result = await mammoth.extractRawText(input(bytes));
+  return result.value.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// A complete page around docxToHtml's body. The CSP is the second lock after the WebView's own
+// settings (JavaScript off, navigation blocked): no scripts, no network, images only as data: URIs.
+export function docxPageHtml(body: string, colors: { bg: string; ink: string; muted: string; edge: string; accent: string }): string {
+  return `<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background: ${colors.bg}; color: ${colors.ink}; font: 16px/1.55 -apple-system, Roboto, sans-serif; margin: 0; padding: 20px 18px 48px; overflow-wrap: break-word; }
+  h1, h2, h3, h4 { line-height: 1.25; margin: 1.2em 0 0.5em; }
+  p { margin: 0 0 0.8em; }
+  img { max-width: 100%; height: auto; }
+  table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0 0 1em; }
+  td, th { border: 1px solid ${colors.edge}; padding: 4px 8px; vertical-align: top; }
+  a { color: ${colors.accent}; }
+  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }
+</style>
+</head><body>${body}</body></html>`;
+}

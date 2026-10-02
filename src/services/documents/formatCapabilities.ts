@@ -1,4 +1,5 @@
 import type { DocFormat, LibraryDocument } from '../../types/models';
+import { MIME_BY_FORMAT } from '../../utils/docFormat';
 
 // Formats with real rasterized page images (LibraryPage[] with a real fileUri) - everything the
 // scan pipeline produces, plus PDFs promoted via promoteExternalToLibrary. Merge/Split/Compress/
@@ -9,6 +10,16 @@ export const PAGE_RASTER_FORMATS: DocFormat[] = ['PDF', 'JPG'];
 // Formats whose reader mounts a local "Find" (substring scan over already-in-memory text/rows)
 // rather than react-native-pdf-jsi's searchTextDirect, which is PDF-only.
 export const IN_READER_FIND_FORMATS: DocFormat[] = ['PDF', 'CSV', 'TXT'];
+
+// §7 R5: the formats a file from outside the app can be opened as - exactly the ones the Reader
+// has a viewer for (PDF engine, TxtView, SheetView, DocxView). The in-app picker and app.json's
+// "Open with" intent filters offer these and nothing else.
+export const OPENABLE_FORMATS: readonly DocFormat[] = ['PDF', 'TXT', 'CSV', 'XLSX', 'XLS', 'DOCX'];
+
+// Some Android file providers label CSV with an older MIME type.
+const PICKER_MIME_ALIASES = ['text/comma-separated-values'];
+
+export const PICKER_MIME_TYPES: readonly string[] = [...OPENABLE_FORMATS.map((format) => MIME_BY_FORMAT[format]), ...PICKER_MIME_ALIASES];
 
 export function isPageRasterFormat(format: DocFormat): boolean {
   return PAGE_RASTER_FORMATS.includes(format);

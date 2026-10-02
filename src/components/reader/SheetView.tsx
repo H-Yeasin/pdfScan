@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { File } from 'expo-file-system';
-import * as XLSX from 'xlsx';
-import Papa from 'papaparse';
 import { spacing, useTheme } from '../../theme';
-import { readTextWithEncodingFallback } from '../../services/documents/txtService';
-import type { DocFormat } from '../../types/models';
+import { loadSheets, PreviewTooLargeError, type Sheet } from '../../services/documents/sheetService';
 import { useT } from '../../i18n/useT';
 
 const MAX_COLUMNS = 200;
@@ -13,23 +9,6 @@ const SAMPLE_ROWS_FOR_WIDTH = 50;
 const MIN_COL_WIDTH = 60;
 const MAX_COL_WIDTH = 240;
 const CHAR_WIDTH = 8;
-
-type Sheet = { name: string; rows: string[][] };
-
-async function loadSheets(uri: string, format: DocFormat): Promise<Sheet[]> {
-  if (format === 'CSV') {
-    const { text } = await readTextWithEncodingFallback(uri);
-    const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true });
-    return [{ name: 'Sheet1', rows: parsed.data }];
-  }
-  // XLSX/XLS - array-of-arrays (header: 1) avoids SheetJS guessing header-row keys.
-  const arrayBuffer = await new File(uri).arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-  return workbook.SheetNames.map((name) => ({
-    name,
-    rows: XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[name], { header: 1 }),
-  }));
-}
 
 // Computed once per sheet load and kept static rather than live-measured per cell - real
 // auto-fit text measurement would defeat FlatList's row virtualization.
@@ -75,14 +54,14 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
   const { tokens } = useTheme();
   const { t } = useT();
   const [sheets, setSheets] = useState<Sheet[] | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'failed' | 'tooLarge' | null>(null);
   const [activeSheet, setActiveSheet] = useState(0);
   const listRef = useRef<FlatList<string[]>>(null);
 
   useEffect(() => {
     let cancelled = false;
     setSheets(null);
-    setError(false);
+    setError(null);
     setActiveSheet(0);
     loadSheets(uri, format)
       .then((loaded) => {
@@ -92,7 +71,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
       .catch((e) => {
         if (cancelled) return;
         console.warn('SheetView: failed to load', uri, e);
-        setError(true);
+        setError(e instanceof PreviewTooLargeError ? 'tooLarge' : 'failed');
       });
     return () => {
       cancelled = true;
@@ -114,7 +93,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
   if (error) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
-        <Text style={{ color: tokens.muted }}>{t('reader.openFailed')}</Text>
+        <Text style={{ color: tokens.muted }}>{t(error === 'tooLarge' ? 'reader.tooLargeToPreview' : 'reader.openFailed')}</Text>
       </View>
     );
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
-import { importExternalFile, pruneExternalOpens } from '../services/files/externalFileService';
+import { importExternalFile, LegacyWordDocError, pruneExternalOpens } from '../services/files/externalFileService';
 import { promoteExternalToLibrary } from '../services/persistence/libraryOperations';
 import { useAppState } from './AppStateContext';
 import { useRouter } from '../navigation/router';
@@ -35,7 +35,7 @@ export function useExternalFileLinking(libraryLoaded: boolean): void {
         go('reader');
       } catch (e) {
         console.warn('useExternalFileLinking: failed to open', uri, e);
-        dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.openFailed') });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t(e instanceof LegacyWordDocError ? 'reader.docUnsupported' : 'library.openFailed') });
       }
     },
     [dispatch, go]

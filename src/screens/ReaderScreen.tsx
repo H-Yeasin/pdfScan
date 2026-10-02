@@ -10,6 +10,7 @@ import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
 import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
+import { DocxView } from '../components/reader/DocxView';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
@@ -417,6 +418,13 @@ export function ReaderScreen() {
           onMatchCount={setLocalMatchCount}
           onTap={handleTap}
         />
+      ) : format === 'DOCX' ? (
+        <DocxView key={nativeUri} uri={nativeUri!} night={night} />
+      ) : format === 'DOC' ? (
+        // Only on documents added before R5 dropped .doc; there's no viewer for it.
+        <View style={styles.unsupported}>
+          <Text style={[styles.unsupportedText, { color: tokens.muted }]}>{t('reader.docUnsupported')}</Text>
+        </View>
       ) : null}
 
       {needsPassword && (
@@ -591,6 +599,8 @@ export function ReaderScreen() {
 }
 
 const styles = StyleSheet.create({
+  unsupported: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  unsupportedText: { textAlign: 'center' },
   container: {
     flex: 1,
   },

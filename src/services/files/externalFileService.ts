@@ -2,7 +2,7 @@ import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues
 import { Directory, File, Paths } from 'expo-file-system';
 import { PDFDocument } from 'pdf-lib';
 import { createId } from '../../utils/id';
-import { detectDocFormat, EXTENSION_BY_FORMAT } from '../../utils/docFormat';
+import { detectDocFormat, EXTENSION_BY_FORMAT, isLegacyWordDoc } from '../../utils/docFormat';
 import type { DocFormat, ExternalFileDocument } from '../../types/models';
 
 const EXTERNAL_OPEN_ROOT = 'external-open';
@@ -18,6 +18,15 @@ function findSourceFile(dir: Directory): File | undefined {
   return dir.list().find((entry): entry is File => entry instanceof File && entry.name.startsWith('source'));
 }
 
+// §7 R5: an old binary Word file (.doc). There's no viewer for it, so it's refused before it is
+// copied, and the message says what to do instead.
+export class LegacyWordDocError extends Error {
+  constructor() {
+    super('Legacy .doc files are not supported');
+    this.name = 'LegacyWordDocError';
+  }
+}
+
 // Copies an arbitrary file (from expo-document-picker, an OS "Open with" intent, or a share-target)
 // into a stable app-owned local path and returns a lightweight, never-persisted description of it.
 // Always copies, even for the in-app picker's already-app-owned cache URI - the OS "Open with"/
@@ -27,6 +36,7 @@ export async function importExternalFile(
   sourceUri: string,
   opts?: { originalFileName?: string; mimeType?: string }
 ): Promise<ExternalFileDocument> {
+  if (isLegacyWordDoc(sourceUri, opts)) throw new LegacyWordDocError();
   const format = detectDocFormat(sourceUri, opts) ?? 'PDF';
   const id = createId('extfile');
   const dir = new Directory(Paths.document, EXTERNAL_OPEN_ROOT, id);

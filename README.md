@@ -93,10 +93,13 @@ so scanned documents never touch a server.
   drag/resize overlay, flattened directly into the exported PDF or JPG.
 
 ### Universal document reader
-- One reader for everything: **PDF, JPG, DOCX, DOC, XLSX, XLS, CSV, TXT** — spreadsheets
-  render as sheets, Word docs as formatted text, PDFs and images through a native
-  page-by-page viewer with pinch-zoom, in-document find, and a night-reading mode.
-- Registers as a system PDF handler on both platforms (open-in from Mail, Files, Drive, etc.).
+- Reads **PDF** (and the app's own scans) through a native page-by-page viewer with
+  pinch-zoom, in-document find, and a night-reading mode.
+- **Preview only** for **TXT, CSV, XLSX, XLS and DOCX**: spreadsheets show as sheets, Word
+  documents as formatted text. They can't be edited or converted to PDF, and very large files
+  (over 10 MB or 50,000 cells for spreadsheets) aren't previewed. Old `.doc` files aren't
+  supported — open them in Google Docs and export as PDF.
+- Opens these formats from other apps on Android ("Open with" from Mail, Files, Drive, etc.).
 
 ### Library & organization
 - Courses, starring, recents, and full-text search that matches OCR content — not just
@@ -120,7 +123,7 @@ so scanned documents never touch a server.
 | Image processing | `@shopify/react-native-skia`, `expo-image-manipulator`, `react-native-view-shot` |
 | OCR | `rn-mlkit-ocr` (Google ML Kit, on-device) |
 | PDF engine | `pdf-lib` (build/sign; OCR text via a bundled glyphless font), `react-native-pdf-jsi` (native render), `expo-print` |
-| Office formats | `mammoth` (DOCX), `xlsx` (XLS/XLSX), `papaparse` (CSV) |
+| Office previews | `mammoth` (DOCX → HTML in a locked-down `react-native-webview`), SheetJS `xlsx` (XLS/XLSX), `papaparse` (CSV) |
 | State | Custom reducer/context store (`AppStateContext` + slice reducers) — no Redux dependency |
 | Persistence | `expo-sqlite`, `@react-native-async-storage/async-storage`, `expo-file-system` |
 | Motion & gestures | `react-native-reanimated` 4, `react-native-worklets`, `react-native-gesture-handler` |

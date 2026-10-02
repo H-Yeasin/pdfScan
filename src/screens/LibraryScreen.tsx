@@ -25,16 +25,11 @@ import { useRouter } from '../navigation/router';
 import { startScan } from '../services/courses/startScan';
 import { searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
-import { importExternalFile } from '../services/files/externalFileService';
-import { MIME_BY_FORMAT } from '../utils/docFormat';
+import { importExternalFile, LegacyWordDocError } from '../services/files/externalFileService';
+import { PICKER_MIME_TYPES } from '../services/documents/formatCapabilities';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
-
-// Formats reachable via the in-app picker today. Widens as DOCX/XLSX/XLS viewers land (see the
-// universal-reader plan's phasing) - deliberately narrower than docFormat.ts's full MIME_BY_FORMAT
-// map so the picker never lets someone select a format with no viewer built yet.
-const PICKABLE_MIME_TYPES = [MIME_BY_FORMAT.PDF, MIME_BY_FORMAT.TXT, MIME_BY_FORMAT.CSV];
 
 export function LibraryScreen() {
   const { tokens } = useTheme();
@@ -144,7 +139,7 @@ export function LibraryScreen() {
 
 
   const handleOpenFile = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: PICKABLE_MIME_TYPES, copyToCacheDirectory: true });
+    const result = await DocumentPicker.getDocumentAsync({ type: [...PICKER_MIME_TYPES], copyToCacheDirectory: true });
     if (result.canceled || !result.assets[0]) return;
     try {
       const ext = await importExternalFile(result.assets[0].uri, {
@@ -155,7 +150,7 @@ export function LibraryScreen() {
       go('reader');
     } catch (e) {
       console.warn('LibraryScreen.handleOpenFile failed', e);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.openFailed') });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t(e instanceof LegacyWordDocError ? 'reader.docUnsupported' : 'library.openFailed') });
     }
   }, [dispatch, go]);
 

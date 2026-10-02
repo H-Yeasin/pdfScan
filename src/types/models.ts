@@ -8,6 +8,8 @@ export type EnhanceMode = 'original' | 'auto' | 'color' | 'gray' | 'ink' | 'boar
 // See services/capture/captureModes.ts for what each mode does. Documents saved before Notes and
 // Board existed only ever have 'doc' / 'id' / 'book', which are still valid.
 export type CaptureMode = 'notes' | 'doc' | 'board' | 'book' | 'id';
+// 'DOC' (old binary Word) is legacy: no new file gets it since §7 R5 (an incoming .doc is refused);
+// it only survives on documents added before, which the Reader explains it can't show.
 export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' | 'TXT';
 
 // Mirrors rn-mlkit-ocr's OcrResult shape (block -> line), kept close to the native

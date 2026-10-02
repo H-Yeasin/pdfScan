@@ -6,6 +6,7 @@ import { THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { getDocumentDir } from './libraryFiles';
 import { buildSearchHaystack } from '../search/searchService';
 import { readTextWithEncodingFallback } from '../documents/txtService';
+import { extractDocxText } from '../documents/docxService';
 import type { Annotation, ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
@@ -208,8 +209,10 @@ export async function applySignedPage(
 //    any imported PDF whose indexedAt is unset - so saving stays instant even for a 300-page file.
 //  - CSV/TXT: a single synthetic page whose ocr.text holds the whole file's decoded text, reusing
 //    the existing OCR-text search plumbing (buildHaystack, dbService's FTS indexing) for free.
-//  - DOCX/DOC/XLSX/XLS: no text-extraction pipeline exists for these - pages stays empty and search
-//    is filename-only (title-LIKE search still finds it).
+//  - DOCX (§7 R5): the same single synthetic page, holding the document's text from mammoth.
+//    Best-effort: if it can't be read, the file is still added and found by name.
+//  - XLSX/XLS: no text extraction - pages stays empty and search is filename-only (title-LIKE
+//    search still finds it).
 export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const dir = getDocumentDir(documentId);
@@ -249,8 +252,17 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
   const dest = new File(dir, `document${EXTENSION_BY_FORMAT[ext.format]}`);
   new File(ext.uri).copySync(dest);
 
-  if (ext.format === 'CSV' || ext.format === 'TXT') {
-    const { text } = await readTextWithEncodingFallback(dest.uri);
+  const text = await (async () => {
+    if (ext.format === 'CSV' || ext.format === 'TXT') return (await readTextWithEncodingFallback(dest.uri)).text;
+    if (ext.format !== 'DOCX') return undefined;
+    try {
+      return await extractDocxText(dest.uri);
+    } catch (error) {
+      console.warn('promoteExternalToLibrary: DOCX text extraction failed', error);
+      return undefined;
+    }
+  })();
+  if (text !== undefined) {
     const pages: LibraryPage[] = [
       { id: createId('page'), fileUri: '', width: 850, height: 1100, ocr: { text, blocks: [] } },
     ];

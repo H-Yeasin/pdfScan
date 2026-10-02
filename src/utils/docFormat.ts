@@ -23,13 +23,16 @@ export const MIME_BY_FORMAT: Record<DocFormat, string> = {
   TXT: 'text/plain',
 };
 
+// §7 R5: legacy Word .doc has no viewer, so it is never detected as a format - an incoming .doc is
+// refused with an explanation (isLegacyWordDoc) instead. 'DOC' stays in DocFormat only for
+// documents added before that.
+const DETECTABLE = (Object.keys(EXTENSION_BY_FORMAT) as DocFormat[]).filter((format) => format !== 'DOC');
+
 const FORMAT_BY_EXTENSION: Record<string, DocFormat> = Object.fromEntries(
-  Object.entries(EXTENSION_BY_FORMAT).map(([format, ext]) => [ext, format as DocFormat])
+  DETECTABLE.map((format) => [EXTENSION_BY_FORMAT[format], format])
 );
 
-const FORMAT_BY_MIME: Record<string, DocFormat> = Object.fromEntries(
-  Object.entries(MIME_BY_FORMAT).map(([format, mime]) => [mime, format as DocFormat])
-);
+const FORMAT_BY_MIME: Record<string, DocFormat> = Object.fromEntries(DETECTABLE.map((format) => [MIME_BY_FORMAT[format], format]));
 
 // Legacy/alternate MIME strings some apps hand off instead of the canonical ones above.
 const MIME_ALIASES: Record<string, DocFormat> = {
@@ -58,7 +61,18 @@ export function detectDocFormat(uri: string, opts?: { mimeType?: string; origina
 }
 
 function extensionOf(nameOrUri: string): DocFormat | null {
+  const ext = rawExtension(nameOrUri);
+  return ext ? (FORMAT_BY_EXTENSION[ext] ?? null) : null;
+}
+
+function rawExtension(nameOrUri: string): string | null {
   const match = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(nameOrUri);
-  if (!match) return null;
-  return FORMAT_BY_EXTENSION[`.${match[1].toLowerCase()}`] ?? null;
+  return match ? `.${match[1].toLowerCase()}` : null;
+}
+
+// An old binary Word file (.doc), by name or MIME type, checked the same way detectDocFormat looks.
+export function isLegacyWordDoc(uri: string, opts?: { mimeType?: string; originalFileName?: string }): boolean {
+  const names = [new File(uri).name, opts?.originalFileName, uri];
+  if (names.some((name) => name && rawExtension(name) === EXTENSION_BY_FORMAT.DOC)) return true;
+  return opts?.mimeType === MIME_BY_FORMAT.DOC;
 }

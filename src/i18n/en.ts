@@ -360,6 +360,8 @@ export const en = {
     openFailed: "Couldn't open this file.",
     loading: 'Loading…',
     firstColumns: 'Showing the first {count} columns.',
+    tooLargeToPreview: 'File too large to preview',
+    docUnsupported: "Old .doc files aren't supported. Open it in Google Docs and export it as PDF.",
     notUtf8: 'This file may not be UTF-8 — some characters may not display correctly.',
     select: {
       title: 'Select text · p. {page}',
