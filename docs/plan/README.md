@@ -16,7 +16,7 @@ code **when the section was planned**, and are kept as history.
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
-| §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1 done in code (device checks open; needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R2–R4 next; R6 waits for Pro. |
+| §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1 and R2 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R3–R4 next; R6 waits for Pro. |
 | §8 Backup and later | — | — | Not planned yet. Next to plan: `docs/plan/08-backup.md` (see `docs/PLAN.md` §8). |
 
 ## Phases (from `docs/PLAN.md` §5)
@@ -30,7 +30,7 @@ checks pass on a device.
 | **P0: Foundation** | §0 | §0 F1–F8 done in code | **Done in code**, device checks open (upgrade from an AsyncStorage-era build keeps every document) |
 | **P1: Student MVP** | §1, §2 (Ink + Board), §3, §4, §9 onboarding | §1, §2 (E1–E6), §3, §4 done in code; E7 benchmark run open | **Not complete**: §9 onboarding (onboarding screens, teaching empty states, accessibility, performance budget) is not planned yet; device checks open |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | §5 T1–T6 and §6 L1–L4 done in code | **Not complete**: §8 zip export is not planned yet; device checks open (L3's font spike included) |
-| **P3: Grow** | §10 Pro, §8 Drive, §11, iOS parity | — | Not started (§7 R1 done in code, R5 all but the SheetJS swap; R2–R4 planned; R6 waits for Pro) |
+| **P3: Grow** | §10 Pro, §8 Drive, §11, iOS parity | — | Not started (§7 R1–R2 done in code, R5 all but the SheetJS swap; R3–R4 planned; R6 waits for Pro) |
 | **P4: Expand** | Bengali (§6 L5–L6), flashcards (§5 T7), more templates | Groundwork in place (script registry, OCR engines, any-script PDF text, i18n) | Not started |
 
 **Next to unblock the phases:** plan and build §9 (finishes P1 in code) and §8's zip export
@@ -92,6 +92,7 @@ lines here.
 | L4c Deliver, Submit, deadlines, document text | 10c1b6b | `document.*` + `tDoc()`, `settings.documentLanguage`, `footerPresetText()` |
 | L4d Library, Reader, courses, shared, services | 2854eb4 | hard-coded string check fails for every `.tsx` outside `src/dev` |
 | R1 Imported PDFs: thumbnails, text, search | 2b46521 | migration v13, `modules/pdf-native` (new dev build), `pdf/pdfNative.ts`, `documents/importedPdfIndex.ts`, `store/useImportedPdfIndexing.ts` |
+| R2 Page tools for imported PDFs | 9f97fc1 | `pdf/{pdfOps,rasterPdf,pdfErrors}.ts`, `decoratePdf`, `usePageImage`; pages keep ids on merge/split, `syncLibrary` deletes removed documents first |
 | R5 Office formats: read-only, capped | 2e00ceb | `documents/{sheetService,docxService}.ts`, `DocxView`, `OPENABLE_FORMATS`; **SheetJS 0.20.3 swap still open** |
 
 ## How the branches came together

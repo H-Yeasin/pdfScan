@@ -125,7 +125,7 @@ word from its page 23 (and opens that page if §5 T2 is there).
   (annotations are off for them); R2/R3 need it, along with each page's size in points.
 
 ### R2 · Page-level tools for imported PDFs *(M)*
-Status: todo
+Status: done in code (commit 9f97fc1); device checks open
 
 - `src/services/pdf/pdfOps.ts` (pdf-lib):
   `mergePdfs(sources: { uri, pages?: number[] }[])`, `extractPages(uri, pages)`,
@@ -155,6 +155,52 @@ Status: todo
 **Done when:** a student can merge a teacher's PDF with their own scanned answers, sign it, and
 submit it under 2 MB, and the teacher's pages still have selectable text when no
 rasterizing was needed.
+
+**As built:**
+- `pdf/pdfOps.ts` writes to a `dest` file (it may be the source) and returns
+  `{ uri, sizeBytes, pageCount }`; `mergePdfs` also returns `pagesPerSource`. Added
+  `splitPdf` (loads the source once) and `stampImage` (Sign). Encryption is detected by
+  reloading with `ignoreEncryption` and checking `isEncrypted`: pdf-lib's `EncryptedPDFError`
+  fails `instanceof`. A PDF with only owner restrictions (opens without a password) also
+  counts as encrypted here, since pdf-lib can't copy its encrypted streams; the student sees
+  "This PDF is password-protected". `PdfEncryptedError` moved to `pdf/pdfErrors.ts`, shared
+  with `pdfNative.ts`.
+- **Merge/split keep page ids** (not only the rows' contents), so bookmarks and annotations
+  follow their pages: `library/REPLACE_FILES` moves them to the new document that has their
+  page. To make that possible on disk, `syncLibrary` now **deletes removed documents first**
+  (freeing the page ids), then writes. An all-scans merge/split also writes the annotations
+  into the rebuilt PDF now (before, they were dropped).
+- A PDF-level merge takes a scan's own `document.pdf` when it is standard and coverless (so a
+  signature burned in by Sign survives), otherwise a standard rebuild from its masters into
+  the cache. The result is `sourceKind: 'imported_pdf'`. It is marked indexed only when every
+  part was; otherwise the R1 indexer fills in the pages without a thumbnail.
+- Compress for imported PDFs is `compressImportedPdf`, rasterizing through
+  `pdf/rasterPdf.buildRasterPdf` (pages keep their own size, edge to edge; the text goes back
+  as the glyphless layer). It replaces the original only if it's smaller. The snack says
+  "Pages were turned into images; the text stays searchable", or "It's already as small as it
+  gets".
+- Sign: rather than `getPageSize` + `applySignatureToPdf`, the placement is made on the page
+  rendered on demand (`components/shared/usePageImage`, 1600 px) and passed as fractions to
+  `pdfOps.stampImage`, which maps them through the page's own media box and `/Rotate` with
+  pdf-lib. Note: the existing `applySignatureToPdf` (scans) deletes the signature file it is
+  given, which is the saved, reusable one; the imported path leaves it alone. Not fixed here.
+- Submit: `submitPdfLevel` decorates the original (`pdfService.decoratePdf`: cover in front,
+  border/header/footer stamped at each page's own size). Over the limit, it samples renders
+  at the ladder levels (`findLevel`) and builds raster PDFs (`buildUnderLimit`);
+  `SubmitResult.rasterized` makes `useSubmitDocument` show "To fit 2 MB, pages were turned
+  into images. The text stays searchable." The preset's 2-in-1 layout is ignored for these
+  (pages stay as the PDF has them). Stamps assume an unrotated page whose media box starts at
+  0,0; a turned page gets its footer along the wrong edge (R3 brings rotation).
+- `formatCapabilities`: `isPdfLevel`, `isPasswordProtected` (R1's `indexState: 'encrypted'`),
+  `canUsePageTools`, `hasPageMasters`. Sign/Submit need `modules/pdf-native` for imported
+  PDFs. Select/copy text, annotate and exam packs now check `hasPageMasters` (they draw on or
+  copy masters). The Library's selection tools look off for a password-protected PDF but stay
+  tappable to explain why.
+- Tests: `pdf/__tests__/pdfOps.test.ts`, `persistence/__tests__/pdfLevelOps.test.ts` (mixed
+  merge, rows and text kept, bookmarks/annotations moved through the reducer and the
+  database, split, compress both ways, sign, submit as-is and rasterized),
+  `documents/__tests__/capabilities.test.ts`. The pdf-native mock now writes JPEG-shaped files
+  (`test/jpeg.ts`), so pdf-lib can embed renders.
 
 ### R3 · Edit pages after saving *(M)*
 Status: todo
