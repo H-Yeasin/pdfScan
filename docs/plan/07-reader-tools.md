@@ -203,7 +203,7 @@ rasterizing was needed.
   (`test/jpeg.ts`), so pdf-lib can embed renders.
 
 ### R3 · Edit pages after saving *(M)*
-Status: todo
+Status: done in code (commits 510eb3b, a123c21); device checks open
 
 - Reader overflow → **Edit pages**: reuse `GridPagesModal` (from Review) in a library mode:
   - reorder (drag), rotate 90° (lossless: `pages.rotation` → `/Rotate`; migration
@@ -222,6 +222,48 @@ Status: todo
 
 **Done when:** a student can remove a wrong page, fix a sideways page and add a forgotten page
 to a saved assignment without rescanning everything.
+
+**As built:**
+- **Rotation** (migration **v14**, `pages.rotation`; `LibraryPage.rotation`) is a clockwise turn
+  on top of the stored page: width/height and OCR stay unturned. A standard build sets
+  `/Rotate`, which leaves the page's own space, and so `pdfRectFor` and annotations, unchanged.
+  A 2-in-1 column can't have its own `/Rotate`, so the page is drawn turned under a matrix
+  (`pdf/rotation.ts`). `pageMap.pdfRectFor` applies the same turn, and a pdfjs test checks it
+  for 90/180/270. Footers/headers on a turned page (`stampAcademicPage`, `decoratePdf`) are
+  drawn in the page as shown, so they sit along the bottom the reader sees. This also fixes
+  R2's note about rotated imported pages and media boxes not at 0,0. A rasterized imported
+  page's text layer is turned the same way. Every build goes through
+  `pdfService.toSourcePage`, so submissions, exam packs and rebuilds all carry the turn. For an
+  imported PDF, `rotation` is the turn added since indexing (its PDF already has it); the R1
+  indexer resets it when it re-reads a page.
+- **Editing is a draft** (`persistence/pageEdits.ts`: `PageEdit`, `rotatePages`,
+  `movePages`, `removePages`, `savePageEdit`). Save is one rebuild, not one per tap: scans
+  from their masters, imported PDFs with `pdfOps.rearrangePages` (order, deletions and turns
+  in one pass). **Delete's Undo is in the editor** (an undo bar until Save), not in the app
+  snack: the snack sits under the modal, and a saved delete removes the page's files. A
+  removed page's bookmarks and annotations go with it (`library/UPDATE_FILE`). An imported
+  PDF must be fully indexed before it can be edited ("still being read").
+- **Reorder** uses "Earlier" / "Later" buttons on the selected pages, not drag: there's no
+  drag-and-drop list in the dependencies. `react-native-draggable-flatlist` (JS on top of
+  Reanimated and Gesture Handler) could add drag later.
+- **Extract** (`extractToNewDocument`) copies the selected pages (new ids; the source keeps
+  them) into a new document in the same course; imported pages as PDF pages. Extract and Add
+  pages wait until the draft is saved.
+- **Add pages**: from another document, `libraryOperations.appendDocuments`; merge is now
+  `combineInto` shared by both, and the target keeps its id and page ids. From a new scan,
+  `startScan(..., { appendTo })` sets `deliver.appendTo`; Deliver shows "Adding pages to …",
+  builds the pages as plain pages (no cover, stamps, 2-in-1 or size target), appends them,
+  deletes the temporary document and opens the Reader. A scan session already in progress has
+  to be finished first. A general scan clears a target left from an abandoned session.
+- **File names**: since pages move, files copied into an existing document are named by page
+  id (`copyPageInto({ byId })`), as are the R1 indexer's thumbnails. `applySignedPage` no
+  longer writes `page_N.jpg` (which could be another page's master after a reorder); it uses
+  new names and deletes the page's old files.
+- Review's grid is now `components/shared/PageGrid`, used by `GridPagesModal` and
+  `EditPagesModal`.
+- Not done: the Annotate and Select text sheets still show a turned scanned page unturned
+  (their marks still land correctly). The "library display copies" aren't shown anywhere since
+  the Reader moved to the PDF engine, so only thumbnails needed the transform.
 
 ### R4 · Reader conveniences *(S)*
 Status: todo
