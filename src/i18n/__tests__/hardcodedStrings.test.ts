@@ -8,8 +8,8 @@ import { join, relative } from 'path';
 
 const SRC = join(__dirname, '../..');
 
-// Converted so far (L4a: Settings, Home; L4b: Capture, Review). L4c-d add theirs; L4d replaces
-// this with "every file".
+// Converted so far (L4a: Settings, Home; L4b: Capture, Review; L4c: Deliver, Academic options,
+// submissions, deadlines). L4d adds the rest and replaces this with "every file".
 const CONVERTED = [
   'screens/SettingsScreen.tsx',
   'screens/HomeScreen.tsx',
@@ -33,6 +33,23 @@ const CONVERTED = [
   'components/review/PreviewControls.tsx',
   'components/review/ProcessingProgress.tsx',
   'components/review/ThumbnailStrip.tsx',
+  'screens/DeliverScreen.tsx',
+  'screens/AcademicOptionsScreen.tsx',
+  'components/deliver/CoverThumbnail.tsx',
+  'components/deliver/FolderPickerModal.tsx',
+  'components/deliver/FormatSegmented.tsx',
+  'components/deliver/LayoutModeSegmented.tsx',
+  'components/deliver/MoreOptionsPanel.tsx',
+  'components/deliver/NameField.tsx',
+  'components/deliver/ProfilePromptSheet.tsx',
+  'components/deliver/QualitySlider.tsx',
+  'components/deliver/SizeTargetRow.tsx',
+  'components/deliver/StickyActions.tsx',
+  'components/submit/SubmissionList.tsx',
+  'components/submit/SubmissionsSheet.tsx',
+  'components/submit/SubmittedFilterChips.tsx',
+  'components/deadlines/DeadlineEditorSheet.tsx',
+  'components/deadlines/DeadlineList.tsx',
 ];
 
 // Literals that aren't language: the app's name, example values in a fixed format.

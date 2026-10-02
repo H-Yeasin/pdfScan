@@ -1,12 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 export type SubmittedFilter = 'all' | 'submitted' | 'notSubmitted' | 'bookmarked';
 
-const SUBMITTED_OPTIONS: { id: SubmittedFilter; label: string }[] = [
-  { id: 'submitted', label: 'Submitted' },
-  { id: 'notSubmitted', label: 'Not submitted' },
-];
 
 // Library filters: Submitted / Not submitted (§4 S7) once something has been submitted, and
 // Bookmarked (§5 T5) once a page has been bookmarked.
@@ -22,10 +19,16 @@ export function SubmittedFilterChips({
   showBookmarked?: boolean;
 }) {
   const { tokens } = useTheme();
-  const options = [
-    { id: 'all' as const, label: 'All' },
-    ...(showSubmitted ? SUBMITTED_OPTIONS : []),
-    ...(showBookmarked ? [{ id: 'bookmarked' as const, label: 'Bookmarked' }] : []),
+  const { t } = useT();
+  const options: { id: SubmittedFilter; label: string }[] = [
+    { id: 'all', label: t('submit.all') },
+    ...(showSubmitted
+      ? [
+          { id: 'submitted' as const, label: t('submit.submitted') },
+          { id: 'notSubmitted' as const, label: t('submit.notSubmitted') },
+        ]
+      : []),
+    ...(showBookmarked ? [{ id: 'bookmarked' as const, label: t('submit.bookmarked') }] : []),
   ];
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>

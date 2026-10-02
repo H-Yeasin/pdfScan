@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { makePng } from '../../../test/png';
 import { buildPdfFromPages, fillPageNumbers, pageSizeOfPdf, type PageSizeId } from '../pdfService';
 import { defaultPageSize } from '../pageSize';
-import { FOOTER_PRESET_TEXT, footerPresetOf } from '../../submit/footerPresets';
+import { footerPresetOf, footerPresetText } from '../../submit/footerPresets';
 import { renderText } from '../../submit/naming';
 
 jest.mock('../../enhance/skiaEnhance', () => ({ renderPage: jest.fn() }));
@@ -87,13 +87,13 @@ const ctx = {
 
 describe('header and footer text', () => {
   it('fills the S2 tokens and keeps {X}/{Y} for the builder', () => {
-    expect(renderText(FOOTER_PRESET_TEXT.namePages, ctx)).toBe('RahimUddin · 2021331045 · {X}/{Y}');
+    expect(renderText(footerPresetText('namePages'), ctx)).toBe('RahimUddin · 2021331045 · {X}/{Y}');
     expect(renderText('{course} — {type}{n}', ctx)).toBe('CSE101 — HW3');
   });
 
   it('drops an empty token with its separator, and keeps characters a file name could not have', () => {
     const noRoll = { ...ctx, profile: { ...ctx.profile, roll: '' } };
-    expect(renderText(FOOTER_PRESET_TEXT.namePages, noRoll)).toBe('RahimUddin · {X}/{Y}');
+    expect(renderText(footerPresetText('namePages'), noRoll)).toBe('RahimUddin · {X}/{Y}');
     expect(renderText('{roll} | {name}', noRoll)).toBe('RahimUddin');
     expect(renderText('Q: {name}?', ctx)).toBe('Q: RahimUddin?');
   });
@@ -117,7 +117,7 @@ describe('header and footer text', () => {
       'as-is',
       {
         enableBorder: false,
-        footerText: renderText(FOOTER_PRESET_TEXT.namePages, ctx),
+        footerText: renderText(footerPresetText('namePages'), ctx),
         coverPage: { mode: 'template', templateId: 'simple', values: { title: 'HW 3' } },
       },
       'standard',

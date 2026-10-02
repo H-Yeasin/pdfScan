@@ -1,3 +1,4 @@
+import { formatNumber, t } from '../../i18n';
 import { File } from 'expo-file-system';
 import { SIZE_LADDER } from '../capture/imageSpec';
 import { encodedBytes } from '../enhance/skiaEnhance';
@@ -104,8 +105,8 @@ export async function buildUnderLimit(
 // "2 MB", "1.5 MB", "800 KB": a limit or a result, in the units the limit was given in.
 // Rounded up, so a file just over a 2 MB limit reads "2.01 MB", never "2 MB".
 export function formatLimit(bytes: number): string {
-  if (bytes < MB) return `${Math.ceil(bytes / 1000)} KB`;
-  return `${Math.ceil((bytes / MB) * 100) / 100} MB`;
+  if (bytes < MB) return t('common.bytes.kb', { size: formatNumber(Math.ceil(bytes / 1000)) });
+  return t('common.bytes.mb', { size: formatNumber(Math.ceil((bytes / MB) * 100) / 100) });
 }
 
 // Shown after a save that couldn't get under the limit; the file is still saved.
@@ -113,8 +114,8 @@ export function tooLargeMessage(result: Pick<SizedBuild, 'sizeBytes' | 'level'>,
   const size = formatLimit(result.sizeBytes);
   const limit = formatLimit(limitBytes);
   return result.level >= lowestLevel
-    ? `This scan is too large for ${limit} even at the lowest quality (${size}). Remove pages or choose a bigger limit.`
-    : `Couldn't get this scan under ${limit} (${size}). Remove pages or choose a bigger limit.`;
+    ? t('deliver.size.tooLargeLowest', { limit, size })
+    : t('deliver.size.tooLarge', { limit, size });
 }
 
 // Builds the document's PDF from final master pages (rotation and filters already applied) so it

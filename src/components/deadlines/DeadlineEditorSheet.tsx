@@ -3,11 +3,13 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DocTypeSelector } from '../courses/DocTypeChips';
 import { NameField } from '../deliver/NameField';
-import { getDocType, nextTypeNumber } from '../../services/courses/docTypes';
+import { nextTypeNumber } from '../../services/courses/docTypes';
 import { dueAtFrom, formatTime, parseTime, startOfDay, upcomingDays } from '../../services/submit/deadlines';
 import { useAppState } from '../../store/AppStateContext';
 import { useDeadlineActions } from '../../store/useDeadlines';
 import { radii, spacing, useTheme } from '../../theme';
+import { formatDate, t, tDoc } from '../../i18n';
+import { useT } from '../../i18n/useT';
 import type { Deadline, DocType } from '../../types/models';
 
 const TIME_PRESETS = [9 * 60, 12 * 60, 17 * 60, 23 * 60 + 59];
@@ -29,9 +31,9 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 
 function dayLabel(day: number, now: number): string {
   const [today, tomorrow] = upcomingDays(now, 2);
-  if (day === today) return 'Today';
-  if (day === tomorrow) return 'Tomorrow';
-  return new Date(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: day < today ? 'short' : undefined });
+  if (day === today) return t('common.today');
+  if (day === tomorrow) return t('deadlines.tomorrow');
+  return formatDate(day, { weekday: 'short', day: 'numeric', month: day < today ? 'short' : undefined });
 }
 
 type DeadlineEditorSheetProps = {
@@ -46,6 +48,8 @@ type DeadlineEditorSheetProps = {
 // Add or edit a deadline: course, title, day, time, type. Saving schedules the reminders.
 export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixedCourseId }: DeadlineEditorSheetProps) {
   const { tokens } = useTheme();
+  // t is imported (dayLabel uses it too); this re-renders on a language change.
+  useT();
   const insets = useSafeAreaInsets();
   const { state, dispatch } = useAppState();
   const { save, remove } = useDeadlineActions();
@@ -73,7 +77,7 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
 
   // "HW3": the type's short name and the number the next one in this course will get.
   const suggestedTitle = useMemo(
-    () => (courseId ? `${getDocType(docType).short}${nextTypeNumber(state.library.files, courseId, docType)}` : ''),
+    () => (courseId ? `${tDoc(`document.docTypeShort.${docType}`)}${nextTypeNumber(state.library.files, courseId, docType)}` : ''),
     [courseId, docType, state.library.files]
   );
   useEffect(() => {
@@ -88,7 +92,15 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
   const minutes = parseTime(timeText);
   const dueAt = minutes === null ? null : dueAtFrom(day, minutes);
   const problem =
-    !courseId ? 'Pick a course' : !title.trim() ? 'Give it a title' : dueAt === null ? 'Time as HH:MM, e.g. 10:00' : dueAt <= Date.now() ? 'Pick a time in the future' : null;
+    !courseId
+      ? t('deadlines.pickCourse')
+      : !title.trim()
+        ? t('deadlines.giveTitle')
+        : dueAt === null
+          ? t('deadlines.timeFormat')
+          : dueAt <= Date.now()
+            ? t('deadlines.pickFuture')
+            : null;
 
   const handleSave = async () => {
     if (problem || !courseId || dueAt === null || saving) return;
@@ -96,7 +108,7 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
     try {
       const { remindersOn } = await save({ courseId, title: title.trim(), dueAt, docType }, deadline);
       if (!remindersOn) {
-        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Saved without reminders: notifications are off for PDF Scan' });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('deadlines.noReminders') });
       }
       onClose();
     } finally {
@@ -106,13 +118,13 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
-        <Text style={[styles.title, { color: tokens.ink }]}>{deadline ? 'Edit deadline' : 'Add deadline'}</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{deadline ? t('deadlines.edit') : t('deadlines.add')}</Text>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {!fixedCourseId && !deadline ? (
             <View style={styles.group}>
-              <Text style={[styles.label, { color: tokens.ink }]}>Course</Text>
+              <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.course')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                 {activeCourses.map((c) => (
                   <Chip key={c.id} label={c.code || c.name} selected={c.id === courseId} onPress={() => setCourseId(c.id)} />
@@ -122,22 +134,22 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
           ) : null}
 
           <View style={styles.group}>
-            <Text style={[styles.label, { color: tokens.ink }]}>Type</Text>
+            <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.type')}</Text>
             <DocTypeSelector value={docType} onChange={setDocType} />
           </View>
 
           <NameField
-            label="Title"
+            label={t('deadlines.title')}
             value={title}
             onChange={(value) => {
               setTitle(value);
               setTitleEdited(true);
             }}
-            placeholder="e.g. HW3"
+            placeholder={t('deadlines.titlePlaceholder')}
           />
 
           <View style={styles.group}>
-            <Text style={[styles.label, { color: tokens.ink }]}>Due</Text>
+            <Text style={[styles.label, { color: tokens.ink }]}>{t('deadlines.due')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {days.map((d) => (
                 <Chip key={d} label={dayLabel(d, Date.now())} selected={d === day} onPress={() => setDay(d)} />
@@ -151,12 +163,12 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
                 value={timeText}
                 onChangeText={setTimeText}
                 keyboardType="numbers-and-punctuation"
-                accessibilityLabel="Time"
+                accessibilityLabel={t('deadlines.time')}
                 style={[styles.timeInput, { color: tokens.ink, borderColor: tokens.edge, backgroundColor: tokens.surface }]}
               />
             </View>
             <Text style={[styles.hint, { color: problem ? tokens.danger : tokens.muted }]}>
-              {problem ?? 'Reminders 24 hours and 2 hours before.'}
+              {problem ?? t('deadlines.remindersHint')}
             </Text>
           </View>
 
@@ -170,7 +182,7 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
                 }}
                 accessibilityRole="button"
               >
-                <Text style={[styles.ghostLabel, { color: tokens.danger }]}>Delete</Text>
+                <Text style={[styles.ghostLabel, { color: tokens.danger }]}>{t('deadlines.delete')}</Text>
               </Pressable>
             ) : null}
             <Pressable
@@ -179,7 +191,7 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
               disabled={!!problem || saving}
               accessibilityRole="button"
             >
-              <Text style={styles.primaryLabel}>Save</Text>
+              <Text style={styles.primaryLabel}>{t('deadlines.save')}</Text>
             </Pressable>
           </View>
         </ScrollView>

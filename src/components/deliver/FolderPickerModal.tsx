@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { CourseBadge } from '../courses/CourseBadge';
 import { TextPromptModal } from '../shared/TextPromptModal';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { Course } from '../../types/models';
 
 type FolderPickerModalProps = {
@@ -24,6 +25,7 @@ export function FolderPickerModal({
   onClose,
 }: FolderPickerModalProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [creating, setCreating] = useState(false);
   // Archived courses can't be picked for new documents; the current choice stays visible though.
   const pickable = courses.filter((c) => !c.archived || c.id === selectedCourseId);
@@ -32,7 +34,7 @@ export function FolderPickerModal({
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={[styles.title, { color: tokens.ink }]}>Course</Text>
+          <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.picker.title')}</Text>
           <ScrollView style={styles.list} contentContainerStyle={{ gap: spacing.xs }}>
             <Pressable
               style={styles.row}
@@ -41,7 +43,7 @@ export function FolderPickerModal({
                 onClose();
               }}
             >
-              <Text style={[styles.rowLabel, { color: tokens.ink }]}>Unsorted</Text>
+              <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('common.unsorted')}</Text>
               {selectedCourseId === null && <Ionicons name="checkmark" size={18} color={tokens.accent} />}
             </Pressable>
             {pickable.map((course) => (
@@ -64,20 +66,20 @@ export function FolderPickerModal({
 
           <Pressable style={styles.newRow} onPress={() => setCreating(true)}>
             <Ionicons name="add" size={18} color={tokens.accentInk} />
-            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>New course</Text>
+            <Text style={[styles.newLabel, { color: tokens.accentInk }]}>{t('deliver.picker.newCourse')}</Text>
           </Pressable>
 
           <Pressable style={styles.cancelRow} onPress={onClose}>
-            <Text style={[styles.cancelLabel, { color: tokens.muted }]}>Cancel</Text>
+            <Text style={[styles.cancelLabel, { color: tokens.muted }]}>{t('common.cancel')}</Text>
           </Pressable>
         </Pressable>
       </Pressable>
 
       <TextPromptModal
         visible={creating}
-        title="New course"
-        placeholder="Course name, e.g. CSE 101"
-        submitLabel="Create"
+        title={t('deliver.picker.newCourse')}
+        placeholder={t('deliver.picker.newCoursePlaceholder')}
+        submitLabel={t('deliver.picker.create')}
         onCancel={() => setCreating(false)}
         onSubmit={(value) => {
           const newId = onCreate(value);

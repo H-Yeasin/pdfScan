@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type ExportCopyProps = {
   enabled: boolean;
@@ -22,6 +23,7 @@ export function MoreOptionsPanel({
   exportCopy,
 }: MoreOptionsPanelProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <View style={[styles.container, { borderTopColor: tokens.edge }]}>
@@ -32,23 +34,23 @@ export function MoreOptionsPanel({
           color={tokens.ink}
           style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}
         />
-        <Text style={[styles.headerLabel, { color: tokens.ink }]}>More options</Text>
+        <Text style={[styles.headerLabel, { color: tokens.ink }]}>{t('deliver.more.title')}</Text>
       </Pressable>
 
       {open && (
         <View style={styles.body}>
           <View style={styles.row}>
-            <Text style={[styles.rowLabel, { color: tokens.ink }]}>Margin</Text>
-            <Text style={{ color: tokens.muted }}>Small</Text>
+            <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('deliver.more.margin')}</Text>
+            <Text style={{ color: tokens.muted }}>{t('deliver.more.marginSmall')}</Text>
           </View>
           {exportCopy && (
             <View style={styles.row}>
               <View style={styles.rowTextWrap}>
-                <Text style={[styles.rowLabel, { color: tokens.ink }]}>Also save a copy to device</Text>
+                <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('deliver.more.exportCopy')}</Text>
                 <Text style={[styles.disclosure, { color: tokens.muted }]}>
                   {exportCopy.folderLabel
-                    ? `Copies the export to ${exportCopy.folderLabel}.`
-                    : 'Set up a default export folder in Settings first.'}
+                    ? t('deliver.more.exportCopyTo', { folder: exportCopy.folderLabel })
+                    : t('deliver.more.exportCopySetup')}
                 </Text>
               </View>
               {exportCopy.folderLabel ? (
@@ -59,7 +61,7 @@ export function MoreOptionsPanel({
                 />
               ) : (
                 <Pressable onPress={exportCopy.onSetup}>
-                  <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>Set up →</Text>
+                  <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('deliver.more.setUp')}</Text>
                 </Pressable>
               )}
             </View>

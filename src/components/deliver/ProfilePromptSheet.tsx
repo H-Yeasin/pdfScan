@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NameField } from './NameField';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { StudentProfile } from '../../types/models';
 
 type ProfilePromptSheetProps = {
@@ -17,6 +18,7 @@ type ProfilePromptSheetProps = {
 // The rest of the profile is in Settings.
 export function ProfilePromptSheet({ visible, initial, onDone, onCancel }: ProfilePromptSheetProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(initial.name);
   const [roll, setRoll] = useState(initial.roll);
@@ -31,17 +33,17 @@ export function ProfilePromptSheet({ visible, initial, onDone, onCancel }: Profi
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel} accessibilityLabel="Close" />
+      <Pressable style={styles.backdrop} onPress={onCancel} accessibilityLabel={t('deliver.profilePrompt.close')} />
       <View style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.lg }]}>
-        <Text style={[styles.title, { color: tokens.ink }]}>Your name and roll number</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.profilePrompt.title')}</Text>
         <Text style={[styles.body, { color: tokens.muted }]}>
-          Used for file names like 2021331045_Rahim_CSE101_HW3 and on cover pages. Stored only on this phone.
+          {t('deliver.profilePrompt.body')}
         </Text>
-        <NameField label="Full name" value={name} onChange={setName} placeholder="e.g. Rahim Uddin" />
-        <NameField label="Roll / student ID" value={roll} onChange={setRoll} placeholder="e.g. 2021331045" />
+        <NameField label={t('settings.profile.name')} value={name} onChange={setName} placeholder={t('settings.profile.namePlaceholder')} />
+        <NameField label={t('settings.profile.roll')} value={roll} onChange={setRoll} placeholder={t('settings.profile.rollPlaceholder')} />
         <View style={styles.actions}>
           <Pressable style={styles.ghost} onPress={() => onDone(null)} accessibilityRole="button">
-            <Text style={[styles.ghostLabel, { color: tokens.muted }]}>Skip</Text>
+            <Text style={[styles.ghostLabel, { color: tokens.muted }]}>{t('deliver.profilePrompt.skip')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primary, { backgroundColor: tokens.accent, opacity: filled ? 1 : 0.5 }]}
@@ -49,7 +51,7 @@ export function ProfilePromptSheet({ visible, initial, onDone, onCancel }: Profi
             disabled={!filled}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryLabel}>Save and submit</Text>
+            <Text style={styles.primaryLabel}>{t('deliver.profilePrompt.saveAndSubmit')}</Text>
           </Pressable>
         </View>
       </View>

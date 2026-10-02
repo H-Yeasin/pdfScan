@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { File } from 'expo-file-system';
 import { typeNumberOf } from '../courses/docTypes';
 import { getDocumentDir } from '../persistence/libraryFiles';
@@ -61,5 +62,5 @@ export async function ensureSubmissionFile(
 export function submittedSummary(submissions: readonly Submission[], formatDate: (at: number) => string): string | null {
   if (submissions.length === 0) return null;
   const last = submissions.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
-  return `Submitted ${submissions.length}× · last on ${formatDate(last.createdAt)}`;
+  return t('submit.summary', { count: submissions.length, date: formatDate(last.createdAt) });
 }

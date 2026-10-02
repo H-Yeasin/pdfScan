@@ -12,6 +12,8 @@ import { SizeTargetRow } from '../components/deliver/SizeTargetRow';
 import { StickyActions } from '../components/deliver/StickyActions';
 import { ProfilePromptSheet } from '../components/deliver/ProfilePromptSheet';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
+import { formatBytes, tDoc } from '../i18n';
+import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { summarizeAcademicConfig } from './AcademicOptionsScreen';
 import { saveImagesToLibrary } from '../services/export/imageExportService';
@@ -45,20 +47,15 @@ import { useFilingCourse } from '../store/useFilingCourse';
 import { resolveOcrScript } from '../services/scripts/registry';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
-import { formatBytes } from '../utils/format';
 import { createId } from '../utils/id';
 
-const PAGE_SIZE_SEGMENTS: { id: PageSizeId; label: string }[] = [
-  { id: 'A4', label: 'A4' },
-  { id: 'Letter', label: 'Letter' },
-];
 
 type SaveMode = 'save' | 'share' | 'submit';
 
 function defaultName(): string {
   const now = new Date();
   const iso = now.toISOString().slice(0, 10);
-  return `Scan_${iso}`;
+  return tDoc('document.scanName', { date: iso });
 }
 
 // One page on its way into the library: its rendered master (+ optional stamped display copy).
@@ -77,6 +74,7 @@ type LibraryInputPage = {
 
 export function DeliverScreen() {
   const { tokens } = useTheme();
+  const { t } = useT();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages } = state.capture;
@@ -133,8 +131,8 @@ export function DeliverScreen() {
   }, [rememberPreset, course, presetCourseId, currentPreset, coursePreset, dispatch]);
 
   const courseName = useMemo(
-    () => courses.find((c) => c.id === courseId)?.name ?? 'Unsorted',
-    [courses, courseId]
+    () => courses.find((c) => c.id === courseId)?.name ?? t('common.unsorted'),
+    [courses, courseId, t]
   );
 
   const handleCreateCourse = useCallback(
@@ -181,7 +179,7 @@ export function DeliverScreen() {
         const contentPages: (LibraryInputPage & { exportUri: string })[] = [];
         for (let i = 0; i < total; i++) {
           const page = pages[i];
-          setProgress(`Preparing page ${i + 1} of ${total}…`);
+          setProgress(t('deliver.progress.preparing', { current: i + 1, total }));
           const edits = {
             rotation: page.rotation,
             enhance: page.enhance,
@@ -212,7 +210,7 @@ export function DeliverScreen() {
         if (format === 'PDF' && academicConfig) {
           if (academicConfig.enableBorder || academicConfig.headerText || academicConfig.footerText) {
             for (let i = 0; i < contentPages.length; i++) {
-              setProgress(`Stamping page ${i + 1} of ${total}…`);
+              setProgress(t('deliver.progress.stamping', { current: i + 1, total }));
               const stamped = await stampContentPageImage(contentPages[i].masterUri, academicConfig, i + 1, total);
               contentPages[i].displayUri = stamped.uri;
             }
@@ -239,12 +237,12 @@ export function DeliverScreen() {
         let pdfResult: { uri: string; sizeBytes: number };
         let sizeWarning: string | null = null;
         if (librarySizeLimit !== null) {
-          setProgress(`Fitting under ${formatLimit(librarySizeLimit)}…`);
+          setProgress(t('deliver.progress.fitting', { size: formatLimit(librarySizeLimit) }));
           const sized = await buildPdfUnderLimit(documentId, pdfPages, librarySizeLimit, academicConfig ?? undefined, layoutMode, pageSize);
           if (!sized.fits) sizeWarning = tooLargeMessage(sized, librarySizeLimit);
           pdfResult = sized;
         } else {
-          setProgress('Building PDF…');
+          setProgress(t('deliver.progress.building'));
           pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academicConfig ?? undefined, layoutMode, pageSize);
         }
         const pdfUri: string = pdfResult.uri;
@@ -359,22 +357,22 @@ export function DeliverScreen() {
 
         // The device-folder copy runs after the in-app save has already succeeded and never
         // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.
-        let snackMsg = shareAfter ? 'Saved · sharing…' : `Saved · ${courseName}`;
+        let snackMsg = shareAfter ? t('deliver.snack.savedSharing') : t('deliver.snack.saved', { course: courseName });
         // Saved all the same; the student decides whether to drop pages or pick a bigger limit.
         if (sizeWarning) snackMsg = sizeWarning;
         if (submission) {
           snackMsg = submission.fits
-            ? `Submitting ${submission.fileName} · ${formatLimit(submission.sizeBytes)}`
+            ? t('deliver.snack.submitting', { file: submission.fileName, size: formatLimit(submission.sizeBytes) })
             : tooLargeMessage(submission, currentPreset.sizeLimitBytes ?? 0);
         } else if (submitFailed) {
-          snackMsg = `Saved · ${courseName} · couldn't build the submission`;
+          snackMsg = t('deliver.snack.submitFailed', { course: courseName });
         }
         if (mode === 'save' && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
           const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
           if (!sizeWarning) snackMsg =
             result.failed === 0
-              ? `Saved · ${courseName} · copied to ${androidExportFolderLabel ?? 'device folder'}`
-              : `Saved · ${courseName} · copy to device folder failed`;
+              ? t('deliver.snack.copied', { course: courseName, folder: androidExportFolderLabel ?? t('deliver.snack.deviceFolder') })
+              : t('deliver.snack.copyFailed', { course: courseName });
         }
 
         // §4 S8: a submission that answers an open deadline offers to settle it, instead of Undo.
@@ -383,15 +381,15 @@ export function DeliverScreen() {
           const submissionId = record.id;
           dispatch({
             type: 'ui/SHOW_SNACK',
-            msg: `${snackMsg} · Mark '${deadline.title}' as done?`,
-            action: 'Done',
+            msg: t('deliver.snack.markDone', { message: snackMsg, title: deadline.title }),
+            action: t('deliver.snack.done'),
             onAction: () => dispatch({ type: 'library/UPDATE_DEADLINE', id: deadline.id, patch: { doneSubmissionId: submissionId } }),
           });
         } else {
           dispatch({
             type: 'ui/SHOW_SNACK',
             msg: snackMsg,
-            action: 'Undo',
+            action: t('deliver.snack.undo'),
             onAction: () => {
               dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
               deleteDocumentFiles(documentId);
@@ -403,7 +401,7 @@ export function DeliverScreen() {
         if (submission) await shareAs(submission.uri, submission.fileName, 'application/pdf');
       } catch (error) {
         console.warn('DeliverScreen: save failed', error);
-        dispatch({ type: 'ui/SHOW_SNACK', msg: "Couldn't save. Your pages are still here." });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('deliver.snack.saveFailed') });
       } finally {
         setSaving(false);
         setProgress(null);
@@ -462,27 +460,27 @@ export function DeliverScreen() {
       <View style={styles.header}>
         <Pressable style={styles.headerButton} onPress={() => go('review', 'back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>Back</Text>
+          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Deliver</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.title')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <NameField
           value={name}
           onChange={(value) => dispatch({ type: 'deliver/SET_NAME', name: value })}
-          helperText={nameEdited ? undefined : 'From your naming template in Settings.'}
+          helperText={nameEdited ? undefined : t('deliver.nameFromTemplate')}
         />
 
         <View>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Format</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.format')}</Text>
           <FormatSegmented value={format} onChange={(value) => dispatch({ type: 'deliver/SET_FORMAT', format: value })} />
         </View>
 
         {sizeLimit === null ? (
           <View>
             <View style={styles.qualityHeader}>
-              <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Quality</Text>
+              <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.quality')}</Text>
               <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>≈ {formatBytes(sizeEstimate)}</Text>
             </View>
             <QualitySlider value={quality} onChange={(value) => dispatch({ type: 'deliver/SET_QUALITY', quality: value })} />
@@ -506,9 +504,9 @@ export function DeliverScreen() {
 
         <View style={styles.typeSection}>
           <View style={styles.qualityHeader}>
-            <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Course</Text>
+            <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.course')}</Text>
             <Text style={{ color: tokens.muted, fontSize: 13 }}>
-              {courseId === null ? 'Unsorted' : automatic ? 'Suggested' : ''}
+              {courseId === null ? t('common.unsorted') : automatic ? t('deliver.suggested') : ''}
             </Text>
           </View>
           {suggestions.length > 0 ? (
@@ -524,14 +522,14 @@ export function DeliverScreen() {
               style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
               onPress={() => setFolderPickerOpen(true)}
             >
-              <Text style={{ color: tokens.ink, fontSize: 15 }}>Save to</Text>
+              <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.saveTo')}</Text>
               <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
             </Pressable>
           )}
         </View>
 
         <View style={styles.typeSection}>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Type</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.type')}</Text>
           <DocTypeSelector value={docType} onChange={(type) => dispatch({ type: 'deliver/SET_DOC_TYPE', docType: type })} />
         </View>
 
@@ -543,7 +541,7 @@ export function DeliverScreen() {
             accessibilityState={{ expanded: optionsOpen }}
           >
             <View style={styles.optionsHeaderText}>
-              <Text style={[styles.sectionLabelInline, { color: tokens.ink }]}>Submission</Text>
+              <Text style={[styles.sectionLabelInline, { color: tokens.ink }]}>{t('deliver.submission')}</Text>
               <Text style={{ color: tokens.muted, fontSize: 13 }} numberOfLines={2}>
                 {summarizePreset(currentPreset)}
               </Text>
@@ -555,31 +553,34 @@ export function DeliverScreen() {
             <View style={styles.optionsBody}>
               <View>
                 <View style={styles.qualityHeader}>
-                  <Text style={[styles.sectionLabel, { color: tokens.ink }]}>File size</Text>
+                  <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.fileSize')}</Text>
                   {sizeLimitBytes !== null ? (
-                    <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>Will be ≤ {formatLimit(sizeLimitBytes)}</Text>
+                    <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>{t('deliver.willBeAtMost', { size: formatLimit(sizeLimitBytes) })}</Text>
                   ) : null}
                 </View>
                 <SizeTargetRow value={sizeLimitBytes} onChange={(bytes) => dispatch({ type: 'deliver/SET_SIZE_LIMIT', bytes })} />
               </View>
 
               <View>
-                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Page Layout</Text>
+                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.pageLayout')}</Text>
                 <LayoutModeSegmented
                   value={layoutMode}
                   onChange={(value) => dispatch({ type: 'deliver/SET_LAYOUT_MODE', layoutMode: value })}
                 />
                 <Text style={[styles.helperText, { color: tokens.muted }]}>
                   {layoutMode === '2_in_1'
-                    ? 'Eco-Save (2 Pages per Sheet - Side-by-Side): fewer sheets to print, PDF only.'
-                    : 'Standard (1 Page per Sheet).'}
+                    ? t('deliver.layoutHintTwoUp')
+                    : t('deliver.layoutHintStandard')}
                 </Text>
               </View>
 
               <View>
-                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Page size</Text>
+                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.pageSize')}</Text>
                 <SegmentedControl
-                  segments={PAGE_SIZE_SEGMENTS}
+                  segments={[
+                    { id: 'A4' as PageSizeId, label: 'A4' },
+                    { id: 'Letter' as PageSizeId, label: t('deliver.paperLetter') },
+                  ]}
                   value={pageSize}
                   onChange={(value) => dispatch({ type: 'deliver/SET_PAGE_SIZE', pageSize: value })}
                 />
@@ -589,7 +590,7 @@ export function DeliverScreen() {
                 style={[styles.saveToRow, { backgroundColor: tokens.bg, borderColor: tokens.edge }]}
                 onPress={() => go('academicOptions')}
               >
-                <Text style={{ color: tokens.ink, fontSize: 15 }}>Cover, footer, border</Text>
+                <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.academicRow')}</Text>
                 <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>
                   {summarizeAcademicConfig(academicConfig)}
                 </Text>
@@ -597,9 +598,9 @@ export function DeliverScreen() {
 
               <View style={styles.rememberRow}>
                 <View style={styles.optionsHeaderText}>
-                  <Text style={{ color: tokens.ink, fontSize: 15 }}>Include my annotations</Text>
+                  <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.includeAnnotations')}</Text>
                   <Text style={{ color: tokens.muted, fontSize: 12.5 }}>
-                    Highlights, pen and notes in the submitted file. Off gives the teacher a clean copy.
+                    {t('deliver.includeAnnotationsHint')}
                   </Text>
                 </View>
                 <Switch
@@ -612,17 +613,17 @@ export function DeliverScreen() {
               {course ? (
                 <>
                   <NameField
-                    label={`File name template for ${course.code || course.name}`}
+                    label={t('deliver.courseTemplate', { course: course.code || course.name })}
                     value={state.deliver.nameTemplate ?? ''}
                     onChange={(value) => dispatch({ type: 'deliver/SET_NAME_TEMPLATE', template: value })}
                     placeholder={state.settings.nameTemplate}
-                    helperText="Empty: the template from Settings."
+                    helperText={t('deliver.courseTemplateHint')}
                   />
                   <View style={styles.rememberRow}>
                     <View style={styles.optionsHeaderText}>
-                      <Text style={{ color: tokens.ink, fontSize: 15 }}>Remember for {course.code || course.name}</Text>
+                      <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.remember', { course: course.code || course.name })}</Text>
                       <Text style={{ color: tokens.muted, fontSize: 12.5 }}>
-                        The next scan for this course starts with these options.
+                        {t('deliver.rememberHint')}
                       </Text>
                     </View>
                     <Switch

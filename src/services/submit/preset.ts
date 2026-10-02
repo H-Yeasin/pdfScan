@@ -1,7 +1,8 @@
+import { t, type TKey } from '../../i18n';
 import { getCoverTemplate, type CoverTemplateId } from '../pdf/coverTemplates';
 import { defaultPageSize, type PageSizeId } from '../pdf/pageSize';
 import type { AcademicConfig, LayoutMode } from '../pdf/pdfService';
-import { FOOTER_PRESET_TEXT, footerPresetOf, type FooterPreset } from './footerPresets';
+import { footerPresetOf, footerPresetText, type FooterPreset } from './footerPresets';
 import { formatLimit } from './sizeTarget';
 
 // How a course's work is handed in (§4 S6), remembered on the course after the first submit so
@@ -75,7 +76,7 @@ export function serializeSubmitPreset(preset: SubmitPreset | undefined): string 
 export function presetFooterText(preset: SubmitPreset): string {
   if (preset.footerPreset === 'none') return '';
   if (preset.footerPreset === 'custom') return preset.footerText ?? '';
-  return FOOTER_PRESET_TEXT[preset.footerPreset];
+  return footerPresetText(preset.footerPreset);
 }
 
 // The academic options a preset gives (no header: that's per document). The cover starts with no
@@ -138,22 +139,22 @@ function normalizeKeys(p: SubmitPreset): SubmitPreset {
   return out;
 }
 
-const FOOTER_SUMMARY: Record<FooterPreset, string | null> = {
+const FOOTER_SUMMARY: Record<FooterPreset, TKey | null> = {
   none: null,
-  pages: 'Page numbers',
-  namePages: 'Name + pages',
-  custom: 'Custom footer',
+  pages: 'deliver.summary.footerPages',
+  namePages: 'deliver.summary.footerNamePages',
+  custom: 'deliver.summary.footerCustom',
 };
 
 // "Under 2 MB · Assignment cover · Name + pages · A4": the collapsed options line in Deliver.
 export function summarizePreset(preset: SubmitPreset): string {
   const parts = [
-    preset.sizeLimitBytes !== null ? `Under ${formatLimit(preset.sizeLimitBytes)}` : 'Original size',
-    preset.coverTemplateId ? `${getCoverTemplate(preset.coverTemplateId).label} cover` : null,
-    FOOTER_SUMMARY[preset.footerPreset],
-    preset.border ? 'Border' : null,
-    preset.layout === '2_in_1' ? '2 per sheet' : null,
-    preset.includeAnnotations ? 'With annotations' : null,
+    preset.sizeLimitBytes !== null ? t('deliver.summary.under', { size: formatLimit(preset.sizeLimitBytes) }) : t('deliver.summary.originalSize'),
+    preset.coverTemplateId ? t('deliver.summary.cover', { template: t(getCoverTemplate(preset.coverTemplateId).labelKey) }) : null,
+    FOOTER_SUMMARY[preset.footerPreset] ? t(FOOTER_SUMMARY[preset.footerPreset]!) : null,
+    preset.border ? t('deliver.summary.border') : null,
+    preset.layout === '2_in_1' ? t('deliver.summary.twoPerSheet') : null,
+    preset.includeAnnotations ? t('deliver.summary.withAnnotations') : null,
     preset.pageSize,
   ];
   return parts.filter(Boolean).join(' · ');

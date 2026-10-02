@@ -1,5 +1,6 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type NameFieldProps = {
   value: string;
@@ -15,15 +16,16 @@ export function NameField({
   value,
   onChange,
   helperText,
-  label = 'Name',
-  placeholder = 'Untitled scan',
+  label,
+  placeholder,
   onSelectionChange,
 }: NameFieldProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <View>
-      <Text style={[styles.label, { color: tokens.ink }]}>{label}</Text>
+      <Text style={[styles.label, { color: tokens.ink }]}>{label ?? t('deliver.nameLabel')}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -32,7 +34,7 @@ export function NameField({
           styles.input,
           { borderColor: tokens.edge, backgroundColor: tokens.surface, color: tokens.ink },
         ]}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('deliver.namePlaceholder')}
         placeholderTextColor={tokens.muted}
       />
       {helperText ? <Text style={[styles.helper, { color: tokens.muted }]}>{helperText}</Text> : null}

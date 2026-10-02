@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { PSEUDO_LOCALE, isUiLanguage, setUiLanguage } from '../i18n';
+import { PSEUDO_LOCALE, isDocumentLanguage, isUiLanguage, setDocumentLanguage, setUiLanguage } from '../i18n';
 import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings } from '../services/persistence/settingsStorage';
 import { normalizeProfile } from '../services/submit/profile';
@@ -51,6 +51,9 @@ export function useSettingsPersistence() {
         if (isUiLanguage(settings.uiLanguage) && (settings.uiLanguage !== PSEUDO_LOCALE || __DEV__)) {
           dispatch({ type: 'settings/SET_UI_LANGUAGE', language: settings.uiLanguage });
         }
+        if (isDocumentLanguage(settings.documentLanguage)) {
+          dispatch({ type: 'settings/SET_DOCUMENT_LANGUAGE', language: settings.documentLanguage });
+        }
         if (isCaptureMode(settings.lastCaptureMode)) {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
@@ -79,6 +82,7 @@ export function useSettingsPersistence() {
       profilePrompted: state.settings.profilePrompted,
       unsortedPromptDone: state.settings.unsortedPromptDone,
       uiLanguage: state.settings.uiLanguage,
+      documentLanguage: state.settings.documentLanguage,
     });
   }, [
     loaded,
@@ -97,10 +101,14 @@ export function useSettingsPersistence() {
     state.settings.profilePrompted,
     state.settings.unsortedPromptDone,
     state.settings.uiLanguage,
+    state.settings.documentLanguage,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.
   useEffect(() => {
     setUiLanguage(state.settings.uiLanguage);
   }, [state.settings.uiLanguage]);
+  useEffect(() => {
+    setDocumentLanguage(state.settings.documentLanguage);
+  }, [state.settings.documentLanguage]);
 }

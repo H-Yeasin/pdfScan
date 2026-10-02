@@ -1,4 +1,4 @@
-import type { UiLanguage } from '../../i18n';
+import type { DocumentLanguage, UiLanguage } from '../../i18n';
 import { getCaptureModeSpec } from '../../services/capture/captureModes';
 import type { CaptureModeSpec } from '../../services/capture/captureModes';
 import { DEFAULT_NAME_TEMPLATE } from '../../services/submit/naming';
@@ -41,6 +41,9 @@ export type SettingsState = {
   // §6 L4: the app's language. 'system' follows the phone (the first of its languages that has a
   // catalog, else English); 'en-XA' is the developer pseudo-locale (dev builds only).
   uiLanguage: UiLanguage;
+  // §6 L4: the language of text that goes into documents (cover labels, footers, the {type} file
+  // name token). 'ui' follows the app language; a Bangla UI can still make English covers.
+  documentLanguage: DocumentLanguage;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -59,6 +62,7 @@ export const initialSettingsState: SettingsState = {
   profilePrompted: false,
   unsortedPromptDone: false,
   uiLanguage: 'system',
+  documentLanguage: 'ui',
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -88,7 +92,8 @@ export type SettingsAction =
   | { type: 'settings/SET_NAME_TEMPLATE'; template: string }
   | { type: 'settings/SET_PROFILE_PROMPTED' }
   | { type: 'settings/SET_UNSORTED_PROMPT_DONE' }
-  | { type: 'settings/SET_UI_LANGUAGE'; language: UiLanguage };
+  | { type: 'settings/SET_UI_LANGUAGE'; language: UiLanguage }
+  | { type: 'settings/SET_DOCUMENT_LANGUAGE'; language: DocumentLanguage };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -122,6 +127,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, nameTemplate: action.template };
     case 'settings/SET_UI_LANGUAGE':
       return { ...state, uiLanguage: action.language };
+    case 'settings/SET_DOCUMENT_LANGUAGE':
+      return { ...state, documentLanguage: action.language };
     default:
       return state;
   }

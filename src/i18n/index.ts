@@ -104,13 +104,26 @@ function lookup(catalog: CatalogShape, key: string): string | Plural | undefined
   return undefined;
 }
 
-function interpolate(text: string, params: TParams | undefined): string {
+function interpolate(text: string, params: TParams | undefined, locale: string): string {
   if (!params) return text;
   return text.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = params[name];
     if (value === undefined) return match;
-    return typeof value === 'number' ? formatNumber(value) : value;
+    return typeof value === 'number' ? formatNumber(value, undefined, locale) : value;
   });
+}
+
+function translate(catalog: Catalog, key: TKey, params: TParams | undefined): string {
+  let value = lookup(catalog, key);
+  if (value === undefined && catalog !== en) {
+    if (__DEV__) console.warn(`i18n: '${key}' is missing from '${catalog.meta.locale}', using English`);
+    value = lookup(en, key);
+  }
+  if (value === undefined) return key;
+  const locale = intlTag(catalog.meta.locale);
+  if (typeof value === 'string') return interpolate(value, params, locale);
+  const count = typeof params?.count === 'number' ? params.count : 0;
+  return interpolate(value[catalog.meta.plural(count)], params, locale);
 }
 
 // The string for `key` in the active language, with `{name}` parameters filled in; a plural picks
@@ -118,38 +131,63 @@ function interpolate(text: string, params: TParams | undefined): string {
 // to English (TypeScript makes that rare: only a catalog loaded at runtime could miss one); in
 // development it also warns, so it gets noticed.
 export function t(key: TKey, params?: TParams): string {
-  const catalog = current();
-  let value = lookup(catalog, key);
-  if (value === undefined && catalog !== en) {
-    if (__DEV__) console.warn(`i18n: '${key}' is missing from '${catalog.meta.locale}', using English`);
-    value = lookup(en, key);
-  }
-  if (value === undefined) return key;
-  if (typeof value === 'string') return interpolate(value, params);
-  const count = typeof params?.count === 'number' ? params.count : 0;
-  return interpolate(value[catalog.meta.plural(count)], params);
+  return translate(current(), key, params);
+}
+
+// --- Document language ---------------------------------------------------------------------------
+//
+// Text that goes INTO documents (cover labels, footers, the `{type}` file name token, the exam
+// pack's contents page) has its own language, so a Bangla UI can still make the English cover a
+// teacher expects. 'ui' (the default) follows the UI language, pseudo-locale included.
+
+export type DocumentLanguage = 'ui' | CatalogId;
+let documentLanguage: DocumentLanguage = 'ui';
+
+export function isDocumentLanguage(value: unknown): value is DocumentLanguage {
+  return value === 'ui' || (typeof value === 'string' && value in CATALOGS);
+}
+
+export function setDocumentLanguage(next: DocumentLanguage): void {
+  documentLanguage = next;
+}
+
+function documentCatalog(): Catalog {
+  return documentLanguage === 'ui' ? current() : (CATALOGS[documentLanguage] ?? en);
+}
+
+// t() for document text: keys under `document.*`, in the document language.
+export function tDoc(key: TKey & `document.${string}`, params?: TParams): string {
+  return translate(documentCatalog(), key, params);
+}
+
+export function getDocumentLocale(): string {
+  return intlTag(documentCatalog().meta.locale);
 }
 
 // --- Formatting in the active locale ------------------------------------------------------------
 
 // The pseudo-locale formats like English; Intl doesn't know 'en-XA' everywhere.
-function intlLocale(): string {
-  const locale = getLocale();
+function intlTag(locale: string): string {
   return locale === PSEUDO_LOCALE ? 'en' : locale;
 }
 
-export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
+function intlLocale(): string {
+  return intlTag(getLocale());
+}
+
+// `locale`: the UI's by default; document text passes getDocumentLocale().
+export function formatNumber(value: number, options?: Intl.NumberFormatOptions, locale: string = intlLocale()): string {
   try {
-    return new Intl.NumberFormat(intlLocale(), options).format(value);
+    return new Intl.NumberFormat(locale, options).format(value);
   } catch {
     return String(value);
   }
 }
 
-export function formatDate(date: Date | number, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: Date | number, options?: Intl.DateTimeFormatOptions, locale: string = intlLocale()): string {
   const d = typeof date === 'number' ? new Date(date) : date;
   try {
-    return new Intl.DateTimeFormat(intlLocale(), options).format(d);
+    return new Intl.DateTimeFormat(locale, options).format(d);
   } catch {
     return d.toDateString();
   }

@@ -5,6 +5,8 @@ import { renderLayoutImage } from '../pdf/academicRasterService';
 import { formatCoverDate, itemsAsOcr, layoutContents, type ContentsEntry } from '../pdf/coverTemplates';
 import { buildPdfFromPages, pageDimensions, type PageSizeId } from '../pdf/pdfService';
 import { copyPageInto } from '../persistence/libraryOperations';
+import { footerPresetText } from '../submit/footerPresets';
+import { tDoc } from '../../i18n';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { buildSearchHaystack } from '../search/searchService';
 import type { Annotation, LibraryDocument, LibraryPage } from '../../types/models';
@@ -110,7 +112,7 @@ export async function buildExamPack(
     documentId,
     pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
     'as-is',
-    options.pageNumbers ? { enableBorder: false, footerText: 'Page {X} of {Y}' } : undefined,
+    options.pageNumbers ? { enableBorder: false, footerText: footerPresetText('pages') } : undefined,
     'standard',
     options.pageSize,
     {
@@ -142,5 +144,6 @@ export async function buildExamPack(
 
 // "CSE101 exam pack – 2 October 2026".
 export function defaultPackTitle(courseLabel: string | undefined, date: Date): string {
-  return `${courseLabel ? `${courseLabel} ` : ''}exam pack – ${formatCoverDate(date)}`.replace(/^e/, courseLabel ? 'e' : 'E');
+  const when = formatCoverDate(date);
+  return courseLabel ? tDoc('document.examPack', { course: courseLabel, date: when }) : tDoc('document.examPackNoCourse', { date: when });
 }

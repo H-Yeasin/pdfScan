@@ -9,7 +9,7 @@ import { NameTemplateSection } from '../components/settings/NameTemplateSection'
 import { ProfileSection } from '../components/settings/ProfileSection';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
-import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, systemCatalogId, type UiLanguage } from '../i18n';
+import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, systemCatalogId, type DocumentLanguage, type UiLanguage } from '../i18n';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
@@ -35,13 +35,17 @@ export function SettingsScreen() {
   const classCount = state.library.timetable.filter((slot) =>
     state.library.courses.some((c) => c.id === slot.courseId && !c.archived)
   ).length;
-  const { ocrScript, uiLanguage, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
+  const { ocrScript, uiLanguage, documentLanguage, androidExportFolderUri, androidExportFolderLabel, crashReportsEnabled, scannerUnavailable } =
     state.settings;
   // 'system' first, then each language with a catalog, then (development builds) the pseudo-locale.
   const languageOptions: { id: UiLanguage; name: string }[] = [
     { id: 'system', name: t('settings.language.system', { name: catalogNativeName(systemCatalogId()) }) },
     ...CATALOG_IDS.map((id): { id: UiLanguage; name: string } => ({ id, name: catalogNativeName(id) })),
     ...(__DEV__ ? [{ id: PSEUDO_LOCALE as UiLanguage, name: t('settings.language.pseudo') }] : []),
+  ];
+  const documentLanguageOptions: { id: DocumentLanguage; name: string }[] = [
+    { id: 'ui', name: t('settings.language.documentSameAsApp') },
+    ...CATALOG_IDS.map((id): { id: DocumentLanguage; name: string } => ({ id, name: catalogNativeName(id) })),
   ];
 
   const handlePickExportFolder = useCallback(async () => {
@@ -88,6 +92,21 @@ export function SettingsScreen() {
               />
             ))}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.language.documentSection')}</Text>
+          <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+            {documentLanguageOptions.map((option) => (
+              <LanguageRow
+                key={option.id}
+                name={option.name}
+                selected={documentLanguage === option.id}
+                onPress={() => dispatch({ type: 'settings/SET_DOCUMENT_LANGUAGE', language: option.id })}
+              />
+            ))}
+          </View>
+          <Text style={[styles.footnote, { color: tokens.muted }]}>{t('settings.language.documentHint')}</Text>
         </View>
 
         <View style={styles.section}>

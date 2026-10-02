@@ -1,4 +1,4 @@
-import { getDocType } from '../courses/docTypes';
+import { formatDate, getDocumentLocale, tDoc, type TKey } from '../../i18n';
 import { measureText, type MeasureText } from './visibleText';
 import type { Course, DocType, PageOcr, StudentProfile } from '../../types/models';
 
@@ -26,35 +26,37 @@ export type CoverFieldKey =
 
 export type CoverValues = Partial<Record<CoverFieldKey, string>>;
 
-export type CoverTemplate = { id: CoverTemplateId; label: string; fields: readonly CoverFieldKey[] };
+// labelKey: the template's name in the picker (UI language).
+export type CoverTemplate = { id: CoverTemplateId; labelKey: TKey; fields: readonly CoverFieldKey[] };
 
 export const COVER_TEMPLATES: readonly CoverTemplate[] = [
-  { id: 'simple', label: 'Simple', fields: ['title', 'docLabel', 'name', 'roll', 'courseCode', 'courseName', 'date'] },
+  { id: 'simple', labelKey: 'deliver.cover.templates.simple', fields: ['title', 'docLabel', 'name', 'roll', 'courseCode', 'courseName', 'date'] },
   {
     id: 'assignment',
-    label: 'Assignment',
+    labelKey: 'deliver.cover.templates.assignment',
     fields: ['institution', 'docLabel', 'title', 'courseCode', 'courseName', 'name', 'roll', 'section', 'teacher', 'date'],
   },
   {
     id: 'lab',
-    label: 'Lab report',
+    labelKey: 'deliver.cover.templates.lab',
     fields: ['institution', 'experimentNo', 'experimentName', 'courseCode', 'courseName', 'name', 'roll', 'section', 'teacher', 'date'],
   },
 ];
 
-export const COVER_FIELD_LABELS: Record<CoverFieldKey, string> = {
-  institution: 'Institution',
-  title: 'Title',
-  docLabel: 'Type and number',
-  courseCode: 'Course code',
-  courseName: 'Course name',
-  teacher: 'Teacher',
-  name: 'Name',
-  roll: 'Roll / ID',
-  section: 'Section',
-  date: 'Date',
-  experimentNo: 'Experiment no.',
-  experimentName: 'Experiment name',
+// The field editor's labels (UI language).
+export const COVER_FIELD_LABELS: Record<CoverFieldKey, TKey> = {
+  institution: 'deliver.cover.fields.institution',
+  title: 'deliver.cover.fields.title',
+  docLabel: 'deliver.cover.fields.docLabel',
+  courseCode: 'deliver.cover.fields.courseCode',
+  courseName: 'deliver.cover.fields.courseName',
+  teacher: 'deliver.cover.fields.teacher',
+  name: 'deliver.cover.fields.name',
+  roll: 'deliver.cover.fields.roll',
+  section: 'deliver.cover.fields.section',
+  date: 'deliver.cover.fields.date',
+  experimentNo: 'deliver.cover.fields.experimentNo',
+  experimentName: 'deliver.cover.fields.experimentName',
 };
 
 export function getCoverTemplate(id: string | undefined): CoverTemplate {
@@ -89,12 +91,15 @@ export function normalizeCoverConfig(raw: unknown): CoverPageConfig | undefined 
 
 // --- Defaults -------------------------------------------------------------------------------
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-// "2 October 2026": spelled out, so no reader mixes up day and month. English, like the rest of
-// the cover's labels (they move to the translation catalog in §6 L4).
+// "2 October 2026": the month spelled out, so no reader mixes up day and month. In the document
+// language (§6 L4): the order comes from the catalog, the month name from Intl.
 export function formatCoverDate(date: Date): string {
-  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+  const locale = getDocumentLocale();
+  return tDoc('document.coverDate', {
+    day: formatDate(date, { day: 'numeric' }, locale),
+    month: formatDate(date, { month: 'long' }, locale),
+    year: formatDate(date, { year: 'numeric' }, locale),
+  });
 }
 
 export type CoverContext = {
@@ -117,7 +122,7 @@ export function coverDefaults(ctx: CoverContext): CoverValues {
     courseCode: ctx.course?.code?.trim() ?? '',
     courseName: ctx.course?.name.trim() ?? '',
     teacher: ctx.course?.teacher?.trim() ?? '',
-    docLabel: `${getDocType(ctx.docType).label} ${ctx.n}`,
+    docLabel: tDoc('document.docLabel', { type: tDoc(`document.docTypes.${ctx.docType}`), n: ctx.n }),
     date: formatCoverDate(ctx.date),
     experimentNo: ctx.docType === 'lab' ? String(ctx.n) : '',
   };
@@ -241,7 +246,7 @@ function column(heading: string, rows: Row[], x: number, top: number, width: num
   items.push({ kind: 'text', text: heading, x, y, size: headingSize, bold: true, align: 'left' });
   y += headingSize * (LINE_GAP - 1) + 6;
   for (const row of filled) {
-    for (const line of wrapText(`${row.label}: ${row.value}`, size, false, width, 2, measure)) {
+    for (const line of wrapText(tDoc('document.rowValue', { label: row.label, value: row.value }), size, false, width, 2, measure)) {
       y += size;
       items.push({ kind: 'text', text: line, x, y, size, bold: false, align: 'left' });
       y += size * (LINE_GAP - 1);
@@ -257,11 +262,11 @@ function submissionBox(layout: Layout, v: CoverValues) {
   const columnWidth = (width - BOX_PADDING_PT * 3) / 2;
   const top = layout.y + BOX_PADDING_PT;
   const by = column(
-    'Submitted by',
+    tDoc('document.submittedBy'),
     [
-      { label: 'Name', value: v.name },
-      { label: 'Roll', value: v.roll },
-      { label: 'Section', value: v.section },
+      { label: tDoc('document.row.name'), value: v.name },
+      { label: tDoc('document.row.roll'), value: v.roll },
+      { label: tDoc('document.row.section'), value: v.section },
     ],
     x + BOX_PADDING_PT,
     top,
@@ -269,10 +274,10 @@ function submissionBox(layout: Layout, v: CoverValues) {
     layout.measure
   );
   const to = column(
-    'Submitted to',
+    tDoc('document.submittedTo'),
     [
-      { label: 'Teacher', value: v.teacher },
-      { label: 'Course', value: v.courseCode || v.courseName },
+      { label: tDoc('document.row.teacher'), value: v.teacher },
+      { label: tDoc('document.row.course'), value: v.courseCode || v.courseName },
     ],
     x + BOX_PADDING_PT * 2 + columnWidth,
     top,
@@ -301,7 +306,7 @@ export function layoutCover(
     if (v.title?.trim()) layout.centered(v.docLabel, 14, false, 1, 24);
     else layout.y += 14;
     layout.centered(v.name, 14, false, 2, 4);
-    layout.centered(v.roll ? `Roll: ${v.roll}` : '', 12, false, 1, 4);
+    layout.centered(v.roll ? tDoc('document.roll', { roll: v.roll }) : '', 12, false, 1, 4);
     layout.centered(courseLine(v), 12, false, 2, 4);
     layout.centered(v.date, 12, false, 1);
     return layout.items;
@@ -314,9 +319,9 @@ export function layoutCover(
   }
   layout.y = Math.max(layout.y, page.height * 0.24);
   if (templateId === 'lab') {
-    layout.centered('Lab Report', 28, true, 1, 16);
+    layout.centered(tDoc('document.labReport'), 28, true, 1, 16);
     layout.centered(courseLine(v), 15, false, 2, 22);
-    layout.centered(v.experimentNo ? `Experiment no. ${v.experimentNo}` : '', 14, true, 1, 6);
+    layout.centered(v.experimentNo ? tDoc('document.experimentNo', { n: v.experimentNo }) : '', 14, true, 1, 6);
     layout.centered(v.experimentName, 16, false, 3);
   } else {
     layout.centered(v.docLabel, 28, true, 1, 16);
@@ -327,7 +332,7 @@ export function layoutCover(
   submissionBox(layout, v);
   if (coverSafe(v.date ?? '')) {
     layout.y += 28;
-    layout.centered(`Date of submission: ${v.date}`, 12, false, 1);
+    layout.centered(tDoc('document.dateOfSubmission', { date: v.date ?? '' }), 12, false, 1);
   }
   return layout.items;
 }
@@ -346,7 +351,7 @@ export function pageList(pages: readonly number[]): string {
     runs.push(i === j ? `${sorted[i]}` : `${sorted[i]}–${sorted[j]}`);
     i = j;
   }
-  return `p. ${runs.join(', ')}`;
+  return tDoc('document.contents.pages', { list: runs.join(', ') });
 }
 
 // The pack's first page: its title, a subtitle (course and date), then where each run of pages
@@ -357,7 +362,7 @@ export function layoutContents(title: string, subtitle: string, entries: readonl
   layout.centered(title, 22, true, 2, 4);
   layout.centered(subtitle, 12, false, 1, 10);
   layout.rule(18);
-  layout.centered('Contents', 14, true, 1, 8);
+  layout.centered(tDoc('document.contents.title'), 14, true, 1, 8);
   const bottom = page.height - MARGIN_PT;
   for (const entry of entries) {
     if (layout.y > bottom - 40) {
@@ -366,7 +371,8 @@ export function layoutContents(title: string, subtitle: string, entries: readonl
     }
     const [from, to] = entry.packPages;
     layout.centered(entry.document, 12.5, true, 2, 2);
-    layout.centered(`${pageList(entry.sourcePages)} · pack ${from === to ? `page ${from}` : `pages ${from}–${to}`}`, 11, false, 2, 10);
+    const pages = pageList(entry.sourcePages);
+    layout.centered(from === to ? tDoc('document.contents.packPage', { pages, from }) : tDoc('document.contents.packPages', { pages, from, to }), 11, false, 2, 10);
   }
   return layout.items;
 }

@@ -26,6 +26,8 @@ export type PersistedSettings = {
   unsortedPromptDone?: boolean;
   // Optional: added in §6 L4a. Unknown values read as 'system'.
   uiLanguage?: string;
+  // Optional: added in §6 L4c. Unknown values read as 'ui'.
+  documentLanguage?: string;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

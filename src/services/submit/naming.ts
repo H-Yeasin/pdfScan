@@ -1,4 +1,4 @@
-import { getDocType } from '../courses/docTypes';
+import { tDoc } from '../../i18n';
 import { sanitizeFileName } from '../../utils/sanitize';
 import type { Course, DocType, StudentProfile } from '../../types/models';
 import { isProfileComplete } from './profile';
@@ -47,7 +47,8 @@ function tokenValue(token: NameToken, ctx: NamingContext): string {
     case 'course':
       return noSpaces(ctx.course?.code?.trim() || ctx.course?.name || '');
     case 'type':
-      return getDocType(ctx.docType).short;
+      // In the document language (§6 L4): the file name is part of what the teacher gets.
+      return tDoc(`document.docTypeShort.${ctx.docType}`);
     case 'n':
       return String(ctx.n);
     case 'date':

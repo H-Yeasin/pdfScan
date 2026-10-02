@@ -1,5 +1,6 @@
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 type StickyActionsProps = {
   saving: boolean;
@@ -13,6 +14,7 @@ type StickyActionsProps = {
 
 export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare }: StickyActionsProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
@@ -20,9 +22,9 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
         style={[styles.primary, { backgroundColor: tokens.accent, opacity: saving ? 0.7 : 1 }]}
         onPress={onSubmit}
         disabled={saving}
-        accessibilityLabel="Submit: save, then share the named file"
+        accessibilityLabel={t('deliver.actions.submitA11y')}
       >
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryLabel}>Submit</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryLabel}>{t('deliver.actions.submit')}</Text>}
       </Pressable>
       {saving && progress ? (
         <Text style={[styles.progress, { color: tokens.muted }]} accessibilityLiveRegion="polite">
@@ -31,18 +33,18 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
       ) : null}
       <View style={styles.secondaryRow}>
         <Pressable style={styles.ghost} onPress={onSave} disabled={saving}>
-          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>Save</Text>
+          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.save')}</Text>
         </Pressable>
         <Pressable style={styles.ghost} onPress={onSaveShare} disabled={saving}>
-          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>Save & Share</Text>
+          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.saveShare')}</Text>
         </Pressable>
       </View>
       {Platform.OS === 'ios' && (
         <Text style={[styles.shareHint, { color: tokens.muted }]}>
-          Share also lets you save to Files, iCloud Drive, or another app.
+          {t('deliver.actions.shareHintIos')}
         </Text>
       )}
-      <Text style={[styles.footnote, { color: tokens.muted }]}>No watermark. No account. Nothing leaves your phone.</Text>
+      <Text style={[styles.footnote, { color: tokens.muted }]}>{t('deliver.actions.footnote')}</Text>
     </View>
   );
 }

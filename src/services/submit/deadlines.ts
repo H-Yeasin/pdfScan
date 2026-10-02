@@ -1,3 +1,4 @@
+import { formatDate, t } from '../../i18n';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { docTypeOf } from '../courses/docTypes';
@@ -23,24 +24,21 @@ export function reminderTimes(dueAt: number, now: number): number[] {
 // "Tue 10:00", or "today 10:00" / "tomorrow 10:00": how a due time reads in a reminder and a list.
 export function formatDue(dueAt: number, now: number): string {
   const due = new Date(dueAt);
-  const time = due.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  const startOfDay = (t: number) => new Date(new Date(t).toDateString()).getTime();
+  const time = formatDate(due, { hour: '2-digit', minute: '2-digit' });
+  const startOfDay = (at: number) => new Date(new Date(at).toDateString()).getTime();
   const days = Math.round((startOfDay(dueAt) - startOfDay(now)) / DAY);
-  if (days === 0) return `today ${time}`;
-  if (days === 1) return `tomorrow ${time}`;
-  if (days === -1) return `yesterday ${time}`;
-  const date =
-    Math.abs(days) < 7
-      ? due.toLocaleDateString(undefined, { weekday: 'short' })
-      : due.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-  return `${date} ${time}`;
+  if (days === 0) return t('deadlines.when.today', { time });
+  if (days === 1) return t('deadlines.when.tomorrow', { time });
+  if (days === -1) return t('deadlines.when.yesterday', { time });
+  const date = formatDate(due, Math.abs(days) < 7 ? { weekday: 'short' } : { day: 'numeric', month: 'short' });
+  return t('deadlines.when.other', { date, time });
 }
 
 let channelReady: Promise<unknown> | null = null;
 function ensureChannel(): Promise<unknown> {
   if (Platform.OS !== 'android') return Promise.resolve();
   channelReady ??= Notifications.setNotificationChannelAsync(DEADLINE_CHANNEL_ID, {
-    name: 'Deadlines',
+    name: t('deadlines.channel'),
     importance: Notifications.AndroidImportance.HIGH,
   });
   return channelReady;
@@ -75,8 +73,8 @@ export async function scheduleReminders(
     ids.push(
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `${deadline.title} is due ${formatDue(deadline.dueAt, at)}`,
-          body: `${courseLabel} · tap to scan it now`,
+          title: t('deadlines.reminderTitle', { title: deadline.title, due: formatDue(deadline.dueAt, at) }),
+          body: t('deadlines.reminderBody', { course: courseLabel }),
           data,
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: DEADLINE_CHANNEL_ID },

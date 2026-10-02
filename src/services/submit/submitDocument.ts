@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { Directory, File } from 'expo-file-system';
 import { docTypeOf } from '../courses/docTypes';
 import { coverDefaults, withCoverDefaults, type CoverValues } from '../pdf/coverTemplates';
@@ -99,7 +100,7 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
   const dir = new Directory(getDocumentDir(doc.id), 'submissions');
   if (!dir.exists) dir.create({ intermediates: true });
   const dest = new File(dir, fileName);
-  const onPage = (done: number, total: number) => onProgress?.(`Building PDF… page ${done} of ${total}`);
+  const onPage = (done: number, total: number) => onProgress?.(t('deliver.progress.buildingPage', { current: done, total }));
   // §5 T4: the submission's own layout for mapping annotations - its content pages, after the
   // preset's cover if it has one (a stand-in page, so the offset is right). An annotation on the
   // document's old cover page has no place here and is left out.
@@ -122,7 +123,7 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
       : undefined;
 
   if (preset.sizeLimitBytes !== null) {
-    onProgress?.(`Fitting under ${formatLimit(preset.sizeLimitBytes)}…`);
+    onProgress?.(t('deliver.progress.fitting', { size: formatLimit(preset.sizeLimitBytes) }));
     const sized = await buildPdfUnderLimit(doc.id, pages, preset.sizeLimitBytes, academicConfig, preset.layout, preset.pageSize, {
       dest,
       onPage,

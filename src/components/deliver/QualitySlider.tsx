@@ -3,6 +3,7 @@ import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 
 const STEPS = 5;
 const THUMB_SIZE = 22;
@@ -14,6 +15,7 @@ type QualitySliderProps = {
 
 export function QualitySlider({ value, onChange }: QualitySliderProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   const [trackWidth, setTrackWidth] = useState(0);
   const x = useSharedValue(0);
 
@@ -64,8 +66,8 @@ export function QualitySlider({ value, onChange }: QualitySliderProps) {
         </View>
       </GestureDetector>
       <View style={styles.labels}>
-        <Text style={[styles.labelText, { color: tokens.muted }]}>Small</Text>
-        <Text style={[styles.labelText, { color: tokens.muted }]}>High</Text>
+        <Text style={[styles.labelText, { color: tokens.muted }]}>{t('deliver.qualitySmall')}</Text>
+        <Text style={[styles.labelText, { color: tokens.muted }]}>{t('deliver.qualityHigh')}</Text>
       </View>
     </View>
   );

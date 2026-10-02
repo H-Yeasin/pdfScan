@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatDue } from '../../services/submit/deadlines';
 import { radii, spacing, useTheme } from '../../theme';
+import { useT } from '../../i18n/useT';
 import type { Deadline } from '../../types/models';
 
 type DeadlineListProps = {
@@ -18,6 +19,7 @@ type DeadlineListProps = {
 // Open deadlines, soonest first as given; overdue ones in the danger colour.
 export function DeadlineList({ deadlines, now, onPress, courseLabel, highlightId, onScanNow }: DeadlineListProps) {
   const { tokens } = useTheme();
+  const { t } = useT();
   return (
     <View style={styles.list}>
       {deadlines.map((d) => {
@@ -41,8 +43,7 @@ export function DeadlineList({ deadlines, now, onPress, courseLabel, highlightId
                 {d.title}
               </Text>
               <Text style={[styles.meta, { color: overdue ? tokens.danger : tokens.muted }]} numberOfLines={1}>
-                {overdue ? 'Overdue · ' : 'Due '}
-                {formatDue(d.dueAt, now)}
+                {overdue ? t('deadlines.overdue', { due: formatDue(d.dueAt, now) }) : t('deadlines.dueAt', { due: formatDue(d.dueAt, now) })}
               </Text>
             </View>
             {highlighted && onScanNow ? (
@@ -50,10 +51,10 @@ export function DeadlineList({ deadlines, now, onPress, courseLabel, highlightId
                 style={[styles.scan, { backgroundColor: tokens.accent }]}
                 onPress={() => onScanNow(d)}
                 accessibilityRole="button"
-                accessibilityLabel={`Scan ${d.title} now`}
+                accessibilityLabel={t('deadlines.scanNowA11y', { title: d.title })}
               >
                 <Ionicons name="scan" size={16} color="#fff" />
-                <Text style={styles.scanLabel}>Scan now</Text>
+                <Text style={styles.scanLabel}>{t('deadlines.scanNow')}</Text>
               </Pressable>
             ) : null}
           </Pressable>

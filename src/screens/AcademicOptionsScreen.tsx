@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CoverThumbnail } from '../components/deliver/CoverThumbnail';
 import { NameField } from '../components/deliver/NameField';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
+import { t } from '../i18n';
+import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { renderPage } from '../services/enhance/skiaEnhance';
@@ -23,7 +25,7 @@ import {
   type CoverValues,
 } from '../services/pdf/coverTemplates';
 import { useCoverDefaults, useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
-import { FOOTER_PRESET_TEXT, footerPresetOf, type FooterPreset } from '../services/submit/footerPresets';
+import { footerPresetOf, footerPresetText, type FooterPreset } from '../services/submit/footerPresets';
 import { renderText } from '../services/submit/naming';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { useAppState } from '../store/AppStateContext';
@@ -32,26 +34,27 @@ import { createId } from '../utils/id';
 
 type CoverMode = CoverPageConfig['mode'] | 'none';
 
-const FOOTER_SEGMENTS: { id: FooterPreset; label: string }[] = [
-  { id: 'none', label: 'None' },
-  { id: 'pages', label: 'Pages' },
-  { id: 'namePages', label: 'Name + pages' },
-  { id: 'custom', label: 'Custom' },
+// Built per render (in the active language).
+const footerSegments = (): { id: FooterPreset; label: string }[] => [
+  { id: 'none', label: t('deliver.academic.footerModes.none') },
+  { id: 'pages', label: t('deliver.academic.footerModes.pages') },
+  { id: 'namePages', label: t('deliver.academic.footerModes.namePages') },
+  { id: 'custom', label: t('deliver.academic.footerModes.custom') },
 ];
 
-const COVER_SEGMENTS: { id: CoverMode; label: string }[] = [
-  { id: 'none', label: 'None' },
-  { id: 'template', label: 'Template' },
-  { id: 'imported_image', label: 'Photo' },
+const coverSegments = (): { id: CoverMode; label: string }[] => [
+  { id: 'none', label: t('deliver.academic.coverModes.none') },
+  { id: 'template', label: t('deliver.academic.coverModes.template') },
+  { id: 'imported_image', label: t('deliver.academic.coverModes.photo') },
 ];
 
 export function summarizeAcademicConfig(cfg: AcademicConfig | null): string {
-  if (!cfg) return 'Off';
+  if (!cfg) return t('deliver.academic.off');
   const parts: string[] = [];
-  if (cfg.coverPage) parts.push('Cover page');
-  if (cfg.enableBorder) parts.push('Border');
-  if (cfg.headerText || cfg.footerText) parts.push('Header/footer');
-  return parts.length > 0 ? parts.join(' · ') : 'Off';
+  if (cfg.coverPage) parts.push(t('deliver.academic.coverPage'));
+  if (cfg.enableBorder) parts.push(t('deliver.academic.border'));
+  if (cfg.headerText || cfg.footerText) parts.push(t('deliver.academic.headerFooter'));
+  return parts.length > 0 ? parts.join(' · ') : t('deliver.academic.off');
 }
 
 type FieldState = {
@@ -85,6 +88,8 @@ function buildConfig(next: FieldState): AcademicConfig | null {
 
 export function AcademicOptionsScreen() {
   const { tokens } = useTheme();
+  // t is imported (the module-level helpers use it too); this re-renders on a language change.
+  useT();
   const { go, previousScreen } = useRouter();
   const { state, dispatch } = useAppState();
   const cfg = state.deliver.academicConfig;
@@ -207,18 +212,16 @@ export function AcademicOptionsScreen() {
       <View style={styles.header}>
         <Pressable style={styles.headerButton} onPress={() => go(previousScreen ?? 'deliver', 'back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>Back</Text>
+          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
         </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>Academic export</Text>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.academic.title')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.row}>
           <View style={styles.rowTextWrap}>
-            <Text style={[styles.rowLabel, { color: tokens.ink }]}>Geometric border</Text>
-            <Text style={[styles.disclosure, { color: tokens.muted }]}>
-              Draws a thin inset rectangle on every content page.
-            </Text>
+            <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('deliver.academic.borderRow')}</Text>
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.borderHint')}</Text>
           </View>
           <Switch
             value={enableBorder}
@@ -228,42 +231,42 @@ export function AcademicOptionsScreen() {
         </View>
 
         <NameField
-          label="Header text"
+          label={t('deliver.academic.header')}
           value={headerText}
           onChange={(value) => commit({ headerText: value })}
-          placeholder="e.g. {course} — {type}{n}"
-          helperText="Can use {name}, {roll}, {section}, {course}, {type}, {n}, {date}, {X} and {Y}."
+          placeholder={t('deliver.academic.headerPlaceholder')}
+          helperText={t('deliver.academic.headerHint')}
         />
 
         <View style={styles.footerSection}>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Footer</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.academic.footer')}</Text>
           <SegmentedControl
-            segments={FOOTER_SEGMENTS}
+            segments={footerSegments()}
             value={footerMode}
             onChange={(mode) => {
               setFooterMode(mode);
               if (mode === 'none') commit({ footerText: '' });
-              else if (mode !== 'custom') commit({ footerText: FOOTER_PRESET_TEXT[mode] });
+              else if (mode !== 'custom') commit({ footerText: footerPresetText(mode) });
             }}
           />
           {footerMode === 'custom' && (
             <NameField
-              label="Footer text"
+              label={t('deliver.academic.footerText')}
               value={footerText}
               onChange={(value) => commit({ footerText: value })}
-              placeholder="e.g. {name} · Page {X} of {Y}"
-              helperText="{X} and {Y} are the page number and page count (the cover page is not counted); {name}, {roll}, {course}, … come from your profile and the course."
+              placeholder={t('deliver.academic.footerPlaceholder')}
+              helperText={t('deliver.academic.footerHint')}
             />
           )}
           {footerSample ? (
-            <Text style={[styles.disclosure, { color: tokens.muted }]}>Page 1 shows: {footerSample}</Text>
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.footerSample', { text: footerSample })}</Text>
           ) : null}
         </View>
 
         <View>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>Cover page</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.academic.coverPage')}</Text>
           <SegmentedControl
-            segments={COVER_SEGMENTS}
+            segments={coverSegments()}
             value={coverMode}
             onChange={(value) => commit({ coverMode: value })}
           />
@@ -281,27 +284,24 @@ export function AcademicOptionsScreen() {
                     onPress={() => commit({ templateId: template.id })}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={`${template.label} cover`}
+                    accessibilityLabel={t('deliver.academic.templateA11y', { template: t(template.labelKey) })}
                   >
                     <View style={[styles.templateFrame, { borderColor: selected ? tokens.accent : 'transparent' }]}>
                       <CoverThumbnail templateId={template.id} values={shownValues} width={92} />
                     </View>
-                    <Text style={[styles.templateLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{template.label}</Text>
+                    <Text style={[styles.templateLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{t(template.labelKey)}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            <Text style={[styles.disclosure, { color: tokens.muted }]}>
-              Filled in from your profile, the course and the document type. Changes here apply to this cover only;
-              an empty field is left off.
-            </Text>
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.templateHint')}</Text>
             {getCoverTemplate(templateId).fields.map((key) => (
               <NameField
                 key={key}
-                label={COVER_FIELD_LABELS[key]}
+                label={t(COVER_FIELD_LABELS[key])}
                 value={shownValues[key] ?? ''}
                 onChange={(value) => commit({ coverValues: { ...coverValues, [key]: value } })}
-                placeholder={COVER_FIELD_LABELS[key]}
+                placeholder={t(COVER_FIELD_LABELS[key])}
               />
             ))}
           </>
@@ -319,7 +319,7 @@ export function AcademicOptionsScreen() {
                   { borderColor: tokens.edge, backgroundColor: tokens.surface },
                 ]}
               >
-                <Text style={{ color: tokens.muted, fontSize: 13 }}>No photo selected</Text>
+                <Text style={{ color: tokens.muted, fontSize: 13 }}>{t('deliver.academic.noPhoto')}</Text>
               </View>
             )}
             <Pressable
@@ -327,7 +327,7 @@ export function AcademicOptionsScreen() {
               onPress={handlePickCoverImage}
             >
               <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>
-                {importedUri ? 'Choose a different photo' : 'Choose photo'}
+                {importedUri ? t('deliver.academic.chooseOtherPhoto') : t('deliver.academic.choosePhoto')}
               </Text>
             </Pressable>
           </View>
@@ -341,7 +341,7 @@ export function AcademicOptionsScreen() {
           {previewing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.previewButtonLabel}>Preview PDF</Text>
+            <Text style={styles.previewButtonLabel}>{t('deliver.academic.preview')}</Text>
           )}
         </Pressable>
       </ScrollView>
