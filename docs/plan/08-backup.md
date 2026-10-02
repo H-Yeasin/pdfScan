@@ -75,7 +75,37 @@ storage under control. Cloud backup to the student's own Google Drive is a later
 ## Steps
 
 ### B1 · Storage health: integrity, clean-up, report, low-space guard *(M)*
-Status: todo
+Status: done (commit 58ba0ee)
+
+As built:
+- Migration **v16**: `documents.missing_files` (also `LibraryDocument.missingFiles`, written by
+  the normal sync) and `documents.disk_bytes`. `disk_bytes` is **not** in `LibraryDocument`: it
+  is a database-only cache that `writeDocument` keeps only when the pages, PDF path and size are
+  unchanged, so any save or edit clears it and `storageReport` measures that folder again (lazy,
+  instead of measuring on every save). `libraryRepo.{loadDiskBytes,saveDiskBytes,documentIdsInDb}`.
+- `findOrphans(documents, rowIds, now)` treats a folder as left over only when neither the
+  in-memory library nor the database knows it, it isn't empty, and nothing in it changed for
+  15 minutes (a save writes files before its row). It skips `.`-folders (`.trash`, B4's
+  `.incoming`) and the legacy `Courses/`. "Missing" means the PDF, the Office original or a
+  page master is gone (thumbnails and display copies aren't checked); flagged documents whose
+  files came back are unflagged. Trash entries are named `<movedAt>_<docId>`, so no other record
+  is needed for the 7-day clean-up. Hook: `store/useStorageIntegrity.ts`.
+- `cleanCaches({ sessionActive })`: always empties `share`, `extract`, `pdf-ops`, `pdf-native`;
+  without an open session also `ImageManipulator/` and loose `.jpg/.png/.pdf` files in
+  `Paths.cache`; prunes `external-open` to 5.
+- Space guard: `usage.{spaceLevel,checkSpaceFor}` plus `store/useSpaceGuard.ts`. Before a scan
+  or gallery import: an alert ("Free up space" / "Continue") once per app run. Before a save
+  (`BYTES_PER_SAVED_PAGE` = 3 MB per page): under 50 MB left it stops with a snack, under 300 MB
+  it warns with a "Free up space" snack action and saves.
+- Storage screen: `screens/StorageScreen.tsx` (screen `storage`). Compress reuses the selection
+  bar's logic, now `compressDocuments` in `useDocumentListActions.tsx`. `formatBytes` gained GB.
+- Reader: shows "Some files are missing" when the file it would open doesn't exist (checked
+  directly, not only through the flag); library rows show the same note when flagged.
+- Backup rules: `database` domain `.` covers AsyncStorage (`RKStorage`, where `app:settings`
+  lives on Android); the database itself is `files/SQLite/` (expo-sqlite's default folder).
+  `library/.trash/` and `library/.incoming/` are excluded. Needs `npx expo prebuild` / a new dev
+  build. The Storage screen's Android note doesn't say "Use Back up…" yet: B3 should add that
+  once Back up exists.
 
 - `src/services/storage/integrity.ts`:
   - `findOrphans()`: folders in `library/` with no document row (left over from crashes) and

@@ -17,7 +17,7 @@ code **when the section was planned**, and are kept as history.
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
-| §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | Planned (2026-10-02). B1 first; B6 (Google Drive) waits for Pro. |
+| §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | B1 done in code (device checks open; the backup rules need a new dev build). **Next: B2.** B6 (Google Drive) waits for Pro. |
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | Planned (2026-10-02). O1 first (Android back button exits the app today). |
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M6 | Planned (2026-10-02). Pro launches with §8 B6 or §7 R6 (see M6). |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
@@ -99,6 +99,7 @@ lines here.
 | R3 Edit pages after saving | 510eb3b, a123c21 | migration v14 (`pages.rotation`), `pdf/rotation.ts`, `persistence/pageEdits.ts`, `appendDocuments`, `EditPagesModal`, `deliver.appendTo` |
 | R4 Reader conveniences | a68b7ed | migration v15 (`documents.last_page`), `documents/readerPosition.ts`, `PageScrubberSheet`; page rows not rewritten when unchanged |
 | R5 Office formats: read-only, capped | 2e00ceb | `documents/{sheetService,docxService}.ts`, `DocxView`, `OPENABLE_FORMATS`; **SheetJS 0.20.3 swap still open** |
+| B1 Storage health | 58ba0ee | migration v16 (`documents.missing_files`, `disk_bytes`), `services/storage/{integrity,usage}.ts`, `StorageScreen`, `useSpaceGuard`, `plugins/withBackupRules.js` (new dev build) |
 
 ## How the branches came together
 

@@ -200,7 +200,7 @@ Goal: students never lose a semester of notes.
 
 **Detailed steps:** [`docs/plan/08-backup.md`](plan/08-backup.md)
 
-- [ ] B1 Storage health: integrity check, cache clean-up, space per course, low-space guard, Android backup rules
+- [x] B1 Storage health: integrity check, cache clean-up, space per course, low-space guard, Android backup rules
 - [ ] B2 Backup format: dependency-free zip (store-only, Zip64) with readable PDFs and `library.json`
 - [ ] B3 Back up and export (whole library, one course, chosen documents; everything or PDFs only)
 - [ ] B4 Restore and import (Restore keeps ids; Add for a classmate's course; all-or-nothing)
