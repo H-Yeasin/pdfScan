@@ -1,5 +1,5 @@
 import { Animated } from 'react-native';
-import { transitionStyle } from '../transitions';
+import { RESTING_STYLE, transitionStyle } from '../transitions';
 
 describe('screen transitions', () => {
   const progress = new Animated.Value(0);
@@ -16,5 +16,11 @@ describe('screen transitions', () => {
     expect(incoming).toEqual({ opacity: progress });
     expect(outgoing).toHaveProperty('opacity');
     expect(outgoing).not.toHaveProperty('transform');
+  });
+
+  // Fabric asserts these keep their types after the native driver animated them (RN 0.86).
+  it('keep transform an array and opacity a number at rest', () => {
+    expect(Array.isArray(RESTING_STYLE.transform)).toBe(true);
+    expect(typeof RESTING_STYLE.opacity).toBe('number');
   });
 });

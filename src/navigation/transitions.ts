@@ -32,6 +32,13 @@ export function transitionStyle(
   return { transform: [{ translateX: slideTransform(progress, width, kind, dir) }] };
 }
 
+// The incoming layer's style when no transition runs. It must never be null: the native driver
+// leaves the animated transform/opacity on the view, and on the next prop update RN 0.86's Fabric
+// mounting (overridePropsReadableMap) asserts that React still sends `transform` as an array and
+// `opacity` as a number. Dropping them (style null) crashed the app at the end of every slide.
+// Both keys are always set, so switching reduce motion on or off between transitions is safe too.
+export const RESTING_STYLE = { opacity: 1, transform: [{ translateX: 0 }] };
+
 export function runSlide(progress: Animated.Value, onDone?: () => void) {
   progress.setValue(0);
   Animated.timing(progress, {

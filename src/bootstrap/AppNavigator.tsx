@@ -6,7 +6,7 @@ import { resolveBack, type BackContext } from '../navigation/backHandling';
 import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
-import { runSlide, transitionStyle } from '../navigation/transitions';
+import { RESTING_STYLE, runSlide, transitionStyle } from '../navigation/transitions';
 import { useReducedMotion } from '../theme/useReducedMotion';
 import type { NavDir, ScreenName } from '../types/navigation';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -257,7 +257,7 @@ export function AppNavigator() {
       <Animated.View
         style={[
           styles.layer,
-          outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : null,
+          outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : RESTING_STYLE,
         ]}
       >
         <ScreenFrame name={screen} background={tokens.bg} />
