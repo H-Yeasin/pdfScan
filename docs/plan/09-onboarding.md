@@ -57,7 +57,29 @@ This is the last section before the Play Store closed beta (phase P1 in `docs/PL
 ## Steps
 
 ### O1 · Navigation basics: Android back, start screen, splash *(S)*
-Status: todo
+Status: done (commit 1e998dc). Device checks open; needs a new dev build (`expo-splash-screen`,
+predictive back).
+
+As built:
+- `navigation/backHandling.resolveBack(ctx)` is the pure order: selection (only on screens with
+  a document list), then Library search, then the screen's own Back target (plus its clean-up:
+  Review clears the retake target, Course the highlighted deadline), then exit from the root
+  tab (`rootScreen`: Home with a course, else Capture). Non-root tabs go back to the root tab.
+  AppNavigator registers one `BackHandler` listener at boot; `exit` returns `false` (Android's
+  default, the app goes to the background).
+- "Discard N pages?" is asked when back would **exit** with an unsaved scan, not on Review:
+  Review's Back goes to Capture and keeps the pages, so nothing is lost there.
+- Sheets: almost all are RN `Modal`s, which already close on back via `onRequestClose`; the four
+  without it (`SignatureModal`, `SignatureCaptureModal`, `SignaturePlacementOverlay`,
+  `CropOverlay`) now cancel. `navigation/useBackHandler(onBack, enabled)` is for inline overlays:
+  Reader's find bar and Review's Adjust panel use it.
+- Splash: `bootstrap/splash.ts` (`holdSplash` at module scope in `App.tsx`, `releaseSplash` one
+  frame after the start screen renders, 3 s safety timeout that also covers a crash during boot).
+  AppNavigator has its own 3 s boot timeout; if loading finishes later and the user hasn't
+  navigated, the start screen is still corrected. `bootstrap/startScreen.chooseStartScreen` is
+  where O2 adds Onboarding. Splash colours match `tokens.bg` (light/dark), image
+  `assets/splash-icon.png`.
+- Tests: `navigation/__tests__/backHandling.test.ts`, `bootstrap/__tests__/{startScreen,splash}.test.ts`.
 
 - **Android back** (`BackHandler` in `AppNavigator`): close the top sheet or modal first (sheets
   register a handler while open, via a small `useBackHandler(onBack)` hook), then leave

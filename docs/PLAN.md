@@ -215,7 +215,7 @@ Goal: a good first five minutes, and an app that is fast and usable for everyone
 
 **Detailed steps:** [`docs/plan/09-onboarding.md`](plan/09-onboarding.md)
 
-- [ ] O1 Android back button, start screen without a flash, splash screen
+- [x] O1 Android back button, start screen without a flash, splash screen
 - [ ] O2 Onboarding: three skippable screens (what it does, profile, courses)
 - [ ] O3 Empty states that teach, and one-time hints
 - [ ] O4 Accessibility: labels and roles, large text, contrast, reduce motion, gesture alternatives
