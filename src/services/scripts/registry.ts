@@ -100,11 +100,30 @@ export type ScriptEntry = ScriptDefinition & { id: OcrScript };
 // a ready script).
 export const DEFAULT_OCR_SCRIPT: OcrScript = 'latin';
 
-export const READY_SCRIPTS: readonly ScriptEntry[] = SCRIPTS.filter((s) => s.status === 'ready');
-export const PLANNED_SCRIPTS: readonly ScriptEntry[] = SCRIPTS.filter((s) => s.status === 'planned');
+// The lists the app reads. They start as SCRIPTS and only ever change through registerScript
+// (tests), so screens, OCR and parsing all see one registry.
+const allScripts: ScriptEntry[] = [...SCRIPTS];
+const readyScripts: ScriptEntry[] = allScripts.filter((s) => s.status === 'ready');
+const plannedScripts: ScriptEntry[] = allScripts.filter((s) => s.status === 'planned');
+
+export const READY_SCRIPTS: readonly ScriptEntry[] = readyScripts;
+export const PLANNED_SCRIPTS: readonly ScriptEntry[] = plannedScripts;
 
 export function getScript(id: string | null | undefined): ScriptEntry | undefined {
-  return SCRIPTS.find((s) => s.id === id);
+  return allScripts.find((s) => s.id === id);
+}
+
+// Test hook (§6 L2): adds an entry as if it were written in SCRIPTS above, so the fake-script test
+// (src/test/fakeScript.ts) can prove a new script needs nothing outside the registry and its
+// engine. Returns the undo. Not for app code: a real script goes in SCRIPTS, which also gives it
+// its OcrScript id.
+export function registerScript(entry: ScriptEntry): () => void {
+  if (getScript(entry.id)) throw new Error(`Script '${entry.id}' is already registered`);
+  const lists = [allScripts, entry.status === 'ready' ? readyScripts : plannedScripts];
+  for (const list of lists) list.push(entry);
+  return () => {
+    for (const list of lists) list.splice(list.indexOf(entry), 1);
+  };
 }
 
 // Narrows an untrusted value (a database column, stored settings) to a known script id. Planned
