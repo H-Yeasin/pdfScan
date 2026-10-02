@@ -246,6 +246,13 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v12 (§6 L1): a course's recognition script (scripts/registry ids). NULL = the app setting.
+    version: 12,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE courses ADD COLUMN ocr_script TEXT;');
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

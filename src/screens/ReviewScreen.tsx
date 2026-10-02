@@ -32,6 +32,7 @@ import { drawAcademicStamp, hasContentPageStamp } from '../services/pdf/academic
 import { applySignatureToPage } from '../services/signature/signatureCompositeService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppState } from '../store/AppStateContext';
+import { useScanOcrScript } from '../store/useScanOcrScript';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
 import { useResolvedAcademicConfig } from '../store/useDeliverContext';
@@ -49,6 +50,8 @@ export function ReviewScreen() {
   const { tokens } = useTheme();
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
+  // §6 L1: re-OCR and ID card sides use the filing course's script, like the original scan.
+  const ocrScript = useScanOcrScript();
   const { pages, processingStatus, progress } = state.capture;
   const { sel, ocrRunning, history } = state.review;
   const canUndo = history.past.length > 0;
@@ -228,7 +231,7 @@ export function ReviewScreen() {
   const handleOcr = useCallback(async () => {
     if (!selectedPage || ocrRunning) return;
     dispatch({ type: 'review/SET_OCR_RUNNING', running: true });
-    const ocr = await runOcr(selectedPage.uri, state.settings.ocrScript);
+    const ocr = await runOcr(selectedPage.uri, ocrScript);
     const err = !ocr || ocr.text.trim().length < OCR_SPARSE_THRESHOLD;
     dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: { ocr, err } });
     dispatch({ type: 'review/SET_OCR_RUNNING', running: false });
@@ -236,7 +239,7 @@ export function ReviewScreen() {
       type: 'ui/SHOW_SNACK',
       msg: ocr && !err ? 'OCR finished · text is searchable' : 'OCR finished · little or no text found',
     });
-  }, [dispatch, selectedPage, ocrRunning, state.settings.ocrScript]);
+  }, [dispatch, selectedPage, ocrRunning, ocrScript]);
 
   // Mirrors ReaderScreen's PDF-signing flow (SignatureCaptureModal -> SignaturePlacementOverlay),
   // but applied to the in-memory SessionPage directly, before the document is ever saved.
@@ -403,7 +406,7 @@ export function ReviewScreen() {
       try {
         const next = await getNext();
         if (!next) return;
-        const patch = await recomposeIdCard(selectedPage, next, state.settings.ocrScript);
+        const patch = await recomposeIdCard(selectedPage, next, ocrScript);
         dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch });
         dispatch({ type: 'ui/SHOW_SNACK', msg: doneMsg });
       } catch (error) {
@@ -413,7 +416,7 @@ export function ReviewScreen() {
         setIdCardBusy(false);
       }
     },
-    [dispatch, idCardBusy, selectedPage, state.settings.ocrScript]
+    [dispatch, idCardBusy, selectedPage, ocrScript]
   );
 
   const handleSwapIdSides = useCallback(() => {
@@ -426,10 +429,10 @@ export function ReviewScreen() {
     const card = selectedPage?.idCard;
     if (!card) return;
     void updateIdCard(async () => {
-      const back = await scanIdCardSide(state.settings.ocrScript);
+      const back = await scanIdCardSide(ocrScript);
       return back ? { front: card.front, back } : null;
     }, card.back ? 'Back replaced' : 'Back added');
-  }, [selectedPage, updateIdCard, state.settings.ocrScript]);
+  }, [selectedPage, updateIdCard, ocrScript]);
 
   // Book mode split this page out of a two-page spread; put the pair back together. The halves'
   // own files are no longer referenced afterwards, so they're deleted.

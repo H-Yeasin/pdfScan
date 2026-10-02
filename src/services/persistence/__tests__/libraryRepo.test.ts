@@ -157,6 +157,27 @@ describe('courses and semesters', () => {
     expect((await loadAll(await getDb())).courses[0].submitPreset).toEqual(preset);
   });
 
+  it("keeps a course's recognition script, and clearing it (migration v12)", async () => {
+    const before = { documents: [], semesters: [], timetable: [], courses: [courseIn('chem', 0)] };
+    await seed(before);
+    expect((await loadAll(await getDb())).courses[0].ocrScript).toBeUndefined();
+
+    const chinese = { ...before, courses: [{ ...before.courses[0], ocrScript: 'chinese' as const }] };
+    await syncLibrary(await getDb(), before, chinese);
+    expect((await loadAll(await getDb())).courses[0].ocrScript).toBe('chinese');
+
+    const cleared = { ...before, courses: [{ ...before.courses[0], ocrScript: undefined }] };
+    await syncLibrary(await getDb(), chinese, cleared);
+    expect((await loadAll(await getDb())).courses[0].ocrScript).toBeUndefined();
+  });
+
+  it('reads an unknown stored recognition script as the app default', async () => {
+    await seed({ documents: [], semesters: [], timetable: [], courses: [courseIn('chem', 0)] });
+    const db = await getDb();
+    await db.runAsync('UPDATE courses SET ocr_script = ?', ['klingon']);
+    expect((await loadAll(db)).courses[0].ocrScript).toBeUndefined();
+  });
+
   it('archiveSemester archives the semester and only its courses', async () => {
     await seed({
       semesters: [fall, spring], timetable: [],

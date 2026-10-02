@@ -1,27 +1,135 @@
-import type { OcrScript } from '../../types/models';
-
-// Every writing system the app knows about, in one place. Settings lists the 'ready' ones; adding a
-// script later means adding an entry here (plus its OCR engine/model), not touching screens.
-// The PDF text layer needs nothing per script: the glyphless font (pdf/textLayer.ts) carries any
-// BMP text.
+// Every writing system the app knows about, in one place. Settings lists the 'ready' ones (and the
+// 'planned' ones as "coming soon"), the course editor offers the 'ready' ones, and OCR looks the
+// model up here. Adding a script later means adding an entry here (plus its OCR engine/model), not
+// touching screens. The PDF text layer needs nothing per script: the glyphless font
+// (pdf/textLayer.ts) carries any BMP text.
+//
+// No imports from types/models.ts: that file re-exports OcrScript from here, so the dependency
+// only goes one way.
 export type ScriptStatus = 'ready' | 'planned';
+export type OcrEngineId = 'mlkit' | 'tesseract';
 
-export type ScriptEntry = {
-  id: OcrScript;
+type ScriptDefinition = {
+  id: string;
+  // English name, with the languages it covers when the script name alone wouldn't say.
   label: string;
-  // Which on-device recognizer model handles it (rn-mlkit-ocr's model names today).
-  ocrModel: OcrScript;
+  // The name in its own script, shown first so a student finds their language at a glance.
+  nativeName: string;
+  // Which on-device recognizer handles it, and that engine's model name (rn-mlkit-ocr's detector
+  // types for ML Kit; a traineddata name such as 'ben' for Tesseract).
+  engine: OcrEngineId;
+  model: string;
+  // 'planned' entries are shown as "coming soon" and never offered for OCR.
   status: ScriptStatus;
+  // A few words in the script, shown in Settings so the student can recognise it.
+  sampleText: string;
+  // Only 'ltr' is supported. The field exists so a future RTL script (Arabic, Urdu) has to be an
+  // explicit decision - its PDF text, OCR line order and UI all need work - not an accident.
+  direction: 'ltr';
 };
 
-export const SCRIPTS: ScriptEntry[] = [
-  { id: 'latin', label: 'English / Western (Latin)', ocrModel: 'latin', status: 'ready' },
-  { id: 'devanagari', label: 'Hindi · Marathi · Nepali (Devanagari)', ocrModel: 'devanagari', status: 'ready' },
-  { id: 'chinese', label: 'Chinese', ocrModel: 'chinese', status: 'ready' },
-  { id: 'japanese', label: 'Japanese', ocrModel: 'japanese', status: 'ready' },
-  { id: 'korean', label: 'Korean', ocrModel: 'korean', status: 'ready' },
-  // Bengali needs a second OCR engine (ML Kit has no Bengali model) - planned for §6:
-  // { id: 'bengali', label: 'Bangla (Bengali)', ocrModel: 'tesseract:ben', status: 'planned' },
-];
+export const SCRIPTS = [
+  {
+    id: 'latin',
+    label: 'English / Western (Latin)',
+    nativeName: 'English',
+    engine: 'mlkit',
+    model: 'latin',
+    status: 'ready',
+    sampleText: 'Aa Bb Éé Ññ',
+    direction: 'ltr',
+  },
+  {
+    id: 'devanagari',
+    label: 'Hindi · Marathi · Nepali (Devanagari)',
+    nativeName: 'हिन्दी',
+    engine: 'mlkit',
+    model: 'devanagari',
+    status: 'ready',
+    sampleText: 'देवनागरी लिपि',
+    direction: 'ltr',
+  },
+  {
+    id: 'chinese',
+    label: 'Chinese',
+    nativeName: '中文',
+    engine: 'mlkit',
+    model: 'chinese',
+    status: 'ready',
+    sampleText: '汉字 漢字',
+    direction: 'ltr',
+  },
+  {
+    id: 'japanese',
+    label: 'Japanese',
+    nativeName: '日本語',
+    engine: 'mlkit',
+    model: 'japanese',
+    status: 'ready',
+    sampleText: 'ひらがな カタカナ',
+    direction: 'ltr',
+  },
+  {
+    id: 'korean',
+    label: 'Korean',
+    nativeName: '한국어',
+    engine: 'mlkit',
+    model: 'korean',
+    status: 'ready',
+    sampleText: '한글',
+    direction: 'ltr',
+  },
+  // ML Kit has no Bengali model, so Bangla waits for the Tesseract engine (§6 L5) and its
+  // downloadable pack (L6). Until then it is listed, never offered.
+  {
+    id: 'bengali',
+    label: 'Bangla (Bengali)',
+    nativeName: 'বাংলা',
+    engine: 'tesseract',
+    model: 'ben',
+    status: 'planned',
+    sampleText: 'বাংলা লিপি',
+    direction: 'ltr',
+  },
+] as const satisfies readonly ScriptDefinition[];
 
-export const READY_SCRIPTS = SCRIPTS.filter((s) => s.status === 'ready');
+export type OcrScript = (typeof SCRIPTS)[number]['id'];
+export type ScriptEntry = ScriptDefinition & { id: OcrScript };
+
+// The app's default when nothing else applies (fresh install, or a stored value that is no longer
+// a ready script).
+export const DEFAULT_OCR_SCRIPT: OcrScript = 'latin';
+
+export const READY_SCRIPTS: readonly ScriptEntry[] = SCRIPTS.filter((s) => s.status === 'ready');
+export const PLANNED_SCRIPTS: readonly ScriptEntry[] = SCRIPTS.filter((s) => s.status === 'planned');
+
+export function getScript(id: string | null | undefined): ScriptEntry | undefined {
+  return SCRIPTS.find((s) => s.id === id);
+}
+
+// Narrows an untrusted value (a database column, stored settings) to a known script id. Planned
+// ids are kept: a course set to one by a newer build should still say so, and resolveOcrScript
+// won't use it until it is ready.
+export function parseOcrScript(value: unknown): OcrScript | undefined {
+  return typeof value === 'string' ? getScript(value)?.id : undefined;
+}
+
+export function isReadyScript(id: string | null | undefined): id is OcrScript {
+  return getScript(id)?.status === 'ready';
+}
+
+// The one place that decides which script a page is recognised with: the course's own choice if it
+// has one, otherwise the app setting, and never a script that isn't ready (a planned one, or one
+// a later build removed), falling back to the default. Everything that runs OCR for a scan or a
+// saved document calls this instead of reading settings.ocrScript.
+export function resolveOcrScript({
+  course,
+  settings,
+}: {
+  course?: { ocrScript?: OcrScript } | null;
+  settings: { ocrScript: OcrScript };
+}): OcrScript {
+  if (isReadyScript(course?.ocrScript)) return course.ocrScript;
+  if (isReadyScript(settings.ocrScript)) return settings.ocrScript;
+  return DEFAULT_OCR_SCRIPT;
+}

@@ -3,23 +3,37 @@ import { spacing, useTheme } from '../../theme';
 
 type LanguageRowProps = {
   name: string;
+  // The English label under the name, and a few words in the script so it can be recognised.
+  subtitle?: string;
+  sample?: string;
   selected: boolean;
-  onPress: () => void;
+  // A planned script: shown so students know it's coming, but not selectable.
+  comingSoon?: boolean;
+  onPress?: () => void;
 };
 
-export function LanguageRow({ name, selected, onPress }: LanguageRowProps) {
+export function LanguageRow({ name, subtitle, sample, selected, comingSoon, onPress }: LanguageRowProps) {
   const { tokens } = useTheme();
 
   return (
     <Pressable
       style={[styles.row, { borderBottomColor: tokens.edge }]}
-      onPress={onPress}
+      onPress={comingSoon ? undefined : onPress}
+      disabled={comingSoon}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled: comingSoon }}
+      accessibilityLabel={comingSoon ? `Coming soon: ${name}${subtitle ? ` (${subtitle})` : ''}` : undefined}
     >
-      <Text style={[styles.name, { color: tokens.ink }]}>{name}</Text>
+      <View style={styles.text}>
+        <Text style={[styles.name, { color: comingSoon ? tokens.muted : tokens.ink }]}>{name}</Text>
+        {subtitle || sample ? (
+          <Text style={[styles.subtitle, { color: tokens.muted }]} numberOfLines={1}>
+            {[subtitle, sample].filter(Boolean).join('  ·  ')}
+          </Text>
+        ) : null}
+      </View>
       <Text style={[styles.status, { color: selected ? tokens.accentInk : tokens.muted }]}>
-        {selected ? 'Active' : 'Select'}
+        {comingSoon ? 'Coming soon' : selected ? 'Active' : 'Select'}
       </Text>
     </Pressable>
   );
@@ -35,8 +49,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  text: {
+    flex: 1,
+  },
   name: {
     fontSize: 15.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
   status: {
     fontSize: 13,

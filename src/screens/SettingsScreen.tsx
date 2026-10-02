@@ -13,7 +13,7 @@ import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppState } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
-import { READY_SCRIPTS } from '../services/scripts/registry';
+import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 
 const THEME_SEGMENTS: { id: ThemePref; label: string }[] = [
   { id: 'system', label: 'System' },
@@ -67,20 +67,32 @@ export function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>OCR script</Text>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>Recognition language</Text>
           <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
             {READY_SCRIPTS.map((script) => (
               <LanguageRow
                 key={script.id}
-                name={script.label}
+                name={script.nativeName}
+                subtitle={script.label}
+                sample={script.sampleText}
                 selected={ocrScript === script.id}
                 onPress={() => dispatch({ type: 'settings/SET_OCR_SCRIPT', script: script.id })}
               />
             ))}
+            {PLANNED_SCRIPTS.map((script) => (
+              <LanguageRow
+                key={script.id}
+                name={script.nativeName}
+                subtitle={script.label}
+                selected={false}
+                comingSoon
+              />
+            ))}
           </View>
           <Text style={[styles.footnote, { color: tokens.muted }]}>
-            Recognition runs fully on-device. Pick the script that matches your document —
-            Devanagari covers Hindi, Marathi, Nepali and Sanskrit; Bengali script isn't supported yet.
+            Recognition runs fully on-device and makes your scans searchable. Pick the script your
+            documents are written in; a course can use its own (edit the course). Devanagari also
+            covers Sanskrit.
           </Text>
         </View>
 

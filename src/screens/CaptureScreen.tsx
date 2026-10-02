@@ -11,6 +11,7 @@ import { TabBar } from '../components/shared/TabBar';
 import { useRouter } from '../navigation/router';
 import { ingestGalleryBatch } from '../services/capture/ingestBatch';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
+import { resolveOcrScript } from '../services/scripts/registry';
 import { useAppState } from '../store/AppStateContext';
 import { captureSpecFor } from '../store/slices/settingsSlice';
 import { useFilingCourse } from '../store/useFilingCourse';
@@ -24,12 +25,14 @@ export function CaptureScreen() {
   const { go } = useRouter();
   const { state, dispatch } = useAppState();
   const { pages, processingStatus, mode, scannerRequested } = state.capture;
-  const { ocrScript, loaded: settingsLoaded, firstRun, lastCaptureMode, scannerUnavailable } = state.settings;
+  const { loaded: settingsLoaded, firstRun, lastCaptureMode, scannerUnavailable } = state.settings;
   const busyScanning = processingStatus === 'scanning' || processingStatus === 'processing';
   const spec = useMemo(() => captureSpecFor(state.settings, mode), [state.settings, mode]);
   // "Saving to" chip (K5): where this scan will be filed, so it can be changed before scanning.
   const { courseId: filingCourseId } = useFilingCourse();
   const filingCourse = state.library.courses.find((c) => c.id === filingCourseId);
+  // §6 L1: the filing course's recognition script, else the app setting.
+  const ocrScript = resolveOcrScript({ course: filingCourse, settings: state.settings });
   const hasCourses = state.library.courses.some((c) => !c.archived);
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const restoredMode = useRef(false);

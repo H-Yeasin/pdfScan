@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { COURSE_EMOJIS, defaultSemester, findSemesterByName, hasErrors, validateCourseDraft } from '../../services/courses/courseSetup';
 import { COURSE_COLORS, courseColorValue, nextCourseColor } from '../../services/courses/palette';
+import { READY_SCRIPTS, getScript, resolveOcrScript } from '../../services/scripts/registry';
 import { useAppState } from '../../store/AppStateContext';
 import { radii, spacing, useTheme } from '../../theme';
-import type { Course, CourseColor } from '../../types/models';
+import type { Course, CourseColor, OcrScript } from '../../types/models';
 import { createId } from '../../utils/id';
 import { CourseBadge } from './CourseBadge';
 import { CourseSheet, SheetField, sheetInputStyle } from './CourseSheet';
@@ -36,9 +37,14 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
   const [color, setColor] = useState<CourseColor>(COURSE_COLORS[0]);
   const [semester, setSemester] = useState<SemesterChoice>({ kind: 'none' });
   const [archived, setArchived] = useState(false);
+  // §6 L1: undefined = the app setting (Settings → Recognition language).
+  const [ocrScript, setOcrScript] = useState<OcrScript | undefined>();
   const [attempted, setAttempted] = useState(false);
   const [classTimesOpen, setClassTimesOpen] = useState(false);
   const classTimes = course ? state.library.timetable.filter((s) => s.courseId === course.id) : [];
+
+  // What "App default" currently means, so the chip can say it.
+  const appDefaultScript = getScript(resolveOcrScript({ settings: state.settings }))!;
 
   const todayTerm = useMemo(() => defaultSemester(new Date()), []);
   const todaySemester = findSemesterByName(semesters, todayTerm.name);
@@ -53,6 +59,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
     setEmoji(course?.emoji);
     setColor(course?.color ?? nextCourseColor(courses));
     setArchived(course?.archived ?? false);
+    setOcrScript(course?.ocrScript);
     setAttempted(false);
     if (course) {
       setSemester(course.semesterId ? { kind: 'existing', id: course.semesterId } : { kind: 'none' });
@@ -92,6 +99,7 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
       color,
       semesterId: targetSemesterId,
       archived,
+      ocrScript,
     };
     let id = course?.id;
     if (id) {
@@ -218,6 +226,32 @@ export function CourseEditorSheet({ visible, course, onClose, onSaved }: CourseE
             </Pressable>
           ) : null}
         </View>
+      </SheetField>
+
+      <SheetField label="Recognition language">
+        <View style={styles.wrap}>
+          <Pressable
+            style={chip(ocrScript === undefined)}
+            onPress={() => setOcrScript(undefined)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: ocrScript === undefined }}
+          >
+            <Text style={[styles.chipLabel, { color: tokens.ink }]}>App default ({appDefaultScript.nativeName})</Text>
+          </Pressable>
+          {READY_SCRIPTS.map((script) => (
+            <Pressable
+              key={script.id}
+              style={chip(ocrScript === script.id)}
+              onPress={() => setOcrScript(script.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: ocrScript === script.id }}
+              accessibilityLabel={script.label}
+            >
+              <Text style={[styles.chipLabel, { color: tokens.ink }]}>{script.nativeName}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={[styles.hint, { color: tokens.muted }]}>The script this course's scans are written in, so they can be searched.</Text>
       </SheetField>
 
       {course ? (

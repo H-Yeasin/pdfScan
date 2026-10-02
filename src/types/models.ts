@@ -1,3 +1,4 @@
+import type { OcrScript } from '../services/scripts/registry';
 import type { SubmitPreset } from '../services/submit/preset';
 
 // Session-only filter IDs (the library stores baked pixels, so these can change freely). Each one
@@ -12,7 +13,8 @@ export type DocFormat = 'PDF' | 'JPG' | 'DOCX' | 'DOC' | 'XLSX' | 'XLS' | 'CSV' 
 // Mirrors rn-mlkit-ocr's OcrResult shape (block -> line), kept close to the native
 // return value rather than flattened, so bounding-box data survives for a future
 // in-image "Find" highlight feature.
-export type OcrScript = 'latin' | 'chinese' | 'devanagari' | 'japanese' | 'korean';
+// Derived from the script registry (§6 L1); re-exported here so existing imports keep working.
+export type { OcrScript } from '../services/scripts/registry';
 export type OcrBounding = { left: number; top: number; width: number; height: number };
 // One recognised word (ML Kit "element"), in master pixels. §5 T1: kept for word-level
 // selection and highlights; pages OCR'd before T1 have none (features fall back to the line).
@@ -201,6 +203,10 @@ export type Course = {
   // How work for this course is submitted (§4 S6); set by the first submit. Undefined: the app
   // default (submit/preset.defaultSubmitPreset).
   submitPreset?: SubmitPreset;
+  // §6 L1: the script this course's pages are recognised with (a Bangla literature course and an
+  // English physics course need different models). Undefined: the app setting. Always read
+  // through scripts/registry.resolveOcrScript.
+  ocrScript?: OcrScript;
 };
 
 export type CourseColor =

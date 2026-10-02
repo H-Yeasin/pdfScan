@@ -5,6 +5,7 @@ import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, View } fr
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { runOcr } from '../../services/ocr/ocrService';
+import { resolveOcrScript } from '../../services/scripts/registry';
 import { masterToLayer } from '../../services/study/canvasMath';
 import { readingOrderTokens, selectBetween, selectionText, tokenAt, type TextToken } from '../../services/study/textSelection';
 import { useAppState } from '../../store/AppStateContext';
@@ -71,7 +72,9 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
     if (!page) return;
     setRerunning(true);
     try {
-      const ocr = await runOcr(page.fileUri, state.settings.ocrScript);
+      // §6 L1: the document's course decides the script, like it did when the page was scanned.
+      const course = state.library.courses.find((c) => c.id === doc.courseId);
+      const ocr = await runOcr(page.fileUri, resolveOcrScript({ course, settings: state.settings }));
       const pages = doc.pages.map((p, i) => (i === pageIdx ? { ...p, ocr, ocrFailed: ocr === undefined || undefined } : p));
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: { pages } });
       if (!ocr?.text.trim()) dispatch({ type: 'ui/SHOW_SNACK', msg: 'Still no text found on this page' });

@@ -42,6 +42,7 @@ import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/su
 import { useAppState } from '../store/AppStateContext';
 import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
 import { useFilingCourse } from '../store/useFilingCourse';
+import { resolveOcrScript } from '../services/scripts/registry';
 import { fontFamily, spacing, typeScale, useTheme } from '../theme';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
 import { formatBytes } from '../utils/format';
@@ -90,7 +91,7 @@ export function DeliverScreen() {
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel, ocrScript, profile, profilePrompted } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, profile, profilePrompted } = state.settings;
   const { presetCourseId, rememberPreset } = state.deliver;
   // The course's own file-name template, if its preset has one, else the Settings one.
   const nameTemplate = state.deliver.nameTemplate ?? state.settings.nameTemplate;
@@ -105,6 +106,8 @@ export function DeliverScreen() {
   // (Unsorted and courses without one get the default), and while "Remember" is on every change
   // to them is saved back to the course, so the next scan for it is already set up.
   const course = useMemo(() => courses.find((c) => c.id === courseId), [courses, courseId]);
+  // §6 L1: the final OCR uses the filing course's script, else the app setting.
+  const ocrScript = resolveOcrScript({ course, settings: state.settings });
   const coursePreset = useMemo(() => course?.submitPreset ?? defaultSubmitPreset(courseId), [course, courseId]);
   useEffect(() => {
     if (presetCourseId === courseId) return;
