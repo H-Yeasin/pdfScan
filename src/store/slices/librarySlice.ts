@@ -122,7 +122,8 @@ export type LibraryAction =
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_DOC_TYPE'; ids: string[]; docType: DocType }
   | { type: 'library/SET_ACTIVE_COURSE'; id: string | null }
-  | { type: 'library/SET_INDEXING'; progress: IndexingProgress | null };
+  | { type: 'library/SET_INDEXING'; progress: IndexingProgress | null }
+  | { type: 'library/SET_LAST_PAGE'; id: string; page: number };
 
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
 // creation time.
@@ -164,6 +165,13 @@ function followPages<T extends { documentId: string; pageId: string }>(
 
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
+    // §7 R4: where the Reader is in a document. The pages array is kept as it is, so saving it
+    // writes only the document row (libraryRepo.syncLibrary).
+    case 'library/SET_LAST_PAGE':
+      return {
+        ...state,
+        files: state.files.map((f) => (f.id === action.id && f.lastPage !== action.page ? { ...f, lastPage: action.page } : f)),
+      };
     case 'library/SET_INDEXING':
       return { ...state, indexing: action.progress };
     case 'library/SET_LOAD_STATUS':

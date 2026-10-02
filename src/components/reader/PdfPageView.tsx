@@ -53,12 +53,22 @@ export const PdfPageView = forwardRef<PdfPageViewHandle, PdfPageViewProps>(funct
         onLoadComplete={(numberOfPages) => onLoad(numberOfPages)}
         onPageChanged={(page, numberOfPages) => onPageChanged(page, numberOfPages)}
         onPageSingleTap={(page) => onTap?.(page)}
-        onError={(error) => onError(typeof error === 'string' ? error : JSON.stringify(error))}
+        onError={(error) => onError(errorMessage(error))}
       />
       {night && <View pointerEvents="none" style={styles.nightOverlay} />}
     </View>
   );
 });
+
+// pdf-jsi hands onError an Error built from the native message (index.js _onChange), and
+// JSON.stringify of an Error is "{}" - so the message is read directly (§7 R4 tells a password
+// from a damaged file by it).
+function errorMessage(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === 'string' ? message : JSON.stringify(error);
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

@@ -350,6 +350,7 @@ export const en = {
     notFound: 'Document not found.',
     preparingPreview: 'Preparing preview…',
     passwordTitle: "Couldn't open this PDF. It may be password protected.",
+    passwordNeeded: 'This PDF needs a password.',
     password: 'Password',
     unlock: 'Unlock',
     changeType: 'Change type',
@@ -367,6 +368,17 @@ export const en = {
     loading: 'Loading…',
     firstColumns: 'Showing the first {count} columns.',
     tooLargeToPreview: 'File too large to preview',
+    // §7 R4.
+    pageIndicator: '{page} / {count}',
+    jumpTitle: 'Go to page',
+    jumpPlaceholder: '1–{count}',
+    go: 'Go',
+    noSuchPage: 'Type a page from 1 to {count}',
+    pages: 'Pages',
+    pageA11y: 'Page {page} of {count}. Tap to go to a page.',
+    cantOpen: "Can't open this file",
+    cantOpenBody: 'It may be damaged, or not really a PDF.',
+    wrongPassword: "That password didn't work.",
     // §7 R3.
     edit: {
       title: 'Edit pages',

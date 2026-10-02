@@ -13,6 +13,8 @@ import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
+import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
+import { classifyPdfError, parseJumpInput, resumePage } from '../services/documents/readerPosition';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
@@ -47,6 +49,8 @@ import { spacing, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 
 const SEARCH_DEBOUNCE_MS = 200;
+// §7 R4: how long the page must stay on screen before it's saved as "where I left off".
+const LAST_PAGE_SAVE_MS = 800;
 
 export function ReaderScreen() {
   const { tokens } = useTheme();
@@ -82,6 +86,14 @@ export function ReaderScreen() {
   const [password, setPassword] = useState<string | undefined>(undefined);
   const [passwordDraft, setPasswordDraft] = useState('');
   const [needsPassword, setNeedsPassword] = useState(false);
+  // §7 R4: how the last load failed. 'password': the prompt says a password is needed (and, after
+  // a try, that it didn't work); 'damaged': no password can help - "Can't open this file".
+  const [loadProblem, setLoadProblem] = useState<'password' | 'wrongPassword' | 'unknown' | 'damaged' | null>(null);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const [scrubberOpen, setScrubberOpen] = useState(false);
+  // §7 R4: the saved page has been jumped to (or there was none); until then, page changes
+  // (the viewer starting on page 1) aren't saved over it.
+  const restored = useRef(false);
   const [reloadKey, setReloadKey] = useState(0);
   // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it.
   const editPages = useEditPages(
@@ -156,9 +168,39 @@ export function ReaderScreen() {
     setPassword(undefined);
     setPasswordDraft('');
     setNeedsPassword(false);
+    setLoadProblem(null);
     setReloadKey(0);
     setTargetPage(null);
+    restored.current = false;
   }, [contentKey]);
+
+  // §7 R4: resume where the student left off, once the PDF has loaded - unless a search hit or a
+  // bookmark is being opened (the effect below handles that; it runs after this one, so the
+  // target is still set here).
+  useEffect(() => {
+    if (pageCount === 0 || restored.current) return;
+    restored.current = true;
+    const page = doc && !external ? resumePage(doc.lastPage, pageCount, !!state.reader.target) : null;
+    if (page) pdfRef.current?.goToPage(page);
+  }, [pageCount, doc, external, state.reader.target]);
+
+  // Saves the page on screen (debounced: flicking through pages writes once), and on leaving.
+  const lastSeenPage = useRef<number | null>(null);
+  const docId = !external ? doc?.id : undefined;
+  useEffect(() => {
+    if (!docId || pageCount === 0 || !restored.current) return;
+    const page = activeIndex + 1;
+    lastSeenPage.current = page;
+    const timer = setTimeout(() => dispatch({ type: 'library/SET_LAST_PAGE', id: docId, page }), LAST_PAGE_SAVE_MS);
+    return () => clearTimeout(timer);
+  }, [docId, activeIndex, pageCount, dispatch]);
+  useEffect(
+    () => () => {
+      if (docId && lastSeenPage.current) dispatch({ type: 'library/SET_LAST_PAGE', id: docId, page: lastSeenPage.current });
+      lastSeenPage.current = null;
+    },
+    [docId, dispatch]
+  );
 
   // A page search result: once the PDF has loaded, jump to that library page's PDF page and
   // highlight the query there.
@@ -206,6 +248,7 @@ export function ReaderScreen() {
   const handleLoad = useCallback((count: number) => {
     setPageCount(count);
     setNeedsPassword(false);
+    setLoadProblem(null);
   }, []);
 
   const handlePageChanged = useCallback((page: number, count: number) => {
@@ -215,12 +258,23 @@ export function ReaderScreen() {
 
   const handleTap = useCallback(() => setChrome((v) => !v), []);
 
-  const handlePdfError = useCallback(() => {
-    // This package's onError is an opaque `object` with no confirmed error-code shape for the
-    // installed version, so a password prompt is the best-effort default for any load failure
-    // rather than only ones confirmed to be password-related.
-    setNeedsPassword(true);
-  }, []);
+  // §7 R4: pdf-jsi says when a password is missing or wrong (readerPosition.classifyPdfError);
+  // any other failure is a file no password will open. With no message to go by, the prompt is
+  // offered as before, and a failure after a password was tried is taken as a damaged file.
+  const handlePdfError = useCallback(
+    (message: string) => {
+      const kind = classifyPdfError(message);
+      const tried = password !== undefined;
+      if (kind === 'damaged' || (kind === 'unknown' && tried)) {
+        setNeedsPassword(false);
+        setLoadProblem('damaged');
+        return;
+      }
+      setLoadProblem(kind === 'password' ? (tried ? 'wrongPassword' : 'password') : 'unknown');
+      setNeedsPassword(true);
+    },
+    [password]
+  );
 
   const handleSubmitPassword = useCallback(() => {
     setPassword(passwordDraft);
@@ -439,12 +493,29 @@ export function ReaderScreen() {
         </View>
       ) : null}
 
+      {loadProblem === 'damaged' && (
+        <View style={styles.passwordOverlay} pointerEvents="box-none">
+          <View style={[styles.passwordCard, { backgroundColor: tokens.surface }]}>
+            <Text style={[styles.passwordTitle, { color: tokens.ink }]}>{t('reader.cantOpen')}</Text>
+            <Text style={{ color: tokens.muted }}>{t('reader.cantOpenBody')}</Text>
+            <View style={styles.passwordActions}>
+              <Pressable onPress={() => go(hub, 'back')}>
+                <Text style={{ color: tokens.accent, fontWeight: '600' }}>{t('common.back')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
       {needsPassword && (
         <View style={styles.passwordOverlay} pointerEvents="box-none">
           <View style={[styles.passwordCard, { backgroundColor: tokens.surface }]}>
             <Text style={[styles.passwordTitle, { color: tokens.ink }]}>
-              {t('reader.passwordTitle')}
+              {loadProblem === 'password' || loadProblem === 'wrongPassword' ? t('reader.passwordNeeded') : t('reader.passwordTitle')}
             </Text>
+            {loadProblem === 'wrongPassword' ? (
+              <Text style={{ color: tokens.danger }}>{t('reader.wrongPassword')}</Text>
+            ) : null}
             <TextInput
               style={[styles.passwordInput, { color: tokens.ink, borderColor: tokens.edge }]}
               placeholder={t('reader.password')}
@@ -497,7 +568,39 @@ export function ReaderScreen() {
         showFind={!!format && canFindInDoc(format)}
         onNight={() => dispatch({ type: 'reader/TOGGLE_NIGHT' })}
         nightOn={night}
+        onJump={isPageRaster ? () => setJumpOpen(true) : undefined}
+        onPages={doc && !external && isPageRaster && doc.pages.length > 1 ? () => setScrubberOpen(true) : undefined}
       />
+
+      {/* §7 R4: any page two taps away - type its number, or pick its thumbnail. */}
+      <TextPromptModal
+        visible={jumpOpen}
+        title={t('reader.jumpTitle')}
+        placeholder={t('reader.jumpPlaceholder', { count: pageCount })}
+        submitLabel={t('reader.go')}
+        keyboardType="number-pad"
+        onCancel={() => setJumpOpen(false)}
+        onSubmit={(value) => {
+          const page = parseJumpInput(value, pageCount);
+          // The snack would sit under the prompt, so the prompt closes either way.
+          setJumpOpen(false);
+          if (page === null) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noSuchPage', { count: pageCount }) });
+          else pdfRef.current?.goToPage(page);
+        }}
+      />
+
+      {doc && !external ? (
+        <PageScrubberSheet
+          visible={scrubberOpen}
+          pages={doc.pages}
+          currentIdx={currentIdx}
+          onPick={(idx) => {
+            setScrubberOpen(false);
+            pdfRef.current?.goToPage(pdfPageFor(doc, idx).page);
+          }}
+          onClose={() => setScrubberOpen(false)}
+        />
+      ) : null}
 
       <ReaderActionBar
         visible={chromeVisible}

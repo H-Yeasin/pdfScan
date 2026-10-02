@@ -188,6 +188,9 @@ export type LibraryDocument = {
   // up, resuming after the pages that already have a thumbnail.
   indexedAt?: number;
   indexState?: IndexState;
+  // §7 R4: the PDF page (1-based) the Reader was last on, so reopening resumes there. Undefined:
+  // never read (opens at page 1).
+  lastPage?: number;
 };
 
 // A file opened from outside the library (OS "Open with", share-to-app, or the in-app picker) —

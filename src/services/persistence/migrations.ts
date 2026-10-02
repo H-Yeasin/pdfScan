@@ -275,6 +275,13 @@ export const MIGRATIONS: Migration[] = [
       await db.execAsync('ALTER TABLE pages ADD COLUMN rotation INTEGER NOT NULL DEFAULT 0;');
     },
   },
+  {
+    // v15 (§7 R4): the PDF page (1-based) a document was last read at. NULL: never read.
+    version: 15,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE documents ADD COLUMN last_page INTEGER;');
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

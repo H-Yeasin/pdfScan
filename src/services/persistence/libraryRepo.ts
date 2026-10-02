@@ -46,6 +46,7 @@ type DocumentRow = {
   pdf_page_size: string | null;
   indexed_at: number | null;
   index_state: string | null;
+  last_page: number | null;
 };
 
 type PageRow = {
@@ -259,6 +260,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       pdfPageSize: row.pdf_page_size === 'Letter' || row.pdf_page_size === 'A4' ? row.pdf_page_size : undefined,
       indexedAt: row.indexed_at ?? undefined,
       indexState: INDEX_STATES.includes(row.index_state as IndexState) ? (row.index_state as IndexState) : undefined,
+      lastPage: row.last_page && row.last_page > 0 ? row.last_page : undefined,
     };
   });
 
@@ -423,7 +425,15 @@ export async function listSubmissions(
 // Writes one document and replaces its pages. Pages are deleted and re-inserted (rather than
 // INSERT OR REPLACE) because REPLACE's implicit delete doesn't fire the FTS delete trigger, which
 // would leave stale rows in pages_fts. Must run inside a transaction.
-async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict: 'upsert' | 'ignore'): Promise<void> {
+// `pagesUnchanged`: the caller knows the pages are the ones already stored (the reducer kept the
+// same array), so only the document row is written - a rename, a star, or the Reader saving the
+// page it's on (§7 R4) mustn't rewrite every page row.
+async function writeDocument(
+  db: SQLiteDatabase,
+  doc: LibraryDocument,
+  conflict: 'upsert' | 'ignore',
+  pagesUnchanged = false
+): Promise<void> {
   const params = [
     doc.id,
     doc.name,
@@ -446,11 +456,12 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
     doc.pdfPageSize ?? null,
     doc.indexedAt ?? null,
     doc.indexState ?? null,
+    doc.lastPage ?? null,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
        updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size,
-       indexed_at, index_state)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       indexed_at, index_state, last_page)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -462,9 +473,10 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
          tag = excluded.tag, locked = excluded.locked, cover_kind = excluded.cover_kind,
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
          archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size,
-         indexed_at = excluded.indexed_at, index_state = excluded.index_state`,
+         indexed_at = excluded.indexed_at, index_state = excluded.index_state, last_page = excluded.last_page`,
       params
     );
+    if (pagesUnchanged) return;
     await db.runAsync('DELETE FROM pages WHERE document_id = ?', [doc.id]);
   }
 
@@ -656,7 +668,8 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
     await deleteRows(db, 'documents', documents.removedIds);
     for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
-    for (const doc of documents.changed) await writeDocument(db, doc, 'upsert');
+    const prevDocs = new Map(prev.documents.map((d) => [d.id, d]));
+    for (const doc of documents.changed) await writeDocument(db, doc, 'upsert', prevDocs.get(doc.id)?.pages === doc.pages);
     for (const slot of slots.changed) await writeSlot(db, slot);
     // After documents and courses, which they reference.
     for (const submission of submissions.changed) await writeSubmission(db, submission);

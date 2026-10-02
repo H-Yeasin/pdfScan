@@ -13,6 +13,9 @@ type ReaderBottomChromeProps = {
   showFind?: boolean;
   onNight: () => void;
   nightOn: boolean;
+  // §7 R4: tap the "12 / 40" indicator to type a page; the Pages button opens the thumbnails.
+  onJump?: () => void;
+  onPages?: () => void;
 };
 
 // Approximate rendered height of ReaderActionBar's content (paddingTop + item row), so this
@@ -29,6 +32,8 @@ export function ReaderBottomChrome({
   showFind = true,
   onNight,
   nightOn,
+  onJump,
+  onPages,
 }: ReaderBottomChromeProps) {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -48,16 +53,29 @@ export function ReaderBottomChrome({
       ]}
       pointerEvents="box-none"
     >
-      <View style={styles.dots}>
-        {Array.from({ length: Math.min(pageCount, 8) }).map((_, i) => (
-          <View
-            key={i}
-            style={[styles.dot, { backgroundColor: i === activeIndex ? tokens.accent : tokens.edge }]}
-          />
-        ))}
-      </View>
+      {pageCount > 0 ? (
+        <Pressable
+          style={styles.indicator}
+          onPress={onJump}
+          disabled={!onJump}
+          accessibilityRole="button"
+          accessibilityLabel={t('reader.pageA11y', { page: activeIndex + 1, count: pageCount })}
+        >
+          <Text style={[styles.indicatorText, { color: tokens.ink }]}>
+            {t('reader.pageIndicator', { page: activeIndex + 1, count: pageCount })}
+          </Text>
+        </Pressable>
+      ) : (
+        <View />
+      )}
 
       <View style={styles.actions}>
+        {onPages ? (
+          <Pressable style={styles.actionButton} onPress={onPages}>
+            <Ionicons name="albums-outline" size={17} color={tokens.ink} />
+            <Text style={[styles.actionLabel, { color: tokens.ink }]}>{t('reader.pages')}</Text>
+          </Pressable>
+        ) : null}
         {showFind && (
           <Pressable style={styles.actionButton} onPress={onFind}>
             <Ionicons name="search" size={17} color={findOpen ? tokens.accent : tokens.ink} />
@@ -86,15 +104,15 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  dots: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: spacing.sm,
+  indicator: {
+    height: 40,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
   },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+  indicatorText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   actions: {
     flexDirection: 'row',
