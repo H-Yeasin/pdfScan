@@ -267,6 +267,14 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v14 (§7 R3): a page's clockwise turn after saving (0/90/180/270), applied as the PDF page's
+    // /Rotate - the master is never re-encoded.
+    version: 14,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE pages ADD COLUMN rotation INTEGER NOT NULL DEFAULT 0;');
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

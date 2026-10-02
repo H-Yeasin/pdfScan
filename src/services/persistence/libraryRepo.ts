@@ -8,6 +8,7 @@ import type {
   DocType,
   CaptureMode,
   IndexState,
+  PageRotation,
   LibraryDocument,
   LibraryPage,
   PageOcr,
@@ -61,6 +62,7 @@ type PageRow = {
   ocr_failed: number;
   layout: string | null;
   text_source: string | null;
+  rotation: number;
 };
 
 type CourseRow = {
@@ -172,7 +174,13 @@ function rowToPage(row: PageRow): LibraryPage {
     ocrFailed: row.ocr_failed ? true : undefined,
     layout: row.layout === 'fullPage' ? 'fullPage' : undefined,
     textSource: row.text_source === 'pdf' || row.text_source === 'ocr' ? row.text_source : undefined,
+    rotation: toRotation(row.rotation),
   };
+}
+
+// 0 (or anything that isn't a quarter turn) reads as undefined, like every page saved before R3.
+function toRotation(value: number): PageRotation | undefined {
+  return value === 90 || value === 180 || value === 270 ? value : undefined;
 }
 
 const INDEX_STATES: readonly IndexState[] = ['done', 'partial', 'encrypted', 'failed'];
@@ -462,8 +470,8 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
 
   const pageStmt = await db.prepareAsync(
     `INSERT INTO pages (id, document_id, idx, master_path, display_path, thumb_path, width, height, ocr_text,
-       ocr_json, ocr_failed, layout, text_source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ocr_json, ocr_failed, layout, text_source, rotation)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   try {
     for (let i = 0; i < doc.pages.length; i++) {
@@ -482,6 +490,7 @@ async function writeDocument(db: SQLiteDatabase, doc: LibraryDocument, conflict:
         page.ocrFailed ? 1 : 0,
         page.layout ?? null,
         page.textSource ?? null,
+        page.rotation ?? 0,
       ]);
     }
   } finally {

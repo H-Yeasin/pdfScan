@@ -1,11 +1,12 @@
 import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues; also imported at the app entrypoint, but kept here too so this module is safe even if ever imported outside that graph (e.g. a future test file)
 import { File } from 'expo-file-system';
-import { PDFDocument, PageSizes, rgb, type PDFFont, type PDFPage, type PDFRef } from 'pdf-lib';
+import { PDFDocument, PageSizes, degrees, rgb, type PDFFont, type PDFPage, type PDFRef } from 'pdf-lib';
 import { renderPage } from '../enhance/skiaEnhance';
 import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { fitBox, type BoxFit } from '../../utils/fitBox';
-import type { LibraryDocument, PageLayout, PageOcr } from '../../types/models';
+import type { LibraryDocument, LibraryPage, PageLayout, PageOcr, PageRotation } from '../../types/models';
+import { boxMatrix, shownSpace, turnedSize, withMatrix } from './rotation';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
 import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
 import { createTextDrawer, type TextDrawer } from './visibleText';
@@ -77,7 +78,15 @@ export type PdfSourcePage = {
   height: number;
   ocr?: PageOcr;
   layout?: PageLayout;
+  // §7 R3: the page's turn after saving. Standard pages get it as /Rotate; a 2-in-1 column draws
+  // the image turned (rotation.ts). Never re-encoded either way.
+  rotation?: PageRotation;
 };
+
+// A library page as a build source: its master and everything that goes with it.
+export function toSourcePage(p: LibraryPage): PdfSourcePage {
+  return { uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout, rotation: p.rotation };
+}
 
 // The box a standard-layout page image is fit into: the margin box, or for a 'fullPage' image (an
 // A4 canvas at a fixed dpi, e.g. an ID card page) an A4-sized box centred on the sheet, so it
@@ -93,7 +102,11 @@ function contentBox(layout: PageLayout | undefined, page: PageDims): { x: number
 // paper; a 2-in-1 sheet is that paper turned landscape. The builder draws with this and
 // documents/pageMap.ts maps OCR boxes with it, so the two can't drift apart.
 export type PageSlot = 'full' | 'left' | 'right';
-export function imagePlacement(width: number, height: number, slot: PageSlot, pageDims: PageDims, layout?: PageLayout): BoxFit {
+// `rotation` matters only for a 2-in-1 column: the turned image is fit into it (the returned box
+// is the turned image's; its scale is pixels → points either way). A standard page is placed
+// unturned - its /Rotate turns the whole sheet.
+export function imagePlacement(width: number, height: number, slot: PageSlot, pageDims: PageDims, layout?: PageLayout, rotation?: PageRotation): BoxFit {
+  if (slot !== 'full') ({ width, height } = turnedSize(width, height, rotation));
   if (slot === 'full') {
     const box = contentBox(layout, pageDims);
     return fitBox(width, height, box.x, box.y, box.width, box.height);
@@ -267,7 +280,31 @@ export function fillPageNumbers(text: string, pageNumber: number, totalPages: nu
 // "Page X of Y" count entirely). Takes this call's own pageWidthPt/pageHeightPt rather than a
 // fixed size, matching the existing per-page-variable-size architecture. Header and footer text
 // can be in any script (§6 L3, visibleText.ts).
+// §7 R3: on a page with /Rotate it draws in the page as shown (shownSpace), so the footer stays
+// along the bottom edge the reader sees; pageWidthPt/pageHeightPt are then ignored (as they are
+// for a media box that doesn't start at 0,0).
 async function stampAcademicPage(
+  pdfPage: PDFPage,
+  pageWidthPt: number,
+  pageHeightPt: number,
+  text: TextDrawer,
+  config: AcademicConfig,
+  contentPageNumber: number,
+  totalContentPages: number
+): Promise<void> {
+  const mediaBox = pdfPage.getMediaBox();
+  // An imported PDF's page may also have a media box that doesn't start at 0,0 (shownSpace allows for it).
+  if (pdfPage.getRotation().angle % 360 !== 0 || mediaBox.x !== 0 || mediaBox.y !== 0) {
+    const shown = shownSpace(pdfPage);
+    await withMatrix(pdfPage, shown.matrix, () =>
+      drawAcademicStamps(pdfPage, shown.width, shown.height, text, config, contentPageNumber, totalContentPages)
+    );
+    return;
+  }
+  await drawAcademicStamps(pdfPage, pageWidthPt, pageHeightPt, text, config, contentPageNumber, totalContentPages);
+}
+
+async function drawAcademicStamps(
   pdfPage: PDFPage,
   pageWidthPt: number,
   pageHeightPt: number,
@@ -340,6 +377,8 @@ async function buildStandardContentPages(
     if (page.ocr && page.ocr.blocks.length > 0) {
       drawOcrTextLayer(pdfPage, ocrFont, page.ocr, { origin: placement.origin, heightPt: placement.height, scale: placement.scale });
     }
+    // §7 R3: the whole sheet turns; image, text layer and annotations stay in its own space.
+    if (page.rotation) pdfPage.setRotation(degrees(page.rotation));
 
     // Cover page (if any) is intentionally excluded from this stamping and from the X/Y count -
     // it's not part of `pages`, and this block only ever runs for entries of that array.
@@ -364,18 +403,18 @@ async function drawTwoUpColumn(
   pageDims: PageDims
 ): Promise<void> {
   const image = await embedPageImage(pdfDoc, page.uri, encoding);
-  const placement = imagePlacement(page.width, page.height, slot, pageDims);
+  const placement = imagePlacement(page.width, page.height, slot, pageDims, undefined, page.rotation);
+  // §7 R3: a column can't have its own /Rotate, so a turned page is drawn turned: unturned at
+  // (0, 0) under a matrix that puts it into the column's box.
+  const box = { x: placement.origin.x, y: placement.origin.y, width: placement.width, height: placement.height };
+  const local = turnedSize(box.width, box.height, page.rotation);
 
-  pdfPage.drawImage(image, {
-    x: placement.origin.x,
-    y: placement.origin.y,
-    width: placement.width,
-    height: placement.height,
+  await withMatrix(pdfPage, boxMatrix(box, page.rotation), () => {
+    pdfPage.drawImage(image, { x: 0, y: 0, width: local.width, height: local.height });
+    if (page.ocr && page.ocr.blocks.length > 0) {
+      drawOcrTextLayer(pdfPage, ocrFont, page.ocr, { origin: { x: 0, y: 0 }, heightPt: local.height, scale: placement.scale });
+    }
   });
-
-  if (page.ocr && page.ocr.blocks.length > 0) {
-    drawOcrTextLayer(pdfPage, ocrFont, page.ocr, { origin: placement.origin, heightPt: placement.height, scale: placement.scale });
-  }
 }
 
 // 2-in-1 ("Eco-Save") layout: two source pages per landscape sheet, side-by-side. Sheets are
@@ -585,7 +624,7 @@ export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDo
   if (doc.pdfUri) return doc;
   const result = await buildPdfFromPages(
     doc.id,
-    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
+    doc.pages.map(toSourcePage),
     'as-is'
   );
   return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes, pdfLayout: 'standard', pdfPageSize: 'A4' };

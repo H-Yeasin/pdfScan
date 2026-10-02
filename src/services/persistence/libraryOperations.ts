@@ -1,5 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { applySignatureToPdf, buildPdfFromPages, encodingForQuality, pageSizeOfPdf } from '../pdf/pdfService';
+import { applySignatureToPdf, buildPdfFromPages, encodingForQuality, pageSizeOfPdf, toSourcePage } from '../pdf/pdfService';
 import { mergePdfs, splitPdf, stampImage } from '../pdf/pdfOps';
 import { buildRasterPdf } from '../pdf/rasterPdf';
 import { isPdfLevel } from '../documents/formatCapabilities';
@@ -27,29 +27,43 @@ function copyIfPresent(uri: string | undefined, dest: File): string | undefined 
 }
 
 // Copies one page's master (+ display copy and thumbnail, when present) into another document's
-// directory as page N - byte-for-byte, so merging/splitting never costs image quality.
+// directory - byte-for-byte, so merging/splitting never costs image quality. Files are named by
+// position (page_N.jpg) in a new document; `byId` names them by page id instead, for a document
+// that already has files (an append, §7 R3), whose positions no longer match its file names.
 // `keepId` (merge, split: the source document goes away) keeps the page's id, so its bookmarks
 // and annotations follow it to the new document (library/REPLACE_FILES); a copy that leaves the
-// source in place (an exam pack) needs a new one.
-export function copyPageInto(page: LibraryPage, dir: Directory, pageNumber: number, options: { keepId?: boolean } = {}): LibraryPage {
+// source in place (an exam pack, an append, an extract) needs a new one.
+export function copyPageInto(
+  page: LibraryPage,
+  dir: Directory,
+  pageNumber: number,
+  options: { keepId?: boolean; byId?: boolean } = {}
+): LibraryPage {
+  const id = options.keepId ? page.id : createId('page');
+  const name = (kind: string) => new File(dir, options.byId ? `${kind}_${id}.jpg` : `${kind}_${pageNumber}.jpg`);
   return {
     ...page,
-    id: options.keepId ? page.id : createId('page'),
-    fileUri: copyIfPresent(page.fileUri, new File(dir, `page_${pageNumber}.jpg`)) ?? '',
-    displayUri: copyIfPresent(page.displayUri, new File(dir, `display_${pageNumber}.jpg`)),
-    thumbUri: copyIfPresent(page.thumbUri, new File(dir, `thumb_${pageNumber}.jpg`)),
+    id,
+    fileUri: copyIfPresent(page.fileUri, name('page')) ?? '',
+    displayUri: copyIfPresent(page.displayUri, name('display')),
+    thumbUri: copyIfPresent(page.thumbUri, name('thumb')),
   };
 }
 
+// The files a page row owns (master, display copy, thumbnail), for deleting a removed page.
+export function pageFiles(page: LibraryPage): string[] {
+  return [page.fileUri, page.displayUri, page.thumbUri].filter((uri): uri is string => !!uri);
+}
+
 // Annotations a rebuild writes into a standard, coverless document.pdf (§5 T4).
-function annotationsHook(pages: LibraryPage[], pageSize: Awaited<ReturnType<typeof pageSizeOfPdf>>, annotations: readonly Annotation[]) {
+export function annotationsHook(pages: LibraryPage[], pageSize: Awaited<ReturnType<typeof pageSizeOfPdf>>, annotations: readonly Annotation[]) {
   return annotations.length
     ? (pdf: Parameters<typeof writeAnnotations>[0]) =>
         writeAnnotations(pdf, { pages, coverKind: undefined, pdfLayout: 'standard', pdfPageSize: pageSize }, annotations)
     : undefined;
 }
 
-function tempPdf(): File {
+export function tempPdf(): File {
   const dir = new Directory(Paths.cache, 'pdf-ops');
   if (!dir.exists) dir.create({ intermediates: true });
   return new File(dir, `${createId('tmp')}.pdf`);
@@ -58,13 +72,13 @@ function tempPdf(): File {
 // A scan's pages as a PDF with one page per library page, for a PDF-level merge: its own
 // document.pdf when that is already laid out so (it then also carries a signature burned in by
 // Sign, and its annotations), otherwise a standard rebuild from the masters into the cache.
-async function standardPdfOf(doc: LibraryDocument, annotations: readonly Annotation[]): Promise<{ uri: string; temp: boolean }> {
+export async function standardPdfOf(doc: LibraryDocument, annotations: readonly Annotation[]): Promise<{ uri: string; temp: boolean }> {
   const ownIsStandard = (doc.pdfLayout ?? 'standard') === 'standard' && !doc.coverKind;
   if (doc.pdfUri && ownIsStandard && new File(doc.pdfUri).exists) return { uri: doc.pdfUri, temp: false };
   const pageSize = await pageSizeOfPdf(doc.pdfUri);
   const built = await buildPdfFromPages(
     doc.id,
-    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
+    doc.pages.map(toSourcePage),
     'as-is',
     undefined,
     'standard',
@@ -74,50 +88,45 @@ async function standardPdfOf(doc: LibraryDocument, annotations: readonly Annotat
   return { uri: built.uri, temp: true };
 }
 
-function stubPage(): LibraryPage {
+export function stubPage(): LibraryPage {
   return { id: createId('page'), fileUri: '', width: 850, height: 1100 };
 }
 
 // Whether every page of an imported PDF has been read (R1). A document made from parts that
 // weren't is left for the indexer, which fills in only the pages missing a thumbnail.
-function fullyIndexed(doc: LibraryDocument): boolean {
+export function fullyIndexed(doc: LibraryDocument): boolean {
   return !isPdfLevel(doc) || doc.indexState === 'done';
 }
 
-// Merged output lands in the source docs' course only when they all share one; a merge combining
-// docs from different courses has no single obviously-correct destination, so it goes to Unsorted.
-// Pages keep their ids (see copyPageInto), so bookmarks and annotations follow them.
-// §7 R2: all scans → rebuilt from the masters, as before. Any imported PDF among them → merged
-// as PDFs (pdfOps.mergePdfs): the imported pages are copied untouched, keeping their text and
-// quality, and the result is a PDF-level document itself.
-export async function mergeDocuments(docs: LibraryDocument[], annotations: readonly Annotation[] = []): Promise<LibraryDocument> {
-  const documentId = createId('doc');
-  const dir = getDocumentDir(documentId);
-  const name = `Merged_${docs.length}_files`;
-  const courseId = docs.every((d) => d.courseId === docs[0].courseId) ? docs[0].courseId : undefined;
-  const base = {
-    id: documentId,
-    name,
-    format: 'PDF' as const,
-    mode: 'doc' as const,
-    createdAt: Date.now(),
-    star: false,
-    tag: 'PDF',
-    locked: false,
-    courseId,
-    pdfLayout: 'standard' as const,
-  };
+// What a combine of documents (merge, §7 R3 append) produces for the target document.
+type Combined = Pick<LibraryDocument, 'pages' | 'pdfUri' | 'sizeBytes' | 'sourceKind' | 'indexedAt' | 'indexState' | 'pdfLayout' | 'pdfPageSize'>;
 
-  if (docs.some(isPdfLevel)) {
+// The pages of `parts`, in order, as document `documentId`'s pages and document.pdf. A part that
+// is that document itself (an append) keeps its rows and files where they are; every other part's
+// pages are copied in (keeping their ids when `keepIds`: the source goes away).
+// All scans → rebuilt from the masters. Any imported PDF among them (§7 R2) → combined as PDFs
+// (pdfOps.mergePdfs): imported pages are copied untouched, keeping their text and quality; a scan
+// contributes its standard PDF (standardPdfOf); the result is a PDF-level document.
+async function combineInto(
+  documentId: string,
+  parts: readonly { doc: LibraryDocument; keepIds: boolean }[],
+  annotations: readonly Annotation[]
+): Promise<Combined> {
+  const dir = getDocumentDir(documentId);
+  const rowFor = (doc: LibraryDocument, row: LibraryPage, keepIds: boolean, n: number) =>
+    doc.id === documentId ? row : copyPageInto(row, dir, n, { keepId: keepIds, byId: true });
+
+  if (parts.some((part) => isPdfLevel(part.doc))) {
     const sources: { uri: string; temp: boolean }[] = [];
-    for (const doc of docs) {
+    for (const { doc } of parts) {
       if (isPdfLevel(doc)) {
-        if (!doc.pdfUri) throw new Error(`mergeDocuments: ${doc.id} has no PDF`);
+        if (!doc.pdfUri) throw new Error(`combineInto: ${doc.id} has no PDF`);
         sources.push({ uri: doc.pdfUri, temp: false });
       } else {
         sources.push(await standardPdfOf(doc, annotations.filter((a) => a.documentId === doc.id)));
       }
     }
+    // mergePdfs reads every source before writing, so the target's own document.pdf can be both.
     let merged;
     try {
       merged = await mergePdfs(sources, new File(dir, 'document.pdf'));
@@ -127,51 +136,78 @@ export async function mergeDocuments(docs: LibraryDocument[], annotations: reado
     // Page rows line up with the pages each source actually gave (an imported PDF saved before
     // it was indexed may have fewer rows than pages).
     const pages: LibraryPage[] = [];
-    docs.forEach((doc, d) => {
+    parts.forEach(({ doc, keepIds }, d) => {
       for (let i = 0; i < merged.pagesPerSource[d]; i++) {
         const row = doc.pages[i];
-        pages.push(row ? copyPageInto(row, dir, pages.length + 1, { keepId: true }) : stubPage());
+        pages.push(row ? rowFor(doc, row, keepIds, pages.length + 1) : stubPage());
       }
     });
-    const indexed = docs.every(fullyIndexed) && docs.every((doc, d) => doc.pages.length >= merged.pagesPerSource[d]);
+    const indexed = parts.every(({ doc }, d) => fullyIndexed(doc) && doc.pages.length >= merged.pagesPerSource[d]);
     return {
-      ...base,
       pages,
       pdfUri: merged.uri,
       sizeBytes: merged.sizeBytes,
-      searchHaystack: buildHaystack(name, pages),
       sourceKind: 'imported_pdf',
       indexedAt: indexed ? Date.now() : undefined,
       indexState: indexed ? 'done' : undefined,
+      pdfLayout: 'standard',
+      pdfPageSize: undefined,
     };
   }
 
-  const mergedPages: LibraryPage[] = [];
-  for (const doc of docs) {
-    for (const page of doc.pages) mergedPages.push(copyPageInto(page, dir, mergedPages.length + 1, { keepId: true }));
+  const pages: LibraryPage[] = [];
+  for (const { doc, keepIds } of parts) {
+    for (const row of doc.pages) pages.push(rowFor(doc, row, keepIds, pages.length + 1));
   }
-
-  // Rebuilds keep the paper size (A4 or Letter) the document was saved with; a merge takes the
+  // Rebuilds keep the paper size (A4 or Letter) the document was saved with; a combine takes the
   // first document's.
-  const pageSize = await pageSizeOfPdf(docs[0]?.pdfUri);
-  const pdfResult = await buildPdfFromPages(
-    documentId,
-    mergedPages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
-    'as-is',
-    undefined,
-    'standard',
-    pageSize,
-    { beforeSave: annotationsHook(mergedPages, pageSize, annotations) }
-  );
+  const pageSize = await pageSizeOfPdf(parts[0]?.doc.pdfUri);
+  const pdfResult = await buildPdfFromPages(documentId, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize, {
+    beforeSave: annotationsHook(pages, pageSize, annotations),
+  });
+  return { pages, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes, pdfLayout: 'standard', pdfPageSize: pageSize };
+}
 
+// Merged output lands in the source docs' course only when they all share one; a merge combining
+// docs from different courses has no single obviously-correct destination, so it goes to Unsorted.
+// Pages keep their ids (see copyPageInto), so bookmarks and annotations follow them.
+export async function mergeDocuments(docs: LibraryDocument[], annotations: readonly Annotation[] = []): Promise<LibraryDocument> {
+  const documentId = createId('doc');
+  const name = `Merged_${docs.length}_files`;
+  const combined = await combineInto(
+    documentId,
+    docs.map((doc) => ({ doc, keepIds: true })),
+    annotations
+  );
   return {
-    ...base,
-    pages: mergedPages,
-    pdfUri: pdfResult.uri,
-    sizeBytes: pdfResult.sizeBytes,
-    searchHaystack: buildHaystack(name, mergedPages),
-    pdfPageSize: pageSize,
+    id: documentId,
+    name,
+    format: 'PDF',
+    mode: 'doc',
+    createdAt: Date.now(),
+    star: false,
+    tag: 'PDF',
+    locked: false,
+    courseId: docs.every((d) => d.courseId === docs[0].courseId) ? docs[0].courseId : undefined,
+    ...combined,
+    searchHaystack: buildHaystack(name, combined.pages),
   };
+}
+
+// §7 R3 "Add pages": `sources`' pages (copied; the sources stay) go at the end of `target`, which
+// keeps its id, its pages' ids and everything that points at them. A later rebuild (compress,
+// sign) may drop a former cover's special placement, so the cover is cleared like a rebuild does.
+export async function appendDocuments(
+  target: LibraryDocument,
+  sources: readonly LibraryDocument[],
+  annotations: readonly Annotation[] = []
+): Promise<LibraryDocument> {
+  const combined = await combineInto(
+    target.id,
+    [{ doc: target, keepIds: true }, ...sources.map((doc) => ({ doc, keepIds: false }))],
+    annotations.filter((a) => a.documentId === target.id)
+  );
+  return { ...target, ...combined, coverKind: undefined, searchHaystack: buildHaystack(target.name, combined.pages) };
 }
 
 // One document per page. Split output stays in the source document's course; pages keep their
@@ -226,7 +262,7 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
     // PDF for every library document (see DeliverScreen.tsx's matching change).
     const pdfResult = await buildPdfFromPages(
       documentId,
-      [{ uri: page.fileUri, width: page.width, height: page.height, ocr: page.ocr, layout: page.layout }],
+      [toSourcePage(page)],
       'as-is',
       undefined,
       'standard',
@@ -294,7 +330,7 @@ export async function compressDocument(doc: LibraryDocument, quality = 2, annota
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
-    doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
+    doc.pages.map(toSourcePage),
     encodingForQuality(quality),
     undefined,
     'standard',
@@ -320,18 +356,19 @@ export async function applySignedPage(
   annotations: readonly Annotation[] = []
 ): Promise<LibraryDocument> {
   const dir = getDocumentDir(doc.id);
-  const dest = new File(dir, `page_${pageIndex + 1}.jpg`);
-  if (dest.exists) dest.delete();
+  const old = doc.pages[pageIndex];
+  // New file names (not page_N): since §7 R3 a page's position no longer matches its file names,
+  // and page_N may belong to another page. The page's old files go.
+  const stamp = createId('signed');
+  const dest = new File(dir, `page_${stamp}.jpg`);
   new File(flattenedUri).moveSync(dest);
 
   // The old display copy and thumbnail show the unsigned page - regenerate the thumbnail and drop
   // the display copy (the viewer falls back to the signed master).
   const thumbSource = await downscaleAndCompressPage(dest.uri, THUMB_MAX_DIM, THUMB_JPEG_Q);
-  const thumb = new File(dir, `thumb_${pageIndex + 1}.jpg`);
-  if (thumb.exists) thumb.delete();
+  const thumb = new File(dir, `thumb_${stamp}.jpg`);
   new File(thumbSource.uri).moveSync(thumb);
-  const staleDisplay = new File(dir, `display_${pageIndex + 1}.jpg`);
-  if (staleDisplay.exists) staleDisplay.delete();
+  if (old) cleanTemporaryCache(pageFiles(old).filter((uri) => uri !== dest.uri && uri !== thumb.uri));
 
   const pages = doc.pages.map((page, i) =>
     i === pageIndex ? { ...page, fileUri: dest.uri, thumbUri: thumb.uri, displayUri: undefined } : page
@@ -341,7 +378,7 @@ export async function applySignedPage(
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
   const pdfResult = await buildPdfFromPages(
     doc.id,
-    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
+    pages.map(toSourcePage),
     'as-is',
     undefined,
     'standard',

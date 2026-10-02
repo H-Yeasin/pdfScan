@@ -72,7 +72,7 @@ describe('indexImportedPdf', () => {
       expect(page.textSource).toBe('pdf');
       expect(page.ocr?.text).toContain(`Lecture page ${i + 1}`);
       expect(page).toMatchObject({ width: master.width, height: master.height });
-      expect(page.thumbUri).toBe(new File(Paths.document, 'library', doc.id, `thumb_${i + 1}.jpg`).uri);
+      expect(page.thumbUri).toBe(new File(Paths.document, 'library', doc.id, `thumb_${page.id}.jpg`).uri);
       expect(new File(page.thumbUri!).exists).toBe(true);
     }
     expect(master.height).toBe(MASTER_MAX_DIM);

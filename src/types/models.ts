@@ -97,6 +97,8 @@ export type SourceImage = { uri: string; width: number; height: number };
 // true-size A4 canvas (ID card mode), so they print at real size.
 export type PageLayout = 'fullPage';
 
+export type PageRotation = 0 | 90 | 180 | 270;
+
 export type LibraryPage = {
   id: string;
   // The clean master image: rotation/enhance already applied, never academic-stamped, never
@@ -115,6 +117,11 @@ export type LibraryPage = {
   // True when OCR ran at save time and failed (as opposed to finding no text), so the reader can
   // offer "Retry OCR" later.
   ocrFailed?: boolean;
+  // §7 R3: clockwise turn applied when the page is shown and built (PDF /Rotate), on top of the
+  // page as stored - never baked into the master. width/height and ocr stay in the unturned
+  // space; documents/pageMap applies the turn. For an imported PDF it's the turn added since the
+  // page was indexed (its document.pdf already carries it). Undefined = 0.
+  rotation?: PageRotation;
   // §7 R1: where `ocr` came from. 'pdf': the text layer of an imported PDF (exact, nothing was
   // recognised); 'ocr': recognised from pixels. Undefined: a scan (always OCR) or no text yet.
   textSource?: 'ocr' | 'pdf';

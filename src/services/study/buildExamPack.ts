@@ -3,7 +3,7 @@ import { processSequentially } from '../capture/processSequentially';
 import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { renderLayoutImage } from '../pdf/academicRasterService';
 import { formatCoverDate, itemsAsOcr, layoutContents, type ContentsEntry } from '../pdf/coverTemplates';
-import { buildPdfFromPages, pageDimensions, type PageSizeId } from '../pdf/pdfService';
+import { buildPdfFromPages, pageDimensions, type PageSizeId, toSourcePage } from '../pdf/pdfService';
 import { copyPageInto } from '../persistence/libraryOperations';
 import { footerPresetText } from '../submit/footerPresets';
 import { t, tDoc } from '../../i18n';
@@ -110,7 +110,7 @@ export async function buildExamPack(
   const mapped = { pages, coverKind: undefined, pdfLayout: 'standard' as const, pdfPageSize: options.pageSize };
   const pdf = await buildPdfFromPages(
     documentId,
-    pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout })),
+    pages.map(toSourcePage),
     'as-is',
     options.pageNumbers ? { enableBorder: false, footerText: footerPresetText('pages') } : undefined,
     'standard',

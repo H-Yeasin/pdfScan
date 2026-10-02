@@ -1,4 +1,5 @@
 import { imagePlacement, pageDimensions, type PageSlot } from '../pdf/pdfService';
+import { boxMatrix, transformRect, turnedSize } from '../pdf/rotation';
 import type { LibraryDocument, OcrBounding } from '../../types/models';
 
 // §5 T1: one page index everyone agrees on. Search results, bookmarks, annotations and exam packs
@@ -56,7 +57,21 @@ export function pdfRectFor(doc: MappedDoc, libraryIdx: number, rect: OcrBounding
   const placement =
     doc.coverKind === 'template' && libraryIdx === 0
       ? { origin: { x: 0, y: 0 }, width: dims.width, height: dims.height, scale: dims.width / page.width }
-      : imagePlacement(page.width, page.height, ref.slot, dims, page.layout);
+      : imagePlacement(page.width, page.height, ref.slot, dims, page.layout, page.rotation);
+  // §7 R3: a turned page in a 2-in-1 column is drawn turned (pdfService.drawTwoUpColumn), so its
+  // boxes turn with it. A standard page turns through /Rotate, which leaves its own space - and
+  // so these rectangles - as they are.
+  if (ref.slot !== 'full' && page.rotation) {
+    const box = { x: placement.origin.x, y: placement.origin.y, width: placement.width, height: placement.height };
+    const localHeight = turnedSize(box.width, box.height, page.rotation).height;
+    const local = {
+      x: rect.left * placement.scale,
+      y: localHeight - (rect.top + rect.height) * placement.scale,
+      width: rect.width * placement.scale,
+      height: rect.height * placement.scale,
+    };
+    return { page: ref.page, ...transformRect(boxMatrix(box, page.rotation), local) };
+  }
   return {
     page: ref.page,
     x: placement.origin.x + rect.left * placement.scale,

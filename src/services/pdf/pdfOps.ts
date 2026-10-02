@@ -103,6 +103,24 @@ export async function setRotation(uri: string, page: number, angle: number, dest
   return savePdf(pdfDoc, dest);
 }
 
+// §7 R3, Edit pages on an imported PDF in one pass: page i of the result is source page
+// order[i] (pages left out are deleted), turned a further turnBy[i] degrees clockwise on top of
+// the /Rotate it already has.
+export async function rearrangePages(uri: string, order: readonly number[], turnBy: readonly number[], dest: File): Promise<PdfFile> {
+  if (order.length === 0) throw new RangeError('A PDF needs at least one page');
+  if (turnBy.length !== order.length) throw new RangeError('rearrangePages: one turn per page');
+  if (turnBy.some((angle) => angle % 90 !== 0)) throw new RangeError('rearrangePages: turns are multiples of 90');
+  const src = await loadPdf(uri);
+  checkPages(src, order);
+  const out = await PDFDocument.create();
+  const copied = await out.copyPages(src, [...order]);
+  copied.forEach((page, i) => {
+    out.addPage(page);
+    if (turnBy[i] % 360 !== 0) page.setRotation(degrees((((page.getRotation().angle + turnBy[i]) % 360) + 360) % 360));
+  });
+  return savePdf(out, dest);
+}
+
 // A rectangle on a page as it is shown (its /Rotate applied), as fractions of the shown width and
 // height, origin top-left - the same whatever size the page was rendered at for placing it.
 export type ShownRect = { x: number; y: number; width: number; height: number };

@@ -3,7 +3,7 @@ import MlkitOcr from 'rn-mlkit-ocr';
 import { makePng } from '../../../test/png';
 import { runOcr } from '../../ocr/ocrService';
 import { buildPdfFromPages, type PageSizeId } from '../../pdf/pdfService';
-import type { LibraryDocument, LibraryPage, PageLayout } from '../../../types/models';
+import type { LibraryDocument, LibraryPage, PageLayout, PageRotation } from '../../../types/models';
 import { libraryIdxFor, pdfPageCount, pdfPageFor, pdfRectFor } from '../pageMap';
 import { backfillPdfInfo } from '../pdfInfoBackfill';
 
@@ -83,13 +83,14 @@ describe('pdfPageFor / libraryIdxFor', () => {
 
 // Builds a real PDF with one OCR "word" at `rect` on library page `idx`, and finds where pdf.js
 // says that text is: the builder draws the text layer with the same placement as the image.
-async function builtTextBox(layout: 'standard' | '2_in_1', size: PageSizeId, n: number, idx: number, pageLayout?: PageLayout) {
+async function builtTextBox(layout: 'standard' | '2_in_1', size: PageSizeId, n: number, idx: number, pageLayout?: PageLayout, rotation?: PageRotation) {
   const rect = { left: 120, top: 300, width: 500, height: 60 };
   const image = new File(Paths.cache, `pm_${Math.random()}.png`);
   image.write(makePng(20, 28));
   const dims = pageLayout === 'fullPage' ? { width: 1654, height: 2339 } : { width: 1000, height: 1400 };
-  const lib = pages(n, dims).map((p) => ({ ...p, layout: pageLayout }));
+  const lib = pages(n, dims).map((p, i) => ({ ...p, layout: pageLayout, rotation: i === idx ? rotation : undefined }));
   const src = lib.map((p, i) => ({
+    rotation: p.rotation,
     uri: image.uri,
     width: p.width,
     height: p.height,
@@ -121,6 +122,29 @@ describe('pdfRectFor', () => {
 
   it('is null for a page that does not exist', () => {
     expect(pdfRectFor(doc({}), 9, { left: 0, top: 0, width: 1, height: 1 })).toBeNull();
+  });
+
+  // §7 R3. A standard page turns through /Rotate, which leaves its own space alone: the text is
+  // where it was. In a 2-in-1 column the page is drawn turned, and the text with it; pdfjs gives
+  // the start of the text's baseline, which is the box's top-left corner turned 90° clockwise and
+  // its bottom-right corner turned 270°.
+  it('standard, turned 90°: the text stays where the unturned page has it', async () => {
+    const { expected, actual } = await builtTextBox('standard', 'A4', 2, 1, undefined, 90);
+    expect(Math.abs(actual.x - expected.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(actual.y - expected.y)).toBeLessThanOrEqual(1);
+  });
+
+  it.each<[PageRotation, (r: { x: number; y: number; width: number; height: number }) => { x: number; y: number }]>([
+    [90, (r) => ({ x: r.x, y: r.y + r.height })],
+    [180, (r) => ({ x: r.x + r.width, y: r.y + r.height })],
+    [270, (r) => ({ x: r.x + r.width, y: r.y })],
+  ])('2-in-1, turned %i°: the box turns with the page', async (rotation, baselineStart) => {
+    const { expected, actual } = await builtTextBox('2_in_1', 'A4', 2, 1, undefined, rotation);
+    const corner = baselineStart(expected);
+    expect(Math.abs(actual.x - corner.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(actual.y - corner.y)).toBeLessThanOrEqual(1);
+    // Turned on its side, a wide line becomes a tall box.
+    if (rotation !== 180) expect(expected.height).toBeGreaterThan(expected.width);
   });
 });
 

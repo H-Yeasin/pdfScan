@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { Directory, File } from 'expo-file-system';
 import { docTypeOf } from '../courses/docTypes';
 import { coverDefaults, withCoverDefaults, type CoverValues } from '../pdf/coverTemplates';
-import { buildPdfFromPages, decoratePdf, encodingForQuality, type AcademicConfig, type PdfSourcePage } from '../pdf/pdfService';
+import { buildPdfFromPages, decoratePdf, encodingForQuality, type AcademicConfig, type PdfSourcePage, toSourcePage } from '../pdf/pdfService';
 import { loadPdf, savePdf } from '../pdf/pdfOps';
 import { buildRasterPdf, renderedPageBytes } from '../pdf/rasterPdf';
 import { isPdfLevel } from '../documents/formatCapabilities';
@@ -59,7 +59,7 @@ const FALLBACK_FILE_NAME = 'submission';
 // cover a saved document may already start with - the preset adds its own.
 export function submissionPages(doc: LibraryDocument): PdfSourcePage[] {
   const pages = doc.coverKind ? doc.pages.slice(1) : doc.pages;
-  return pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout }));
+  return pages.map(toSourcePage);
 }
 
 // The academic options a submission is drawn with: the preset's, with the cover filled from the

@@ -188,8 +188,10 @@ function isUnavailable(error: unknown): boolean {
 }
 
 // One page: its text (the PDF's own, or OCR of a rendered master when the page has none - a
-// scanned handout), then its thumbnail. Best-effort like OCR everywhere: a page that can't be
-// read keeps what it got; only a password (or a build without the module) stops the run.
+// scanned handout), then its thumbnail. Both are measured as the page is shown now, so a turn
+// recorded for it earlier (R3, already in the PDF's /Rotate) is reset. Best-effort like OCR
+// everywhere: a page that can't be read keeps what it got; only a password (or a build without
+// the module) stops the run.
 async function readPage(
   uri: string,
   index: number,
@@ -209,19 +211,21 @@ async function readPage(
   try {
     if (text && text.text.trim()) {
       const size = masterSizeFor(text);
-      next = { ...page, fileUri: '', width: size.width, height: size.height, ocr: pdfTextToOcr(text), ocrFailed: undefined, textSource: 'pdf' };
+      next = { ...page, fileUri: '', width: size.width, height: size.height, ocr: pdfTextToOcr(text), ocrFailed: undefined, textSource: 'pdf', rotation: undefined };
     } else {
       // No text layer: a scanned page. Render a master just for OCR, then drop it.
       const master = await renderPage(uri, index, { maxDim: MASTER_MAX_DIM, quality: MASTER_JPEG_Q });
       try {
         const ocr = await runOcr(master.uri, script);
-        next = { ...page, fileUri: '', width: master.width, height: master.height, ocr, ocrFailed: ocr ? undefined : true, textSource: 'ocr' };
+        next = { ...page, fileUri: '', width: master.width, height: master.height, ocr, ocrFailed: ocr ? undefined : true, textSource: 'ocr', rotation: undefined };
       } finally {
         cleanTemporaryCache([master.uri]);
       }
     }
     const thumb = await renderPage(uri, index, { maxDim: THUMB_MAX_DIM, quality: THUMB_JPEG_Q });
-    return { ...next, thumbUri: keep(thumb.uri, new File(dir, `thumb_${index + 1}.jpg`)) };
+    // Named by page id, not position: pages move (R3), and a later run must not overwrite another
+    // page's thumbnail.
+    return { ...next, thumbUri: keep(thumb.uri, new File(dir, `thumb_${page.id}.jpg`)) };
   } catch (error) {
     if (error instanceof PdfEncryptedError || isUnavailable(error)) throw error;
     // One damaged page doesn't stop the rest; it keeps whatever it got (no thumbnail).

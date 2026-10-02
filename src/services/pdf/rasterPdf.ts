@@ -8,6 +8,7 @@ import { getPageCount, getPageSize, renderPage } from './pdfNative';
 import { savePdf, type PdfFile } from './pdfOps';
 import { decoratePdf, type AcademicConfig, type PageSizeId } from './pdfService';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
+import { boxMatrix, turnedSize, withMatrix } from './rotation';
 
 // §7 R2: the one path that turns an existing PDF's pages into images - only for jobs that need
 // fewer bytes than the original has (Compress, a submission's size limit), and the caller says
@@ -42,9 +43,15 @@ export async function buildRasterPdf(
       const pdfPage = pdfDoc.addPage([size.width, size.height]);
       pdfPage.drawImage(image, { x: 0, y: 0, width: size.width, height: size.height });
       const page = pages[i];
-      // page.ocr is in the page's master pixels (page.width wide), whatever size it was rendered at.
+      // page.ocr is in the page's own pixels (page.width wide), whatever size it was rendered at,
+      // and unturned: a page turned since it was indexed (R3) is rendered turned, so its text
+      // layer is drawn turned the same way.
       if (page?.ocr && page.ocr.blocks.length > 0 && page.width > 0) {
-        drawOcrTextLayer(pdfPage, font, page.ocr, { origin: { x: 0, y: 0 }, heightPt: size.height, scale: size.width / page.width });
+        const local = turnedSize(size.width, size.height, page.rotation);
+        const box = { x: 0, y: 0, width: size.width, height: size.height };
+        await withMatrix(pdfPage, boxMatrix(box, page.rotation), () => {
+          drawOcrTextLayer(pdfPage, font, page.ocr!, { origin: { x: 0, y: 0 }, heightPt: local.height, scale: local.width / page.width });
+        });
       }
     } finally {
       cleanTemporaryCache([rendered.uri]);
