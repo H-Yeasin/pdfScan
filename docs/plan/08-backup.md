@@ -358,7 +358,31 @@ with every course, document, annotation, bookmark, submission and deadline, and 
 from a classmate adds its documents under a matching course without touching the rest.
 
 ### B5 · Backup reminders and automatic backups to a folder *(S)*
-Status: todo
+Status: done (commit 956c5d5)
+
+As built:
+- `backup/schedule.ts` (pure): `backupReminderDue`, `autoBackupDue`, `rotateAutoBackups`.
+  "The library has changed" means `libraryRepo.libraryChangedAt`, the newest
+  `documents.updated_at` or `courses.created_at`. Since `updated_at` also moves when the Reader
+  saves the page it's on, reading counts as a change. An automatic backup is skipped when
+  nothing changed since the last one.
+- **Home card:** `store/useBackupReminder.ts`, a one-line card on top of Home with "Later" and
+  "Back up". "Back up" goes through `ui/REQUEST_EXPORT` to `components/backup/ExportHost.tsx`
+  (always mounted), which runs B3's dialog.
+- **Semester hint:** archiving a semester with documents shows "Spring 2026 archived. Back it
+  up before you forget?" with "Back up", which exports that semester's courses. Without
+  documents it shows the plain "archived" snack.
+- **Automatic backups:** `backup/autoBackup.runAutoBackup` + `store/useAutoBackup.ts` (after
+  boot, Android, once per launch). They only start while no scan session is open; one already
+  running isn't stopped by a new scan. The chip is `components/backup/AutoBackupChip.tsx`
+  (`ui.autoBackupProgress`). Files are named `PDF Scan auto-backup YYYY-MM-DD.zip`.
+- **Rotation:** only deletes URIs the app recorded (`settings.autoBackupUris`, from
+  `saveFileToFolder`'s return value). Choosing another folder clears that list. An automatic
+  backup also sets `lastBackupAt`.
+- **One backup at a time:** `createBackup` throws `BackupBusyError` if a backup is already
+  running. The automatic one then just stops, since the manual backup does the same job.
+- **Wi-Fi rule:** as planned, just "not while scanning or saving" (no cloud-folder detection).
+  **iOS:** the reminder only; B3's Backup screen already has the iCloud note.
 
 - **Reminder:** when the library has changed and the last backup is more than 30 days old (or
   there was never one and the library has 20+ documents), Home shows a one-line card: "Last

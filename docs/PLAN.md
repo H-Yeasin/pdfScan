@@ -204,7 +204,7 @@ Goal: students never lose a semester of notes.
 - [x] B2 Backup format: dependency-free zip (store-only, Zip64) with readable PDFs and `library.json`
 - [x] B3 Back up and export (whole library, one course, chosen documents; everything or PDFs only)
 - [x] B4 Restore and import (Restore keeps ids; Add for a classmate's course; all-or-nothing)
-- [ ] B5 Backup reminders and automatic backups to a chosen folder (Android)
+- [x] B5 Backup reminders and automatic backups to a chosen folder (Android)
 - [ ] B6 *(Later, Pro)* Google Drive backup (`drive.appdata`, incremental)
 
 **Done when:** a full backup restores on a new phone with every course, document, annotation and
