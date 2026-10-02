@@ -105,7 +105,7 @@ console check are open (owner, `docs/firebase.md`).
   and screen reporting until M8. New dev build needed.
 
 ### M3 · Pro feature registry and entitlements *(S)* (the old M1, adapted)
-Status: todo
+Status: done (commit 6c75dfa); needs a new dev build for `expo-secure-store`.
 
 - `src/services/pro/proFeatures.ts`: `PRO_FEATURES` (`coverTemplates`, `themeAccents`,
   `appLock`, `noBanners`, later `pdfPasswords` §7 R6 and `driveBackup` §8 B6, each
@@ -117,6 +117,19 @@ Status: todo
   would expose data; only turning it **on** needs Pro); documents made with a Pro template keep
   it; Drive auto-backup (later) pauses with a notice; banners come back.
 - Tests: pass active and expired; lapse rules; the free/Pro overlap test.
+- **As built:** every Pro feature is `planned` until M4/M5 (and R6, B6) build it, so the Pro
+  list is empty for now. Lapse rules are data (`LapseRule`: `keepUntilOff` app lock,
+  `keepExisting` covers and PDF passwords, `pause` Drive, `stop` accents and banners) read only by
+  `canUseProFeature(id, 'start' | 'keep', isPro)`; when a pass ends, accents go back to the default.
+  `FREE_FOREVER` also lists what was already free (reader, PDF tools, sign, share, deadlines,
+  restore, no watermark); its test holds a baseline that may only grow. A pass is active only
+  between `checkedAt` and `expiresAt` (setting the clock back ends it); `grantPass` adds to a
+  running pass and never replaces a paid licence; M6 applies the daily cap. The entitlement is
+  module state (`useEntitlement`, `useSyncExternalStore`) loaded at start without deferring;
+  until it loads the app counts as free. Secure-store key `pro.entitlement`; `SecureStore.xml` is
+  excluded from Android backup (its key can't leave the phone). `FeatureList` now lists
+  `liveProFeatures()`; the old `pro.features.*` keys were replaced. A `__DEV__` Settings row
+  grants or ends a 24-hour pass.
 
 ### M4 · Pro features worth a pass: cover templates, accents, app lock *(M)* (the old M3 + M4)
 Status: todo
