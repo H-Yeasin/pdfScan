@@ -209,7 +209,36 @@ As built:
 exactly once.
 
 ### O4 · Accessibility *(M, can be split a/b)*
-Status: todo
+Status: done in code (O4a 38b3fb4, O4b 854cb74). The by-hand checks (TalkBack flow, 200 % font,
+reduce motion, VoiceOver) are in `docs/qa/walkthrough.md` §2–3 and still open.
+
+As built:
+- **O4a:** `src/__tests__/a11yLabels.test.ts` fails on any `Pressable`/`TouchableOpacity` without a
+  name (`accessibilityLabel` or a `<Text>` inside) **or** without an `accessibilityRole`; elements
+  that only swallow taps are `accessible={false}`. The allowlist is empty. Only 12 buttons were
+  unnamed (the plan's count of 67 labels missed text children); 127 lacked a role and got
+  `button`. Segmented controls and the filter strip are `radio` with `selected`, the star is a
+  `switch`, filter toggles are `checkbox`. Labels live in `en.ts` under `a11y.*`.
+- Review thumbnails are one element: "Page 3 of 10", `selected`, actions Move earlier / Move later
+  / Remove page (drag and the × badge aren't reachable by TalkBack). Edit pages and the exam pack
+  already had buttons for this. Course cards: "CSE 101, Programming, 12 documents, last scan …".
+- Touch targets: `theme.touchSlop(size)` gives 36/44 dp icon buttons hitSlop up to 48 dp
+  (`MIN_TOUCH`), so layouts didn't change.
+- **O4b contrast:** `theme/contrast.ts` + `theme/__tests__/contrast.test.ts` (ink, muted,
+  accentInk and danger on bg/surface/surface2 and accentSoft at 4.5:1; accent icons at 3:1;
+  onAccent on accent; bg on ink for hints; white on danger at 3:1). Fixes: light `accent`
+  `#16a085` → `#0f7f69`; new `onAccent` token (white in light, `#0b1f1a` in dark, where white on
+  the bright teal was 2.4:1), used by every label and icon on an accent fill; dark `danger`
+  `#e74c3c` → `#f16253`; text that used `accent` now uses `accentInk`.
+- **Reduce motion:** `theme/useReducedMotion`; `navigation/transitions.transitionStyle` fades
+  instead of sliding; Review's ribbon stops looping.
+- **Announcements:** `services/a11y/announce` speaks on iOS only (Android reads the live regions:
+  the snackbar and scan progress now have them), so nothing is read twice.
+- **Gesture alternatives:** crop has **Auto crop** (runs `detectDocumentQuad`) and **Use whole
+  photo**; signature placement has **Place in bottom right**.
+- **Large text:** dense chrome (tab bar, Library tabs, filter chips, capture modes, filter strip,
+  Reader bars) caps at `CHROME_MAX_FONT_SCALE` 1.4. Fixed heights that clip at 200 % need the
+  device pass; hard-coded `fontSize` values weren't swapped for `typeScale` (none were touched).
 
 - **O4a: names, roles, guard rail.**
   - Every icon-only `Pressable` gets `accessibilityLabel` (from `en.ts`, under `a11y.*`),
@@ -304,7 +333,25 @@ As built:
 **Done when:** every budget above is met and recorded in `docs/qa/performance.md`.
 
 ### O6 · Polish sweep before the beta *(S)*
-Status: todo
+Status: in progress: the code fixes are done (ac1c707); the "first day" walkthrough in both themes
+(`docs/qa/walkthrough.md` §1) is open and decides what's left.
+
+As built (fixes found without a device):
+- **Status bar:** only Capture set one, so with the app's theme set opposite to the phone's the
+  icons were unreadable. AppNavigator now sets it from the app theme; Capture still overrides.
+- **Snackbar queue** (`ui.snackQueue`): a snack with an action (Undo, Done, Scan more) isn't
+  overwritten; later ones wait (3 at most, repeats dropped). Plain messages still replace each
+  other, so "Building…" doesn't hold up the result.
+- **Tablets:** every screen but Capture, Review and the Reader is at most 720 dp wide, centred
+  (`ScreenFrame` in AppNavigator).
+- **Loading:** the Library showed "No documents yet" while loading; now `SkeletonRows`.
+- **Haptics** (`services/feedback/haptics`): success on save and submit, warning when they fail,
+  `hapticSelection` when selection starts; the capture loop already had its own.
+- **Errors:** the messages that only said what failed now say what to do (scan, page, tools, open,
+  submit, share, exam pack, backup, folder copy). There's no `errors.*` group; they live by area.
+- **Keyboard:** the deadline sheet and text prompt use `KeyboardAvoidingView` on iOS (Android's
+  modal windows resize); the prompt's Done key submits. CourseSheet already had it.
+- Dark/light visuals, keyboard behaviour on real devices and the walkthrough itself: open.
 
 A checklist session, fixing what it finds (each fix small; anything bigger becomes a new step):
 - every screen in **dark mode** and **light mode**; status bar style per screen;

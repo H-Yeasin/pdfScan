@@ -18,7 +18,7 @@ code **when the section was planned**, and are kept as history.
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
 | §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | B1–B5 done in code (device checks open; B1's backup rules and B4's zip "Open with" need a new dev build). B6 (Google Drive) waits for Pro. |
-| §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2 and O3 done in code. **O5 in progress:** done in code; the measurements in `docs/qa/performance.md` are open. **Next: O4** (accessibility), then O6. |
+| §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2, O3 and O4 done in code. **O5 and O6 in progress:** their code is done; what's left is on a device: the measurements in `docs/qa/performance.md` and the walkthrough in `docs/qa/walkthrough.md`. |
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M6 | Planned (2026-10-02). Pro launches with §8 B6 or §7 R6 (see M6). |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
 
@@ -31,13 +31,14 @@ checks pass on a device.
 | Phase | Sections | Code status | Phase status |
 |---|---|---|---|
 | **P0: Foundation** | §0 | §0 F1–F8 done in code | **Done in code**, device checks open (upgrade from an AsyncStorage-era build keeps every document) |
-| **P1: Student MVP** | §1, §2 (Ink + Board), §3, §4, §9 onboarding | §1, §2 (E1–E6), §3, §4 done in code; E7 benchmark run open | **Not complete**: §9 onboarding (onboarding screens, teaching empty states, accessibility, performance budget) is not planned yet; device checks open |
+| **P1: Student MVP** | §1, §2 (Ink + Board), §3, §4, §9 onboarding | §1, §2 (E1–E6), §3, §4 done in code; E7 benchmark run open | **Not complete**: §9 is done in code; its device work is open (O5 measurements, the O6 walkthrough, O4's TalkBack pass), with the other device checks |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | §5 T1–T6, §6 L1–L4 and §8 B1–B5 done in code | **Done in code**; device checks open (L3's font spike, §8's backup and restore on a phone included) |
 | **P3: Grow** | §10 Pro, §8 Drive, §11, iOS parity | — | Not started (§7 R1–R4 done in code, R5 all but the SheetJS swap; R6 waits for Pro) |
 | **P4: Expand** | Bengali (§6 L5–L6), flashcards (§5 T7), more templates | Groundwork in place (script registry, OCR engines, any-script PDF text, i18n) | Not started |
 
-**Next to unblock the phases:** finish §9 (finishes P1 in code; §8's zip export is done, so P2
-is done in code), then the device checks for P0–P2.
+**Next to unblock the phases:** §9 is done in code, so P1 and P2 are done in code. What's left is
+on a device: the checks for P0–P2, §9's walkthrough (`docs/qa/walkthrough.md`) and performance
+budget (`docs/qa/performance.md`).
 
 The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
 lines here.
@@ -109,6 +110,8 @@ lines here.
 | O5 Performance (code) | ffc68d3, 35016b8 | selector store (`useAppSlices`/`useAppSelector`), memo'd rows, `useDeferredBoot`, lazy xlsx/mammoth, `src/dev/seedLibrary.ts`; measurements open (`docs/qa/performance.md`) |
 | O2 Onboarding | 84b2252 | `OnboardingScreen`, `services/onboarding/onboarding.ts`, `CourseSetupForm` (shared with `QuickSetupSheet`), `settings.onboardingDone` |
 | O3 Empty states, hints | c4dd4f7 | `components/shared/{EmptyState,Hint,useHint}`, `services/hints/hints.ts`, `settings.hintsSeen`, `store/useGalleryImport` |
+| O4 Accessibility | 38b3fb4, 854cb74 | `__tests__/a11yLabels.test.ts`, `theme/{contrast,useReducedMotion}.ts`, `onAccent` token, `touchSlop`, `services/a11y/announce`; by-hand checks in `docs/qa/walkthrough.md` |
+| O6 Polish (code) | ac1c707 | snack queue, theme status bar, tablet max width, `SkeletonRows`, haptics, error wording, keyboard; walkthrough open |
 
 ## How the branches came together
 
