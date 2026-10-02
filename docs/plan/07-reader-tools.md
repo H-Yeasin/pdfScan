@@ -266,7 +266,7 @@ to a saved assignment without rescanning everything.
   the Reader moved to the PDF engine, so only thumbnails needed the transform.
 
 ### R4 · Reader conveniences *(S)*
-Status: todo
+Status: done in code (commit a68b7ed); device checks open
 
 - **Resume reading:** `documents.last_page` (migration), saved on page change (debounced); the
   Reader opens there unless a search target (§5 T2) says otherwise.
@@ -281,6 +281,30 @@ Status: todo
 
 **Done when:** reopening a 40-page document returns to the page the student left, and any page
 is two taps away.
+
+**As built:**
+- Migration **v15** (`documents.last_page`, `LibraryDocument.lastPage`): the PDF page, 1-based.
+  After a reorder (R3) it's the same page number, not necessarily the same page. Saved by
+  `library/SET_LAST_PAGE` 800 ms after the page settles, and on leaving the document; not
+  before the saved page has been jumped to, so the viewer starting on page 1 can't overwrite
+  it. `libraryRepo.syncLibrary` now skips rewriting a document's page rows when its `pages`
+  array is the same one (so a page save, rename or star writes one row).
+- `documents/readerPosition.ts`: `resumePage` (a search hit or bookmark wins; a saved page past
+  the end opens at the last page), `parseJumpInput` (whole numbers 1…count only),
+  `classifyPdfError`.
+- Bottom chrome: the dots are replaced by "12 / 40" (tap → "Go to page" prompt, number pad).
+  A **Pages** button (library documents with more than one page) opens `PageScrubberSheet`, a
+  strip of the page thumbnails with turns shown. An invalid page number closes the prompt and
+  says "Type a page from 1 to N" (the snack can't show above the prompt).
+- Load errors: pdf-jsi reports "Password required or incorrect password." on both platforms
+  (android `PdfView.onError`, ios `RNPDFPdfView`), and other failures with their own message
+  ("Load pdf failed…"). `PdfPageView` was losing the message (`JSON.stringify(new Error())` is
+  `{}`); it now passes it through. A password error shows "This PDF needs a password." (and
+  "That password didn't work." after a try); anything else shows "Can't open this file". With
+  no message, the old prompt is shown, and a failure after a password try falls back to
+  "Can't open this file".
+- **Known limit:** night mode is still a dim overlay; pdf-jsi has no invert or dark rendering
+  (see `PdfPageView`).
 
 ### R5 · Office formats: read-only, safe, honest *(S)*
 Status: in progress: everything but the SheetJS swap is done in code (commit 2e00ceb). **Open:** the
