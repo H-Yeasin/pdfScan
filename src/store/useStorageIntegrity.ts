@@ -6,18 +6,21 @@ import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // §8 B1: once per launch, after the library has loaded, checks that every document's files are
 // there and that library/ holds no left-over folders (storage/integrity.ts). In the background,
-// one folder at a time. This also covers every kind of restore (Android Auto Backup, a device
-// transfer, B4): each ends with the app starting again.
+// one folder at a time. This also covers every kind of restore: Android Auto Backup and a device
+// transfer end with the app starting again, and a B4 restore reloads the library (a new
+// loadAttempt), which runs the check once more.
 export function useStorageIntegrity(libraryLoaded: boolean): void {
   const dispatch = useAppDispatch();
   const state = useAppSlices('library');
   const files = useRef(state.library.files);
   files.current = state.library.files;
-  const ran = useRef(false);
+  const loadAttempt = state.library.loadAttempt;
+  // The load attempt the check last ran for.
+  const ran = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!libraryLoaded || ran.current) return;
-    ran.current = true;
+    if (!libraryLoaded || ran.current === loadAttempt) return;
+    ran.current = loadAttempt;
     let cancelled = false;
     (async () => {
       const rowIds = await documentIdsInDb(await getDb());
@@ -32,5 +35,5 @@ export function useStorageIntegrity(libraryLoaded: boolean): void {
     return () => {
       cancelled = true;
     };
-  }, [libraryLoaded, dispatch]);
+  }, [libraryLoaded, loadAttempt, dispatch]);
 }

@@ -1,8 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 import type { ThemePref } from '../../theme';
+import { FILTERS } from '../enhance/filters/registry';
 
 const SETTINGS_KEY = 'app:settings';
+
+// Filter IDs are session-only and may be renamed (E1 renamed document_scan); a stored ID that no
+// longer exists is dropped rather than handed to the registry.
+export function sanitizeDefaultEnhance(raw: Partial<Record<CaptureMode, EnhanceMode>> | undefined) {
+  const valid = new Set<string>(FILTERS.filter((spec) => spec.available).map((spec) => spec.id));
+  const out: Partial<Record<CaptureMode, EnhanceMode>> = {};
+  for (const [mode, enhance] of Object.entries(raw ?? {})) if (enhance && valid.has(enhance)) out[mode as CaptureMode] = enhance;
+  return out;
+}
 
 export type PersistedSettings = {
   themePref: ThemePref;

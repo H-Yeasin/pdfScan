@@ -32,6 +32,18 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
 // For tests: forget the memoized connection so the next getDb() starts from scratch.
 export function __resetDbForTests(): void {
   dbPromise = null;
+  writeChain = Promise.resolve();
+}
+
+// §8 B4: library writes take turns. The library sync (useLibraryPersistence) and a restore both
+// open transactions on the one connection; two at once would interleave ("cannot start a
+// transaction within a transaction"). Each waits for the one before, whether it succeeded or not.
+let writeChain: Promise<unknown> = Promise.resolve();
+
+export function withWriteLock<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(task, task);
+  writeChain = run.catch(() => undefined);
+  return run;
 }
 
 // Ids of documents whose OCR text (prefix match per token) or name (substring) matches, most

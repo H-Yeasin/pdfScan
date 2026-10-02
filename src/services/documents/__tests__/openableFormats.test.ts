@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { OPENABLE_FORMATS, PICKER_MIME_TYPES } from '../formatCapabilities';
 import { detectDocFormat, isLegacyWordDoc, MIME_BY_FORMAT } from '../../../utils/docFormat';
 import { importExternalFile, LegacyWordDocError } from '../../files/externalFileService';
+import { ZIP_MIME_TYPES } from '../../backup/incomingZip';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const appJson = require('../../../../app.json') as {
   expo: { android: { intentFilters: { action: string; data: { mimeType?: string }[] }[] } };
@@ -17,11 +18,14 @@ describe('formats a file from outside can be opened as (§7 R5)', () => {
     expect([...picked].sort()).toEqual([...OPENABLE_FORMATS].sort());
   });
 
-  it('"Open with" registers a MIME type for every one of them, and nothing else', () => {
+  it('"Open with" registers a MIME type for every one of them, and nothing else but backup zips', () => {
     const view = appJson.expo.android.intentFilters.find((f) => f.action === 'VIEW' && f.data.some((d) => d.mimeType));
     const mimes = view!.data.map((d) => d.mimeType).filter((m): m is string => !!m);
     for (const format of OPENABLE_FORMATS) expect(mimes).toContain(MIME_BY_FORMAT[format]);
-    expect(mimes.every((mime) => PICKER_MIME_TYPES.includes(mime))).toBe(true);
+    // §8 B4: zips go to the restore / import flow, not to a viewer.
+    const zips: readonly string[] = ZIP_MIME_TYPES;
+    expect(mimes.filter((mime) => !zips.includes(mime)).every((mime) => PICKER_MIME_TYPES.includes(mime))).toBe(true);
+    expect(mimes).toEqual(expect.arrayContaining([...ZIP_MIME_TYPES]));
   });
 });
 

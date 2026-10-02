@@ -44,7 +44,9 @@
             { "mimeType": "text/comma-separated-values" },
             { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
             { "mimeType": "application/vnd.ms-excel" },
-            { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+            { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+            { "mimeType": "application/zip" },
+            { "mimeType": "application/x-zip-compressed" }
           ]
         },
         {

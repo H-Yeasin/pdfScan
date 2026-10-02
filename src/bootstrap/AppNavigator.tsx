@@ -22,6 +22,7 @@ import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
 import { ExamPackScreen } from '../screens/ExamPackScreen';
 import { StorageScreen } from '../screens/StorageScreen';
 import { BackupScreen } from '../screens/BackupScreen';
+import { RestoreHost } from '../components/backup/RestoreHost';
 import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
@@ -224,6 +225,8 @@ export function AppNavigator() {
       >
         <Incoming />
       </Animated.View>
+      {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
+      <RestoreHost />
     </View>
   );
 }

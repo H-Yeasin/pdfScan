@@ -4,6 +4,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBackupExport } from '../components/backup/useBackupExport';
+import { pickBackupZip } from '../store/backupIntake';
 import { SettingRow } from '../components/settings/SettingRow';
 import { formatBytes, formatDate } from '../i18n';
 import { useT } from '../i18n/useT';
@@ -62,6 +63,21 @@ export function BackupScreen() {
             onPress={hasDocuments && !busy ? () => void backUpEverything() : undefined}
           />
           <SettingRow title={t('backup.screen.last')} trailing={last} />
+        </View>
+
+        <View style={styles.section}>
+          <SettingRow
+            title={t('backup.screen.restore')}
+            subtitle={t('backup.screen.restoreSubtitle')}
+            chevron
+            onPress={busy ? undefined : () => void pickBackupZip(dispatch)}
+          />
+          <SettingRow
+            title={t('backup.screen.import')}
+            subtitle={t('backup.screen.importSubtitle')}
+            chevron
+            onPress={busy ? undefined : () => void pickBackupZip(dispatch)}
+          />
         </View>
 
         {Platform.OS === 'android' ? (

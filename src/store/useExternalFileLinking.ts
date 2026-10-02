@@ -3,6 +3,9 @@ import * as Linking from 'expo-linking';
 import { importExternalFile, LegacyWordDocError, pruneExternalOpens } from '../services/files/externalFileService';
 import { promoteExternalToLibrary } from '../services/persistence/libraryOperations';
 import { useAppDispatch } from './AppStateContext';
+import { File } from 'expo-file-system';
+import { looksLikeZip } from '../services/backup/incomingZip';
+import { openIncomingZip } from './backupIntake';
 import { useRouter } from '../navigation/router';
 import { t } from '../i18n';
 
@@ -24,6 +27,15 @@ function isFileUri(uri: string): boolean {
   return /^(file|content):\/\//i.test(uri);
 }
 
+// The name a content:// URI resolves to (its display name), when the provider tells.
+function safeName(uri: string): string | null {
+  try {
+    return new File(uri).name;
+  } catch {
+    return null;
+  }
+}
+
 export function useExternalFileLinking(libraryLoaded: boolean): void {
   const dispatch = useAppDispatch();
   const { go } = useRouter();
@@ -32,6 +44,11 @@ export function useExternalFileLinking(libraryLoaded: boolean): void {
   const openUri = useCallback(
     async (uri: string) => {
       if (!isFileUri(uri)) return;
+      // §8 B4: a PDF Scan backup or a shared course opens the restore / import flow.
+      if (looksLikeZip(uri) || looksLikeZip(safeName(uri))) {
+        await openIncomingZip(dispatch, uri);
+        return;
+      }
       try {
         const ext = await importExternalFile(uri);
         // Promoted straight to the Library (not left as an ephemeral SET_EXTERNAL view) so a file

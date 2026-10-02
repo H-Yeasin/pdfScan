@@ -27,6 +27,8 @@ import { searchDocumentsByText } from '../services/persistence/dbService';
 import { getMatchSnippet, searchDocuments } from '../services/search/searchService';
 import { importExternalFile, LegacyWordDocError } from '../services/files/externalFileService';
 import { PICKER_MIME_TYPES } from '../services/documents/formatCapabilities';
+import { looksLikeZip, ZIP_MIME_TYPES } from '../services/backup/incomingZip';
+import { openIncomingZip } from '../store/backupIntake';
 import { useStableCallback } from '../utils/useStableCallback';
 import { DOC_LIST_TUNING } from '../components/library/docListTuning';
 import type { LibraryDocument } from '../types/models';
@@ -148,8 +150,13 @@ export function LibraryScreen() {
 
 
   const handleOpenFile = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: [...PICKER_MIME_TYPES], copyToCacheDirectory: true });
+    const result = await DocumentPicker.getDocumentAsync({ type: [...PICKER_MIME_TYPES, ...ZIP_MIME_TYPES], copyToCacheDirectory: true });
     if (result.canceled || !result.assets[0]) return;
+    // §8 B4: a backup or a shared course goes to the restore / import flow instead.
+    if (looksLikeZip(result.assets[0].name, result.assets[0].mimeType)) {
+      await openIncomingZip(dispatch, result.assets[0].uri);
+      return;
+    }
     try {
       const ext = await importExternalFile(result.assets[0].uri, {
         originalFileName: result.assets[0].name,

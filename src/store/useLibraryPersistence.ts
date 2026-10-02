@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { backfillPdfInfo } from '../services/documents/pdfInfoBackfill';
-import { getDb } from '../services/persistence/dbService';
+import { getDb, withWriteLock } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
@@ -77,7 +77,8 @@ export function useLibraryPersistence(): boolean {
       if (!prev) return;
       const next = latest.current;
       try {
-        await syncLibrary(await getDb(), prev, next);
+        // Shares the write lock with a restore (§8 B4), so their transactions never overlap.
+        await withWriteLock(async () => syncLibrary(await getDb(), prev, next));
         committed.current = next;
       } catch (error) {
         console.warn('Failed to save library changes', error);
