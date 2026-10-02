@@ -1,8 +1,8 @@
 // The code points Helvetica (a standard PDF font, WinAnsi encoding) can draw: printable ASCII,
 // Latin-1 from U+00A0, and the 0x80–0x9F extras WinAnsi maps to typographic characters. It must
 // match `font.getCharacterSet()` for Helvetica, which pdfService.toWinAnsiSafe uses (a test
-// checks this). This copy exists so the UI can check text synchronously, without embedding a
-// font, e.g. to warn that a Bengali name will show as '?' on a cover page.
+// checks this). This copy exists to check text synchronously, without embedding a font:
+// visibleText.needsShaping (§6 L3) uses it to pick Helvetica or Skia for each run.
 const WIN_ANSI_EXTRAS = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
 
 const WIN_ANSI = new Set<number>();

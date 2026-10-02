@@ -1,12 +1,12 @@
-import { StandardFontEmbedder, StandardFonts } from 'pdf-lib';
 import { getDocType } from '../courses/docTypes';
-import { WIN_ANSI_CODE_POINTS } from './winAnsi';
+import { measureText, type MeasureText } from './visibleText';
 import type { Course, DocType, PageOcr, StudentProfile } from '../../types/models';
 
 // Cover page templates (§4 S4). layoutCover turns a template and its values into positioned items
-// in PDF points, top-left origin; pdfService.buildCoverPage draws them with pdf-lib (vector text)
-// and academicRasterService.renderCoverPageImage with Skia (the library's display copy). Line
-// breaks are decided here, once, with Helvetica's metrics, so both come out the same.
+// in PDF points, top-left origin; pdfService.buildCoverPage draws them into the PDF and
+// academicRasterService.renderCoverPageImage with Skia (the library's display copy). Line breaks
+// are decided here, once, with visibleText.measureText - Helvetica's metrics for text it can draw,
+// Skia's shaped width for any other script (§6 L3) - so both come out the same.
 
 export type CoverTemplateId = 'simple' | 'assignment' | 'lab';
 
@@ -92,7 +92,7 @@ export function normalizeCoverConfig(raw: unknown): CoverPageConfig | undefined 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // "2 October 2026": spelled out, so no reader mixes up day and month. English, like the rest of
-// the cover (Helvetica can't show other scripts yet).
+// the cover's labels (they move to the translation catalog in §6 L4).
 export function formatCoverDate(date: Date): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
@@ -145,22 +145,13 @@ export type CoverItem =
   | { kind: 'line'; x1: number; y1: number; x2: number; y2: number; width: number }
   | { kind: 'box'; x: number; y: number; width: number; height: number; borderWidth: number };
 
-export type MeasureText = (text: string, size: number, bold: boolean) => number;
+export type { MeasureText } from './visibleText';
+export { helveticaWidth } from './visibleText';
 
-// pdf-lib types StandardFontEmbedder.for with @pdf-lib/standard-fonts' own enum, which has the
-// same string values as the StandardFonts it exports.
-type FontName = Parameters<typeof StandardFontEmbedder.for>[0];
-const helvetica = StandardFontEmbedder.for(StandardFonts.Helvetica as unknown as FontName);
-const helveticaBold = StandardFontEmbedder.for(StandardFonts.HelveticaBold as unknown as FontName);
-
-export const helveticaWidth: MeasureText = (text, size, bold) => (bold ? helveticaBold : helvetica).widthOfTextAtSize(text, size);
-
-// Characters Helvetica can't draw become '?', as pdfService.toWinAnsiSafe does, and here already
-// so the Skia copy shows exactly what the PDF shows.
+// A field's text as one line of words: any script is drawn as typed since §6 L3 (it used to turn
+// what Helvetica couldn't draw into '?').
 export function coverSafe(text: string): string {
-  let out = '';
-  for (const ch of text.replace(/\s+/g, ' ').trim()) out += WIN_ANSI_CODE_POINTS.has(ch.codePointAt(0) ?? 0) ? ch : '?';
-  return out;
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 const ELLIPSIS = '…';
@@ -301,7 +292,7 @@ export function layoutCover(
   templateId: CoverTemplateId,
   values: CoverValues,
   page: PageSizePt,
-  measure: MeasureText = helveticaWidth
+  measure: MeasureText = measureText
 ): CoverItem[] {
   const v = values;
   if (templateId === 'simple') {
@@ -361,7 +352,7 @@ export function pageList(pages: readonly number[]): string {
 // The pack's first page: its title, a subtitle (course and date), then where each run of pages
 // came from: "Cell biology notes" / "p. 2, 4–6 · pack pages 2–5". Long lists wrap; a pack too
 // long for one page is cut with "…" (the pages themselves are all there).
-export function layoutContents(title: string, subtitle: string, entries: readonly ContentsEntry[], page: PageSizePt, measure: MeasureText = helveticaWidth): CoverItem[] {
+export function layoutContents(title: string, subtitle: string, entries: readonly ContentsEntry[], page: PageSizePt, measure: MeasureText = measureText): CoverItem[] {
   const layout = new Layout(page, measure, MARGIN_PT + 20);
   layout.centered(title, 22, true, 2, 4);
   layout.centered(subtitle, 12, false, 1, 10);
@@ -382,7 +373,7 @@ export function layoutContents(title: string, subtitle: string, entries: readonl
 
 // OCR blocks for a page drawn from items, so a generated page (the contents page) is searchable
 // like a scan: each text item becomes a line, in master pixels (`scale` = pixels per point).
-export function itemsAsOcr(items: readonly CoverItem[], scale: number, measure: MeasureText = helveticaWidth): PageOcr {
+export function itemsAsOcr(items: readonly CoverItem[], scale: number, measure: MeasureText = measureText): PageOcr {
   const blocks = items
     .filter((item): item is Extract<CoverItem, { kind: 'text' }> => item.kind === 'text')
     .map((item) => {

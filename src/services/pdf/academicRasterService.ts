@@ -1,9 +1,10 @@
 import { File, Paths } from 'expo-file-system';
-import { FontStyle, ImageFormat, PaintStyle, Skia } from '@shopify/react-native-skia';
+import { ImageFormat, PaintStyle, Skia } from '@shopify/react-native-skia';
 import type { SkCanvas } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
 import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
 import { fillPageNumbers, pageDimensions, type AcademicConfig, type PageSizeId } from './pdfService';
+import { drawShaped } from './skiaText';
 
 // ReaderScreen now renders the real compiled PDF (via PdfPageView), so this module's cover/
 // border/header-footer visuals are no longer needed to make the in-app reader match the export.
@@ -29,13 +30,8 @@ const STAMP_TEXT_COLOR = '#1a1a1a';
 // the same shape, 1200 px on the long side, like a normal scanned page's display copy.
 const COVER_RASTER_HEIGHT_PX = 1200;
 
-// No bundled font file / fontkit exists in this project (see pdfService.ts's own StandardFonts-
-// only convention), so text is drawn with the platform's default system font via FontMgr.System()
-// rather than requiring a shipped TTF asset.
-function systemFont(size: number, bold: boolean) {
-  const typeface = Skia.FontMgr.System().matchFamilyStyle('', bold ? FontStyle.Bold : FontStyle.Normal);
-  return Skia.Font(typeface, size);
-}
+// Text is drawn with skiaText.drawShaped: the same Skia Paragraph (system fonts, any script) the
+// PDF uses for text Helvetica can't draw (§6 L3), so the display copy and the PDF agree.
 
 async function writeJpeg(surface: NonNullable<ReturnType<typeof Skia.Surface.MakeOffscreen>>, prefix: string) {
   surface.flush();
@@ -77,8 +73,8 @@ export async function renderCoverPageImage(
 
 // Draws laid-out page items (coverTemplates: a cover, or §5 T6's exam-pack contents page) on a
 // white page-shaped canvas, COVER_RASTER_HEIGHT_PX tall, and writes it as a JPEG in the cache:
-// the same items pdfService draws as vectors, scaled from points to pixels. Text uses the system
-// font (no font files are bundled), centred with its own metrics; line breaks come from the layout.
+// the same items pdfService draws, scaled from points to pixels. Text is shaped with the system
+// fonts (skiaText.ts), centred with its own metrics; line breaks come from the layout.
 export async function renderLayoutImage(
   items: readonly CoverItem[],
   pageSize: PageSizeId,
@@ -93,9 +89,6 @@ export async function renderLayoutImage(
   canvas.drawColor(Skia.Color('#ffffff'));
 
   const scale = width / pagePt.width;
-  const textPaint = Skia.Paint();
-  textPaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
-  textPaint.setAntiAlias(true);
   const strokePaint = Skia.Paint();
   strokePaint.setStyle(PaintStyle.Stroke);
   strokePaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
@@ -103,9 +96,7 @@ export async function renderLayoutImage(
 
   for (const item of items) {
     if (item.kind === 'text') {
-      const font = systemFont(item.size * scale, item.bold);
-      const x = item.align === 'center' ? item.x * scale - font.measureText(item.text, textPaint).width / 2 : item.x * scale;
-      canvas.drawText(item.text, x, item.y * scale, textPaint, font);
+      drawShaped(canvas, item.text, item.x * scale, item.y * scale, item.size * scale, item.bold, item.align, STAMP_TEXT_COLOR);
     } else if (item.kind === 'line') {
       strokePaint.setStrokeWidth(item.width * scale);
       canvas.drawLine(item.x1 * scale, item.y1 * scale, item.x2 * scale, item.y2 * scale, strokePaint);
@@ -146,21 +137,14 @@ export function drawAcademicStamp(
     canvas.drawRect(Skia.XYWHRect(inset, inset, width - inset * 2, height - inset * 2), borderPaint);
   }
 
-  if (config.headerText || config.footerText) {
-    const textPaint = Skia.Paint();
-    textPaint.setColor(Skia.Color(STAMP_TEXT_COLOR));
-    textPaint.setAntiAlias(true);
-    const font = systemFont(STAMP_FONT_SIZE_RATIO * longSide, false);
-
-    if (config.headerText) {
-      canvas.drawText(fillPageNumbers(config.headerText, pageNumber, totalPages), STAMP_INSET_RATIO * longSide, HEADER_Y_RATIO * longSide, textPaint, font);
-    }
-
-    if (config.footerText) {
-      const text = fillPageNumbers(config.footerText, pageNumber, totalPages);
-      const textWidth = font.measureText(text, textPaint).width;
-      canvas.drawText(text, (width - textWidth) / 2, height - FOOTER_Y_RATIO * longSide, textPaint, font);
-    }
+  const size = STAMP_FONT_SIZE_RATIO * longSide;
+  if (config.headerText) {
+    const text = fillPageNumbers(config.headerText, pageNumber, totalPages);
+    drawShaped(canvas, text, STAMP_INSET_RATIO * longSide, HEADER_Y_RATIO * longSide, size, false, 'left', STAMP_TEXT_COLOR);
+  }
+  if (config.footerText) {
+    const text = fillPageNumbers(config.footerText, pageNumber, totalPages);
+    drawShaped(canvas, text, width / 2, height - FOOTER_Y_RATIO * longSide, size, false, 'center', STAMP_TEXT_COLOR);
   }
 }
 

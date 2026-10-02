@@ -1,4 +1,5 @@
 import { File, Paths } from 'expo-file-system';
+import { installFakeShaper } from '../../../test/fakeShaper';
 import { makePng } from '../../../test/png';
 import {
   COVER_TEMPLATES,
@@ -99,8 +100,15 @@ describe('layoutCover', () => {
     expect(first).toMatchObject({ text: 'Lab 2', bold: true, size: 24 });
   });
 
-  it("shows '?' for characters Helvetica can't draw", () => {
-    expect(texts(layoutCover('simple', { title: 'রহিম Rahim' }, A4))[0].text).toBe('???? Rahim');
+  it('keeps text in any script as typed, wrapped with its shaped width (§6 L3)', () => {
+    const { shaper, uninstall } = installFakeShaper();
+    try {
+      const [first] = texts(layoutCover('simple', { title: 'রহিম Rahim' }, A4));
+      expect(first.text).toBe('রহিম Rahim');
+      expect(shaper.measure).toHaveBeenCalledWith('রহিম Rahim', 24, true);
+    } finally {
+      uninstall();
+    }
   });
 });
 

@@ -25,6 +25,14 @@ export enum ImageFormat {
   JPEG = 3,
   PNG = 4,
 }
+export enum FontWeight {
+  Normal = 400,
+  Bold = 700,
+}
+export enum TextAlign {
+  Left = 0,
+  Center = 2,
+}
 export enum TileMode {
   Clamp = 0,
 }

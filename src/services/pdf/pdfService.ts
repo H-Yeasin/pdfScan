@@ -1,6 +1,6 @@
 import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues; also imported at the app entrypoint, but kept here too so this module is safe even if ever imported outside that graph (e.g. a future test file)
 import { File } from 'expo-file-system';
-import { PDFDocument, PageSizes, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFRef } from 'pdf-lib';
+import { PDFDocument, PageSizes, rgb, type PDFFont, type PDFPage, type PDFRef } from 'pdf-lib';
 import { renderPage } from '../enhance/skiaEnhance';
 import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
 import { getDocumentDir } from '../persistence/libraryFiles';
@@ -8,6 +8,7 @@ import { fitBox, type BoxFit } from '../../utils/fitBox';
 import type { LibraryDocument, PageLayout, PageOcr } from '../../types/models';
 import { drawOcrTextLayer, embedGlyphlessFont } from './textLayer';
 import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTemplates';
+import { createTextDrawer, type TextDrawer } from './visibleText';
 import type { PageSizeId } from './pageSize';
 
 export type { CoverPageConfig } from './coverTemplates';
@@ -172,9 +173,10 @@ function sniffImageKind(bytes: Uint8Array): 'png' | 'jpg' {
   return isPng ? 'png' : 'jpg';
 }
 
-// The visible stamp/cover text uses a standard font (WinAnsi encoding), which throws on any
-// character it can't encode - e.g. a Bengali or Chinese name - and used to sink the export. Such
-// characters become '?' instead. Proper per-script visible fonts are planned for §6.
+// What a standard font (WinAnsi encoding) would draw for `text`: anything it can't encode, which
+// would throw, becomes '?'. Visible text no longer goes through this - since §6 L3 it is drawn by
+// visibleText.ts in any script - but isWinAnsiSafe (winAnsi.ts) is tested against it, and
+// visibleText's last-resort fallback does the same.
 const winAnsiSets = new WeakMap<PDFFont, Set<number>>();
 export function toWinAnsiSafe(text: string, font: PDFFont): string {
   let supported = winAnsiSets.get(font);
@@ -191,7 +193,7 @@ export function toWinAnsiSafe(text: string, font: PDFFont): string {
 // index 0. Must be called BEFORE the per-content-page loop in buildPdfFromPages runs - see the
 // invariant comment above that loop for why prepending a page here is guaranteed not to affect
 // any content page's OCR text coordinates.
-async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig, pageDims: PageDims): Promise<void> {
+async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig, pageDims: PageDims, text: TextDrawer): Promise<void> {
   if (cover.mode === 'imported_image') {
     if (!cover.importedUri) {
       console.warn('pdfService: cover mode "imported_image" with no importedUri, skipping cover page');
@@ -224,21 +226,16 @@ async function buildCoverPage(pdfDoc: PDFDocument, cover: CoverPageConfig, pageD
 
   // mode === 'template': coverTemplates.layoutCover places everything; this only draws it.
   const page = pdfDoc.addPage([pageDims.width, pageDims.height]);
-  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  drawCoverItems(page, layoutCover(cover.templateId, cover.values, pageDims), regular, bold);
+  await drawCoverItems(page, layoutCover(cover.templateId, cover.values, pageDims), text);
 }
 
-// layoutCover's items are top-down; pdf-lib's y axis points up.
-function drawCoverItems(page: PDFPage, items: CoverItem[], regular: PDFFont, bold: PDFFont): void {
+// layoutCover's items are top-down; pdf-lib's y axis points up. Text in any script (§6 L3).
+async function drawCoverItems(page: PDFPage, items: CoverItem[], text: TextDrawer): Promise<void> {
   const pageHeight = page.getHeight();
   const ink = rgb(0.1, 0.1, 0.1);
   for (const item of items) {
     if (item.kind === 'text') {
-      const font = item.bold ? bold : regular;
-      const text = toWinAnsiSafe(item.text, font);
-      const x = item.align === 'center' ? item.x - font.widthOfTextAtSize(text, item.size) / 2 : item.x;
-      page.drawText(text, { x, y: pageHeight - item.y, size: item.size, font, color: ink });
+      await text.draw(page, item.text, { x: item.x, y: pageHeight - item.y, size: item.size, bold: item.bold, align: item.align });
     } else if (item.kind === 'line') {
       page.drawLine({
         start: { x: item.x1, y: pageHeight - item.y1 },
@@ -268,16 +265,17 @@ export function fillPageNumbers(text: string, pageNumber: number, totalPages: nu
 // Draws the optional border/header/footer onto one CONTENT page (never the cover page - the
 // cover is built separately by buildCoverPage and excluded from this stamping and from the
 // "Page X of Y" count entirely). Takes this call's own pageWidthPt/pageHeightPt rather than a
-// fixed size, matching the existing per-page-variable-size architecture.
-function stampAcademicPage(
+// fixed size, matching the existing per-page-variable-size architecture. Header and footer text
+// can be in any script (§6 L3, visibleText.ts).
+async function stampAcademicPage(
   pdfPage: PDFPage,
   pageWidthPt: number,
   pageHeightPt: number,
-  font: PDFFont,
+  text: TextDrawer,
   config: AcademicConfig,
   contentPageNumber: number,
   totalContentPages: number
-): void {
+): Promise<void> {
   if (config.enableBorder) {
     pdfPage.drawRectangle({
       x: STAMP_INSET_PT,
@@ -291,25 +289,19 @@ function stampAcademicPage(
   }
 
   if (config.headerText) {
-    pdfPage.drawText(toWinAnsiSafe(fillPageNumbers(config.headerText, contentPageNumber, totalContentPages), font), {
+    await text.draw(pdfPage, fillPageNumbers(config.headerText, contentPageNumber, totalContentPages), {
       x: STAMP_INSET_PT,
       y: pageHeightPt - HEADER_Y_FROM_TOP_PT,
       size: HEADER_FONT_SIZE,
-      font,
     });
   }
 
   if (config.footerText) {
-    const text = toWinAnsiSafe(
-      fillPageNumbers(config.footerText, contentPageNumber, totalContentPages),
-      font
-    );
-    const width = font.widthOfTextAtSize(text, FOOTER_FONT_SIZE);
-    pdfPage.drawText(text, {
-      x: (pageWidthPt - width) / 2,
+    await text.draw(pdfPage, fillPageNumbers(config.footerText, contentPageNumber, totalContentPages), {
+      x: pageWidthPt / 2,
       y: FOOTER_Y_PT,
       size: FOOTER_FONT_SIZE,
-      font,
+      align: 'center',
     });
   }
 }
@@ -324,7 +316,7 @@ async function buildStandardContentPages(
   pages: PdfSourcePage[],
   encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
-  stampFont: PDFFont,
+  text: TextDrawer,
   ocrFont: PDFRef,
   pageDims: PageDims,
   onPage?: (done: number, total: number) => void
@@ -352,7 +344,7 @@ async function buildStandardContentPages(
     // Cover page (if any) is intentionally excluded from this stamping and from the X/Y count -
     // it's not part of `pages`, and this block only ever runs for entries of that array.
     if (academicConfig) {
-      stampAcademicPage(pdfPage, pageDims.width, pageDims.height, stampFont, academicConfig, contentPageNumber, totalContentPages);
+      await stampAcademicPage(pdfPage, pageDims.width, pageDims.height, text, academicConfig, contentPageNumber, totalContentPages);
     }
     onPage?.(contentPageNumber, totalContentPages);
   }
@@ -396,7 +388,7 @@ async function buildTwoUpContentPages(
   pages: PdfSourcePage[],
   encoding: PageImageEncoding,
   academicConfig: AcademicConfig | undefined,
-  stampFont: PDFFont,
+  text: TextDrawer,
   ocrFont: PDFRef,
   pageDims: PageDims,
   onPage?: (done: number, total: number) => void
@@ -420,7 +412,7 @@ async function buildTwoUpContentPages(
     onPage?.(Math.min(i + 2, pages.length), pages.length);
 
     if (academicConfig) {
-      stampAcademicPage(pdfPage, sheet.width, sheet.height, stampFont, academicConfig, sheetNumber, totalSheets);
+      await stampAcademicPage(pdfPage, sheet.width, sheet.height, text, academicConfig, sheetNumber, totalSheets);
     }
   }
 }
@@ -448,10 +440,10 @@ export async function buildPdfFromPages(
   const pageDims = pageDimensions(pageSize);
 
   const pdfDoc = await PDFDocument.create();
-  // stampFont draws the visible header/footer/cover text (WinAnsi only - see toWinAnsiSafe);
-  // ocrFont is the glyphless font carrying the invisible OCR text in any script (textLayer.ts).
-  const stampFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  // ocrFont is the glyphless font carrying the invisible OCR text in any script (textLayer.ts);
+  // `text` draws the visible header/footer/cover text in any script (visibleText.ts), sharing it.
   const ocrFont = await embedGlyphlessFont(pdfDoc);
+  const text = createTextDrawer(pdfDoc, ocrFont);
 
   // --- Why inserting a cover page here can NEVER desync any content page's OCR text -----------
   // buildCoverPage() calls pdfDoc.addPage() before the loop below starts, so the cover becomes
@@ -470,13 +462,13 @@ export async function buildPdfFromPages(
   // page's own freshly-created PDFPage) - never of pdfDoc's page count or ordering. Adding an
   // unrelated page anywhere else in the document is provably a no-op for this math.
   if (academicConfig?.coverPage) {
-    await buildCoverPage(pdfDoc, academicConfig.coverPage, pageDims);
+    await buildCoverPage(pdfDoc, academicConfig.coverPage, pageDims, text);
   }
 
   if (layoutMode === '2_in_1') {
-    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims, options.onPage);
+    await buildTwoUpContentPages(pdfDoc, pages, encoding, academicConfig, text, ocrFont, pageDims, options.onPage);
   } else {
-    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, stampFont, ocrFont, pageDims, options.onPage);
+    await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, text, ocrFont, pageDims, options.onPage);
   }
 
   options.beforeSave?.(pdfDoc);

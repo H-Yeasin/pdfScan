@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
+import { installFakeShaper } from '../../../test/fakeShaper';
 import { makePng } from '../../../test/png';
 import { FAKE_SCRIPT_ID, FAKE_TEXT, installFakeScript } from '../../../test/fakeScript';
 import { buildPdfFromPages } from '../../pdf/pdfService';
@@ -13,11 +14,19 @@ jest.mock('../../enhance/skiaEnhance', () => ({ renderPage: jest.fn() }));
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 
 // §6 "done when": a script added only as a registry entry plus its engine works everywhere with no
-// other code change. (Visible PDF text joins this in L3.)
+// other code change: Settings, OCR, the PDF text layer and (L3) visible cover/footer text.
 describe('a new script needs only the registry and its engine', () => {
   let uninstall: () => void;
-  beforeEach(() => ({ uninstall } = installFakeScript()));
-  afterEach(() => uninstall());
+  let uninstallShaper: () => void;
+  beforeEach(() => {
+    ({ uninstall } = installFakeScript());
+    // Skia stand-in: visible text in an unknown script goes through the same shaping as any other.
+    ({ uninstall: uninstallShaper } = installFakeShaper());
+  });
+  afterEach(() => {
+    uninstall();
+    uninstallShaper();
+  });
 
   it('is offered in Settings and can be chosen for a course', () => {
     expect(READY_SCRIPTS.map((s) => s.id)).toContain(FAKE_SCRIPT_ID);
@@ -41,6 +50,23 @@ describe('a new script needs only the registry and its engine', () => {
     for (const line of FAKE_TEXT) {
       for (const word of line.split(' ')) expect(text).toContain(word);
     }
+  });
+
+  it('prints on a cover and a footer, searchable', async () => {
+    const image = new File(Paths.cache, `page_${Math.random()}.png`);
+    image.write(makePng(20, 28));
+    const [name, footer] = FAKE_TEXT;
+    const { uri } = await buildPdfFromPages(
+      `doc_${Math.random().toString(36).slice(2)}`,
+      [{ uri: image.uri, width: 1000, height: 1400 }],
+      'as-is',
+      { enableBorder: false, footerText: footer, coverPage: { mode: 'template', templateId: 'simple', values: { name } } }
+    );
+    const doc = await pdfjs.getDocument({ data: await new File(uri).bytes(), verbosity: 0, disableFontFace: true }).promise;
+    const textOf = async (n: number) =>
+      ((await (await doc.getPage(n)).getTextContent()).items as { str: string }[]).map((item) => item.str).join(' ').replace(/\s+/g, ' ');
+    expect(await textOf(1)).toContain(name);
+    expect(await textOf(2)).toContain(footer);
   });
 });
 
