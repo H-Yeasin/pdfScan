@@ -7,6 +7,7 @@ import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
 import { loadRemoteConfig } from '../services/remote/remoteConfig';
+import { loadEntitlement } from '../services/pro/entitlement';
 import { RESTING_STYLE, runSlide, transitionStyle } from '../navigation/transitions';
 import { useReducedMotion } from '../theme/useReducedMotion';
 import type { NavDir, ScreenName } from '../types/navigation';
@@ -111,6 +112,11 @@ export function AppNavigator() {
   useEffect(() => {
     if (afterBoot) initCrashReporting(crashReportsEnabled);
   }, [afterBoot, crashReportsEnabled]);
+  // §10 M3: one small secure-store read, not deferred, so Pro features and the banner policy
+  // (M5) see the pass as soon as they render.
+  useEffect(() => {
+    void loadEntitlement();
+  }, []);
   // §10 M2: the console's settings (ads switch, pass length, support contact); bundled defaults
   // until then and whenever Firebase isn't there.
   useEffect(() => {

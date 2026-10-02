@@ -29,6 +29,11 @@ describe('withBackupRules', () => {
     expect(xml).not.toContain('domain="cache"');
   });
 
+  it('leaves out the secure store (§10 M3: its keys never leave the phone)', () => {
+    expect(plugin.buildFullBackupContent()).toContain('<exclude domain="sharedpref" path="SecureStore.xml" />');
+    expect(plugin.buildDataExtractionRules()).toContain('<exclude domain="sharedpref" path="SecureStore.xml" />');
+  });
+
   it('points the manifest at both files', () => {
     const result = plugin.setBackupAttributes({ manifest: { application: [{ $: { 'android:name': '.MainApplication' } }] } });
     expect(result.manifest.application[0].$).toEqual({

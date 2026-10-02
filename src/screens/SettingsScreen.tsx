@@ -9,13 +9,14 @@ import { NameTemplateSection } from '../components/settings/NameTemplateSection'
 import { ProfileSection } from '../components/settings/ProfileSection';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
-import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, systemCatalogId, type DocumentLanguage, type UiLanguage } from '../i18n';
+import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, formatDate, systemCatalogId, type DocumentLanguage, type UiLanguage } from '../i18n';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref, touchSlop } from '../theme';
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
+import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
 
 
 const APP_VERSION = '1.0';
@@ -32,6 +33,8 @@ export function SettingsScreen() {
   const { go, hub } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
+  const entitlement = useEntitlement();
+  const isPro = useIsPro();
   // Class times of active courses only: an archived course's classes are over.
   const classCount = state.library.timetable.filter((slot) =>
     state.library.courses.some((c) => c.id === slot.courseId && !c.archived)
@@ -209,6 +212,15 @@ export function SettingsScreen() {
               subtitle={t('settings.developer.filterLabSubtitle')}
               chevron
               onPress={() => go('filterLab')}
+            />
+            <SettingRow
+              title={t('settings.developer.proPass')}
+              subtitle={
+                isPro && entitlement?.expiresAt
+                  ? t('settings.developer.proPassActive', { time: formatDate(entitlement.expiresAt, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) })
+                  : t('settings.developer.proPassInactive')
+              }
+              onPress={() => void setEntitlement(isPro ? null : grantPass(entitlement, Date.now(), 24))}
             />
           </View>
         )}

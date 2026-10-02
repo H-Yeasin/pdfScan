@@ -14,6 +14,7 @@ module.exports = {
     '^expo-haptics$': '<rootDir>/src/test/mocks/expoHaptics.ts',
     '^expo-notifications$': '<rootDir>/src/test/mocks/expoNotifications.ts',
     '^expo-clipboard$': '<rootDir>/src/test/mocks/expoClipboard.ts',
+    '^expo-secure-store$': '<rootDir>/src/test/mocks/expoSecureStore.ts',
     '^expo-localization$': '<rootDir>/src/test/mocks/expoLocalization.ts',
     '^@shopify/react-native-skia$': '<rootDir>/src/test/mocks/skia.ts',
     '^react-native-document-scanner-plugin$': '<rootDir>/src/test/mocks/documentScanner.ts',

@@ -146,6 +146,10 @@ export const en = {
       section: 'Developer',
       filterLab: 'Filter Lab',
       filterLabSubtitle: 'Compare every filter and tune its constants',
+      // §10 M3: test Pro features before the rewarded ad (M6) exists.
+      proPass: 'Grant a Pro day pass',
+      proPassActive: 'Pro until {time}. Tap to end it now.',
+      proPassInactive: 'No Pro. Tap for 24 hours of Pro.',
     },
     // §8 B1: Settings → Storage.
     storage: {
@@ -538,12 +542,17 @@ export const en = {
     unavailableTitle: 'Not available yet',
     unavailableBody:
       "{action} isn't wired up in this build — in-app purchases need store-side setup that hasn't happened yet. Everything you use today stays free either way.",
+    // §10 M3: one per services/pro/proFeatures.ts PRO_FEATURES entry.
     features: {
-      batch: 'Batch OCR and batch export across many files',
-      lock: 'Folder lock with fingerprint or passcode',
-      accents: 'Theme accents beyond the default',
-      backup: 'Automatic backup to your own Drive or Dropbox',
+      coverTemplates: 'More cover page designs',
+      themeAccents: 'Theme accent colours',
+      appLock: 'App lock with fingerprint or phone PIN',
+      noBanners: 'No banner ads',
+      pdfPasswords: 'Password-protected PDFs',
+      driveBackup: 'Automatic backup to your Google Drive',
     },
+    badge: 'PRO',
+    badgeLabel: 'Pro feature',
   },
 
   // Text that goes into documents, in the document language (tDoc), not the UI's.

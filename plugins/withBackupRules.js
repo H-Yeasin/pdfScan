@@ -25,6 +25,9 @@ const INCLUDE = [
 const EXCLUDE = [
   { domain: 'file', path: 'library/.trash/' },
   { domain: 'file', path: 'library/.incoming/' },
+  // §10 M3: expo-secure-store's values (the Pro entitlement) are encrypted with a key that never
+  // leaves this phone's keystore, so a restored copy couldn't be read on another phone.
+  { domain: 'sharedpref', path: 'SecureStore.xml' },
 ];
 
 function ruleLines(indent) {
