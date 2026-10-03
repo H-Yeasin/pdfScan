@@ -221,7 +221,8 @@ build, the device checks and the before/after numbers in `docs/qa/performance.md
     and the device checks in `docs/ads.md`.
 
 ### M6 · Rewarded "Pro day pass" and the new Pro screen *(M)*
-Status: todo
+Status: done in code (commit 79325da); open: the rewarded units in AdMob and Remote Config
+(`docs/ads.md`) and the device checks.
 
 - `ProScreen` rebuilt: what Pro includes (`live` features only), what stays free, and one
   button "**Watch an ad, get Pro for 24 hours**". When `pro_sales_enabled` is false (now), no
@@ -236,6 +237,31 @@ Status: todo
 - Tests: reward grants a pass; the daily cap; no reward if the ad is closed early; entry points.
 - Done when: a student can unlock all Pro features for 24 hours by watching one ad, and the
   pass expires cleanly by the lapse rules.
+- **As built:**
+  - `services/pro/dayPass.ts`: `applyReward` (pure) → `grantPass` + a log entry, or `capped`
+    once `pass_max_per_day` passes were granted on this **local calendar day**. The log
+    (`pro.passLog`, last 7 days) is in expo-secure-store next to the entitlement, out of
+    settings and backups. `claimDayPass` re-checks the cap at the reward, so a stale screen
+    can't exceed it. Moving the phone's date forward resets the cap (accepted, like the rest of
+    the phone-only check).
+  - `services/ads/rewarded.ts` `watchAdForPass`: `startAds({ retry: true })` (the student asked,
+    so the consent step may run here even before the 3rd session), then `RewardedAd` with
+    `TestIds.REWARDED` in dev or new Remote Config keys `ads_rewarded_unit_android` / `_ios`
+    (default empty = unavailable in release). Granted on `EARNED_REWARD` (so a pass isn't lost
+    if the app dies before the ad closes); `CLOSED` without it = `closedEarly`; `ERROR` or a 30 s
+    load timeout = `failed`. Results are reported in a snack.
+  - `ProScreen`: kicker, title, `pro.subtitle` with `pass_hours`, a "Pro until …" card while a
+    pass runs, `FeatureList` (live only: covers, accents, app lock, no banners), the free card,
+    the button ("Watch an ad for 24 more hours" while a pass runs, adding to it), passes left
+    today. No price or purchase text at all (a test checks); `pro_sales_enabled` isn't read
+    yet (M9). `FEATURES.pro` and `src/config/features.ts` are gone.
+  - Entry points: `useOfferPro` now just opens the Pro screen (no alert): locked cover
+    templates, accent swatches, the App lock switch, and a new Settings "PDF Scan Pro" row with
+    "Pro until Sat 18:40" (`passEndLabel`) as its trailing text. The router's `detourFrom`
+    makes Pro a detour: Back returns to where it was opened, and that screen's own
+    `previousScreen` is restored (Academic options still goes back to Deliver/Review).
+  - Lapse: covered by M3/M4/M5 (`useIsPro` re-renders at the end; banners return, accent goes
+    to teal, app lock stays, existing covers stay).
 
 ### M7 · Help & feedback contact *(S)*
 Status: todo
