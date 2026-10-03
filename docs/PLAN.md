@@ -273,7 +273,7 @@ ad (or the day pass); marking, OCR and copy/extract text stay free.
 **Detailed steps:** [`docs/plan/12-convert-edit.md`](plan/12-convert-edit.md)
 
 - [x] D1 Pro task gate: a full-screen ad, then the task continues (no broken flow, app lock safe, fail-open offline) — done in code; device check open
-- [ ] D2 Reader layout for studying (tool bar: Mark, Select text, Notes, Pages, Convert/Edit; reading settings)
+- [x] D2 Reader layout for studying (tool bar: Mark, Select text, Notes, Pages, Convert/Edit; reading settings) — done in code (Notes waits for D4); device check open
 - [ ] D3 Mark mode: highlight, underline, strikethrough, pen and notes while reading (free)
 - [ ] D4 Notes panel and notes export (free)
 - [ ] D5 Office → PDF (Pro)

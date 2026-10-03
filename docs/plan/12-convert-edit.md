@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D2** (reader layout). D1 is done in code.
+- **Next: D3** (Mark mode). D1 and D2 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -173,7 +173,30 @@ Status: done in code (commit dc17a06); device check open (see "Done when").
   airplane mode runs the task without an ad (up to the cap).
 
 ### D2 · Reader layout for studying *(M)*
-Status: not started.
+Status: done in code (commit 020361d); device check open (see "Done when").
+
+**As built:**
+- Split: `components/reader/useReaderDocument.ts` (document, files, page/password/load state,
+  resume and "where I left off"), `useReaderFind.ts`, `useReaderChrome.ts` (bars, immersive tap,
+  keep-awake), `ReaderToolBar.tsx`, `ReadingSettingsSheet.tsx`. `ReaderActionBar` and
+  `ReaderBottomChrome` are gone. `ReaderScreen.tsx` is ~700 lines: the signature flow and the
+  sheets stay in it.
+- Which actions show where is pure: `services/documents/readerTools.ts` (`readerTools`,
+  `readerMoreItems`, `readerProTasks`). More takes its item list from there (`OverflowSheet`
+  `items`), and scrolls on small phones.
+- **Notes isn't in the tool bar yet**: D4 adds it (the panel doesn't exist). Mark opens T4's
+  `AnnotateSheet` until D3; Mark and Select text show for scans only (`hasPageMasters`), as before.
+- **Convert/Edit** shows only when `readerProTasks` returns a task, i.e. once that feature is
+  `status: 'live'` in `PRO_FEATURES` (D5/D7/D10). Today none is, so it's hidden; the step that
+  makes the first one live adds the task picker (through `useProTask`) in `handleTool`.
+- Reading settings are **global** (`settings.reading`, `services/documents/readingSettings.ts`,
+  persisted in `app:settings`, read field by field by `normalizeReading`); none seemed worth a
+  per-document library column. Night moved there too (it used to be `reader.night`, unsaved), with
+  Low / Medium / High dimming (Medium = the old 0.72 overlay). Layout, fit and spacing show for
+  the PDF engine only. Keep screen on: `expo-keep-awake@~57.0.2`, tag `reader`, off by default (a native module:
+  **needs a new dev build**).
+- "Chrome comes back on scroll-up" = the page number going down (PDF engine); the text and sheet
+  viewers show it on tap only.
 
 - First split `ReaderScreen.tsx` (824 lines) into hooks and components (`useReaderDocument`,
   `useReaderFind`, `useReaderChrome`, `ReaderToolBar`) with no behaviour change, so the next

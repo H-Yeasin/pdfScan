@@ -22,7 +22,9 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   that swap, device checks (each plan file's Verification), E7's benchmark run, and
   §6 device checks (`docs/plan/06-languages.md`; L1–L4 are done, L3 without its device spike; L5–L6 wait for Bangla); §5 T7 (flashcards) is for later (P4).
   **§12 (reader + convert + light edit) is planned** (`docs/plan/12-convert-edit.md`, D1–D11, revised 2026-10-03); D1 (the
-  Pro task gate, `services/pro/proTask*.ts`, `components/pro/useProTask.tsx`) is done in code; next: D2. Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
+  Pro task gate, `services/pro/proTask*.ts`, `components/pro/useProTask.tsx`) and D2 (study-first
+  reader: `components/reader/useReader*.ts`, `ReaderToolBar`, `services/documents/readerTools.ts`,
+  reading settings in `settings.reading`) are done in code; next: D3. Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
   **§10 was revised (2026-10-02):** light ads + a rewarded "Pro day pass" + Firebase Remote Config,
   no login; paid Pro is parked (no Play payouts in Bangladesh). Never add text that sends users to
   pay outside Google Play (Play Payments policy); WhatsApp 01645724080 is a support contact only.
