@@ -175,7 +175,8 @@ Status: done in code (commit 1b97805); needs a new dev build and the device chec
     locked; recent apps card blank with "Hide in recent apps"; University logo in the PDF.
 
 ### M5 · Banner ads, light and safe *(M)*
-Status: todo
+Status: done in code (commit 81046d6); open: the owner's AdMob setup (`docs/ads.md`), a new dev
+build, the device checks and the before/after numbers in `docs/qa/performance.md`.
 
 - Add `react-native-google-mobile-ads@17.x` (peer `react-native >= 0.86`, matches; check its Expo
   plugin for `androidAppId`/`iosAppId`). AdMob app ids in `app.json`; ad unit ids from Remote
@@ -192,6 +193,32 @@ Status: todo
 - Tests: every `adPolicy` rule; `BannerSlot` renders nothing when the policy says no.
 - Done when: with `ads_enabled` on, a banner shows only on Home and Library, never on a
   capture-to-submit path, and cold start stays within budget.
+- **As built:**
+  - `react-native-google-mobile-ads@~17.2.0`; its plugin in `app.json` with Google's **sample**
+    app ids (test ads only) and `delayAppMeasurementInit`; `app.config.js` swaps in
+    `ADMOB_ANDROID_APP_ID` / `ADMOB_IOS_APP_ID` from the EAS environment. Banner units are new
+    Remote Config keys `ads_banner_unit_android` / `ads_banner_unit_ios` (default empty = no
+    banner in release); dev builds always use `TestIds.ADAPTIVE_BANNER`.
+  - `adPolicy.bannerBlock` returns the first rule that says no (`adsOff`, `screen`,
+    `onboarding`, `newUser` (< `MIN_SESSIONS_FOR_ADS` = 3), `pro` (via `canUseProFeature
+    ('noBanners', 'keep')`, now `live`), `offline` (unknown counts as offline), `processing`
+    (`capture.processingStatus` not idle), `sdk`, `noUnit`). Remote Config can narrow the
+    screens but only Home and Library render a `BannerSlot`.
+  - `adsSdk.startAds()` (module state, SDK required lazily): `AdsConsent.gatherConsent()`, then
+    `setRequestConfiguration({ maxAdContentRating: T })` and `initialize()` only when
+    `canRequestAds`; once per run, any failure leaves ads off. AppNavigator calls it after boot
+    only when a banner could show (ads on, onboarding done, third start, no Pro), so the
+    consent form never meets a brand-new student and phones with ads off never load the SDK.
+  - Personalisation: `nonPersonalizedOnly(gdprApplies, personalizedAdsEnabled)`: where UMP
+    applies, its answer (TCF) decides; elsewhere the M1 toggle sets
+    `requestNonPersonalizedAdsOnly`.
+  - `settings.appSessions` (+1 per cold start, `settings/COUNT_SESSION`); online from
+    `expo-network`'s `useNetworkState` (new native module).
+  - `BannerSlot` mounts the ad in a zero-height view until `onAdLoaded`, and renders nothing
+    after `onAdFailedToLoad`. In the Library it sits above the tab bar (not shown in selection
+    mode).
+  - Not done here: the cold start and APK size measurements (table in `docs/qa/performance.md`)
+    and the device checks in `docs/ads.md`.
 
 ### M6 · Rewarded "Pro day pass" and the new Pro screen *(M)*
 Status: todo

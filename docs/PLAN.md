@@ -245,7 +245,7 @@ exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no
 - [x] M2 Firebase Remote Config, no login (ads switch, pass length, support contact)
 - [x] M3 Pro feature registry and entitlements (pass / lifetime / yearly; a test guards the free list)
 - [x] M4 Pro features worth a pass: cover templates, theme accents, app lock
-- [ ] M5 Banner ads, light and safe (Home and Library only; consent; cold-start budget kept)
+- [x] M5 Banner ads, light and safe (Home and Library only; consent; cold-start budget kept)
 - [ ] M6 Rewarded "Pro day pass" and the new Pro screen
 - [ ] M7 Help & feedback contact (WhatsApp 01645724080, support only)
 - [ ] M8 Opt-in usage counts (Firebase Analytics, off by default, allow-listed events)
