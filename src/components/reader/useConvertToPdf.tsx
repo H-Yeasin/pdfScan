@@ -85,7 +85,8 @@ export function useConvertToPdf(opts: { preload: boolean }) {
 }
 
 // A plain view over the Reader, not a Modal: the snack and the next screen come up as usual.
-function Converting({ label }: { label: string }) {
+// Also D6's (useConvertToWord).
+export function Converting({ label }: { label: string }) {
   const { tokens } = useTheme();
   return (
     <View style={styles.overlay} pointerEvents="auto" accessibilityLiveRegion="polite">

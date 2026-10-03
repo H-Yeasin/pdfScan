@@ -17,6 +17,8 @@ const ICONS: Record<OverflowItemId, keyof typeof Ionicons.glyphMap> = {
   export: 'download-outline',
   // §12 D5: Office → PDF (Pro).
   convertToPdf: 'document-attach-outline',
+  // §12 D6: scan/PDF → Word (Pro).
+  convertToWord: 'document-text-outline',
   print: 'print-outline',
   sign: 'create-outline',
   // §7 R3: reorder, rotate, delete, extract and add pages of a saved document.

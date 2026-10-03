@@ -55,9 +55,13 @@ describe('§12 D2 reader tool bar', () => {
     // §12 D5: Office → PDF is live; editing (D7) isn't yet.
     expect(readerProTasks({ doc: docx })).toEqual(['convert']);
     expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles')).toEqual(['editFiles']);
-    // D6 (scan/PDF → Word) isn't built: a scan has no Convert yet, even with `convert` live.
-    expect(readerProTasks({ doc: scan }, allLive)).toEqual([]);
-    expect(readerProTasks({ doc: imported }, allLive)).toEqual(['pdfForms']);
+    // D6 (scan/PDF → Word) is built: a scan and a PDF have Convert once `convert` is live.
+    expect(readerProTasks({ doc: scan })).toEqual(['convert']);
+    expect(readerProTasks({ external: { format: 'PDF' } })).toEqual(['convert']);
+    expect(readerProTasks({ doc: locked })).toEqual([]);
+    // Before D6 was built, a scan had none.
+    expect(readerProTasks({ doc: scan }, allLive, { officeToPdf: true, pdfToWord: false })).toEqual([]);
+    expect(readerProTasks({ doc: imported }, allLive, { officeToPdf: true, pdfToWord: false })).toEqual(['pdfForms']);
   });
 
   it('lists Convert to PDF in More for office files once `convert` is live', () => {
@@ -65,6 +69,14 @@ describe('§12 D2 reader tool bar', () => {
     expect(readerMoreItems({ external: { format: 'CSV' } }, { proTasks: ['convert'] })).toContain('convertToPdf');
     expect(readerMoreItems({ doc: docx })).not.toContain('convertToPdf');
     expect(readerMoreItems({ doc: scan }, { proTasks: ['convert'] })).not.toContain('convertToPdf');
+  });
+
+  it('lists Convert to Word in More for scans and PDFs once `convert` is live', () => {
+    // §12 D6.
+    expect(readerMoreItems({ doc: scan }, { proTasks: ['convert'] })).toContain('convertToWord');
+    expect(readerMoreItems({ external: { format: 'PDF' } }, { proTasks: ['convert'] })).toContain('convertToWord');
+    expect(readerMoreItems({ doc: scan })).not.toContain('convertToWord');
+    expect(readerMoreItems({ doc: docx }, { proTasks: ['convert'] })).not.toContain('convertToWord');
   });
 });
 

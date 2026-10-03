@@ -27,6 +27,8 @@ export type ReaderMoreItemId =
   | 'export'
   // §12 D5: Office → PDF (Pro), also from the tool bar's Convert.
   | 'convertToPdf'
+  // §12 D6: scan/PDF → Word (Pro), also from the tool bar's Convert.
+  | 'convertToWord'
   | 'print'
   | 'sign'
   | 'editPages'
@@ -46,9 +48,9 @@ function formatOf(subject: ReaderSubject): DocFormat {
 
 const isLiveFeature = (id: ProTaskFeature) => getProFeature(id).status === 'live';
 
-// `convert` covers two conversions built in different steps: Office → PDF (D5, built) and
-// scan/PDF → Word (D6, not yet). D6 flips this.
-export const BUILT_CONVERSIONS = { officeToPdf: true, pdfToWord: false };
+// `convert` covers two conversions built in different steps: Office → PDF (D5) and scan/PDF → Word
+// (D6). Both are built; kept so the rules per format stay testable on their own.
+export const BUILT_CONVERSIONS = { officeToPdf: true, pdfToWord: true };
 
 // The Pro tasks this file allows (each through D1's gate). A feature counts once its step has
 // built it (`status: 'live'` in PRO_FEATURES); until then, none, and the Convert/Edit tool stays
@@ -91,7 +93,7 @@ export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly P
 }
 
 // `proTasks`: readerProTasks for this subject; Convert to PDF is listed when `convert` is one of
-// them on an office file.
+// them on an office file, Convert to Word when it is on a scan or PDF.
 export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: readonly ProTaskFeature[] } = {}): ReaderMoreItemId[] {
   const { doc } = subject;
   const raster = isPageRasterFormat(formatOf(subject));
@@ -102,6 +104,7 @@ export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: reado
   // Export shares the PDF; other formats have none (Share sends the file itself).
   if (raster) items.push('export');
   if (canConvertToPdf(formatOf(subject)) && opts.proTasks?.includes('convert')) items.push('convertToPdf');
+  if (raster && opts.proTasks?.includes('convert')) items.push('convertToWord');
   items.push('print');
   if (doc && canSign(doc)) items.push('sign');
   if (doc && canUsePageTools(doc)) items.push('editPages');

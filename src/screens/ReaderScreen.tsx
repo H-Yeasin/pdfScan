@@ -14,6 +14,7 @@ import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
 import { useConvertToPdf } from '../components/reader/useConvertToPdf';
+import { useConvertToWord } from '../components/reader/useConvertToWord';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
@@ -30,7 +31,7 @@ import {
 } from '../services/persistence/libraryOperations';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { canFindInDoc, canSign } from '../services/documents/formatCapabilities';
+import { canFindInDoc, canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
 import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../services/documents/readerTools';
 import { NIGHT_OVERLAY_ALPHA, pdfViewOptions, type ReadingSettings } from '../services/documents/readingSettings';
 import { useIsPro } from '../services/pro/entitlement';
@@ -121,9 +122,14 @@ export function ReaderScreen() {
   const proTasks = useMemo(() => (subject ? readerProTasks(subject) : []), [subject]);
   const tools = useMemo(() => (subject ? readerTools(subject, { proTasks, isPro }) : []), [subject, proTasks, isPro]);
   const moreItems = useMemo(() => (subject ? readerMoreItems(subject, { proTasks }) : []), [subject, proTasks]);
-  // §12 D5: Office → PDF, through D1's gate; an ad is loaded ahead while a convertible file is open.
-  const convert = useConvertToPdf({ preload: proTasks.includes('convert') });
+  // §12 D5/D6: Office → PDF and scan/PDF → Word, each through D1's gate; an ad is loaded ahead
+  // while a file one of them applies to is open (only by that one: a file has one of the two).
+  const subjectFormat = external ? external.format : doc?.format;
+  const toWord = !!subjectFormat && isPageRasterFormat(subjectFormat);
+  const convert = useConvertToPdf({ preload: proTasks.includes('convert') && !toWord });
+  const word = useConvertToWord({ preload: proTasks.includes('convert') && toWord });
   const { start: startConvert } = convert;
+  const { start: startWord } = word;
   const convertSource = useMemo(() => {
     if (external) return { uri: external.uri, name: external.name, format: external.format, docId: external.uri };
     if (doc?.contentUri) return { uri: doc.contentUri, name: doc.name, format: doc.format, docId: doc.id };
@@ -132,6 +138,10 @@ export function ReaderScreen() {
   const convertToPdf = useCallback(() => {
     if (convertSource) startConvert(convertSource);
   }, [convertSource, startConvert]);
+  const convertToWord = useCallback(() => {
+    if (external) startWord({ uri: external.uri, name: external.name, title: external.name, grantId: external.uri });
+    else if (doc) startWord({ docId: doc.id, title: doc.name, grantId: doc.id });
+  }, [doc, external, startWord]);
 
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [readingOpen, setReadingOpen] = useState(false);
@@ -219,9 +229,12 @@ export function ReaderScreen() {
 
   const handleTool = useCallback(
     (id: ReaderToolId) => {
-      // Today the only Pro task an office file has is Office → PDF (D5); D7's editing adds a picker.
+      // Today a file's only Pro task is one conversion: Office → PDF (D5) for an office file,
+      // scan/PDF → Word (D6) for a scan or PDF. D7's editing adds a picker.
       if (id === 'convertEdit') {
-        if (proTasks.includes('convert')) convertToPdf();
+        if (!proTasks.includes('convert')) return;
+        if (toWord) convertToWord();
+        else convertToPdf();
         return;
       }
       if (!doc) return;
@@ -232,7 +245,7 @@ export function ReaderScreen() {
       else if (id === 'notes') setNotesOpen(true);
       else if (id === 'pages') setScrubberOpen(true);
     },
-    [doc, activeIndex, proTasks, convertToPdf]
+    [doc, activeIndex, proTasks, toWord, convertToPdf, convertToWord]
   );
 
   const handleOverflowSelect = useCallback(
@@ -250,6 +263,8 @@ export function ReaderScreen() {
         else if (pdfUri) await shareAs(pdfUri, shareFileName(title, 'pdf'), 'application/pdf');
       } else if (id === 'convertToPdf') {
         convertToPdf();
+      } else if (id === 'convertToWord') {
+        convertToWord();
       } else if (id === 'sign') {
         if (!doc || !signVisible) return;
         if (doc.format === 'PDF') {
@@ -323,7 +338,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -700,6 +715,7 @@ export function ReaderScreen() {
       ) : null}
 
       {convert.element}
+      {word.element}
 
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />

@@ -481,6 +481,8 @@ export const en = {
       readingSettings: 'Reading settings',
       // §12 D5.
       convertToPdf: 'Convert to PDF',
+      // §12 D6.
+      convertToWord: 'Convert to Word',
     },
     // §12 D2: the bottom tool bar.
     tools: {
@@ -523,6 +525,16 @@ export const en = {
       open: 'Open',
       failed: "Couldn't convert this file.",
       tooLarge: 'This file is too large to convert.',
+    },
+    // §12 D6: scan/PDF → Word. Said before the ad: it keeps the text and its order, not the layout.
+    word: {
+      title: 'Convert to Word',
+      loss: "The Word file keeps the text and its order, not the exact layout: no columns, tables, pictures or fonts. Your original doesn't change.",
+      progress: 'Converting to Word…',
+      progressPages: 'Converting to Word… page {page} of {count}',
+      done: 'Saved as a Word file in your Library',
+      doneInLibrary: "'{name}' is now a Word file in your Library",
+      failed: "Couldn't convert this document.",
     },
     noPageText: 'No text found on this page',
     copiedPage: 'Copied the text of page {page}',
@@ -679,8 +691,7 @@ export const en = {
       noBanners: 'No banner ads',
       pdfPasswords: 'Password-protected PDFs',
       driveBackup: 'Automatic backup to your Google Drive',
-      // §12 D6 adds "and scans to Word".
-      convert: 'Convert Word, Excel and text files to PDF',
+      convert: 'Convert Word, Excel and text files to PDF, and scans to Word',
       editFiles: 'Edit text, CSV, Excel and Word files',
       pdfForms: 'Fill in PDF forms and add text to PDFs',
     },
@@ -773,6 +784,10 @@ export const en = {
       kind: { highlight: 'Highlight', underline: 'Underline', strike: 'Strike', note: 'Note', bookmark: 'Bookmark' },
       quoted: '{kind}: “{text}”',
       plain: '{kind}: {text}',
+    },
+    // §12 D6: a page of a scan or PDF where no text was found, in the Word file.
+    word: {
+      noText: 'Page {page}: no text found',
     },
     contents: {
       title: 'Contents',
