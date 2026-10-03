@@ -40,7 +40,8 @@ import { formatShortDate } from '../utils/format';
 import { libraryIdxFor, pdfPageFor } from '../services/documents/pageMap';
 import * as Clipboard from 'expo-clipboard';
 import { SelectTextSheet } from '../components/reader/SelectTextSheet';
-import { AnnotateSheet } from '../components/reader/AnnotateSheet';
+import { MarkView } from '../components/reader/MarkView';
+import { useAnnotationPdfSync } from '../components/reader/useAnnotationPdfSync';
 import { BookmarksSheet } from '../components/bookmarks/BookmarkList';
 import { documentBookmarks } from '../services/study/bookmarks';
 import { TextPromptModal } from '../components/shared/TextPromptModal';
@@ -127,8 +128,20 @@ export function ReaderScreen() {
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
   // §5 T3: the library page open in "Select text", or null.
   const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
-  // §5 T4: the library page "Mark" opened on, or null.
-  const [annotateIdx, setAnnotateIdx] = useState<number | null>(null);
+  // §12 D3: the library page Mark mode opened on, or null.
+  const [markIdx, setMarkIdx] = useState<number | null>(null);
+  // §12 D3: marks reach document.pdf in the background; the viewer then reloads on the page being
+  // read (tagged with the reload it's for, so another reload doesn't reuse it).
+  const [startPage, setStartPage] = useState<{ contentKey: string | undefined; reloadKey: number; page: number } | null>(null);
+  const position = useRef({ activeIndex, contentKey, reloadKey });
+  position.current = { activeIndex, contentKey, reloadKey };
+  const syncAnnotations = useAnnotationPdfSync(
+    useCallback(() => {
+      const { activeIndex: idx, contentKey: key, reloadKey: current } = position.current;
+      setStartPage({ contentKey: key, reloadKey: current + 1, page: idx + 1 });
+      reload();
+    }, [reload])
+  );
   // §5 T5: bookmarks of this document, and the one on the page on screen.
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [labelling, setLabelling] = useState(false);
@@ -139,7 +152,7 @@ export function ReaderScreen() {
   // hint shows inside the overflow sheet, next to Submit, the first time it's there.
   const sheetOpen =
     overflowOpen || readingOpen || typePickerOpen || jumpOpen || scrubberOpen || submissionsOpen || bookmarksOpen || labelling ||
-    signing || signStep !== null || selectTextIdx !== null || annotateIdx !== null || needsPassword;
+    signing || signStep !== null || selectTextIdx !== null || markIdx !== null || needsPassword;
   const canBookmark = !!doc && !external && isPageRaster;
   const bookmarkHint = useHint('readerBookmark', canBookmark && chrome.shown && !find.open && !sheetOpen);
   const showSubmit = moreItems.includes('submit');
@@ -185,7 +198,7 @@ export function ReaderScreen() {
       if (!doc) return;
       // The library page on screen (on a 2-up sheet, its left page).
       const idx = libraryIdxFor(doc, activeIndex + 1);
-      if (id === 'mark') setAnnotateIdx(idx);
+      if (id === 'mark') setMarkIdx(idx);
       else if (id === 'selectText') setSelectTextIdx(idx);
       else if (id === 'pages') setScrubberOpen(true);
       // 'convertEdit' only shows once a Pro task is live (readerProTasks); D5–D10 add the sheet
@@ -386,6 +399,7 @@ export function ReaderScreen() {
           fitPolicy={pdfOptions.fitPolicy}
           spacing={pdfOptions.spacing}
           highlightRects={find.highlightRects}
+          initialPage={startPage && startPage.contentKey === contentKey && startPage.reloadKey === reloadKey ? startPage.page : undefined}
           onLoad={handleLoad}
           onPageChanged={onPageChanged}
           onTap={chrome.toggle}
@@ -593,20 +607,16 @@ export function ReaderScreen() {
         }}
       />
 
-      {doc && annotateIdx !== null ? (
-        <AnnotateSheet
+      {doc && selectTextIdx !== null ? (
+        <SelectTextSheet
+          visible
           doc={doc}
-          startIdx={annotateIdx}
-          onClose={(changed) => {
-            setAnnotateIdx(null);
-            // The PDF view caches the file; reload it to show the new annotations.
-            if (changed) reload();
+          pageIdx={selectTextIdx}
+          onClose={(marked) => {
+            setSelectTextIdx(null);
+            if (marked) syncAnnotations(doc.id);
           }}
         />
-      ) : null}
-
-      {doc && selectTextIdx !== null ? (
-        <SelectTextSheet visible doc={doc} pageIdx={selectTextIdx} onClose={() => setSelectTextIdx(null)} />
       ) : null}
 
       {signing && doc && doc.pages[activeIndex] && (
@@ -621,6 +631,20 @@ export function ReaderScreen() {
       )}
 
       {editPages.overlays}
+
+      {doc && markIdx !== null ? (
+        <MarkView
+          doc={doc}
+          startIdx={markIdx}
+          onClose={({ lastIdx, changed }) => {
+            setMarkIdx(null);
+            // Back in the native viewer on the page last marked (§5 T1 pageMap: a 2-in-1 sheet
+            // holds two library pages).
+            goToPage(pdfPageFor(doc, lastIdx).page);
+            if (changed) syncAnnotations(doc.id);
+          }}
+        />
+      ) : null}
 
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />

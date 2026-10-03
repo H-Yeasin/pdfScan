@@ -1,3 +1,5 @@
+import { DEFAULT_MARK, normalizeMark, type MarkPrefs } from '../annotations/markMode';
+
 // §12 D2: how the Reader shows a document. One set for every document: the choices are about how
 // the student likes to read (page by page, screen kept on), not about one file, and a per-document
 // copy would need a new library column for little gain. Stored in settings (`app:settings`), so
@@ -21,6 +23,8 @@ export type ReadingSettings = {
   nightStrength: NightStrength;
   // Keep the screen on while the Reader is open (expo-keep-awake). Off by default: battery.
   keepAwake: boolean;
+  // §12 D3: Mark mode's last tool and colours (annotations/markMode).
+  mark: MarkPrefs;
 };
 
 export const DEFAULT_READING: ReadingSettings = {
@@ -31,6 +35,7 @@ export const DEFAULT_READING: ReadingSettings = {
   night: false,
   nightStrength: 'medium',
   keepAwake: false,
+  mark: DEFAULT_MARK,
 };
 
 export const READING_SPACING_PX: Record<ReadingSpacing, number> = { none: 0, small: 10, large: 24 };
@@ -56,6 +61,7 @@ export function normalizeReading(raw: unknown): ReadingSettings {
     night: r.night === true,
     nightStrength: pick(STRENGTHS, r.nightStrength, DEFAULT_READING.nightStrength),
     keepAwake: r.keepAwake === true,
+    mark: normalizeMark(r.mark),
   };
 }
 

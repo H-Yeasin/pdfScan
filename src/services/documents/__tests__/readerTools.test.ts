@@ -20,7 +20,12 @@ describe('§12 D2 reader tool bar', () => {
     expect(ids(readerTools({ doc: onePageScan }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText']);
   });
 
-  it('keeps Mark and Select text to pages with masters', () => {
+  it('offers Mark and Select text on scans and on indexed imported PDFs', () => {
+    // §12 D3: an imported PDF's pages are rendered on demand, once indexing gave them their size
+    // and words (a thumbnail is written last); not when it needs a password.
+    const indexed = { ...imported, pages: [{ ...imported.pages[0], thumbUri: 'thumb.jpg' }] };
+    expect(ids(readerTools({ doc: indexed }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText']);
+    expect(ids(readerTools({ doc: { ...indexed, indexState: 'encrypted' } }, { proTasks: [], isPro: false }))).toEqual([]);
     expect(ids(readerTools({ doc: imported }, { proTasks: [], isPro: false }))).toEqual([]);
     expect(ids(readerTools({ doc: docx }, { proTasks: [], isPro: false }))).toEqual([]);
     expect(ids(readerTools({ external: { format: 'PDF' } }, { proTasks: [], isPro: false }))).toEqual([]);
@@ -81,6 +86,10 @@ describe('§12 D2 reading settings', () => {
   it('reads nothing stored as the defaults', () => {
     expect(normalizeReading(undefined)).toEqual(DEFAULT_READING);
     expect(normalizeReading('paged')).toEqual(DEFAULT_READING);
+  });
+
+  it('keeps Mark mode\'s last tool (§12 D3)', () => {
+    expect(normalizeReading({ mark: { tool: 'underline', lineColor: 'blue' } }).mark).toEqual({ ...DEFAULT_READING.mark, tool: 'underline', lineColor: 'blue' });
   });
 
   it('maps to the PDF engine props', () => {

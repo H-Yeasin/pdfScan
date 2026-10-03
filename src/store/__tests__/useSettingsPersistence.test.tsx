@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_MARK } from '../../services/annotations/markMode';
 import { act, create } from 'react-test-renderer';
 import { getUiLanguage, setUiLanguage } from '../../i18n';
 import { ThemeProvider } from '../../theme';
@@ -175,10 +176,14 @@ describe('§12 D2 reading settings', () => {
       night: false,
       nightStrength: 'medium',
       keepAwake: false,
+      mark: DEFAULT_MARK,
     });
+    const mark = { ...DEFAULT_MARK, tool: 'underline' as const, lineColor: 'blue' as const };
     await act(async () => {
       first().dispatch({ type: 'settings/SET_READING', reading: { layout: 'paged', keepAwake: true } });
       first().dispatch({ type: 'settings/SET_READING', reading: { night: true, nightStrength: 'high' } });
+      // §12 D3: Mark mode's last tool and colour.
+      first().dispatch({ type: 'settings/SET_READING', reading: { mark } });
     });
     await flush();
     const second = await mount();
@@ -189,6 +194,7 @@ describe('§12 D2 reading settings', () => {
       night: true,
       nightStrength: 'high',
       keepAwake: true,
+      mark,
     });
   });
 

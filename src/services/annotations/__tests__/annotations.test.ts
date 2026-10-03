@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system';
-import { PDFDocument } from 'pdf-lib';
+import { degrees, PDFDocument, PDFName } from 'pdf-lib';
 import { makePng } from '../../../test/png';
 import { makeDoc } from '../../../test/fixtures';
 import { initialLibraryState, libraryReducer } from '../../../store/slices/librarySlice';
@@ -7,8 +7,10 @@ import { buildPdfFromPages } from '../../pdf/pdfService';
 import { pdfRectFor } from '../../documents/pageMap';
 import { compressDocument } from '../../persistence/libraryOperations';
 import type { Annotation, LibraryDocument, LibraryPage, PageOcr } from '../../../types/models';
+import { markLine } from '../marks';
 import { NM_PREFIX, removeOurAnnotations, updatePdfAnnotations, writeAnnotations } from '../pdfAnnotations';
-import { snapHighlight } from '../snap';
+import { snapHighlight, wordRects } from '../snap';
+import { readingOrderTokens } from '../../study/textSelection';
 
 jest.mock('../../enhance/skiaEnhance', () => ({
   renderPage: jest.fn(async () => {
@@ -57,6 +59,38 @@ describe('snapHighlight', () => {
     const { rects, text } = snapHighlight([[600, 600], [700, 610]], OCR, 20);
     expect(text).toBeUndefined();
     expect(rects).toEqual([{ left: 590, top: 590, width: 120, height: 30 }]);
+  });
+});
+
+describe('§12 D3 underline and strike', () => {
+  it('snap to the same words as a highlight', () => {
+    // Underline and strike use the highlighter's snapping; only the drawing differs.
+    const stroke: [number, number][] = [[110, 128], [260, 126]];
+    expect(snapHighlight(stroke, OCR, 24)).toEqual({ rects: [{ left: 100, top: 100, width: 180, height: 30 }], text: 'alpha beta' });
+  });
+
+  it('a selection becomes one rect per line, with its text', () => {
+    const tokens = readingOrderTokens(OCR);
+    const { rects, text } = wordRects(tokens.slice(1, 4));
+    expect(text).toBe('beta gamma\ndelta');
+    expect(rects).toEqual([
+      { left: 200, top: 100, width: 180, height: 30 },
+      { left: 100, top: 160, width: 80, height: 30 },
+    ]);
+    expect(wordRects([])).toEqual({ rects: [] });
+  });
+
+  it('an underline sits on the bottom of the words, a strike through their middle', () => {
+    const rect = { left: 10, top: 100, width: 50, height: 30 };
+    const under = markLine('underline', rect);
+    expect(under.left).toBe(10);
+    expect(under.width).toBe(50);
+    expect(under.top + under.height).toBeCloseTo(130);
+    expect(under.height).toBe(3);
+    const strike = markLine('strike', rect);
+    expect(strike.top + strike.height / 2).toBeCloseTo(115.6);
+    // A tall line gets a thicker stroke.
+    expect(markLine('underline', { ...rect, height: 100 }).height).toBeCloseTo(8);
   });
 });
 
@@ -127,6 +161,68 @@ describe('PDF annotations', () => {
     await updatePdfAnnotations({ ...doc, pdfUri: built.uri }, [second]);
     expect((await annotationsIn(built.uri)).map((a) => a.contents)).toEqual(['two']);
     expect((await PDFDocument.load(await new File(built.uri).bytes())).getPageCount()).toBe(2);
+  });
+
+  it('writes underline and strike as /Underline and /StrikeOut with quad points', async () => {
+    const doc = libraryDoc('doc_lines');
+    const rect = { left: 100, top: 100, width: 180, height: 30 };
+    const underline = annotation({ kind: 'underline', color: 'red', data: { rects: [rect] }, text: 'alpha beta' });
+    const strike = annotation({ kind: 'strike', color: 'blue', pageId: 'p1', data: { rects: [rect] } });
+    const { uri } = await buildPdfFromPages(doc.id, doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height })), 'as-is', undefined, 'standard', 'A4', {
+      beforeSave: (pdf) => writeAnnotations(pdf, doc, [underline, strike]),
+    });
+    const found = await annotationsIn(uri);
+    expect(found.map((a) => [a.page, a.subtype])).toEqual([
+      [1, 'StrikeOut'],
+      [2, 'Underline'],
+    ]);
+    expect(found[1].contents).toBe('alpha beta');
+
+    const pdfDoc = await PDFDocument.load(await new File(uri).bytes());
+    const expected = pdfRectFor(doc, 1, rect)!;
+    const annots = pdfDoc.getPage(1).node.Annots()!;
+    const dict = pdfDoc.context.lookup(annots.get(0)) as unknown as { get: (n: unknown) => { asArray: () => { asNumber: () => number }[] } };
+    // Upper-left, upper-right, lower-left, lower-right of the words.
+    const quads = dict.get(PDFName.of('QuadPoints')).asArray().map((n) => n.asNumber());
+    const want = [expected.x, expected.y + expected.height, expected.x + expected.width, expected.y + expected.height, expected.x, expected.y, expected.x + expected.width, expected.y];
+    quads.forEach((q, i) => expect(Math.abs(q - want[i])).toBeLessThan(0.01));
+    expect(removeOurAnnotations(pdfDoc)).toBe(2);
+  });
+
+  it('places marks on an imported PDF by its own pages, turned or not', async () => {
+    // Page 1 upright, page 2 with /Rotate 90, page 3 turned in the app after indexing (R3).
+    const source = await PDFDocument.create();
+    for (let i = 0; i < 3; i++) source.addPage([600, 800]);
+    source.getPage(1).setRotation(degrees(90));
+    source.getPage(2).setRotation(degrees(90));
+    const file = new File(Paths.cache, `imported_${Math.random()}.pdf`);
+    file.write(await source.save());
+    // Master pixels of each page as shown when indexed (2400 px on the long side: 3 px per point).
+    const pages: LibraryPage[] = [
+      { id: 'i1', fileUri: '', thumbUri: 'x', width: 1800, height: 2400 },
+      { id: 'i2', fileUri: '', thumbUri: 'x', width: 2400, height: 1800 },
+      { id: 'i3', fileUri: '', thumbUri: 'x', width: 1800, height: 2400, rotation: 90 },
+    ];
+    const doc = makeDoc({ id: 'doc_imported', sourceKind: 'imported_pdf', pages, pdfUri: file.uri, pdfLayout: 'standard' });
+    const rect = { left: 300, top: 600, width: 600, height: 60 };
+    await updatePdfAnnotations(
+      doc,
+      pages.map((p) => annotation({ kind: 'highlight', pageId: p.id, data: { rects: [rect] } }))
+    );
+    const found = await annotationsIn(file.uri);
+    expect(found.map((a) => a.page)).toEqual([1, 2, 3]);
+    const near = (got: number[], want: number[]) => got.forEach((v, i) => expect(Math.abs(v - want[i])).toBeLessThan(0.01));
+    // Points (100, 200) to (300, 220) from the top-left of the page as shown.
+    near(found[0].rect, [100, 580, 300, 600]);
+    // Shown turned a quarter clockwise: down the page's left side in its own space.
+    near(found[1].rect, [200, 100, 220, 300]);
+    near(found[2].rect, [100, 580, 300, 600]);
+    // Checked against pdf.js's own page-to-screen transform: on page 2 (as shown, with its
+    // /Rotate) the highlight covers exactly those points.
+    const pdf = await pdfjs.getDocument({ data: await file.bytes(), verbosity: 0, disableFontFace: true }).promise;
+    const viewport = (await pdf.getPage(2)).getViewport({ scale: 1 });
+    const [x1, y1, x2, y2] = viewport.convertToViewportRectangle(found[1].rect) as number[];
+    near([Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)], [100, 200, 300, 220]);
   });
 
   it('Compress keeps the annotations', async () => {

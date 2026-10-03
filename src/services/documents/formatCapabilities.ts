@@ -1,4 +1,4 @@
-import type { DocFormat, LibraryDocument } from '../../types/models';
+import type { DocFormat, LibraryDocument, LibraryPage } from '../../types/models';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import { isPdfNativeAvailable } from '../pdf/pdfNative';
 
@@ -58,6 +58,19 @@ export function canSubmit(doc: LibraryDocument): boolean {
 // packs (T6). Not for PDF-level documents, whose pages have no master.
 export function hasPageMasters(doc: LibraryDocument): boolean {
   return isPageRasterFormat(doc.format) && !isPdfLevel(doc) && doc.pages.length > 0;
+}
+
+// §12 D3: Mark mode and Select text. A scan works on its page masters; an imported PDF on its
+// pages rendered on demand (modules/pdf-native), once R1 has indexed them - indexing gives a page
+// its real size and its words, which marks are measured in and snap to.
+export function canMark(doc: LibraryDocument): boolean {
+  if (hasPageMasters(doc)) return true;
+  return doc.format === 'PDF' && isPdfLevel(doc) && !isPasswordProtected(doc) && isPdfNativeAvailable() && doc.pages.some(canMarkPage);
+}
+
+// One page of such a document: a master, or (imported) indexed - its thumbnail is written last.
+export function canMarkPage(page: Pick<LibraryPage, 'fileUri' | 'thumbUri'>): boolean {
+  return !!page.fileUri || !!page.thumbUri;
 }
 
 export function canFindInDoc(format: DocFormat): boolean {

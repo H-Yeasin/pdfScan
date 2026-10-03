@@ -37,7 +37,8 @@ function union(boxes: readonly OcrBounding[]): OcrBounding {
 
 // §5 T4: a highlighter stroke snapped to the words it passes through (within half the stroke's
 // thickness), merged into one rect per OCR line, plus the highlighted text. A stroke that crosses
-// no word becomes one free rect around itself, with no text.
+// no word becomes one free rect around itself, with no text. §12 D3's underline and strike snap
+// the same way; only how the rects are drawn differs (marks.markLine).
 export function snapHighlight(
   stroke: readonly Point[],
   ocr: PageOcr | undefined,
@@ -58,10 +59,17 @@ export function snapHighlight(
     const top = Math.min(...ys) - half;
     return { rects: [{ left, top, width: Math.max(...xs) + half - left, height: Math.max(...ys) + half - top }] };
   }
+  return wordRects(hit);
+}
+
+// Words (from a stroke, or §12 D3's Select text → Highlight/Underline) as one rect per OCR line
+// they're on, plus their text in reading order.
+export function wordRects(words: readonly TextToken[]): { rects: OcrBounding[]; text?: string } {
+  if (words.length === 0) return { rects: [] };
   const byLine = new Map<string, TextToken[]>();
-  for (const token of hit) {
+  for (const token of words) {
     const key = `${token.block}:${token.line}`;
     byLine.set(key, [...(byLine.get(key) ?? []), token]);
   }
-  return { rects: [...byLine.values()].map((line) => union(line.map((t) => t.bounding))), text: selectionText(hit) };
+  return { rects: [...byLine.values()].map((line) => union(line.map((t) => t.bounding))), text: selectionText(words) || undefined };
 }

@@ -1,7 +1,7 @@
 import type { DocFormat, LibraryDocument } from '../../types/models';
 import { getProFeature } from '../pro/proFeatures';
 import type { ProTaskFeature } from '../pro/proTask';
-import { canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRasterFormat, isPdfLevel } from './formatCapabilities';
+import { canMark, canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRasterFormat, isPdfLevel } from './formatCapabilities';
 
 // §12 D2: which actions the Reader shows, and where. Study actions sit in the bottom tool bar, one
 // tap away; managing the file (share, sign, export, print, submit, edit pages, type, delete) is in
@@ -59,8 +59,9 @@ export function readerProTasks(subject: ReaderSubject, isLive: (id: ProTaskFeatu
 export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly ProTaskFeature[]; isPro: boolean }): ReaderTool[] {
   const { doc } = subject;
   const tools: ReaderTool[] = [];
-  // Mark (T4's annotate, D3's Mark mode) and Select text work on a scan's page masters.
-  if (doc && hasPageMasters(doc)) {
+  // Mark (D3's Mark mode) and Select text: a scan's page masters, or an indexed imported PDF's
+  // pages rendered on demand.
+  if (doc && canMark(doc)) {
     tools.push({ id: 'mark', pro: false }, { id: 'selectText', pro: false });
   }
   // R4's thumbnails strip.

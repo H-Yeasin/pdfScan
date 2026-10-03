@@ -21,12 +21,16 @@ type PageCanvasProps = {
   onDragEnd?: (point: MasterPoint) => void;
   onTap?: (point: MasterPoint) => void;
   background: string;
+  // §12 D3: the image to show instead of the page's own master - an imported PDF's page rendered
+  // on demand (usePageImage). Rendered as shown now, it includes any turn added since the page was
+  // indexed (`turn`, page.rotation), so it's turned back into the space its words are in.
+  image?: { uri: string; turn?: number } | null;
 };
 
-// §5 T3 (reused by T4): one library page as an image that can be zoomed and panned, with
+// §5 T3 (Select text): one library page as an image that can be zoomed and panned, with
 // overlays and touches in master-pixel coordinates (where OCR boxes and annotations live). The
 // native PDF view can't select or draw, so interactive work happens here.
-export function PageCanvas({ page, renderOverlay, onDragStart, onDragMove, onDragEnd, onTap, background }: PageCanvasProps) {
+export function PageCanvas({ page, renderOverlay, onDragStart, onDragMove, onDragEnd, onTap, background, image }: PageCanvasProps) {
   const [size, setSize] = useState<CanvasSize | null>(null);
   const fit = useMemo(() => (size ? pageFit(page, size) : null), [page, size]);
 
@@ -100,17 +104,35 @@ export function PageCanvas({ page, renderOverlay, onDragStart, onDragMove, onDra
       <View style={[styles.container, { backgroundColor: background }]} onLayout={handleLayout}>
         {fit ? (
           <Animated.View style={[StyleSheet.absoluteFill, layerStyle]}>
-            <Image
-              source={{ uri: page.displayUri ?? page.fileUri }}
-              style={{ position: 'absolute', left: fit.origin.x, top: fit.origin.y, width: fit.width, height: fit.height }}
-              resizeMode="stretch"
-            />
+            {image !== null ? (
+              <Image
+                source={{ uri: image?.uri ?? page.displayUri ?? page.fileUri }}
+                style={turnedImageStyle(fit, image?.turn ?? 0)}
+                resizeMode="stretch"
+              />
+            ) : null}
             {renderOverlay?.(fit)}
           </Animated.View>
         ) : null}
       </View>
     </GestureDetector>
   );
+}
+
+// The image placed over the fitted page box, turned back by `turn` degrees (a sideways image fills
+// the box once turned).
+function turnedImageStyle(fit: BoxFit, turn: number) {
+  const box = { position: 'absolute' as const, left: fit.origin.x, top: fit.origin.y, width: fit.width, height: fit.height };
+  if (!turn) return box;
+  if (turn % 180 === 0) return { ...box, transform: [{ rotate: `${-turn}deg` }] };
+  return {
+    position: 'absolute' as const,
+    left: fit.origin.x + (fit.width - fit.height) / 2,
+    top: fit.origin.y + (fit.height - fit.width) / 2,
+    width: fit.height,
+    height: fit.width,
+    transform: [{ rotate: `${-turn}deg` }],
+  };
 }
 
 const styles = StyleSheet.create({

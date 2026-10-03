@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,18 +12,24 @@ import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme, touchSlop } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { PageCanvas } from './PageCanvas';
+import { usePageImage } from '../shared/usePageImage';
+import { wordRects } from '../../services/annotations/snap';
+import { createId } from '../../utils/id';
 import { useT } from '../../i18n/useT';
 
 type SelectTextSheetProps = {
   visible: boolean;
   doc: LibraryDocument;
   pageIdx: number;
-  onClose: () => void;
+  // `marked`: the selection was highlighted or underlined, so document.pdf needs its annotations
+  // rewritten (the Reader does it in the background).
+  onClose: (marked: boolean) => void;
 };
 
 // §5 T3 "Select text": drag from one word to another to select everything between them in reading
 // order; start a drag on either end to move that end; tap a word to select just it. Copy or Share
-// the selection. A page without OCR text offers to run OCR again.
+// the selection, or (§12 D3) highlight or underline it without entering Mark mode. A page without
+// OCR text offers to run OCR again. An imported PDF's page is rendered on demand.
 export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSheetProps) {
   const { tokens: theme } = useTheme();
   const { t } = useT();
@@ -34,6 +40,12 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
   const [anchor, setAnchor] = useState<TextToken | null>(null);
   const [focus, setFocus] = useState<TextToken | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const marked = useRef(false);
+  const close = () => onClose(marked.current);
+  // An imported page has no master: its PDF page, rendered now (null while rendering).
+  const needsRender = !!page && !page.fileUri;
+  const rendered = usePageImage(doc, pageIdx, visible && needsRender);
+  const image = needsRender ? (rendered ? { uri: rendered.uri, turn: page?.rotation ?? 0 } : null) : undefined;
 
   useEffect(() => {
     setAnchor(null);
@@ -66,6 +78,32 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
     setFocus(token);
   };
 
+  // §12 D3: the selection as a mark, in the colour Mark mode last used for that kind.
+  const markSelection = (kind: 'highlight' | 'underline') => {
+    if (!page || selected.length === 0) return;
+    const { rects, text: words } = wordRects(selected);
+    const prefs = state.settings.reading.mark;
+    const now = Date.now();
+    dispatch({
+      type: 'library/ADD_ANNOTATION',
+      annotation: {
+        id: createId('annot'),
+        documentId: doc.id,
+        pageId: page.id,
+        kind,
+        color: kind === 'highlight' ? prefs.highlightColor : prefs.lineColor,
+        data: { rects },
+        text: words,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    marked.current = true;
+    setAnchor(null);
+    setFocus(null);
+    dispatch({ type: 'ui/SHOW_SNACK', msg: kind === 'highlight' ? t('reader.select.highlighted') : t('reader.select.underlined') });
+  };
+
   const copy = async () => {
     await Clipboard.setStringAsync(text);
     dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.select.copiedWords', { count: selected.length }) });
@@ -89,11 +127,11 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
   const noText = tokens.length === 0;
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={close}>
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]}>
           <View style={styles.header}>
-            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>
+            <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={close} accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={22} color={theme.ink} />
             </Pressable>
             <Text style={[styles.title, { color: theme.ink }]}>{t('reader.select.title', { page: pageIdx + 1 })}</Text>
@@ -102,6 +140,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
           {page ? (
             <PageCanvas
               page={page}
+              image={image}
               background={theme.surface2}
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
@@ -132,6 +171,8 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
             {noText ? (
               <View style={styles.noText}>
                 <Text style={[styles.noTextLabel, { color: theme.ink }]}>{t('reader.select.noText')}</Text>
+{/* An imported page's words come from R1's indexing (its own text layer or OCR then). */}
+                {needsRender ? null : (
                 <Pressable
                   style={[styles.button, { backgroundColor: theme.accent, opacity: rerunning ? 0.6 : 1 }]}
                   onPress={rerunOcr}
@@ -140,6 +181,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                 >
                   {rerunning ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.buttonLabel, { color: theme.onAccent }]}>{t('reader.select.runOcr')}</Text>}
                 </Pressable>
+                )}
               </View>
             ) : (
               <>
@@ -156,6 +198,12 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                     accessibilityRole="button"
                   >
                     <Text style={[styles.ghostLabel, { color: theme.accentInk }]}>{t('reader.select.selectAll')}</Text>
+                  </Pressable>
+                  <Pressable style={styles.ghost} onPress={() => markSelection('highlight')} disabled={!text} accessibilityRole="button">
+                    <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>{t('reader.select.highlight')}</Text>
+                  </Pressable>
+                  <Pressable style={styles.ghost} onPress={() => markSelection('underline')} disabled={!text} accessibilityRole="button">
+                    <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>{t('reader.select.underline')}</Text>
                   </Pressable>
                   <Pressable style={styles.ghost} onPress={() => text && Share.share({ message: text })} disabled={!text} accessibilityRole="button">
                     <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>{t('reader.select.share')}</Text>
@@ -210,6 +258,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: spacing.sm,

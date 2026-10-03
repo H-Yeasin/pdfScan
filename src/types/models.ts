@@ -326,9 +326,11 @@ export type Deadline = {
 
 // §5 T4: a mark on a library page, stored as data in master pixels (like OCR boxes) and written
 // into document.pdf as a real PDF annotation by every build (annotations/pdfAnnotations.ts).
-export type AnnotationKind = 'highlight' | 'ink' | 'note';
+// §12 D3 added underline and strike: the same word rects as a highlight, drawn as a line.
+export type AnnotationKind = 'highlight' | 'underline' | 'strike' | 'ink' | 'note';
 export type AnnotationData =
-  // Highlighter: one rect per line it covers, snapped to word boxes (or one free rect).
+  // Highlighter, underline, strike: one rect per line it covers, snapped to word boxes (or one
+  // free rect).
   | { rects: OcrBounding[] }
   // Pen: strokes of [x, y] points, and the pen width in master pixels.
   | { strokes: [number, number][][]; width: number }
@@ -342,7 +344,7 @@ export type Annotation = {
   // A key of annotations/palette.ts.
   color: string;
   data: AnnotationData;
-  // Highlight: the words it covers. Note: the note itself.
+  // Highlight, underline, strike: the words it covers. Note: the note itself.
   text?: string;
   createdAt: number;
   updatedAt: number;

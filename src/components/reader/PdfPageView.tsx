@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Pdf from 'react-native-pdf-jsi';
 
@@ -22,6 +22,10 @@ type PdfPageViewProps = {
   onTap?: (page: number) => void;
   onError: (message: string) => void;
   highlightRects?: Array<{ page: number; rect: string }>;
+  // §12 D3: the page to open on (1-indexed), read once when mounted: a reload after Mark mode
+  // wrote its annotations stays on the page being read. pdf-jsi jumps whenever its `page` prop
+  // changes (back to 1 when it goes undefined), so later changes are ignored.
+  initialPage?: number;
 };
 
 // Thin wrapper around react-native-pdf-jsi's <Pdf> - isolates the rest of the reader from that
@@ -31,10 +35,11 @@ type PdfPageViewProps = {
 // invert/night/dark/grayscale - zero matches), so night mode here is a dim overlay rather than a
 // true color invert - an accepted MVP simplification, not a bug.
 export const PdfPageView = forwardRef<PdfPageViewHandle, PdfPageViewProps>(function PdfPageView(
-  { uri, pdfId, password, night, nightAlpha, enablePaging, fitPolicy, spacing, onLoad, onPageChanged, onTap, onError, highlightRects },
+  { uri, pdfId, password, night, nightAlpha, enablePaging, fitPolicy, spacing, onLoad, onPageChanged, onTap, onError, highlightRects, initialPage },
   ref
 ) {
   const innerRef = useRef<Pdf>(null);
+  const [startPage] = useState(initialPage);
 
   useImperativeHandle(
     ref,
@@ -50,6 +55,7 @@ export const PdfPageView = forwardRef<PdfPageViewHandle, PdfPageViewProps>(funct
         ref={innerRef}
         pdfId={pdfId}
         source={{ uri }}
+        page={startPage}
         password={password}
         style={styles.pdf}
         enableDoubleTapZoom

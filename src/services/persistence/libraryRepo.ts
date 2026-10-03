@@ -299,7 +299,7 @@ async function writeBookmark(db: SQLiteDatabase, b: Bookmark): Promise<void> {
   );
 }
 
-const ANNOTATION_KINDS = ['highlight', 'ink', 'note'];
+const ANNOTATION_KINDS = ['highlight', 'underline', 'strike', 'ink', 'note'];
 
 // A row whose kind or data can't be read is skipped rather than failing the whole load.
 function rowToAnnotation(row: AnnotationRow): Annotation | null {
