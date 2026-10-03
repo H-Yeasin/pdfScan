@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PreviewTooLargeError } from '../../services/documents/sheetService';
@@ -13,14 +13,20 @@ import {
   type SheetEditFormat,
   type SheetEdits,
 } from '../../services/edit/sheetEdit';
+import { loadDocxForEdit } from '../../services/edit/docxEdit';
 import { useT } from '../../i18n/useT';
 import { radii, spacing, touchSlop, useTheme } from '../../theme';
 import { CsvGrid } from './CsvGrid';
+import { DocxEditor, type DocxEditorHandle } from './DocxEditor';
 
-export type EditorFile = { uri: string; name: string; format: EditFormat | SheetEditFormat; external: boolean };
+export type EditorFile = { uri: string; name: string; format: EditFormat | SheetEditFormat | 'DOCX'; external: boolean };
 
-// What Save hands over: a TXT or CSV file's whole text, or a workbook's cell edits (§12 D8).
-export type EditorOutput = { kind: 'text'; text: string } | { kind: 'sheet'; edits: SheetEdits };
+// What Save hands over: a TXT or CSV file's whole text, a workbook's cell edits (§12 D8), or a
+// Word file's edited HTML and the pictures its `data-img` tags point at (§12 D9).
+export type EditorOutput =
+  | { kind: 'text'; text: string }
+  | { kind: 'sheet'; edits: SheetEdits }
+  | { kind: 'docx'; html: string; images: readonly string[] };
 
 type FileEditorProps = {
   // null: closed.
@@ -33,12 +39,15 @@ type FileEditorProps = {
 type Loaded =
   | { kind: 'txt'; text: string; fallbackUsed: boolean }
   | { kind: 'csv'; table: CsvTable; fallbackUsed: false }
-  | { kind: 'sheet'; sheets: EditableSheet[]; fallbackUsed: false };
+  | { kind: 'sheet'; sheets: EditableSheet[]; fallbackUsed: false }
+  | { kind: 'docx'; html: string; images: string[]; fallbackUsed: false };
 
 // §12 D7: the full-screen editor for a TXT or CSV file, opened once D1's gate let it (a day pass,
 // or an ad that unlocked this document for `edit_unlock_minutes`). Saving never asks again. Back
 // and Close ask before throwing edits away. The Reader's viewers stay read-only. §12 D8: an XLSX
 // or XLS file's cells, sheet by sheet, saved as a copy after a warning about what may be lost.
+// §12 D9: a Word file's text in DocxEditor (a contenteditable WebView), saved as a copy after a
+// "layout may change" warning.
 export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -54,6 +63,7 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
   const [saving, setSaving] = useState(false);
   // TxtView reads in monospace; prose reads better without it.
   const [mono, setMono] = useState(true);
+  const docxRef = useRef<DocxEditorHandle>(null);
 
   const uri = file?.uri;
   const format = file?.format;
@@ -72,6 +82,10 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
           if (cancelled) return;
           setText(read);
           setLoaded({ kind: 'txt', text: read, fallbackUsed });
+        } else if (format === 'DOCX') {
+          const { html, images } = await loadDocxForEdit(uri);
+          if (cancelled) return;
+          setLoaded({ kind: 'docx', html, images, fallbackUsed: false });
         } else if (format === 'XLSX' || format === 'XLS') {
           const sheets = await loadSheetsForEdit(uri);
           if (cancelled) return;
@@ -108,6 +122,31 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
 
   const save = useCallback(() => {
     if (!loaded || saving) return;
+    if (loaded.kind === 'docx') {
+      // The page's HTML loses Word's styles, fonts and layout on the way back, so the student is
+      // told first; the original is never written.
+      const images = loaded.images;
+      Alert.alert(t('reader.editFile.sheetSaveTitle'), t('reader.editFile.docxSaveBody', { name: sheetCopyName(file?.name ?? '') }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('reader.editFile.sheetSave'),
+          onPress: () => {
+            const editor = docxRef.current;
+            if (!editor) return;
+            setSaving(true);
+            editor
+              .getHtml()
+              .then((html) => write({ kind: 'docx', html, images }))
+              .catch((e: unknown) => {
+                console.warn('FileEditor: could not read the edited document', e);
+                setSaving(false);
+                Alert.alert(t('reader.editFile.failedTitle'), t('reader.editFile.failed'));
+              });
+          },
+        },
+      ]);
+      return;
+    }
     if (loaded.kind !== 'sheet') {
       void write({ kind: 'text', text: loaded.kind === 'txt' ? text : csvToText({ ...loaded.table, rows }) });
       return;
@@ -170,6 +209,8 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
 
         {format === 'XLSX' || format === 'XLS' ? (
           <Banner text={t('reader.editFile.sheetNote')} />
+        ) : format === 'DOCX' ? (
+          <Banner text={t('reader.editFile.docxNote')} />
         ) : file?.external ? (
           <Banner text={t('reader.editFile.outsideNote')} />
         ) : null}
@@ -236,6 +277,14 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
               }}
             />
           </>
+        ) : loaded.kind === 'docx' ? (
+          <DocxEditor
+            // A fresh page per file: the WebView owns the text once it has it.
+            key={uri}
+            ref={docxRef}
+            html={loaded.html}
+            onDirty={() => setDirty(true)}
+          />
         ) : loaded.kind === 'csv' ? (
           <CsvGrid
             rows={rows}

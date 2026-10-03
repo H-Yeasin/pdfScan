@@ -55,10 +55,11 @@ describe('§12 D2 reader tool bar', () => {
   });
 
   it('shows no Pro task until its step is built', () => {
-    // §12 D7/D8: editing is live for TXT, CSV, XLSX and XLS; Word (D9) isn't built yet.
+    // §12 D7–D9: editing is live for TXT, CSV, XLSX, XLS and Word.
     expect(readerProTasks({ doc: makeDoc({ format: 'TXT' }) })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ external: { format: 'CSV' } })).toEqual(['convert', 'editFiles']);
-    expect(readerProTasks({ doc: docx })).toEqual(['convert']);
+    expect(readerProTasks({ doc: docx })).toEqual(['convert', 'editFiles']);
+    expect(readerProTasks({ doc: docx }, allLive, allBuilt, { ...allEdits, docx: false })).toEqual(['convert']);
     expect(readerProTasks({ doc: makeDoc({ format: 'XLSX', pages: [] }) })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ external: { format: 'XLS' } })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles', allBuilt, allEdits)).toEqual(['editFiles']);

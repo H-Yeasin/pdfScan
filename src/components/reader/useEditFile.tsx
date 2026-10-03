@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useProTask } from '../pro/useProTask';
 import { isEditFormat, saveEditedText, type EditTarget } from '../../services/edit/textEdit';
 import { isSheetEditFormat, saveEditedSheet } from '../../services/edit/sheetEdit';
+import { saveEditedDocx } from '../../services/edit/docxEdit';
 import { carryProTaskGrant } from '../../services/pro/proTaskFlow';
 import { useAppDispatch } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
@@ -19,7 +20,8 @@ export const EDIT_FILE_KIND = 'editFile';
 // one; a file from outside is saved into the library as a new document (the file the student
 // opened is never written) and the Reader switches to it. §12 D8: an XLSX or XLS file's edit is
 // always a new library document ("<name> (edited)"), and the Reader switches to that copy; the
-// session carries to it, so further edits there don't ask again. Render `element` once.
+// session carries to it, so further edits there don't ask again. §12 D9: a Word file's edit too.
+// Render `element` once.
 export function useEditFile(opts: { preload: boolean }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
@@ -30,7 +32,7 @@ export function useEditFile(opts: { preload: boolean }) {
   const start = useCallback(
     (target: EditTarget) => {
       const source = target.doc ? { uri: target.doc.contentUri, name: target.doc.name, format: target.doc.format } : target.external;
-      if (!source.uri || !(isEditFormat(source.format) || isSheetEditFormat(source.format))) return;
+      if (!source.uri || !(isEditFormat(source.format) || isSheetEditFormat(source.format) || source.format === 'DOCX')) return;
       const file: EditorFile = { uri: source.uri, name: source.name, format: source.format, external: !!target.external };
       // The grant's id: the library document, or an outside file's app-owned copy (as D5's).
       const docId = target.doc ? target.doc.id : target.external.uri;
@@ -46,8 +48,8 @@ export function useEditFile(opts: { preload: boolean }) {
       if (!editing) return false;
       const { target, file } = editing;
       try {
-        if (output.kind === 'sheet') {
-          const copy = await saveEditedSheet(target, output.edits);
+        if (output.kind === 'sheet' || output.kind === 'docx') {
+          const copy = output.kind === 'sheet' ? await saveEditedSheet(target, output.edits) : await saveEditedDocx(target, output.html, output.images);
           dispatch({ type: 'library/ADD_FILE', file: copy });
           await carryProTaskGrant('editFiles', target.doc ? target.doc.id : target.external.uri, copy.id);
           dispatch({ type: 'reader/SET_READER_ID', id: copy.id });

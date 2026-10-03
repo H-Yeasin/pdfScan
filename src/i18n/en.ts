@@ -544,7 +544,7 @@ export const en = {
       edit: 'Edit',
     },
     // §12 D7: the TXT/CSV editor (Pro). TXT and CSV lose nothing, so the library file is updated;
-    // §12 D8's Excel edits are saved as a copy.
+    // §12 D8's Excel and D9's Word edits are saved as a copy.
     editFile: {
       save: 'Save',
       saved: 'Saved',
@@ -574,6 +574,17 @@ export const en = {
       sheetSave: 'Save copy',
       savedCopy: 'Saved a copy to your Library',
       formulaHint: 'Start with = for a formula, or with an apostrophe to keep it as text.',
+      // §12 D9: Word text, always saved as a copy (the layout may change).
+      docxNote: 'Your edits are saved as a new Word file in your Library. The original stays as it is.',
+      docxSaveBody:
+        "The text, headings, lists, tables and pictures are kept. Fonts, colours and page layout may change. The copy is saved as '{name}'.",
+      docxBold: 'Bold',
+      docxItalic: 'Italic',
+      docxHeading1: 'Heading 1',
+      docxHeading2: 'Heading 2',
+      docxBullets: 'Bulleted list',
+      docxNumbers: 'Numbered list',
+      docxUndo: 'Undo',
     },
     noPageText: 'No text found on this page',
     copiedPage: 'Copied the text of page {page}',
@@ -731,7 +742,7 @@ export const en = {
       pdfPasswords: 'Password-protected PDFs',
       driveBackup: 'Automatic backup to your Google Drive',
       convert: 'Convert Word, Excel and text files to PDF, and scans to Word',
-      editFiles: 'Edit text, CSV and Excel files',
+      editFiles: 'Edit text, CSV, Excel and Word files',
       pdfForms: 'Fill in PDF forms and add text to PDFs',
     },
     // §12 D1: the sheet before a Pro task, and what follows the ad. {name}: the document's name.

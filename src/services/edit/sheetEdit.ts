@@ -3,6 +3,7 @@ import type * as XLSXTypes from 'xlsx';
 import { t } from '../../i18n';
 import type { LibraryDocument } from '../../types/models';
 import { createId } from '../../utils/id';
+import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
 import { readWorkbook, sheetRows, XLSX } from '../documents/sheetService';
 import { promoteExternalToLibrary } from '../persistence/libraryOperations';
 import type { EditTarget } from './textEdit';
@@ -108,26 +109,34 @@ export function applySheetEdits(workbook: XLSXTypes.WorkBook, edits: SheetEdits)
   }
 }
 
+// Also D9's Word copies.
 export function sheetCopyName(name: string): string {
   return t('reader.editFile.copyName', { name });
 }
 
 // Reads the file again (the editor holds only what it shows), applies the edits and saves the
-// result as a new library document. A library document's copy stays in its course, with its type.
+// result as a new library document (saveEditCopy).
 export async function saveEditedSheet(target: EditTarget, edits: SheetEdits): Promise<LibraryDocument> {
   const source = target.doc ? { uri: target.doc.contentUri, name: target.doc.name } : target.external;
   if (!source.uri) throw new Error('saveEditedSheet: the document has no file');
   const workbook = await readWorkbook(source.uri, undefined, { formulas: true });
   applySheetEdits(workbook, edits);
   const out = XLSX().write(workbook, { type: 'array', bookType: 'xlsx', compression: true }) as ArrayBuffer;
+  return saveEditCopy(target, 'XLSX', (temp) => temp.write(new Uint8Array(out)));
+}
 
-  const temp = new File(Paths.cache, 'edit', `${createId('edit')}.xlsx`);
+// An edit that can lose something (D8's workbook, D9's Word file) goes into the library as a new
+// document, "<name> (edited)", written to a temp file (`cache/edit/`, deleted after) by `write`.
+// A library document's copy stays in its course, with its type.
+export async function saveEditCopy(target: EditTarget, format: 'XLSX' | 'DOCX', write: (temp: File) => void): Promise<LibraryDocument> {
+  const name = target.doc ? target.doc.name : target.external.name;
+  const temp = new File(Paths.cache, 'edit', `${createId('edit')}${EXTENSION_BY_FORMAT[format]}`);
   try {
-    temp.write(new Uint8Array(out));
+    write(temp);
     const doc = await promoteExternalToLibrary({
       uri: temp.uri,
-      name: sheetCopyName(source.name),
-      format: 'XLSX',
+      name: sheetCopyName(name),
+      format,
       sizeBytes: temp.size ?? 0,
       sourceUri: temp.uri,
       importedAt: Date.now(),

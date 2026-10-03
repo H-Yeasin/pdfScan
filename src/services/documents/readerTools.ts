@@ -54,9 +54,9 @@ const isLiveFeature = (id: ProTaskFeature) => getProFeature(id).status === 'live
 // (D6). Both are built; kept so the rules per format stay testable on their own.
 export const BUILT_CONVERSIONS = { officeToPdf: true, pdfToWord: true };
 
-// `editFiles` covers editors built in three steps: TXT and CSV (D7), XLSX (D8), Word (D9). The
-// feature is live once the first is; a format whose editor isn't built yet doesn't offer it.
-export const BUILT_EDITS = { text: true, sheet: true, docx: false };
+// `editFiles` covers editors built in three steps: TXT and CSV (D7), XLSX (D8), Word (D9). All
+// are built; kept so the rules per format stay testable on their own.
+export const BUILT_EDITS = { text: true, sheet: true, docx: true };
 
 // The Pro tasks this file allows (each through D1's gate). A feature counts once its step has
 // built it (`status: 'live'` in PRO_FEATURES); until then, none, and the Convert/Edit tool stays

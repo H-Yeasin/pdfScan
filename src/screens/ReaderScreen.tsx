@@ -143,7 +143,7 @@ export function ReaderScreen() {
     if (external) startWord({ uri: external.uri, name: external.name, title: external.name, grantId: external.uri });
     else if (doc) startWord({ docId: doc.id, title: doc.name, grantId: doc.id });
   }, [doc, external, startWord]);
-  // §12 D7/D8: edit a TXT, CSV, XLSX or XLS file (one ad unlocks the document for a while). Preloading is
+  // §12 D7–D9: edit a TXT, CSV, XLSX, XLS or Word file (one ad unlocks the document for a while). Preloading is
   // shared with the conversion gate's (rewarded.preloadRewarded keeps one ad).
   const edit = useEditFile({ preload: proTasks.includes('editFiles') });
   const { start: startEdit } = edit;

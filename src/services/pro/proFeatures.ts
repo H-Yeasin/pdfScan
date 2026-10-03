@@ -45,7 +45,7 @@ export const PRO_FEATURES: readonly ProFeature[] = [
   // (pdfForms: D10).
   // Office → PDF (D5); scan/PDF → Word joins it in D6 (readerTools.BUILT_CONVERSIONS).
   { id: 'convert', status: 'live', labelKey: 'pro.features.convert', lapse: 'keepExisting' },
-  // Edit TXT and CSV files (D7) and XLSX/XLS cells (D8); Word (D9) joins it (readerTools.BUILT_EDITS).
+  // Edit TXT and CSV files (D7), XLSX/XLS cells (D8) and Word text (D9) (readerTools.BUILT_EDITS).
   { id: 'editFiles', status: 'live', labelKey: 'pro.features.editFiles', lapse: 'keepExisting' },
   // Fill PDF forms and add typed text boxes.
   { id: 'pdfForms', status: 'planned', labelKey: 'pro.features.pdfForms', lapse: 'keepExisting' },
