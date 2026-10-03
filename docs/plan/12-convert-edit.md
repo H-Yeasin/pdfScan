@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D11** (reading updates for Word and Excel). D1–D10 are done in code.
+- D1–D11 are done in code; their device checks are open (each step's "Done when" and Verification).
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -627,7 +627,8 @@ closes; with and without an ad; a remembered Text tool reopens without an ad ins
   the PDF.
 
 ### D11 · Reading updates for Word and Excel *(M)*
-Status: not started.
+Status: done in code (commit fa403f4); device check open (Find in a DOCX scrolls to the first
+match; pinching a sheet doesn't fight its scrolling; the first row and column stay put on Android).
 
 **Free.**
 
@@ -635,6 +636,21 @@ Status: not started.
   read-only anchor list) and XLSX (`IN_READER_FIND_FORMATS`).
 - Sheets: pinch zoom and a frozen header row/first column.
 - Edit and Convert entry points are D2's tool bar (through D1's gate); nothing extra here.
+
+As built:
+- DOCX Find: `services/documents/docxFind.markDocxMatches` wraps each match in mammoth's HTML
+  text (never inside a tag; entities matched decoded) in `<mark id="pdfscan-find-N">`, and
+  DocxView reloads the page with them (debounced 250 ms). The count is the number of marks; a
+  match split by formatting isn't found. JavaScript is now on in DocxView, only so
+  `findScrollScript(0)` (a number, never document text) can scroll to the first mark: there is
+  no `onMessage`, and the page's CSP (`default-src 'none'`) still blocks any script or
+  `javascript:` link from the file. Like TXT and sheets, Find goes to the first match (no
+  next/previous).
+- Sheets (`SheetView`): XLSX/XLS added to `IN_READER_FIND_FORMATS`; matching cells are tinted.
+  Pinch zoom (0.6–2.5, steps of 0.1, `sheetZoom`) scales font, padding and column widths, not a
+  picture, so rows stay virtualized. The first row is the FlatList's sticky header (when there are
+  two rows or more); the first column is an `Animated.Text` moved by the horizontal scroll on the
+  native driver. Night mode uses the dark theme's tokens (same colours as before).
 
 ### Order
 D1 → D2 → D3 → D4 → D5 → D6 → D7 → D8 (after the SheetJS swap) → D9 → D10 → D11.
