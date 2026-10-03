@@ -1,59 +1,126 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeatureList } from '../components/pro/FeatureList';
-import { useRouter } from '../navigation/router';
-import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
+import { passEndLabel } from '../components/pro/passEndLabel';
 import { useT } from '../i18n/useT';
+import { useRouter } from '../navigation/router';
+import { watchAdForPass, type WatchResult } from '../services/ads/rewarded';
+import { loadPassLog, passesLeftToday } from '../services/pro/dayPass';
+import { getEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
+import { useRemoteConfig } from '../services/remote/remoteConfig';
+import { useAppDispatch, useAppSelector } from '../store/AppStateContext';
+import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
+import { hapticSuccess } from '../services/feedback/haptics';
+
+// §10 M6: what Pro includes (live features only), what stays free, and one button: watch a
+// rewarded ad, get Pro for `pass_hours`. Opened from Settings and wherever a Pro feature is
+// touched; Back returns there. While `pro_sales_enabled` is off (now) there are no prices and no
+// purchase buttons at all, and nothing here mentions paying anywhere else (Play policy).
 
 export function ProScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go } = useRouter();
+  const { go, previousScreen } = useRouter();
+  const dispatch = useAppDispatch();
+  const remote = useRemoteConfig();
+  const entitlement = useEntitlement();
+  const isPro = useIsPro();
+  const personalizedAdsEnabled = useAppSelector((s) => s.settings.personalizedAdsEnabled);
+  const [passLog, setPassLog] = useState<number[] | null>(null);
+  const [watching, setWatching] = useState(false);
 
-  const showUnavailable = (action: string) =>
-    Alert.alert(
-      t('pro.unavailableTitle'),
-      t('pro.unavailableBody', { action })
-    );
+  const reloadLog = useCallback(() => {
+    void loadPassLog().then(setPassLog);
+  }, []);
+  useEffect(reloadLog, [reloadLog]);
 
+  const left = passLog ? passesLeftToday(passLog, Date.now(), remote.passMaxPerDay) : 0;
+  const available = remote.adsEnabled;
+  const passActive = isPro && entitlement?.source === 'pass' && entitlement.expiresAt !== undefined;
+
+  const watch = async () => {
+    setWatching(true);
+    let result: WatchResult;
+    try {
+      result = await watchAdForPass({ personalizedAdsEnabled, passesLeft: left });
+    } finally {
+      setWatching(false);
+      reloadLog();
+    }
+    if (result === 'granted') hapticSuccess();
+    const messages: Record<Exclude<WatchResult, 'granted'>, string> = {
+      closedEarly: t('pro.closedEarly'),
+      capped: t('pro.noneLeft'),
+      unavailable: t('pro.unavailable'),
+      failed: t('pro.failed'),
+    };
+    // Read after the grant, so the time shown is the new end.
+    const end = getEntitlement()?.expiresAt;
+    dispatch({ type: 'ui/SHOW_SNACK', msg: result === 'granted' ? t('pro.granted', { time: end ? passEndLabel(end) : '' }) : messages[result] });
+  };
+
+  const hours = remote.passHours;
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable
+          hitSlop={touchSlop(44)}
+          accessibilityRole="button"
+          style={styles.headerButton}
+          onPress={() => go(previousScreen ?? 'settings', 'back')}
+          accessibilityLabel={t('common.back')}
+        >
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={[styles.kicker, { color: tokens.accentInk }]}>{t('pro.kicker')}</Text>
-        <Text style={[styles.price, { color: tokens.ink }]}>৳ 890</Text>
-        <Text style={[styles.subtitle, { color: tokens.muted }]}>
-          {t('pro.subtitle')}
+        <Text accessibilityRole="header" style={[styles.title, { color: tokens.ink }]}>
+          {t('pro.title')}
         </Text>
+        <Text style={[styles.subtitle, { color: tokens.muted }]}>{t('pro.subtitle', { count: hours })}</Text>
 
+        {passActive && entitlement?.expiresAt ? (
+          <View style={[styles.activeCard, { backgroundColor: tokens.accentSoft }]}>
+            <Ionicons name="checkmark-circle" size={20} color={tokens.accentInk} />
+            <View style={styles.activeText}>
+              <Text style={[styles.activeTitle, { color: tokens.ink }]}>{t('pro.active', { time: passEndLabel(entitlement.expiresAt) })}</Text>
+              <Text style={[styles.note, { color: tokens.ink }]}>{t('pro.activeBody')}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('pro.includes')}</Text>
         <View style={styles.featuresWrap}>
           <FeatureList />
         </View>
 
-        <View style={[styles.reassuranceCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={[styles.reassuranceTitle, { color: tokens.ink }]}>
-            {t('pro.freeTitle')}
-          </Text>
-          <Text style={[styles.reassuranceBody, { color: tokens.muted }]}>
-            {t('pro.freeBody')}
-          </Text>
+        <View style={[styles.freeCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+          <Text style={[styles.freeTitle, { color: tokens.ink }]}>{t('pro.freeTitle')}</Text>
+          <Text style={[styles.note, { color: tokens.muted }]}>{t('pro.freeBody')}</Text>
         </View>
 
-        <Pressable accessibilityRole="button"
-          style={[styles.primary, { backgroundColor: tokens.accent }]}
-          onPress={() => showUnavailable(t('pro.unlock'))}
-        >
-          <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('pro.unlock')}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.ghost} onPress={() => showUnavailable(t('pro.restore'))}>
-          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('pro.restore')}</Text>
-        </Pressable>
+        {available && left > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: watching, disabled: watching || passLog === null }}
+            disabled={watching || passLog === null}
+            style={[styles.primary, { backgroundColor: tokens.accent }]}
+            onPress={() => void watch()}
+          >
+            {watching ? <ActivityIndicator color={tokens.onAccent} /> : null}
+            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>
+              {watching ? t('pro.loading') : t(passActive ? 'pro.watchMore' : 'pro.watch', { count: hours })}
+            </Text>
+          </Pressable>
+        ) : null}
+        <Text style={[styles.status, { color: tokens.muted }]}>
+          {!available ? t('pro.unavailable') : passLog === null ? '' : left > 0 ? t('pro.left', { count: left }) : t('pro.noneLeft')}
+        </Text>
+        <Text style={[styles.note, { color: tokens.muted }]}>{t('pro.lapseNote')}</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -74,8 +141,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   body: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
   },
   kicker: {
     fontSize: 11,
@@ -83,53 +151,71 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  price: {
+  title: {
     fontFamily: fontFamily.heading,
-    fontSize: 40,
-    marginTop: spacing.sm,
-    marginBottom: 6,
+    fontSize: 30,
+    lineHeight: 36,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 21,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  activeCard: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.card,
+  },
+  activeText: {
+    flex: 1,
+    gap: 2,
+  },
+  activeTitle: {
+    fontSize: 15.5,
+    fontWeight: '600',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: spacing.sm,
   },
   featuresWrap: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.sm,
   },
-  reassuranceCard: {
+  freeCard: {
     padding: spacing.lg,
     borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: spacing.xl,
+    gap: 5,
   },
-  reassuranceTitle: {
+  freeTitle: {
     fontFamily: fontFamily.heading,
     fontSize: 18,
-    marginBottom: 5,
   },
-  reassuranceBody: {
+  note: {
     fontSize: 13.5,
     lineHeight: 19,
   },
   primary: {
-    height: 52,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: spacing.md,
   },
   primaryLabel: {
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
-  ghost: {
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  ghostLabel: {
-    fontSize: 14.5,
-    fontWeight: '600',
+  status: {
+    fontSize: 13.5,
+    textAlign: 'center',
   },
 });

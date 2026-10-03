@@ -62,6 +62,8 @@ describe('parseRemoteConfig', () => {
       adsBannerScreens: ['home'],
       adsBannerUnitAndroid: 'ca-app-pub-1234567890123456/1234567890',
       adsBannerUnitIos: '',
+      adsRewardedUnitAndroid: '',
+      adsRewardedUnitIos: '',
       passHours: 12,
       passMaxPerDay: 0,
       supportWhatsapp: '8801700000000',

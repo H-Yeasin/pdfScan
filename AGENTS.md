@@ -36,15 +36,16 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 App.tsx                 AppProviders > AppNavigator + Snackbar
 src/bootstrap/          AppProviders (theme, ErrorBoundary, store), AppNavigator (screen switch, boot hooks)
 src/navigation/         router.tsx: custom state router, useRouter().go(screen) — NOT React Navigation; `hub`/`tabHub` = where Back returns
-src/screens/            Home (start screen once a course exists), Course, Capture, Review, Deliver, Library, Reader, Settings, Pro (hidden), ManageFolders (= courses), AcademicOptions
+src/screens/            Home (start screen once a course exists), Course, Capture, Review, Deliver, Library, Reader, Settings, Pro (day pass, §10 M6), ManageFolders (= courses), AcademicOptions
 src/components/<area>/  UI split by screen area (capture, review, deliver, library, reader, settings, shared)
 src/store/              AppStateContext (useAppSlices('library',…) / useAppSelector, useAppDispatch; useAppState is legacy and re-renders on everything), appReducer, slices/*, use*Persistence hooks
 src/services/           all logic, no UI (see pipeline below)
 src/theme/              tokens, useTheme(), spacing/radii, fontFamily/typeScale — never hard-code colors
 src/i18n/               en.ts catalog, t()/useT() (from i18n/useT), tDoc() for document text, formatDate/formatNumber; settings.uiLanguage/documentLanguage
 src/types/models.ts     SessionPage, LibraryDocument, LibraryPage, Course, Semester, DocType, PageOcr, OcrScript, DocFormat
-src/services/pro/       Pro registry (PRO_FEATURES, FREE_FOREVER, lapse rules) and entitlement (useIsPro, useProFeature; §10 M3)
-src/config/features.ts  FEATURES flags (pro: false); runtime switches come from services/remote/remoteConfig (Firebase Remote Config, §10 M2)
+src/services/pro/       Pro registry (PRO_FEATURES, FREE_FOREVER, lapse rules), entitlement (useIsPro, useProFeature; §10 M3), dayPass (daily cap, M6)
+src/services/ads/       adPolicy (banner rules), adsSdk (consent + init), rewarded (day pass) - §10 M5/M6
+src/config/             appInfo (APP_VERSION); runtime switches come from services/remote/remoteConfig (Firebase Remote Config, §10 M2)
 src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, docFormat
 modules/pdf-native/     local Expo module (§7 R1): PDF page count/size, render page → JPEG, page text + word boxes
 plugins/                local config plugins (withBackupRules: Android Auto Backup rules, §8 B1)

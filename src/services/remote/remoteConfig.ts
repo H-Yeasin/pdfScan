@@ -18,6 +18,9 @@ export type RemoteConfig = {
   // development builds always use Google's test unit.
   adsBannerUnitAndroid: string;
   adsBannerUnitIos: string;
+  // M6: the AdMob rewarded unit per platform, for the Pro day pass. Same rules as the banner's.
+  adsRewardedUnitAndroid: string;
+  adsRewardedUnitIos: string;
   // Length of a rewarded Pro day pass (M6) and how many a day.
   passHours: number;
   passMaxPerDay: number;
@@ -35,6 +38,8 @@ export const REMOTE_DEFAULTS: RemoteConfig = {
   adsBannerScreens: ['home', 'library'],
   adsBannerUnitAndroid: '',
   adsBannerUnitIos: '',
+  adsRewardedUnitAndroid: '',
+  adsRewardedUnitIos: '',
   passHours: 24,
   passMaxPerDay: 3,
   supportWhatsapp: '8801645724080',
@@ -85,6 +90,8 @@ const KEYS: { [K in keyof RemoteConfig]: { key: string; parse: Parser<RemoteConf
   adsBannerScreens: { key: 'ads_banner_screens', parse: stringList },
   adsBannerUnitAndroid: { key: 'ads_banner_unit_android', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
   adsBannerUnitIos: { key: 'ads_banner_unit_ios', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
+  adsRewardedUnitAndroid: { key: 'ads_rewarded_unit_android', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
+  adsRewardedUnitIos: { key: 'ads_rewarded_unit_ios', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
   passHours: { key: 'pass_hours', parse: int(1, 168) },
   passMaxPerDay: { key: 'pass_max_per_day', parse: int(0, 10) },
   // An empty number would leave Help & feedback without a contact, so it isn't accepted.

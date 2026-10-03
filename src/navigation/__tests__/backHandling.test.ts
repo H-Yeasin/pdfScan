@@ -58,6 +58,9 @@ describe('resolveBack order', () => {
     expect(to({ screen: 'manageFolders' })).toBe('settings');
     expect(to({ screen: 'academicOptions', previousScreen: 'review' })).toBe('review');
     expect(to({ screen: 'academicOptions' })).toBe('deliver');
+    // §10 M6: Pro goes back to where it was opened from.
+    expect(to({ screen: 'pro', previousScreen: 'academicOptions' })).toBe('academicOptions');
+    expect(to({ screen: 'pro' })).toBe('settings');
     expect(to({ screen: 'examPack', previousScreen: 'home' })).toBe('home');
     expect(to({ screen: 'capture' })).toBe('home');
   });

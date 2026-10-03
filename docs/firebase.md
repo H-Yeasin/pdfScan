@@ -32,6 +32,8 @@ wrong type or an out-of-range value uses the default.
 | `ads_banner_screens` | JSON | `["home","library"]` | Screens a banner may show on. Only `home` and `library` have a banner slot. |
 | `ads_banner_unit_android` | String | (empty) | AdMob banner unit `ca-app-pub-…/…`. Empty = no banner in release builds (dev builds use Google's test unit). |
 | `ads_banner_unit_ios` | String | (empty) | The same for iOS. |
+| `ads_rewarded_unit_android` | String | (empty) | AdMob rewarded unit for the Pro day pass (M6). Empty = no pass in release builds. |
+| `ads_rewarded_unit_ios` | String | (empty) | The same for iOS. |
 | `pass_hours` | Number | `24` | Pro day pass length, 1–168. |
 | `pass_max_per_day` | Number | `3` | Passes a day, 0–10. |
 | `support_whatsapp` | String | `8801645724080` | Digits only, with country code (wa.me). Support only. |

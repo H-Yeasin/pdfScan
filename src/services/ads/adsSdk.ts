@@ -38,9 +38,11 @@ export function useAdsSdk(): AdsSdkState {
 }
 
 // Once per run; a failure (no Play services, no network for the consent step) leaves ads off
-// until the next start, which is the safe side.
-export async function startAds(): Promise<void> {
-  if (current.status !== 'off') return;
+// until the next start, which is the safe side. `retry`: the student asked for an ad (M6's day
+// pass), so a run that failed earlier (offline then) tries again.
+export async function startAds({ retry = false }: { retry?: boolean } = {}): Promise<void> {
+  if (current.status === 'starting' || current.status === 'ready') return;
+  if (current.status === 'unavailable' && !retry) return;
   set({ ...current, status: 'starting' });
   try {
     const ads = require('react-native-google-mobile-ads') as typeof import('react-native-google-mobile-ads');

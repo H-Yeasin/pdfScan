@@ -563,15 +563,31 @@ export const en = {
   },
 
   pro: {
-    kicker: 'One time, forever',
-    subtitle: 'Paid once. No subscription, no renewal, no account.',
-    freeTitle: 'Everything you use today stays free.',
-    freeBody: 'Scanning, OCR, export and the reader are not part of this purchase and never will be.',
-    unlock: 'Unlock Pro',
-    restore: 'Restore purchase',
-    unavailableTitle: 'Not available yet',
-    unavailableBody:
-      "{action} isn't wired up in this build — in-app purchases need store-side setup that hasn't happened yet. Everything you use today stays free either way.",
+    // §10 M6: the Pro screen. No prices or purchase buttons while pro_sales_enabled is off.
+    kicker: 'PDF Scan Pro',
+    title: 'Try every Pro feature free',
+    subtitle: {
+      one: 'Watch one short ad and Pro is yours for {count} hour. No account, no payment.',
+      other: 'Watch one short ad and Pro is yours for {count} hours. No account, no payment.',
+    },
+    includes: "What's included",
+    freeTitle: 'Everything else stays free',
+    freeBody:
+      'Scanning, all filters, text recognition in every language, Submit, courses, search, study tools and backups are free, with or without Pro. Nothing free will ever become Pro.',
+    watch: { one: 'Watch an ad, get Pro for {count} hour', other: 'Watch an ad, get Pro for {count} hours' },
+    watchMore: { one: 'Watch an ad for {count} more hour', other: 'Watch an ad for {count} more hours' },
+    loading: 'Loading the ad…',
+    left: { one: '{count} pass left today', other: '{count} passes left today' },
+    noneLeft: "That's all the passes for today. Come back tomorrow.",
+    unavailable: "Ads aren't available right now, so the pass can't be offered. Try again later.",
+    active: 'Pro until {time}',
+    activeBody: 'Every Pro feature is on until then.',
+    granted: 'Pro is on until {time}. Enjoy!',
+    closedEarly: 'The ad was closed before the end, so no pass this time.',
+    failed: "Couldn't load an ad. Check your connection and try again.",
+    lapseNote: 'When a pass ends, your app lock stays on and covers you already made keep their design.',
+    settingsRow: 'PDF Scan Pro',
+    settingsRowSubtitle: 'Cover designs, accent colours, app lock and no banners.',
     // §10 M3: one per services/pro/proFeatures.ts PRO_FEATURES entry.
     features: {
       coverTemplates: 'More cover page designs',
@@ -583,12 +599,6 @@ export const en = {
     },
     badge: 'PRO',
     badgeLabel: 'Pro feature',
-    // §10 M4: picking a Pro feature without Pro. M6 turns this into the day-pass offer.
-    offer: {
-      title: 'Part of PDF Scan Pro',
-      body: '{feature} is part of PDF Scan Pro. A free way to try Pro is coming soon. Everything else stays free.',
-      see: 'See Pro',
-    },
   },
 
   // §10 M4: the app lock screen.

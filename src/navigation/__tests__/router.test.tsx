@@ -37,3 +37,16 @@ describe('router hubs', () => {
     expect(router()).toMatchObject({ screen: 'home', previousScreen: null, navTick: tick, hub: 'home', tabHub: 'home' });
   });
 });
+
+describe('the Pro detour (§10 M6)', () => {
+  it("returns to the screen Pro was opened from with that screen's own Back intact", () => {
+    const router = mount();
+    act(() => router().go('review'));
+    act(() => router().go('academicOptions'));
+    act(() => router().go('pro'));
+    expect(router()).toMatchObject({ screen: 'pro', previousScreen: 'academicOptions' });
+    act(() => router().go('academicOptions', 'back'));
+    // Academic options' Back still goes to Review, not to Pro.
+    expect(router()).toMatchObject({ screen: 'academicOptions', previousScreen: 'review', detourFrom: null });
+  });
+});

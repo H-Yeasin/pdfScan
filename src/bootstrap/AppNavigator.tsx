@@ -43,7 +43,6 @@ import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
 import { useDeadlineReminders } from '../store/useDeadlines';
 import { useStorageIntegrity } from '../store/useStorageIntegrity';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { FEATURES } from '../config/features';
 import { initCrashReporting } from '../services/telemetry/crash';
 import { useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
@@ -74,8 +73,7 @@ const SCREENS: Record<ScreenName, React.ComponentType> = {
   library: LibraryScreen,
   reader: ReaderScreen,
   settings: SettingsScreen,
-  // Falls back to the Library while Pro is disabled, so a stray go('pro') can't reach a dead end.
-  pro: FEATURES.pro ? ProScreen : LibraryScreen,
+  pro: ProScreen,
   manageFolders: ManageFoldersScreen,
   academicOptions: AcademicOptionsScreen,
   examPack: ExamPackScreen,

@@ -11,7 +11,7 @@ import { NameTemplateSection } from '../components/settings/NameTemplateSection'
 import { ProfileSection } from '../components/settings/ProfileSection';
 import { SettingRow } from '../components/settings/SettingRow';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
-import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, formatDate, systemCatalogId, type DocumentLanguage, type UiLanguage } from '../i18n';
+import { CATALOG_IDS, PSEUDO_LOCALE, catalogNativeName, systemCatalogId, type DocumentLanguage, type UiLanguage } from '../i18n';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, type ThemePref, touchSlop } from '../theme';
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
+import { passEndLabel } from '../components/pro/passEndLabel';
 
 
 const APP_VERSION = '1.0';
@@ -80,6 +81,15 @@ export function SettingsScreen() {
         <ProfileSection />
 
         <NameTemplateSection />
+
+        {/* §10 M6: the way to Pro, and while a pass runs, until when. */}
+        <SettingRow
+          title={t('pro.settingsRow')}
+          subtitle={t('pro.settingsRowSubtitle')}
+          trailing={isPro && entitlement?.source === 'pass' && entitlement.expiresAt ? t('pro.active', { time: passEndLabel(entitlement.expiresAt) }) : undefined}
+          chevron
+          onPress={() => go('pro')}
+        />
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.appearance')}</Text>
@@ -220,7 +230,7 @@ export function SettingsScreen() {
               title={t('settings.developer.proPass')}
               subtitle={
                 isPro && entitlement?.expiresAt
-                  ? t('settings.developer.proPassActive', { time: formatDate(entitlement.expiresAt, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) })
+                  ? t('settings.developer.proPassActive', { time: passEndLabel(entitlement.expiresAt) })
                   : t('settings.developer.proPassInactive')
               }
               onPress={() => void setEntitlement(isPro ? null : grantPass(entitlement, Date.now(), 24))}

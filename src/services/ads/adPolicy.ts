@@ -61,13 +61,21 @@ export function shouldShowBanner(i: BannerInputs): boolean {
   return bannerBlock(i) === null;
 }
 
-// The banner unit: Google's test unit in development builds (never a real ad on a dev phone,
-// which AdMob counts as invalid traffic), else the one from Remote Config for this platform.
-export function bannerUnitId(platform: string, remote: Pick<RemoteConfig, 'adsBannerUnitAndroid' | 'adsBannerUnitIos'>, dev: boolean, testUnit: string): string {
+// An ad unit: Google's test unit in development builds (never a real ad on a dev phone, which
+// AdMob counts as invalid traffic), else the one from Remote Config for this platform.
+export function adUnitId(platform: string, units: { android: string; ios: string }, dev: boolean, testUnit: string): string {
   if (dev) return testUnit;
-  if (platform === 'android') return remote.adsBannerUnitAndroid;
-  if (platform === 'ios') return remote.adsBannerUnitIos;
+  if (platform === 'android') return units.android;
+  if (platform === 'ios') return units.ios;
   return '';
+}
+
+export function bannerUnitId(platform: string, remote: Pick<RemoteConfig, 'adsBannerUnitAndroid' | 'adsBannerUnitIos'>, dev: boolean, testUnit: string): string {
+  return adUnitId(platform, { android: remote.adsBannerUnitAndroid, ios: remote.adsBannerUnitIos }, dev, testUnit);
+}
+
+export function rewardedUnitId(platform: string, remote: Pick<RemoteConfig, 'adsRewardedUnitAndroid' | 'adsRewardedUnitIos'>, dev: boolean, testUnit: string): string {
+  return adUnitId(platform, { android: remote.adsRewardedUnitAndroid, ios: remote.adsRewardedUnitIos }, dev, testUnit);
 }
 
 // Where the law asks for consent (EEA, UK, Switzerland: the UMP form, `gdprApplies`), the form's

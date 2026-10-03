@@ -56,9 +56,11 @@ function backTarget(ctx: BackContext): ScreenName {
     case 'manageFolders':
     case 'storage':
     case 'backup':
-    case 'pro':
     case 'filterLab':
       return 'settings';
+    // §10 M6: back to wherever Pro was opened from (a cover picker, Settings, ...).
+    case 'pro':
+      return ctx.previousScreen ?? 'settings';
     case 'academicOptions':
       return ctx.previousScreen ?? 'deliver';
     case 'examPack':
