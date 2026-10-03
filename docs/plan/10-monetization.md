@@ -264,7 +264,7 @@ Status: done in code (commit 79325da); open: the rewarded units in AdMob and Rem
     to teal, app lock stays, existing covers stay).
 
 ### M7 · Help & feedback contact *(S)*
-Status: todo
+Status: done in code (commit 3c01c35); open: tapping both contacts on a phone.
 
 - Settings → **Help & feedback**: "WhatsApp: 01645724080" (opens
   `https://wa.me/8801645724080` with a prefilled message containing the app version and
@@ -272,6 +272,14 @@ Status: todo
 - Wording is support-only ("Questions, problems or ideas? Message us"). No text anywhere says
   the contact sells or unlocks Pro (Play policy).
 - Tests: the link builder; Remote Config values used.
+- **As built:** `services/support/supportLinks.ts` (`supportContacts`, `whatsappUrl`,
+  `mailtoUrl`, `whatsappDisplay`: `880…` shows as `0…`, others as `+…`). The prefilled message
+  is `Hi! (PDF Scan 1.0.0 · Android 14 · samsung SM-A155F)` from `APP_VERSION` and
+  `Platform.constants` (Brand/Model on Android; iOS gives no model, so it's left out); no new
+  native module. Email shows only when `support_email` is set, with the subject
+  "PDF Scan <version>: question or feedback". The section sits above About; a failed open
+  shows a snack. A test checks `settings.help.*` never mentions Pro, paying, buying or
+  unlocking. Settings' About had a hard-coded `'1.0'`; it now uses `APP_VERSION` (`1.0.0`).
 
 ### M8 · Opt-in usage counts *(S)*
 Status: todo

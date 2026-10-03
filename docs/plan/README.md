@@ -19,7 +19,7 @@ code **when the section was planned**, and are kept as history.
 | §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
 | §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | B1–B5 done in code (device checks open; B1's backup rules and B4's zip "Open with" need a new dev build). B6 (Google Drive) waits for Pro. |
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2, O3 and O4 done in code. **O5 and O6 in progress:** their code is done; what's left is on a device: the measurements in `docs/qa/performance.md` and the walkthrough in `docs/qa/walkthrough.md`. |
-| §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1–M6 done in code (open for the owner: the Play Console checklist in `docs/policy/play-console.md`, the Firebase project and EAS file variables in `docs/firebase.md`, AdMob in `docs/ads.md`; M2–M6 need a new dev build, M4–M6 have device checks open, M5 its before/after numbers). Next: M7. |
+| §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1–M7 done in code (open for the owner: the Play Console checklist in `docs/policy/play-console.md`, the Firebase project and EAS file variables in `docs/firebase.md`, AdMob in `docs/ads.md`; M2–M6 need a new dev build, M4–M7 have device checks open, M5 its before/after numbers). Next: M8. |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
 
 ## Phases (from `docs/PLAN.md` §5)
@@ -118,6 +118,7 @@ lines here.
 | M4 Pro covers, accents, app lock | 1b97805 | Formal/University/Minimal covers (+ institution logo), `ACCENTS` in `theme/tokens.ts`, `services/security/appLock.ts` + `AppLockGate`, `useOfferPro`; `expo-local-authentication`, `expo-screen-capture` (new dev build) |
 | M5 Banner ads | 81046d6 | `services/ads/{adPolicy,adsSdk}.ts`, `components/ads/BannerSlot`, `react-native-google-mobile-ads` + `expo-network` (new dev build), `docs/ads.md`; measurements open |
 | M6 Pro day pass, Pro screen | 79325da | `services/pro/dayPass.ts` (daily cap), `services/ads/rewarded.ts`, `ProScreen` rebuilt, entry points open Pro (router `detourFrom`), Settings "PDF Scan Pro" row; `FEATURES` removed |
+| M7 Help & feedback | 3c01c35 | `services/support/supportLinks.ts` (wa.me + mailto from Remote Config, prefilled version and phone model), Settings section |
 
 ## How the branches came together
 

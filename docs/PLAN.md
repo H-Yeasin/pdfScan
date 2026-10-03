@@ -247,7 +247,7 @@ exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no
 - [x] M4 Pro features worth a pass: cover templates, theme accents, app lock
 - [x] M5 Banner ads, light and safe (Home and Library only; consent; cold-start budget kept)
 - [x] M6 Rewarded "Pro day pass" and the new Pro screen
-- [ ] M7 Help & feedback contact (WhatsApp 01645724080, support only)
+- [x] M7 Help & feedback contact (WhatsApp 01645724080, support only)
 - [ ] M8 Opt-in usage counts (Firebase Analytics, off by default, allow-listed events)
 - [ ] M9–M11 *(Later)* Paid Pro, Firebase Auth, launch rules, when a merchant route exists
 
