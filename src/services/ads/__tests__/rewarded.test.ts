@@ -1,7 +1,7 @@
 import * as Ads from 'react-native-google-mobile-ads';
 import * as SecureStore from 'expo-secure-store';
-import { resetAdsSdk } from '../adsSdk';
-import { watchAdForPass } from '../rewarded';
+import { resetAdsSdk, startAds } from '../adsSdk';
+import { isPreloadFresh, preloadRewarded, resetRewarded, showRewarded, watchAdForPass } from '../rewarded';
 import { getEntitlement, isProActive, setEntitlement } from '../../pro/entitlement';
 import { loadPassLog } from '../../pro/dayPass';
 import { REMOTE_DEFAULTS, setRemoteConfig } from '../../remote/remoteConfig';
@@ -20,6 +20,8 @@ beforeEach(async () => {
   (SecureStore as unknown as { __reset(): void }).__reset();
   await setEntitlement(null);
   resetAdsSdk();
+  resetRewarded();
+  jest.clearAllMocks();
   setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: true, passHours: 24, passMaxPerDay: 3 });
   mock.rewardedBehaviour.loads = true;
   mock.rewardedBehaviour.script = [EARNED, CLOSED];
@@ -57,5 +59,38 @@ describe('watchAdForPass', () => {
     mock.rewardedBehaviour.loads = false;
     expect(await watch()).toBe('failed');
     expect(getEntitlement()).toBeNull();
+  });
+});
+
+describe('preloaded ads', () => {
+  const MIN = 60 * 1000;
+
+  it('counts as fresh only under 50 minutes old (AdMob drops a loaded ad after about an hour)', () => {
+    expect(isPreloadFresh(NOON, NOON + 49 * MIN)).toBe(true);
+    expect(isPreloadFresh(NOON, NOON + 50 * MIN)).toBe(false);
+    expect(isPreloadFresh(NOON, NOON - MIN)).toBe(false);
+  });
+
+  it('shows a fresh preloaded ad at once, and loads a new one when it is too old', async () => {
+    await startAds();
+    let clock = NOON;
+    preloadRewarded({ personalizedAdsEnabled: true, now: () => clock });
+    await new Promise((r) => setTimeout(r, 0));
+    const preloaded = mock.lastRewarded;
+    expect(await showRewarded({ timeoutMs: 8_000, personalizedAdsEnabled: true, now: () => clock })).toBe('rewarded');
+    expect(mock.lastRewarded).toBe(preloaded);
+    expect((preloaded as unknown as { load: jest.Mock }).load).toHaveBeenCalledTimes(1);
+
+    preloadRewarded({ personalizedAdsEnabled: true, now: () => clock });
+    await new Promise((r) => setTimeout(r, 0));
+    const stale = mock.lastRewarded;
+    clock = NOON + 51 * MIN;
+    expect(await showRewarded({ timeoutMs: 8_000, personalizedAdsEnabled: true, now: () => clock })).toBe('rewarded');
+    expect(mock.lastRewarded).not.toBe(stale);
+  });
+
+  it('does not start the ads SDK (and its consent form) just to preload', () => {
+    preloadRewarded({ personalizedAdsEnabled: true });
+    expect(Ads.RewardedAd.createForAdRequest).not.toHaveBeenCalled();
   });
 });

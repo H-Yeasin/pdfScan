@@ -14,8 +14,8 @@ const LOG_KEY = 'pro.passLog';
 // Only today's entries matter; a week is kept so a clock moved back a day still counts them.
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
-// "2026-10-03" in local time: the cap resets at the student's midnight.
-function dayKey(ms: number): string {
+// "2026-10-03" in local time: the cap resets at the student's midnight. Also proTask's offline cap.
+export function dayKey(ms: number): string {
   const d = new Date(ms);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }

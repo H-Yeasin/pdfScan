@@ -615,6 +615,49 @@ export const en = {
       noBanners: 'No banner ads',
       pdfPasswords: 'Password-protected PDFs',
       driveBackup: 'Automatic backup to your Google Drive',
+      convert: 'Convert Word, Excel and text files to PDF, and scans to Word',
+      editFiles: 'Edit text, CSV, Excel and Word files',
+      pdfForms: 'Fill in PDF forms and add text to PDFs',
+    },
+    // §12 D1: the sheet before a Pro task, and what follows the ad. {name}: the document's name.
+    task: {
+      title: {
+        convert: "Convert '{name}'",
+        editFiles: "Edit '{name}'",
+        pdfForms: "Fill in '{name}'",
+      },
+      body: {
+        convert: 'Watch a short ad to convert this file. With a Pro day pass there are no ads.',
+        editFiles: {
+          one: 'Watch a short ad to edit this file for {count} minute. With a Pro day pass there are no ads.',
+          other: 'Watch a short ad to edit this file for {count} minutes. With a Pro day pass there are no ads.',
+        },
+        pdfForms: {
+          one: 'Watch a short ad to fill in this PDF for {count} minute. With a Pro day pass there are no ads.',
+          other: 'Watch a short ad to fill in this PDF for {count} minutes. With a Pro day pass there are no ads.',
+        },
+      },
+      watch: 'Watch ad',
+      getPass: {
+        one: 'Get Pro for {count} hour',
+        other: 'Get Pro for {count} hours',
+      },
+      loading: 'Loading the ad…',
+      closedEarly: {
+        convert: 'Watch to the end to convert.',
+        editFiles: 'Watch to the end to edit.',
+        pdfForms: 'Watch to the end to fill in the form.',
+      },
+      offlineUsed: "No ad could load, and today's free tries without one are used up. A Pro day pass unlocks this for the day.",
+      getPro: 'Get Pro',
+      resumeTitle: 'Finish your task?',
+      resumeBody: {
+        convert: "The app closed before converting '{name}'. Finish it now?",
+        editFiles: "The app closed before opening '{name}' for editing. Open it now?",
+        pdfForms: "The app closed before opening '{name}' to fill in. Open it now?",
+      },
+      resume: 'Finish',
+      notNow: 'Not now',
     },
     badge: 'PRO',
     badgeLabel: 'Pro feature',

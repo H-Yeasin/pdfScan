@@ -71,8 +71,19 @@ describe('usage counts', () => {
 describe('allow-list', () => {
   it('is exactly the planned events', () => {
     expect(Object.keys(USAGE_EVENTS).sort()).toEqual(
-      ['app_open', 'backup_made', 'document_saved', 'document_submitted', 'pass_started', 'scan_completed'].sort()
+      [
+        'app_open',
+        'backup_made',
+        'document_saved',
+        'document_submitted',
+        'pass_started',
+        'scan_completed',
+        'pro_task_ad_shown',
+        'pro_task_ad_rewarded',
+        'pro_task_run_without_ad',
+      ].sort()
     );
+    expect(USAGE_EVENTS.pro_task_ad_shown).toEqual(['feature']);
     expect(USAGE_EVENTS.scan_completed).toEqual(['pages']);
   });
 

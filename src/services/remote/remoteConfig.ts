@@ -24,6 +24,11 @@ export type RemoteConfig = {
   // Length of a rewarded Pro day pass (M6) and how many a day.
   passHours: number;
   passMaxPerDay: number;
+  // §12 D1, Pro tasks: how long one ad unlocks editing a document, how many tasks a day may run
+  // without an ad when none can load (offline, no fill), and how long to wait for a task's ad.
+  editUnlockMinutes: number;
+  offlineFreeTasksPerDay: number;
+  taskAdTimeoutMs: number;
   // M7's Help & feedback contact: international digits for wa.me, and an address ('' = none).
   supportWhatsapp: string;
   supportEmail: string;
@@ -42,6 +47,9 @@ export const REMOTE_DEFAULTS: RemoteConfig = {
   adsRewardedUnitIos: '',
   passHours: 24,
   passMaxPerDay: 3,
+  editUnlockMinutes: 30,
+  offlineFreeTasksPerDay: 5,
+  taskAdTimeoutMs: 8_000,
   supportWhatsapp: '8801645724080',
   supportEmail: '',
   proSalesEnabled: false,
@@ -94,6 +102,10 @@ const KEYS: { [K in keyof RemoteConfig]: { key: string; parse: Parser<RemoteConf
   adsRewardedUnitIos: { key: 'ads_rewarded_unit_ios', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
   passHours: { key: 'pass_hours', parse: int(1, 168) },
   passMaxPerDay: { key: 'pass_max_per_day', parse: int(0, 10) },
+  editUnlockMinutes: { key: 'edit_unlock_minutes', parse: int(5, 240) },
+  offlineFreeTasksPerDay: { key: 'offline_free_tasks_per_day', parse: int(0, 50) },
+  // Under 2 s almost no ad loads; over 30 s the student has given up.
+  taskAdTimeoutMs: { key: 'task_ad_timeout_ms', parse: int(2_000, 30_000) },
   // An empty number would leave Help & feedback without a contact, so it isn't accepted.
   supportWhatsapp: { key: 'support_whatsapp', parse: (raw) => (/^\d{8,15}$/.test(raw.trim()) ? raw.trim() : undefined) },
   supportEmail: { key: 'support_email', parse: matching(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) },

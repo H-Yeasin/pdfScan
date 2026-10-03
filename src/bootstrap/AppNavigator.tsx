@@ -32,6 +32,7 @@ import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
 import { AppLockGate } from '../components/security/AppLockGate';
 import { ExportHost } from '../components/backup/ExportHost';
+import { ProTaskResumeHost } from '../components/pro/ProTaskResumeHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
 import { useAutoBackup } from '../store/useAutoBackup';
 import { FilterLabScreen } from '../dev/FilterLabScreen';
@@ -305,6 +306,8 @@ export function AppNavigator() {
         {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
         <ExportHost />
         <AutoBackupChip />
+        {/* §12 D1: a Pro task whose ad was watched before the app was killed. */}
+        <ProTaskResumeHost ready={libraryAfterBoot} />
       </AppLockGate>
     </View>
   );

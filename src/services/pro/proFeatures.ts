@@ -4,7 +4,16 @@ import type { TKey } from '../../i18n';
 // paid Pro (M9) unlocks the same list. The owner's rule: never take away a feature that was
 // free, so FREE_FOREVER only ever grows (__tests__/proFeatures.test.ts holds the baseline).
 
-export type ProFeatureId = 'coverTemplates' | 'themeAccents' | 'appLock' | 'noBanners' | 'pdfPasswords' | 'driveBackup';
+export type ProFeatureId =
+  | 'coverTemplates'
+  | 'themeAccents'
+  | 'appLock'
+  | 'noBanners'
+  | 'pdfPasswords'
+  | 'driveBackup'
+  | 'convert'
+  | 'editFiles'
+  | 'pdfForms';
 
 // What happens when Pro ends (a pass runs out). Turning a feature on, or making something new
 // with it, always needs Pro; this is only about what was set up while Pro was active.
@@ -23,7 +32,7 @@ export type ProFeature = {
   lapse: LapseRule;
 };
 
-// M4 built templates, accents and app lock; M5 the banners; R6 and B6 build the last two.
+// M4 built templates, accents and app lock; M5 the banners; R6 and B6 build the next two.
 export const PRO_FEATURES: readonly ProFeature[] = [
   { id: 'coverTemplates', status: 'live', labelKey: 'pro.features.coverTemplates', lapse: 'keepExisting' },
   { id: 'themeAccents', status: 'live', labelKey: 'pro.features.themeAccents', lapse: 'stop' },
@@ -31,6 +40,15 @@ export const PRO_FEATURES: readonly ProFeature[] = [
   { id: 'noBanners', status: 'live', labelKey: 'pro.features.noBanners', lapse: 'stop' },
   { id: 'pdfPasswords', status: 'planned', labelKey: 'pro.features.pdfPasswords', lapse: 'keepExisting' },
   { id: 'driveBackup', status: 'planned', labelKey: 'pro.features.driveBackup', lapse: 'pause' },
+  // §12 Pro tasks, unlocked one task at a time by a rewarded ad (services/pro/proTask.ts) or by a
+  // day pass. What was converted or edited stays. 'planned' until D5 (convert), D7 (editFiles)
+  // and D10 (pdfForms) build them.
+  // Office → PDF and scan/PDF → Word.
+  { id: 'convert', status: 'planned', labelKey: 'pro.features.convert', lapse: 'keepExisting' },
+  // Edit TXT, CSV, XLSX and Word files.
+  { id: 'editFiles', status: 'planned', labelKey: 'pro.features.editFiles', lapse: 'keepExisting' },
+  // Fill PDF forms and add typed text boxes.
+  { id: 'pdfForms', status: 'planned', labelKey: 'pro.features.pdfForms', lapse: 'keepExisting' },
 ];
 
 export const FREE_FOREVER = [

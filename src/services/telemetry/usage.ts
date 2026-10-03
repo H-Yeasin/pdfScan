@@ -16,6 +16,11 @@ export const USAGE_EVENTS = {
   document_submitted: [],
   pass_started: [],
   backup_made: [],
+  // §12 D1: a Pro task's ad shown, watched to the end, or skipped because none could load.
+  // `feature` is services/pro/proTask.ts's PRO_TASK_FEATURE_CODES number, never a document.
+  pro_task_ad_shown: ['feature'],
+  pro_task_ad_rewarded: ['feature'],
+  pro_task_run_without_ad: ['feature'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UsageEvent = keyof typeof USAGE_EVENTS;

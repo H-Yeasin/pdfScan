@@ -59,6 +59,13 @@ export function lockOnReturn(settings: AppLockSettings, backgroundedAt: number |
   return away < 0 || away >= AFTER_MS[settings.after];
 }
 
+// What to record when the app goes to the background: when it left, or null while an external
+// screen (services/security/externalScreen.ts: the unlock sheet's PIN screen, a rewarded ad) is
+// on top, since that isn't leaving the app and must not lock it on return.
+export function backgroundedAtOnLeave(externalScreenOpen: boolean, now: number): number | null {
+  return externalScreenOpen ? null : now;
+}
+
 // What the unlock attempt's result means for the lock. `noDeviceLock`: the phone has no screen
 // lock (or it was removed), so there is nothing to check against; the app opens rather than
 // locking the student out of their own documents for good, and Settings says why.

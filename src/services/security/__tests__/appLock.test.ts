@@ -1,4 +1,4 @@
-import { DEFAULT_APP_LOCK, lockedAtStart, lockOnReturn, normalizeAppLock, unlockOutcome, type AppLockSettings } from '../appLock';
+import { backgroundedAtOnLeave, DEFAULT_APP_LOCK, lockedAtStart, lockOnReturn, normalizeAppLock, unlockOutcome, type AppLockSettings } from '../appLock';
 import { canUseProFeature } from '../../pro/proFeatures';
 
 const NOW = Date.UTC(2026, 9, 2, 10, 0);
@@ -54,5 +54,17 @@ describe('lapse rule (keepUntilOff)', () => {
     expect(canUseProFeature('appLock', 'start', false)).toBe(false);
     expect(canUseProFeature('appLock', 'start', true)).toBe(true);
     expect(canUseProFeature('appLock', 'keep', false)).toBe(true);
+  });
+});
+
+describe('an external screen (unlock sheet, rewarded ad)', () => {
+  it('is not leaving the app: no lock on return, even with "lock right away"', () => {
+    const left = backgroundedAtOnLeave(true, 1_000);
+    expect(left).toBeNull();
+    expect(lockOnReturn(on('immediately'), left, 60_000)).toBe(false);
+  });
+
+  it('a real trip out still locks', () => {
+    expect(lockOnReturn(on('immediately'), backgroundedAtOnLeave(false, 1_000), 1_000)).toBe(true);
   });
 });

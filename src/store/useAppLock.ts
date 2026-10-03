@@ -3,7 +3,8 @@ import { AppState, Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as ScreenCapture from 'expo-screen-capture';
 import { t } from '../i18n';
-import { lockedAtStart, lockOnReturn, unlockOutcome } from '../services/security/appLock';
+import { backgroundedAtOnLeave, lockedAtStart, lockOnReturn, unlockOutcome } from '../services/security/appLock';
+import { beginExternalScreen, isExternalScreenOpen } from '../services/security/externalScreen';
 import { useAppSlices } from './AppStateContext';
 
 // §10 M4: applies the app lock rules (services/security/appLock.ts) to the running app.
@@ -11,9 +12,10 @@ import { useAppSlices } from './AppStateContext';
 
 export type AppLockStatus = 'unknown' | 'locked' | 'unlocked';
 
-// True while the phone's own unlock sheet is up. On Android the PIN / pattern fallback is a
-// separate system screen, so the app goes to the background and comes back during it; those
-// moves must not count as leaving the app (or "lock right away" would lock again at once).
+// True while the phone's own unlock sheet is up, so a second tap doesn't open another. On Android
+// the PIN / pattern fallback is a separate system screen, so the app goes to the background and
+// comes back during it; it counts as an external screen (services/security/externalScreen.ts),
+// like a rewarded ad, so those moves don't count as leaving the app.
 let authenticating = false;
 
 // Whether the phone has any screen lock (PIN, pattern, password or biometrics) to check against.
@@ -28,6 +30,7 @@ export async function hasDeviceLock(): Promise<boolean> {
 // The phone's unlock sheet: biometrics, with the device PIN / pattern / password as the fallback.
 export async function authenticate(promptMessage: string): Promise<{ success: boolean; error?: string }> {
   authenticating = true;
+  const endExternal = beginExternalScreen();
   try {
     const result = await LocalAuthentication.authenticateAsync({ promptMessage, cancelLabel: t('common.cancel'), disableDeviceFallback: false });
     return result.success ? { success: true } : { success: false, error: result.error };
@@ -36,6 +39,7 @@ export async function authenticate(promptMessage: string): Promise<{ success: bo
     return { success: false, error: 'unknown' };
   } finally {
     authenticating = false;
+    endExternal();
   }
 }
 
@@ -65,9 +69,9 @@ export function useAppLock(): { status: AppLockStatus; promptTick: number; unloc
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'background') {
-        if (!authenticating) backgroundedAt.current = Date.now();
+        backgroundedAt.current = backgroundedAtOnLeave(isExternalScreenOpen(), Date.now());
       } else if (next === 'active') {
-        // null: no real trip to the background (or only the unlock sheet's own).
+        // null: no real trip to the background (or only an external screen's: unlock sheet, ad).
         if (backgroundedAt.current === null) return;
         if (lockOnReturn(lockRef.current, backgroundedAt.current, Date.now())) {
           setStatus('locked');
