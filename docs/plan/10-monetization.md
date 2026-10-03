@@ -282,7 +282,8 @@ Status: done in code (commit 3c01c35); open: tapping both contacts on a phone.
   unlocking. Settings' About had a hard-coded `'1.0'`; it now uses `APP_VERSION` (`1.0.0`).
 
 ### M8 · Opt-in usage counts *(S)*
-Status: todo
+Status: done in code (commit 8fa27fe); open: the proxy check (toggle off) and DebugView (toggle on)
+on a phone with the Firebase files.
 
 - `@react-native-firebase/analytics` with collection **disabled by default**
   (`setAnalyticsCollectionEnabled(false)`); turned on only by the M1 "Help improve" toggle.
@@ -292,6 +293,18 @@ Status: todo
   allow-list.
 - Done when: with the toggle off, no Firebase Analytics traffic (checked with a proxy); with it
   on, the events appear in DebugView.
+- **As built:** `services/telemetry/usage.ts`: `USAGE_EVENTS` (the six events; only
+  `scan_completed` has a parameter, `pages`), `logUsage` (typed per event; drops anything not on
+  the list and any non-number parameter; silent while off or without Firebase),
+  `setUsageCollection` (AppNavigator, after the first frame once settings are loaded; the first
+  call always applies the setting because Analytics persists it natively; switching off also
+  calls `resetAnalyticsData`). `app_open` is logged once per run when collection is on. Call
+  sites: `ingestBatch` success (`pages`), Deliver after `library/ADD_FILE` and after a
+  submission, `useSubmitDocument`, `claimDayPass`, `useBackupExport` (full backups) and
+  `useAutoBackup`. The allow-list test reads every `logUsage(` in `src` (outside tests) and
+  fails on a name that isn't a listed literal. `@react-native-firebase/analytics@26.4.0` is now
+  in `package.json` (no new native code: it was already installed as a peer). The privacy
+  policy draft and `docs/firebase.md` list the events.
 
 ## Later (parked until a merchant route exists)
 Status: later
