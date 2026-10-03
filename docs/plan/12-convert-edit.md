@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D1** (the Pro task gate). D2–D4 (the reader) don't depend on D1 and may go first.
+- **Next: D2** (reader layout). D1 is done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -105,7 +105,32 @@ Until now office files were read-only by design (§1 "not a general office suite
 ## Steps
 
 ### D1 · Pro task gate: a full-screen ad, then the task continues *(M)*
-Status: not started.
+Status: done in code (commit dc17a06); device check open (see "Done when").
+
+**As built:**
+- The three features are `status: 'planned'` (not listed on the Pro screen) until D5, D7 and
+  D10 build them; flip each to `'live'` then.
+- `decide` also takes `adsEnabled` (Remote Config `ads_enabled`) and `offlineFreePerDay`. With
+  ads switched off by the owner there is no ad and no day pass to unlock with, so tasks just
+  run, uncounted. `checkProTask` always passes `adsAvailable: true` (unknown until an ad is
+  asked for); a failed load comes back through `watchAdForTask` as `runWithoutAd` / `offerPro`.
+- A once grant is stored on the reward too and used up only when the task *finishes*, so a
+  failed conversion can be retried within the hour without another ad.
+- Code: `services/pro/proTask.ts` (pure rules, storage, runner registry),
+  `services/pro/proTaskFlow.ts` (check → watch → complete, resume),
+  `services/security/externalScreen.ts` (a counter; `useAppLock`'s unlock sheet uses it too;
+  `appLock.backgroundedAtOnLeave`), `services/ads/rewarded.ts` (`showRewarded`,
+  `preloadRewarded`, `isPreloadFresh`), `components/pro/useProTask.tsx` (returns `start`,
+  `element`, `loadingAd`; a non-modal "Loading the ad…" overlay while it loads),
+  `ProTaskSheet.tsx`, `ProTaskResumeHost.tsx` (an Alert, inside `AppLockGate`, after the library
+  loads).
+- `PendingProTask` also has `kind` (which runner finishes it) and `title` (for the resume
+  message). D5/D6 call `registerProTaskRunner(kind, runner)` at module load of a module imported
+  at start; a pending task with no runner is dropped.
+- Telemetry params are numbers only (M8), so `feature` is `PRO_TASK_FEATURE_CODES`
+  (convert 1, editFiles 2, pdfForms 3).
+- Preloading only happens when the ads SDK is already running (banners started it), so opening
+  the Reader never brings up the consent form. Nothing calls `useProTask` yet: D5 is the first.
 
 - `PRO_FEATURES` gains `convert` (Office → PDF, scan/PDF → Word), `editFiles`
   (TXT/CSV/XLSX/Word) and `pdfForms` (fill forms, typed text boxes), all `lapse: 'keepExisting'`

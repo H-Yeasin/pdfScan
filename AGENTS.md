@@ -21,8 +21,8 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   done in code; §7 R5 is too, except the SheetJS 0.20.3 swap (needs `cdn.sheetjs.com`); §8 B1–B5 are done in code (B6, Google Drive, waits for Pro). §9 O1 and O5's code (selector store, deferred boot) are done; O5's device measurements are open (`docs/qa/performance.md`); §9 O2–O4 and O6's code are done; §9's device work is open (`docs/qa/walkthrough.md`, `docs/qa/performance.md`). §10 M1–M8 are done in code (Play Console checklist, Firebase and AdMob setup open: `docs/policy/play-console.md`, `docs/firebase.md`, `docs/ads.md`; M4–M8 device checks open; M9–M11 parked). **Next:** plan §11 (`docs/plan/11-launch.md`),
   that swap, device checks (each plan file's Verification), E7's benchmark run, and
   §6 device checks (`docs/plan/06-languages.md`; L1–L4 are done, L3 without its device spike; L5–L6 wait for Bangla); §5 T7 (flashcards) is for later (P4).
-  **§12 (reader + convert + light edit) is planned** (`docs/plan/12-convert-edit.md`, D1–D11, revised 2026-10-03); next: D1, the
-  Pro task gate. Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
+  **§12 (reader + convert + light edit) is planned** (`docs/plan/12-convert-edit.md`, D1–D11, revised 2026-10-03); D1 (the
+  Pro task gate, `services/pro/proTask*.ts`, `components/pro/useProTask.tsx`) is done in code; next: D2. Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
   **§10 was revised (2026-10-02):** light ads + a rewarded "Pro day pass" + Firebase Remote Config,
   no login; paid Pro is parked (no Play payouts in Bangladesh). Never add text that sends users to
   pay outside Google Play (Play Payments policy); WhatsApp 01645724080 is a support contact only.
