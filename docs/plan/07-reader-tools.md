@@ -307,8 +307,8 @@ is two taps away.
   (see `PdfPageView`).
 
 ### R5 · Office formats: read-only, safe, honest *(S)*
-Status: in progress: everything but the SheetJS swap is done in code (commit 2e00ceb). **Open:** the
-`xlsx` 0.20.3 tarball (cdn.sheetjs.com was blocked from the session that built this); device checks
+Status: done in code (commit 2e00ceb; the SheetJS 0.20.3 swap landed separately, see As built).
+**Open:** device checks
 
 - **Security:** replace `xlsx@0.18.5` (npm) with SheetJS **0.20.3** from
   `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (the official distribution) in
@@ -334,13 +334,11 @@ Status: in progress: everything but the SheetJS swap is done in code (commit 2e0
 `npm audit` shows no `xlsx` advisories.
 
 **As built:**
-- **SheetJS swap not done yet.** `package.json` still has `xlsx@^0.18.5`: the build session
-  couldn't reach `cdn.sheetjs.com`, and pointing `package.json` at the tarball without
-  updating the lockfile would break `npm ci`. To finish, run
-  `npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` with that host reachable,
-  re-run `npm test` (the sheet tests write and read real XLSX/XLS files) and `npm audit`. The
-  code only uses `read`, `utils.sheet_to_json`, `decode_cell` and `encode_range`, which 0.20.3
-  keeps.
+- **SheetJS swap done (2026-10-03, before §12 D8).** `package.json` points at
+  `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` and the lockfile pins its integrity;
+  0.20.3 bundles what 0.18.5 pulled from npm (`cfb`, `ssf`, `codepage`, …), so those left the
+  lockfile. `npm audit` shows no `xlsx` advisory; the sheet tests (real XLSX/XLS files) pass
+  unchanged. The original build session couldn't reach `cdn.sheetjs.com`.
 - Parsing moved from `SheetView` to `documents/sheetService.ts` (`loadSheets`, caps
   `SHEET_MAX_BYTES` / `SHEET_MAX_CELLS`, `PreviewTooLargeError`). The cell cap counts
   non-empty cells. Rows are built from A1 to the last real cell, so a stray formatted cell at

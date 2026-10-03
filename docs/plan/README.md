@@ -16,7 +16,7 @@ code **when the section was planned**, and are kept as history.
 | §4 Submit | [04-submit.md](04-submit.md) | S1–S8 | All done in code (S3–S8 have device checks open; S8 needs a new dev build). |
 | §5 Study | [05-study.md](05-study.md) | T1–T7 | T1–T6 done in code (device checks open). T7 (flashcards) is for later (P4). |
 | §6 Languages and scripts | [06-languages.md](06-languages.md) | L1–L6 | L1–L4 (the P2 groundwork) done in code; device checks open, L3's font spike was skipped (system fonts assumed). L5–L6 (Tesseract, packs) wait for Bangla (P4). |
-| §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). **R5 in progress:** done in code except the SheetJS 0.20.3 swap (`cdn.sheetjs.com` was blocked). R6 waits for Pro. |
+| §7 Reader and PDF tools | [07-reader-tools.md](07-reader-tools.md) | R1–R6 | R1–R4 done in code (device checks open; R1 needs a new dev build for `modules/pdf-native`). R5 done in code, SheetJS 0.20.3 swap included (device checks open). R6 waits for Pro. |
 | §8 Backup and portability | [08-backup.md](08-backup.md) | B1–B6 | B1–B5 done in code (device checks open; B1's backup rules and B4's zip "Open with" need a new dev build). B6 (Google Drive) waits for Pro. |
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2, O3 and O4 done in code. **O5 and O6 in progress:** their code is done; what's left is on a device: the measurements in `docs/qa/performance.md` and the walkthrough in `docs/qa/walkthrough.md`. |
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1–M8 done in code (open for the owner: the Play Console checklist in `docs/policy/play-console.md`, the Firebase project and EAS file variables in `docs/firebase.md`, AdMob in `docs/ads.md`; M2–M6 need a new dev build, M4–M8 have device checks open, M5 its before/after numbers). M9–M11 (paid Pro) are parked until a merchant route exists. Next: §11 (plan `docs/plan/11-launch.md`). |
@@ -34,7 +34,7 @@ checks pass on a device.
 | **P0: Foundation** | §0 | §0 F1–F8 done in code | **Done in code**, device checks open (upgrade from an AsyncStorage-era build keeps every document) |
 | **P1: Student MVP** | §1, §2 (Ink + Board), §3, §4, §9 onboarding | §1, §2 (E1–E6), §3, §4 done in code; E7 benchmark run open | **Not complete**: §9 is done in code; its device work is open (O5 measurements, the O6 walkthrough, O4's TalkBack pass), with the other device checks |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | §5 T1–T6, §6 L1–L4 and §8 B1–B5 done in code | **Done in code**; device checks open (L3's font spike, §8's backup and restore on a phone included) |
-| **P3: Grow** | §10 Pro, §8 Drive, §11, §12 convert + light edit, iOS parity | — | Not started (§7 R1–R4 done in code, R5 all but the SheetJS swap; R6 waits for Pro) |
+| **P3: Grow** | §10 Pro, §8 Drive, §11, §12 convert + light edit, iOS parity | — | Not started (§7 R1–R4 done in code, R5 done in code; R6 waits for Pro) |
 | **P4: Expand** | Bengali (§6 L5–L6), flashcards (§5 T7), more templates | Groundwork in place (script registry, OCR engines, any-script PDF text, i18n) | Not started |
 
 **Next to unblock the phases:** §9 is done in code, so P1 and P2 are done in code. What's left is
@@ -100,7 +100,7 @@ lines here.
 | R2 Page tools for imported PDFs | 9f97fc1 | `pdf/{pdfOps,rasterPdf,pdfErrors}.ts`, `decoratePdf`, `usePageImage`; pages keep ids on merge/split, `syncLibrary` deletes removed documents first |
 | R3 Edit pages after saving | 510eb3b, a123c21 | migration v14 (`pages.rotation`), `pdf/rotation.ts`, `persistence/pageEdits.ts`, `appendDocuments`, `EditPagesModal`, `deliver.appendTo` |
 | R4 Reader conveniences | a68b7ed | migration v15 (`documents.last_page`), `documents/readerPosition.ts`, `PageScrubberSheet`; page rows not rewritten when unchanged |
-| R5 Office formats: read-only, capped | 2e00ceb | `documents/{sheetService,docxService}.ts`, `DocxView`, `OPENABLE_FORMATS`; **SheetJS 0.20.3 swap still open** |
+| R5 Office formats: read-only, capped | 2e00ceb | `documents/{sheetService,docxService}.ts`, `DocxView`, `OPENABLE_FORMATS`; SheetJS 0.20.3 from cdn.sheetjs.com (separate commit before D8) |
 | B1 Storage health | 58ba0ee | migration v16 (`documents.missing_files`, `disk_bytes`), `services/storage/{integrity,usage}.ts`, `StorageScreen`, `useSpaceGuard`, `plugins/withBackupRules.js` (new dev build) |
 | B2 Backup format | a762099 | `services/backup/zip/*` (STORE + Zip64, CRC patched into local headers), `backup/format.ts` (`exportRows`, `importPlan`, `insertRows`, `upgradeLibraryJson`) |
 | B3 Back up and export | ac0eee5 | `backup/createBackup.ts`, `components/backup/{useBackupExport,BackupSheet}.tsx`, `BackupScreen`, `deviceExportService.saveFileToFolder` (streamed SAF), `settings.lastBackup*`/`backupFolder*` |
