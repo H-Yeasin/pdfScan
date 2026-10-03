@@ -3,11 +3,11 @@ import type * as XLSXTypes from 'xlsx';
 import Papa from 'papaparse';
 import { readTextWithEncodingFallback } from './txtService';
 
-// §9 O5: SheetJS is large and only the sheet preview uses it, so it's loaded on first use rather
-// than at app start (Expo's Metro config doesn't inline requires).
+// §9 O5: SheetJS is large and only the sheet preview (and §12 D8's editor) uses it, so it's
+// loaded on first use rather than at app start (Expo's Metro config doesn't inline requires).
 type XLSXModule = typeof XLSXTypes;
 let xlsx: XLSXModule | null = null;
-function XLSX(): XLSXModule {
+export function XLSX(): XLSXModule {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   xlsx ??= require('xlsx') as XLSXModule;
   return xlsx;
@@ -45,11 +45,26 @@ export async function loadSheets(uri: string, format: SheetFormat, limits: Sheet
     return [{ name: 'Sheet1', rows: parsed.data }];
   }
 
+  const workbook = await readWorkbook(uri, limits, { formulas: false });
+  return workbook.SheetNames.map((name) => ({ name, rows: sheetRows(workbook.Sheets[name]) }));
+}
+
+// The capped read the viewer and §12 D8's editor share (the size was checked by the caller or is
+// checked here). Values only by default: no formulas, styles, HTML or macros - the preview needs
+// none of them. The editor reads formulas too, so the cells it didn't touch are written back with
+// theirs, and number formats, so an edited number keeps showing as a percentage or a date.
+export async function readWorkbook(
+  uri: string,
+  limits: SheetLimits = DEFAULT_LIMITS,
+  opts: { formulas: boolean } = { formulas: false }
+): Promise<XLSXTypes.WorkBook> {
+  const size = new File(uri).size ?? 0;
+  if (size > limits.maxBytes) throw new PreviewTooLargeError(`${size} bytes`);
   const arrayBuffer = await new File(uri).arrayBuffer();
-  // Values only: no formulas, styles, HTML or macros are read - nothing here needs them.
   const workbook = XLSX().read(arrayBuffer, {
     type: 'array',
-    cellFormula: false,
+    cellFormula: opts.formulas,
+    cellNF: opts.formulas,
     cellHTML: false,
     cellStyles: false,
     bookVBA: false,
@@ -60,18 +75,19 @@ export async function loadSheets(uri: string, format: SheetFormat, limits: Sheet
     cells += cellKeys(workbook.Sheets[name]).length;
     if (cells > limits.maxCells) throw new PreviewTooLargeError(`more than ${limits.maxCells} cells`);
   }
+  return workbook;
+}
 
-  return workbook.SheetNames.map((name) => {
-    const sheet = workbook.Sheets[name];
-    // A sheet's declared range can reach column XFD / row 1,048,576 because of one stray
-    // formatted cell; the rows are built for the cells that exist, not the declared range.
-    const ref = usedRange(sheet);
-    if (!ref) return { name, rows: [] };
-    // Array-of-arrays (header: 1) avoids SheetJS guessing header-row keys; raw: false gives the
-    // cells as the spreadsheet shows them (dates, percentages), which is what a preview wants.
-    const rows = XLSX().utils.sheet_to_json<string[]>({ ...sheet, '!ref': ref }, { header: 1, raw: false, defval: '' });
-    return { name, rows };
-  });
+// Row r, column c of the result is the spreadsheet's cell at (r, c): §12 D8's editor maps its
+// grid back to cell addresses this way.
+export function sheetRows(sheet: XLSXTypes.WorkSheet): string[][] {
+  // A sheet's declared range can reach column XFD / row 1,048,576 because of one stray
+  // formatted cell; the rows are built for the cells that exist, not the declared range.
+  const ref = usedRange(sheet);
+  if (!ref) return [];
+  // Array-of-arrays (header: 1) avoids SheetJS guessing header-row keys; raw: false gives the
+  // cells as the spreadsheet shows them (dates, percentages), which is what a preview wants.
+  return XLSX().utils.sheet_to_json<string[]>({ ...sheet, '!ref': ref }, { header: 1, raw: false, defval: '' });
 }
 
 function cellKeys(sheet: XLSXTypes.WorkSheet): string[] {

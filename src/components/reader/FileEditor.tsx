@@ -1,28 +1,44 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PreviewTooLargeError } from '../../services/documents/sheetService';
 import { csvToText, loadCsvForEdit, loadTextForEdit, type CsvTable, type EditFormat } from '../../services/edit/textEdit';
+import {
+  editValue,
+  loadSheetsForEdit,
+  recordEdit,
+  sheetCopyName,
+  type EditableSheet,
+  type SheetEditFormat,
+  type SheetEdits,
+} from '../../services/edit/sheetEdit';
 import { useT } from '../../i18n/useT';
 import { radii, spacing, touchSlop, useTheme } from '../../theme';
 import { CsvGrid } from './CsvGrid';
 
-export type EditorFile = { uri: string; name: string; format: EditFormat; external: boolean };
+export type EditorFile = { uri: string; name: string; format: EditFormat | SheetEditFormat; external: boolean };
+
+// What Save hands over: a TXT or CSV file's whole text, or a workbook's cell edits (§12 D8).
+export type EditorOutput = { kind: 'text'; text: string } | { kind: 'sheet'; edits: SheetEdits };
 
 type FileEditorProps = {
   // null: closed.
   file: EditorFile | null;
-  // Writes the text; resolves false when saving failed (the hook reported it), so the edits stay.
-  onSave: (text: string) => Promise<boolean>;
+  // Writes the edit; resolves false when saving failed (the hook reported it), so the edits stay.
+  onSave: (output: EditorOutput) => Promise<boolean>;
   onClose: () => void;
 };
 
-type Loaded = { kind: 'txt'; text: string; fallbackUsed: boolean } | { kind: 'csv'; table: CsvTable; fallbackUsed: false };
+type Loaded =
+  | { kind: 'txt'; text: string; fallbackUsed: boolean }
+  | { kind: 'csv'; table: CsvTable; fallbackUsed: false }
+  | { kind: 'sheet'; sheets: EditableSheet[]; fallbackUsed: false };
 
 // §12 D7: the full-screen editor for a TXT or CSV file, opened once D1's gate let it (a day pass,
 // or an ad that unlocked this document for `edit_unlock_minutes`). Saving never asks again. Back
-// and Close ask before throwing edits away. The Reader's viewers stay read-only.
+// and Close ask before throwing edits away. The Reader's viewers stay read-only. §12 D8: an XLSX
+// or XLS file's cells, sheet by sheet, saved as a copy after a warning about what may be lost.
 export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -30,6 +46,10 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
   const [error, setError] = useState<'failed' | 'tooLarge' | null>(null);
   const [text, setText] = useState('');
   const [rows, setRows] = useState<string[][]>([]);
+  // A workbook: each sheet's rows as edited, which sheet is shown, and the cell edits to apply.
+  const [sheetRows, setSheetRows] = useState<string[][][]>([]);
+  const [activeSheet, setActiveSheet] = useState(0);
+  const [edits, setEdits] = useState<SheetEdits>({});
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   // TxtView reads in monospace; prose reads better without it.
@@ -43,6 +63,8 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
     setLoaded(null);
     setError(null);
     setDirty(false);
+    setEdits({});
+    setActiveSheet(0);
     (async () => {
       try {
         if (format === 'TXT') {
@@ -50,6 +72,11 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
           if (cancelled) return;
           setText(read);
           setLoaded({ kind: 'txt', text: read, fallbackUsed });
+        } else if (format === 'XLSX' || format === 'XLS') {
+          const sheets = await loadSheetsForEdit(uri);
+          if (cancelled) return;
+          setSheetRows(sheets.map((sheet) => sheet.rows));
+          setLoaded({ kind: 'sheet', sheets, fallbackUsed: false });
         } else {
           const table = await loadCsvForEdit(uri);
           if (cancelled) return;
@@ -67,16 +94,34 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
     };
   }, [uri, format]);
 
-  const save = useCallback(async () => {
+  const write = useCallback(
+    async (output: EditorOutput) => {
+      setSaving(true);
+      try {
+        if (await onSave(output)) setDirty(false);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onSave]
+  );
+
+  const save = useCallback(() => {
     if (!loaded || saving) return;
-    setSaving(true);
-    try {
-      const out = loaded.kind === 'txt' ? text : csvToText({ ...loaded.table, rows });
-      if (await onSave(out)) setDirty(false);
-    } finally {
-      setSaving(false);
+    if (loaded.kind !== 'sheet') {
+      void write({ kind: 'text', text: loaded.kind === 'txt' ? text : csvToText({ ...loaded.table, rows }) });
+      return;
     }
-  }, [loaded, saving, text, rows, onSave]);
+    // A workbook can lose styles, charts and uncomputed formulas on the way through SheetJS, so
+    // the student is told first; the original is never written.
+    Alert.alert(t('reader.editFile.sheetSaveTitle'), t('reader.editFile.sheetSaveBody', { name: sheetCopyName(file?.name ?? '') }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('reader.editFile.sheetSave'), onPress: () => void write({ kind: 'sheet', edits }) },
+    ]);
+  }, [loaded, saving, text, rows, edits, file?.name, write, t]);
+
+  const sheet = loaded?.kind === 'sheet' ? loaded.sheets[activeSheet] : undefined;
+  const activeRows = sheetRows[activeSheet] ?? [];
 
   const close = useCallback(() => {
     if (saving) return;
@@ -116,14 +161,18 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
             accessibilityRole="button"
             accessibilityState={{ disabled: !dirty || saving }}
             disabled={!dirty || saving}
-            onPress={() => void save()}
+            onPress={save}
             style={[styles.saveButton, { backgroundColor: tokens.accent, opacity: dirty && !saving ? 1 : 0.5 }]}
           >
             {saving ? <ActivityIndicator color={tokens.onAccent} size="small" /> : <Text style={[styles.saveLabel, { color: tokens.onAccent }]}>{t('reader.editFile.save')}</Text>}
           </Pressable>
         </View>
 
-        {file?.external ? <Banner text={t('reader.editFile.outsideNote')} /> : null}
+        {format === 'XLSX' || format === 'XLS' ? (
+          <Banner text={t('reader.editFile.sheetNote')} />
+        ) : file?.external ? (
+          <Banner text={t('reader.editFile.outsideNote')} />
+        ) : null}
         {loaded?.fallbackUsed ? <Banner text={t('reader.editFile.notUtf8')} /> : null}
 
         {error ? (
@@ -153,7 +202,41 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
               style={[styles.text, { color: tokens.ink }, mono && styles.mono]}
             />
           </KeyboardAvoidingView>
-        ) : (
+        ) : loaded.kind === 'sheet' && sheet ? (
+          <>
+            {loaded.sheets.length > 1 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabStrip}>
+                {loaded.sheets.map((s, i) => (
+                  <Pressable
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: i === activeSheet }}
+                    key={s.name}
+                    onPress={() => setActiveSheet(i)}
+                    style={[styles.tab, i === activeSheet && { borderBottomColor: tokens.accent, borderBottomWidth: 2 }]}
+                  >
+                    <Text style={{ color: i === activeSheet ? tokens.accentInk : tokens.muted, fontWeight: '600' }}>{s.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : null}
+            <CsvGrid
+              // A fresh grid per sheet: its open cell prompt belongs to the sheet it was opened on.
+              key={sheet.name}
+              rows={activeRows}
+              rowActions={false}
+              hint={t('reader.editFile.formulaHint')}
+              editValue={(row, col) => editValue(sheet, edits, activeRows, row, col)}
+              onCellChange={(row, col, value) => {
+                setEdits((prev) => recordEdit(prev, sheet.name, row, col, value));
+                setDirty(true);
+              }}
+              onChange={(next) => {
+                setSheetRows((prev) => prev.map((r, i) => (i === activeSheet ? next : r)));
+                // Add row changes the rows without a cell edit; nothing to save until a cell is.
+              }}
+            />
+          </>
+        ) : loaded.kind === 'csv' ? (
           <CsvGrid
             rows={rows}
             onChange={(next) => {
@@ -161,7 +244,7 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
               setDirty(true);
             }}
           />
-        )}
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -199,6 +282,8 @@ const styles = StyleSheet.create({
   saveLabel: { fontSize: 15, fontWeight: '600' },
   banner: { padding: spacing.sm },
   bannerText: { fontSize: 12.5, textAlign: 'center' },
+  tabStrip: { flexGrow: 0, flexDirection: 'row' },
+  tab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   text: { flex: 1, padding: spacing.lg, fontSize: 15, lineHeight: 22 },
   mono: { fontFamily: 'monospace', fontSize: 14.5, lineHeight: 21 },

@@ -49,16 +49,18 @@ describe('§12 D2 reader tool bar', () => {
     expect(readerProTasks({ external: { format: 'PDF' } }, allLive, allBuilt)).toEqual(['convert', 'pdfForms']);
     expect(readerProTasks({ doc: docx }, allLive, allBuilt, allEdits)).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ external: { format: 'CSV' } }, allLive)).toEqual(['convert', 'editFiles']);
-    // An old .xls is converted, never edited.
-    expect(readerProTasks({ doc: xls }, allLive, allBuilt, allEdits)).toEqual(['convert']);
+    // §12 D8: an old .xls is edited too (the copy is saved as .xlsx).
+    expect(readerProTasks({ doc: xls }, allLive, allBuilt, allEdits)).toEqual(['convert', 'editFiles']);
+    expect(readerProTasks({ doc: xls }, allLive, allBuilt, { ...allEdits, sheet: false })).toEqual(['convert']);
   });
 
   it('shows no Pro task until its step is built', () => {
-    // §12 D7: editing is live for TXT and CSV; XLSX (D8) and Word (D9) aren't built yet.
+    // §12 D7/D8: editing is live for TXT, CSV, XLSX and XLS; Word (D9) isn't built yet.
     expect(readerProTasks({ doc: makeDoc({ format: 'TXT' }) })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ external: { format: 'CSV' } })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ doc: docx })).toEqual(['convert']);
-    expect(readerProTasks({ doc: makeDoc({ format: 'XLSX', pages: [] }) })).toEqual(['convert']);
+    expect(readerProTasks({ doc: makeDoc({ format: 'XLSX', pages: [] }) })).toEqual(['convert', 'editFiles']);
+    expect(readerProTasks({ external: { format: 'XLS' } })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles', allBuilt, allEdits)).toEqual(['editFiles']);
     // D6 (scan/PDF → Word) is built: a scan and a PDF have Convert once `convert` is live.
     expect(readerProTasks({ doc: scan })).toEqual(['convert']);

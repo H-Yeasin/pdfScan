@@ -143,7 +143,7 @@ export function ReaderScreen() {
     if (external) startWord({ uri: external.uri, name: external.name, title: external.name, grantId: external.uri });
     else if (doc) startWord({ docId: doc.id, title: doc.name, grantId: doc.id });
   }, [doc, external, startWord]);
-  // §12 D7: edit a TXT or CSV file (one ad unlocks the document for a while). Preloading is
+  // §12 D7/D8: edit a TXT, CSV, XLSX or XLS file (one ad unlocks the document for a while). Preloading is
   // shared with the conversion gate's (rewarded.preloadRewarded keeps one ad).
   const edit = useEditFile({ preload: proTasks.includes('editFiles') });
   const { start: startEdit } = edit;
@@ -239,7 +239,7 @@ export function ReaderScreen() {
   const handleTool = useCallback(
     (id: ReaderToolId) => {
       // A file's Pro tasks: one conversion (Office → PDF, D5, or scan/PDF → Word, D6) and, for a
-      // TXT or CSV, editing (D7). With both, a picker; with one, it runs straight away.
+      // TXT, CSV, XLSX or XLS, editing (D7, D8). With both, a picker; with one, it runs straight away.
       if (id === 'convertEdit') {
         const canConvert = proTasks.includes('convert');
         const convertNow = toWord ? convertToWord : convertToPdf;

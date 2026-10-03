@@ -29,7 +29,7 @@ export type ReaderMoreItemId =
   | 'convertToPdf'
   // §12 D6: scan/PDF → Word (Pro), also from the tool bar's Convert.
   | 'convertToWord'
-  // §12 D7: edit a TXT or CSV file (Pro), also from the tool bar's Convert/Edit.
+  // §12 D7: edit a TXT or CSV file (Pro), also from the tool bar's Convert/Edit; D8: XLSX/XLS.
   | 'editFile'
   | 'print'
   | 'sign'
@@ -56,7 +56,7 @@ export const BUILT_CONVERSIONS = { officeToPdf: true, pdfToWord: true };
 
 // `editFiles` covers editors built in three steps: TXT and CSV (D7), XLSX (D8), Word (D9). The
 // feature is live once the first is; a format whose editor isn't built yet doesn't offer it.
-export const BUILT_EDITS = { text: true, sheet: false, docx: false };
+export const BUILT_EDITS = { text: true, sheet: true, docx: false };
 
 // The Pro tasks this file allows (each through D1's gate). A feature counts once its step has
 // built it (`status: 'live'` in PRO_FEATURES); until then, none, and the Convert/Edit tool stays
@@ -77,8 +77,9 @@ export function readerProTasks(
   } else if (format === 'DOCX' || format === 'XLSX' || format === 'XLS' || format === 'CSV' || format === 'TXT') {
     // D5: Office → PDF.
     if (built.officeToPdf && canConvertToPdf(format)) tasks.push('convert');
-    // D7–D9: edit TXT, CSV, XLSX and Word text (an old .xls is converted, not edited).
-    const editable = format === 'TXT' || format === 'CSV' ? edits.text : format === 'XLSX' ? edits.sheet : format === 'DOCX' ? edits.docx : false;
+    // D7–D9: edit TXT, CSV, XLSX/XLS cells and Word text (D8 saves an .xls's edit as .xlsx).
+    const editable =
+      format === 'TXT' || format === 'CSV' ? edits.text : format === 'XLSX' || format === 'XLS' ? edits.sheet : format === 'DOCX' ? edits.docx : false;
     if (editable) tasks.push('editFiles');
   }
   return tasks.filter(isLive);

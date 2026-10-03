@@ -543,7 +543,8 @@ export const en = {
       title: 'Convert or edit',
       edit: 'Edit',
     },
-    // §12 D7: the TXT/CSV editor (Pro). TXT and CSV lose nothing, so the library file is updated.
+    // §12 D7: the TXT/CSV editor (Pro). TXT and CSV lose nothing, so the library file is updated;
+    // §12 D8's Excel edits are saved as a copy.
     editFile: {
       save: 'Save',
       saved: 'Saved',
@@ -565,6 +566,14 @@ export const en = {
       deleteRow: 'Delete row',
       addRow: 'Add row',
       done: 'Done',
+      // §12 D8: XLSX/XLS cells. A workbook can lose things, so the edit is always a new copy.
+      copyName: '{name} (edited)',
+      sheetNote: 'Your edits are saved as a new Excel file in your Library. The original stays as it is.',
+      sheetSaveTitle: 'Save a copy?',
+      sheetSaveBody: "Styles, charts and some formulas may be lost. The copy is saved as '{name}'.",
+      sheetSave: 'Save copy',
+      savedCopy: 'Saved a copy to your Library',
+      formulaHint: 'Start with = for a formula, or with an apostrophe to keep it as text.',
     },
     noPageText: 'No text found on this page',
     copiedPage: 'Copied the text of page {page}',
@@ -722,7 +731,7 @@ export const en = {
       pdfPasswords: 'Password-protected PDFs',
       driveBackup: 'Automatic backup to your Google Drive',
       convert: 'Convert Word, Excel and text files to PDF, and scans to Word',
-      editFiles: 'Edit text and CSV files',
+      editFiles: 'Edit text, CSV and Excel files',
       pdfForms: 'Fill in PDF forms and add text to PDFs',
     },
     // §12 D1: the sheet before a Pro task, and what follows the ad. {name}: the document's name.

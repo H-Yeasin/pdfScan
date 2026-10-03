@@ -10,13 +10,21 @@ const ROW_NUMBER_WIDTH = 48;
 type CsvGridProps = {
   rows: string[][];
   onChange: (rows: string[][]) => void;
+  // §12 D8 (a workbook's sheet): what a cell's prompt starts from (a formula rather than its
+  // value), and each cell edit as it happens, since the save applies cell edits, not rows.
+  editValue?: (row: number, col: number) => string;
+  onCellChange?: (row: number, col: number, value: string) => void;
+  // Off for a sheet: inserting or deleting a row would shift every cell under it, and the formulas
+  // and merged cells that point at them aren't rewritten. Add row (at the end) stays.
+  rowActions?: boolean;
+  hint?: string;
 };
 
-// §12 D7: the CSV editor's grid. Laid out like SheetView (same column widths), plus a row-number
-// column: tap a cell to edit it, tap a row number to insert a row below it or delete it. Edits are
-// pure (services/edit/textEdit), so rows that didn't change keep their identity and don't
-// re-render.
-export function CsvGrid({ rows, onChange }: CsvGridProps) {
+// §12 D7: the CSV editor's grid, also D8's for a workbook's sheet. Laid out like SheetView (same
+// column widths), plus a row-number column: tap a cell to edit it, tap a row number to insert a
+// row below it or delete it. Edits are pure (services/edit/textEdit), so rows that didn't change
+// keep their identity and don't re-render.
+export function CsvGrid({ rows, onChange, editValue, onCellChange, rowActions = true, hint }: CsvGridProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const [cell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
@@ -29,7 +37,7 @@ export function CsvGrid({ rows, onChange }: CsvGridProps) {
   // time of the tap, not the ones from that render (an edit elsewhere would be lost otherwise).
   const latest = useRef({ rows, onChange });
   latest.current = { rows, onChange };
-  const rowActions = useCallback(
+  const rowMenu = useCallback(
     (index: number) => {
       Alert.alert(t('reader.editFile.rowTitle', { row: index + 1 }), undefined, [
         { text: t('common.cancel'), style: 'cancel' },
@@ -39,6 +47,8 @@ export function CsvGrid({ rows, onChange }: CsvGridProps) {
     },
     [t]
   );
+
+  const valueOf = (row: number, col: number) => (editValue ? editValue(row, col) : (rows[row]?.[col] ?? ''));
 
   return (
     <View style={styles.root}>
@@ -51,7 +61,13 @@ export function CsvGrid({ rows, onChange }: CsvGridProps) {
           keyExtractor={(_, i) => String(i)}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item, index }) => (
-            <Row row={item} index={index} widths={columns.slice(0, width)} onCell={(col) => setEditingCell({ row: index, col })} onRowNumber={rowActions} />
+            <Row
+              row={item}
+              index={index}
+              widths={columns.slice(0, width)}
+              onCell={(col) => setEditingCell({ row: index, col })}
+              onRowNumber={rowActions ? rowMenu : undefined}
+            />
           )}
           ListFooterComponent={
             <Pressable
@@ -66,10 +82,14 @@ export function CsvGrid({ rows, onChange }: CsvGridProps) {
       </ScrollView>
       <CellEditModal
         cell={cell}
-        value={cell ? (rows[cell.row]?.[cell.col] ?? '') : ''}
+        value={cell ? valueOf(cell.row, cell.col) : ''}
+        hint={hint}
         onCancel={() => setEditingCell(null)}
         onSubmit={(value) => {
-          if (cell && value !== (rows[cell.row]?.[cell.col] ?? '')) onChange(setCell(rows, cell.row, cell.col, value));
+          if (cell && value !== valueOf(cell.row, cell.col)) {
+            onCellChange?.(cell.row, cell.col, value);
+            onChange(setCell(rows, cell.row, cell.col, value));
+          }
           setEditingCell(null);
         }}
       />
@@ -82,7 +102,8 @@ type RowProps = {
   index: number;
   widths: number[];
   onCell: (col: number) => void;
-  onRowNumber: (index: number) => void;
+  // Undefined: the row number is just a label.
+  onRowNumber?: (index: number) => void;
 };
 
 const Row = memo(function Row({ row, index, widths, onCell, onRowNumber }: RowProps) {
@@ -91,9 +112,10 @@ const Row = memo(function Row({ row, index, widths, onCell, onRowNumber }: RowPr
   return (
     <View style={styles.row}>
       <Pressable
-        accessibilityRole="button"
+        accessibilityRole={onRowNumber ? 'button' : 'text'}
         accessibilityLabel={t('reader.editFile.rowTitle', { row: index + 1 })}
-        onPress={() => onRowNumber(index)}
+        disabled={!onRowNumber}
+        onPress={() => onRowNumber?.(index)}
         style={[styles.rowNumber, { borderColor: tokens.edge, backgroundColor: tokens.surface2 }]}
       >
         <Text style={[styles.rowNumberText, { color: tokens.muted }]}>{index + 1}</Text>
@@ -113,18 +135,20 @@ const Row = memo(function Row({ row, index, widths, onCell, onRowNumber }: RowPr
       ))}
     </View>
   );
-}, (a, b) => a.row === b.row && a.index === b.index && a.widths.length === b.widths.length && a.widths.every((w, i) => w === b.widths[i]));
+}, (a, b) => a.row === b.row && a.index === b.index && !a.onRowNumber === !b.onRowNumber && a.widths.length === b.widths.length && a.widths.every((w, i) => w === b.widths[i]));
 
 // A cell can hold commas, quotes and line breaks (they're quoted on save), and can be cleared, so
 // this isn't TextPromptModal (single line, trims, refuses empty).
 function CellEditModal({
   cell,
   value,
+  hint,
   onCancel,
   onSubmit,
 }: {
   cell: { row: number; col: number } | null;
   value: string;
+  hint?: string;
   onCancel: () => void;
   onSubmit: (value: string) => void;
 }) {
@@ -149,6 +173,7 @@ function CellEditModal({
             multiline
             style={[styles.input, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
           />
+          {hint ? <Text style={[styles.hint, { color: tokens.muted }]}>{hint}</Text> : null}
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
               <Text style={{ color: tokens.muted, fontWeight: '600' }}>{t('common.cancel')}</Text>
@@ -219,6 +244,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlignVertical: 'top',
   },
+  hint: { fontSize: 12.5 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   ghostButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   primaryButton: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.full },

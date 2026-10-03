@@ -2,10 +2,11 @@ import { useCallback, useState, type ReactElement } from 'react';
 import { Alert } from 'react-native';
 import { useProTask } from '../pro/useProTask';
 import { isEditFormat, saveEditedText, type EditTarget } from '../../services/edit/textEdit';
+import { isSheetEditFormat, saveEditedSheet } from '../../services/edit/sheetEdit';
 import { carryProTaskGrant } from '../../services/pro/proTaskFlow';
 import { useAppDispatch } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
-import { FileEditor, type EditorFile } from './FileEditor';
+import { FileEditor, type EditorFile, type EditorOutput } from './FileEditor';
 
 // The Pro task kind for opening the editor. No restart runner is registered for it: there's
 // nothing to finish without the screen, and the session the ad unlocked is saved on the reward,
@@ -16,7 +17,9 @@ export const EDIT_FILE_KIND = 'editFile';
 // document for `edit_unlock_minutes`; saving inside that never shows one, and an editor that's
 // open when the session ends still saves. A library document's file is swapped for the edited
 // one; a file from outside is saved into the library as a new document (the file the student
-// opened is never written) and the Reader switches to it. Render `element` once in the screen.
+// opened is never written) and the Reader switches to it. §12 D8: an XLSX or XLS file's edit is
+// always a new library document ("<name> (edited)"), and the Reader switches to that copy; the
+// session carries to it, so further edits there don't ask again. Render `element` once.
 export function useEditFile(opts: { preload: boolean }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
@@ -27,7 +30,7 @@ export function useEditFile(opts: { preload: boolean }) {
   const start = useCallback(
     (target: EditTarget) => {
       const source = target.doc ? { uri: target.doc.contentUri, name: target.doc.name, format: target.doc.format } : target.external;
-      if (!source.uri || !isEditFormat(source.format)) return;
+      if (!source.uri || !(isEditFormat(source.format) || isSheetEditFormat(source.format))) return;
       const file: EditorFile = { uri: source.uri, name: source.name, format: source.format, external: !!target.external };
       // The grant's id: the library document, or an outside file's app-owned copy (as D5's).
       const docId = target.doc ? target.doc.id : target.external.uri;
@@ -39,11 +42,21 @@ export function useEditFile(opts: { preload: boolean }) {
   );
 
   const save = useCallback(
-    async (text: string): Promise<boolean> => {
+    async (output: EditorOutput): Promise<boolean> => {
       if (!editing) return false;
       const { target, file } = editing;
       try {
-        const result = await saveEditedText(target, file.format, text);
+        if (output.kind === 'sheet') {
+          const copy = await saveEditedSheet(target, output.edits);
+          dispatch({ type: 'library/ADD_FILE', file: copy });
+          await carryProTaskGrant('editFiles', target.doc ? target.doc.id : target.external.uri, copy.id);
+          dispatch({ type: 'reader/SET_READER_ID', id: copy.id });
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.editFile.savedCopy') });
+          setEditing(null);
+          return true;
+        }
+        if (!isEditFormat(file.format)) return false;
+        const result = await saveEditedText(target, file.format, output.text);
         if (result.kind === 'updated') {
           dispatch({ type: 'library/UPDATE_FILE', id: result.id, patch: result.patch });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.editFile.saved') });
