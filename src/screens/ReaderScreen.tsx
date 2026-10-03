@@ -517,7 +517,7 @@ export function ReaderScreen() {
           onTap={chrome.toggle}
         />
       ) : format === 'DOCX' ? (
-        <DocxView key={nativeUri} uri={nativeUri!} night={night} />
+        <DocxView key={nativeUri} uri={nativeUri!} night={night} findQuery={find.query} onMatchCount={find.setLocalMatchCount} />
       ) : format === 'DOC' ? (
         // Only on documents added before R5 dropped .doc; there's no viewer for it.
         <View style={styles.unsupported}>

@@ -54,13 +54,21 @@ export const PRINT_PAGE_CSS = `
   tr, img { break-inside: avoid; page-break-inside: avoid; }`;
 
 // A complete page around docxToHtml's body. The CSP is the second lock after the WebView's own
-// settings (JavaScript off, navigation blocked): no scripts, no network, images only as data: URIs.
-// `print`: for expo-print (D5), which renders it the same locked-down way.
+// settings (no bridge, navigation blocked): no scripts of the document's own (inline, linked or a
+// javascript: link), no network, images only as data: URIs. The app's own injected script (§12
+// D11's scroll to a find mark) runs outside the CSP.
+// `print`: for expo-print (D5), which renders it the same locked-down way. `find`: the colours of
+// §12 D11's find marks (services/documents/docxFind), the first match stronger than the rest.
 export function docxPageHtml(
   body: string,
   colors: { bg: string; ink: string; muted: string; edge: string; accent: string },
-  opts: { print?: boolean } = {}
+  opts: { print?: boolean; find?: { fill: string; current: string; onCurrent: string } } = {}
 ): string {
+  const findCss = opts.find
+    ? `
+  mark.pdfscan-find { background: ${opts.find.fill}; color: inherit; border-radius: 2px; }
+  mark.pdfscan-current { background: ${opts.find.current}; color: ${opts.find.onCurrent}; }`
+    : '';
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
@@ -74,7 +82,7 @@ export function docxPageHtml(
   table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0 0 1em; }
   td, th { border: 1px solid ${colors.edge}; padding: 4px 8px; vertical-align: top; }
   a { color: ${colors.accent}; }
-  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }${opts.print ? PRINT_PAGE_CSS : ''}
+  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }${opts.print ? PRINT_PAGE_CSS : ''}${findCss}
 </style>
 </head><body>${body}</body></html>`;
 }

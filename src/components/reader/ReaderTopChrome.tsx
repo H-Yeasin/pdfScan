@@ -14,7 +14,7 @@ type ReaderTopChromeProps = {
   pageCount: number;
   activeIndex: number;
   onJump?: () => void;
-  // Undefined: the format has no Find (DOCX, XLSX).
+  // Undefined: the format has no Find (formatCapabilities.IN_READER_FIND_FORMATS).
   onFind?: () => void;
   findOpen: boolean;
   findQuery: string;

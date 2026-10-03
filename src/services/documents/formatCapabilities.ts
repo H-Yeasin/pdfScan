@@ -8,9 +8,10 @@ import { isPdfNativeAvailable } from '../pdf/pdfNative';
 // has pages: [] (or one text page) and its own viewer instead.
 export const PAGE_RASTER_FORMATS: DocFormat[] = ['PDF', 'JPG'];
 
-// Formats whose reader mounts a local "Find" (substring scan over already-in-memory text/rows)
-// rather than react-native-pdf-jsi's searchTextDirect, which is PDF-only.
-export const IN_READER_FIND_FORMATS: DocFormat[] = ['PDF', 'CSV', 'TXT'];
+// Formats with Find in the Reader: PDF through react-native-pdf-jsi's searchTextDirect, the others
+// through their viewer's own scan of the text or rows it already holds (TxtView, SheetView, and
+// since §12 D11 DocxView over mammoth's HTML).
+export const IN_READER_FIND_FORMATS: DocFormat[] = ['PDF', 'CSV', 'TXT', 'XLSX', 'XLS', 'DOCX'];
 
 // §7 R5: the formats a file from outside the app can be opened as - exactly the ones the Reader
 // has a viewer for (PDF engine, TxtView, SheetView, DocxView). The in-app picker and app.json's

@@ -1,5 +1,5 @@
 import { makeDoc } from '../../../test/fixtures';
-import { canSign, canSubmit, canUsePageTools, hasPageMasters, isPasswordProtected, isPdfLevel } from '../formatCapabilities';
+import { canFindInDoc, canSign, canSubmit, canUsePageTools, hasPageMasters, isPasswordProtected, isPdfLevel } from '../formatCapabilities';
 
 describe('page tools by kind of document (§7 R2)', () => {
   const scan = makeDoc();
@@ -27,5 +27,12 @@ describe('page tools by kind of document (§7 R2)', () => {
 
   it('leaves other formats alone', () => {
     expect([canUsePageTools(docx), canSign(docx), hasPageMasters(docx)]).toEqual([false, false, false]);
+  });
+});
+
+describe('Find in the Reader (§12 D11)', () => {
+  it('covers every openable format', () => {
+    for (const format of ['PDF', 'TXT', 'CSV', 'XLSX', 'XLS', 'DOCX'] as const) expect(canFindInDoc(format)).toBe(true);
+    expect(canFindInDoc('DOC')).toBe(false);
   });
 });
