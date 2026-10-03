@@ -15,18 +15,19 @@ describe('§12 D2 reader tool bar', () => {
   const xls = makeDoc({ format: 'XLS', pages: [] });
 
   it('puts the study tools first for a scan', () => {
-    expect(ids(readerTools({ doc: scan }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText', 'pages']);
+    expect(ids(readerTools({ doc: scan }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText', 'notes', 'pages']);
     // One page: nothing to scrub through.
-    expect(ids(readerTools({ doc: onePageScan }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText']);
+    expect(ids(readerTools({ doc: onePageScan }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText', 'notes']);
   });
 
   it('offers Mark and Select text on scans and on indexed imported PDFs', () => {
     // §12 D3: an imported PDF's pages are rendered on demand, once indexing gave them their size
     // and words (a thumbnail is written last); not when it needs a password.
     const indexed = { ...imported, pages: [{ ...imported.pages[0], thumbUri: 'thumb.jpg' }] };
-    expect(ids(readerTools({ doc: indexed }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText']);
-    expect(ids(readerTools({ doc: { ...indexed, indexState: 'encrypted' } }, { proTasks: [], isPro: false }))).toEqual([]);
-    expect(ids(readerTools({ doc: imported }, { proTasks: [], isPro: false }))).toEqual([]);
+    expect(ids(readerTools({ doc: indexed }, { proTasks: [], isPro: false }))).toEqual(['mark', 'selectText', 'notes']);
+    // §12 D4: Notes stays, for bookmarks.
+    expect(ids(readerTools({ doc: { ...indexed, indexState: 'encrypted' } }, { proTasks: [], isPro: false }))).toEqual(['notes']);
+    expect(ids(readerTools({ doc: imported }, { proTasks: [], isPro: false }))).toEqual(['notes']);
     expect(ids(readerTools({ doc: docx }, { proTasks: [], isPro: false }))).toEqual([]);
     expect(ids(readerTools({ external: { format: 'PDF' } }, { proTasks: [], isPro: false }))).toEqual([]);
   });

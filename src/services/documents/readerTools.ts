@@ -7,8 +7,7 @@ import { canMark, canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRas
 // tap away; managing the file (share, sign, export, print, submit, edit pages, type, delete) is in
 // More. Pure, so the rules per format and Pro state are tested without rendering the Reader.
 
-// D4 adds 'notes' (the notes panel) between Select text and Pages.
-export type ReaderToolId = 'mark' | 'selectText' | 'pages' | 'convertEdit';
+export type ReaderToolId = 'mark' | 'selectText' | 'notes' | 'pages' | 'convertEdit';
 // `pro`: show the Pro badge (the tool runs a Pro task, and the student has no day pass).
 export type ReaderTool = { id: ReaderToolId; pro: boolean };
 
@@ -64,6 +63,8 @@ export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly P
   if (doc && canMark(doc)) {
     tools.push({ id: 'mark', pro: false }, { id: 'selectText', pro: false });
   }
+  // D4's notes panel: marks and bookmarks, which any library page document can have.
+  if (doc && isPageRasterFormat(doc.format)) tools.push({ id: 'notes', pro: false });
   // R4's thumbnails strip.
   if (doc && isPageRasterFormat(doc.format) && doc.pages.length > 1) tools.push({ id: 'pages', pro: false });
   if (opts.proTasks.length > 0) tools.push({ id: 'convertEdit', pro: !opts.isPro });

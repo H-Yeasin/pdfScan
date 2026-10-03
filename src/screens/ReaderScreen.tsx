@@ -43,10 +43,14 @@ import { SelectTextSheet } from '../components/reader/SelectTextSheet';
 import { MarkView } from '../components/reader/MarkView';
 import { useAnnotationPdfSync } from '../components/reader/useAnnotationPdfSync';
 import { BookmarksSheet } from '../components/bookmarks/BookmarkList';
+import { NotesSheet } from '../components/reader/NotesSheet';
+import { useMarkFlash } from '../components/reader/useMarkFlash';
+import { documentNotes, flashQuery, formatNotesExport, notesExportLabels, type NoteEntry } from '../services/annotations/notesPanel';
+import { tDoc } from '../i18n';
 import { documentBookmarks } from '../services/study/bookmarks';
 import { TextPromptModal } from '../components/shared/TextPromptModal';
 import { createId } from '../utils/id';
-import { writeDocumentText } from '../services/study/textExport';
+import { writeDocumentText, writeExportText } from '../services/study/textExport';
 import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
@@ -147,11 +151,18 @@ export function ReaderScreen() {
   const [labelling, setLabelling] = useState(false);
   const docBookmarks = useMemo(() => (doc ? documentBookmarks(state.library.bookmarks, doc) : []), [doc, state.library.bookmarks]);
   const currentIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
+  // §12 D4: the notes panel: marks, notes and bookmarks by page.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const docNotes = useMemo(
+    () => (doc ? documentNotes(doc, state.library.annotations, state.library.bookmarks) : []),
+    [doc, state.library.annotations, state.library.bookmarks]
+  );
+  const markFlash = useMarkFlash(pdfId, contentKey);
   const currentBookmark = doc ? state.library.bookmarks.find((b) => b.documentId === doc.id && b.pageId === doc.pages[currentIdx]?.id) : undefined;
   // §9 O3: one-time hints. The bookmark hint waits until nothing covers the top bar; the Submit
   // hint shows inside the overflow sheet, next to Submit, the first time it's there.
   const sheetOpen =
-    overflowOpen || readingOpen || typePickerOpen || jumpOpen || scrubberOpen || submissionsOpen || bookmarksOpen || labelling ||
+    overflowOpen || readingOpen || typePickerOpen || jumpOpen || scrubberOpen || submissionsOpen || bookmarksOpen || notesOpen || labelling ||
     signing || signStep !== null || selectTextIdx !== null || markIdx !== null || needsPassword;
   const canBookmark = !!doc && !external && isPageRaster;
   const bookmarkHint = useHint('readerBookmark', canBookmark && chrome.shown && !find.open && !sheetOpen);
@@ -200,6 +211,7 @@ export function ReaderScreen() {
       const idx = libraryIdxFor(doc, activeIndex + 1);
       if (id === 'mark') setMarkIdx(idx);
       else if (id === 'selectText') setSelectTextIdx(idx);
+      else if (id === 'notes') setNotesOpen(true);
       else if (id === 'pages') setScrubberOpen(true);
       // 'convertEdit' only shows once a Pro task is live (readerProTasks); D5–D10 add the sheet
       // that picks one, run through D1's useProTask.
@@ -398,7 +410,7 @@ export function ReaderScreen() {
           enablePaging={pdfOptions.enablePaging}
           fitPolicy={pdfOptions.fitPolicy}
           spacing={pdfOptions.spacing}
-          highlightRects={find.highlightRects}
+          highlightRects={markFlash.rects ?? find.highlightRects}
           initialPage={startPage && startPage.contentKey === contentKey && startPage.reloadKey === reloadKey ? startPage.page : undefined}
           onLoad={handleLoad}
           onPageChanged={onPageChanged}
@@ -591,6 +603,29 @@ export function ReaderScreen() {
         }}
         onRemove={(item) => dispatch({ type: 'library/REMOVE_BOOKMARK', id: item.bookmark.id })}
         onClose={() => setBookmarksOpen(false)}
+      />
+
+      <NotesSheet
+        visible={notesOpen}
+        entries={docNotes}
+        onOpen={(entry: NoteEntry) => {
+          setNotesOpen(false);
+          if (!doc) return;
+          const { page } = pdfPageFor(doc, entry.pageIdx);
+          goToPage(page);
+          const query = flashQuery(entry);
+          if (query) markFlash.flash(page, query);
+        }}
+        onExport={(shown) => {
+          if (!doc) return;
+          const text = formatNotesExport(shown, notesExportLabels(doc.name));
+          shareAs(
+            writeExportText(`${doc.id}-notes`, text),
+            shareFileName(tDoc('document.notesExport.fileName', { name: doc.name }), 'txt'),
+            'text/plain'
+          ).catch((e) => console.warn('ReaderScreen: sharing notes failed', e));
+        }}
+        onClose={() => setNotesOpen(false)}
       />
 
       <TextPromptModal

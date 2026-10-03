@@ -484,6 +484,7 @@ export const en = {
     tools: {
       mark: 'Mark',
       selectText: 'Select text',
+      notes: 'Notes',
       pages: 'Pages',
       convertEdit: 'Convert/Edit',
     },
@@ -613,6 +614,20 @@ export const en = {
       notePlaceholder: 'Your note',
       save: 'Save',
     },
+    // §12 D4: the notes panel.
+    notes: {
+      title: 'Notes',
+      export: 'Export notes',
+      all: 'All',
+      kinds: { highlight: 'Highlights', underline: 'Underlines', strike: 'Strikes', note: 'Notes', bookmark: 'Bookmarks' },
+      kind: { highlight: 'Highlight', underline: 'Underline', strike: 'Strike', note: 'Note', bookmark: 'Bookmark' },
+      colourOnly: '{colour} marks only',
+      page: 'Page {page}',
+      openOnPage: '{kind} on page {page}',
+      emptyTitle: 'No notes yet',
+      emptyBody: 'Highlight, underline or add notes in Mark mode, or bookmark a page. They all show here.',
+      noMatch: 'Nothing matches this filter.',
+    },
   },
 
   pro: {
@@ -734,6 +749,15 @@ export const en = {
     footer: { pages: 'Page {X} of {Y}', namePages: '{name} · {roll} · {X}/{Y}' },
     examPack: '{course} exam pack – {date}',
     examPackNoCourse: 'Exam pack – {date}',
+    // §12 D4: Export notes (a .txt).
+    notesExport: {
+      fileName: '{name} notes',
+      title: '{name}: notes',
+      page: 'Page {page}',
+      kind: { highlight: 'Highlight', underline: 'Underline', strike: 'Strike', note: 'Note', bookmark: 'Bookmark' },
+      quoted: '{kind}: “{text}”',
+      plain: '{kind}: {text}',
+    },
     contents: {
       title: 'Contents',
       pages: 'p. {list}',

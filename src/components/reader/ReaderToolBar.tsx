@@ -9,6 +9,7 @@ import { ProBadge } from '../pro/ProBadge';
 const ICONS: Record<ReaderToolId, keyof typeof Ionicons.glyphMap> = {
   mark: 'color-fill-outline',
   selectText: 'text-outline',
+  notes: 'list-outline',
   pages: 'albums-outline',
   convertEdit: 'swap-horizontal-outline',
 };
