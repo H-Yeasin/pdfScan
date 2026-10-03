@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D3** (Mark mode). D1 and D2 are done in code.
+- **Next: D4** (Notes panel). D1–D3 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -219,7 +219,38 @@ Status: done in code (commit 020361d); device check open (see "Done when").
   settings survive a restart.
 
 ### D3 · Mark mode: highlight, underline, strike, pen and notes while reading *(L)*
-Status: not started.
+Status: done in code (commit d41bfc0); device check open (see "Done when").
+
+**As built:**
+- `components/reader/MarkView.tsx` replaces `AnnotateSheet` (deleted). It's an overlay over the
+  Reader, not a Modal. The column isn't a FlatList: one Reanimated layer (`transformOrigin` top-left,
+  screen = content × scale + translate) holds every page as an empty box, and only `markWindow`'s
+  pages (current ±1) draw their image and marks. The pure maths (layout, page under a point, touch
+  → master pixels, clamp, zoom about the pinch, window) is `services/annotations/markMode.ts`.
+- Imported PDFs can be marked too: `formatCapabilities.canMark` (indexed, not password-protected,
+  pdf-native in the build) gates Mark and Select text in `readerTools`. Their pages render through
+  `useMarkPageImages` (`processSequentially`, PREVIEW size, deleted when they leave the window).
+  `pdfAnnotations.pdfLevelMapper` maps master pixels through each PDF page's crop box and
+  `/Rotate` (minus `page.rotation`, a turn added after indexing; checked against pdf.js's own
+  viewport in the test). A scan page merged into an imported PDF maps through `imagePlacement`.
+- Underline and strike: no migration (the `kind` column has no check constraint); `libraryRepo`
+  reads the new kinds. Both snap with `snapHighlight` and use the pen colours (`lineColor`; a yellow
+  underline barely shows). `marks.markLine` gives the line (bottom of the word box / just above the
+  middle) for both the overlay and the PDF appearance stream; QuadPoints are mapped corner by
+  corner, so a turned page keeps the text direction.
+- A tap with Highlight/Underline/Strike marks the word under it (nothing when there's no word);
+  Hand scrolls with one finger (with fling). Undo and Redo cover add, erase and note edits.
+- Remembered tool and colours: `settings.reading.mark` (`normalizeMark`), not a new storage key.
+- Saving: leaving Mark mode returns the native viewer at once (`pdfPageFor` of the page last marked,
+  else the page on screen); `useAnnotationPdfSync` then writes `document.pdf` (400 ms debounce,
+  never two writes at once) and reloads the viewer, which reopens on the page being read
+  (`PdfPageView.initialPage`, read once at mount: pdf-jsi jumps whenever its `page` prop changes).
+- Select text gained Highlight and Underline (`snap.wordRects`), and shows imported pages through
+  `PageCanvas`'s new `image` prop (`usePageImage`, turned back by `page.rotation`); Run OCR is
+  hidden for them (their text comes from indexing).
+- A scan's page with `rotation` is still shown unturned in Mark mode and Select text, as T4/T3 did.
+- Device check open: drawing smoothness on a mid-range phone, two-finger scroll vs. a stray
+  one-finger stroke, marks in another PDF app (including an imported PDF with `/Rotate`).
 
 Replaces the `AnnotateSheet` modal (free, `annotations` stays in `FREE_FOREVER`).
 - `MarkView`: a vertical list of `PageCanvas` pages at screen width (scans: display or master

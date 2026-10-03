@@ -21,7 +21,7 @@ code **when the section was planned**, and are kept as history.
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2, O3 and O4 done in code. **O5 and O6 in progress:** their code is done; what's left is on a device: the measurements in `docs/qa/performance.md` and the walkthrough in `docs/qa/walkthrough.md`. |
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1–M8 done in code (open for the owner: the Play Console checklist in `docs/policy/play-console.md`, the Firebase project and EAS file variables in `docs/firebase.md`, AdMob in `docs/ads.md`; M2–M6 need a new dev build, M4–M8 have device checks open, M5 its before/after numbers). M9–M11 (paid Pro) are parked until a merchant route exists. Next: §11 (plan `docs/plan/11-launch.md`). |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
-| §12 Convert and light edit | [12-convert-edit.md](12-convert-edit.md) | D1–D11 | **Planned 2026-10-03, revised the same day.** D1 (Pro task gate) done in code (dc17a06; device check open). D2 (study-first reader layout, reading settings) done in code (020361d; device check open). Study-first reader (D2–D4, free), conversions and file editing behind a per-task full-screen rewarded ad (D1 gate, D5–D10 Pro). Next: D3. |
+| §12 Convert and light edit | [12-convert-edit.md](12-convert-edit.md) | D1–D11 | **Planned 2026-10-03, revised the same day.** D1 (Pro task gate) done in code (dc17a06; device check open). D2 (study-first reader layout, reading settings) done in code (020361d; device check open). D3 (Mark mode: underline, strike, scans and imported PDFs) done in code (d41bfc0; device check open). Study-first reader (D2–D4, free), conversions and file editing behind a per-task full-screen rewarded ad (D1 gate, D5–D10 Pro). Next: D4. |
 
 ## Phases (from `docs/PLAN.md` §5)
 
@@ -86,7 +86,7 @@ lines here.
 | T1 Page mapping, word OCR | 0cfbddd | migration v9, `documents/pageMap.ts`, `pdfInfoBackfill.ts` |
 | T2 Page search, jump, highlight | 38e4fd8 | `dbService.searchPages`, `PageResults`, `reader.target` |
 | T3 Copy, extract, select text | 4cdba0a | `expo-clipboard`, `PageCanvas`, `study/textSelection.ts` |
-| T4 Annotations | 5c60573 | migration v10, `services/annotations/*`, `AnnotateSheet`, `beforeSave` |
+| T4 Annotations | 5c60573 | migration v10, `services/annotations/*`, `AnnotateSheet` (replaced by §12 D3's `MarkView`), `beforeSave` |
 | T5 Bookmarks | 2a228ad | migration v11, `study/bookmarks.ts`, `BookmarkList` |
 | T6 Exam pack | 5c14baa | `study/buildExamPack.ts`, `packSlice`, `ExamPackScreen` |
 | L1 Script registry v2, per-course script | 8dc13df | migration v12 (`courses.ocr_script`), `resolveOcrScript`, `store/useScanOcrScript.ts` |
