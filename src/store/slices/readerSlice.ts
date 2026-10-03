@@ -7,7 +7,6 @@ export type ReaderState = {
   // (LibraryScreen's handlePressRow, the "Open a file" entry point, OS "Open with" wiring) stays
   // regression-safe without needing to remember to clear the other field itself.
   external: ExternalFileDocument | null;
-  night: boolean;
   // §5 T2: a page search result (or a bookmark, T5) being opened: the Reader jumps to that
   // library page and, with a query, finds it on that page; then clears this. Any other open
   // (SET_READER_ID) clears it too.
@@ -17,14 +16,12 @@ export type ReaderState = {
 export const initialReaderState: ReaderState = {
   readerId: null,
   external: null,
-  night: false,
   target: null,
 };
 
 export type ReaderAction =
   | { type: 'reader/SET_READER_ID'; id: string }
   | { type: 'reader/SET_EXTERNAL'; doc: ExternalFileDocument | null }
-  | { type: 'reader/TOGGLE_NIGHT' }
   | { type: 'reader/SET_TARGET'; target: { pageId: string; query?: string } | null };
 
 export function readerReducer(state: ReaderState, action: ReaderAction): ReaderState {
@@ -35,8 +32,6 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
       return { ...state, external: action.doc, readerId: action.doc ? null : state.readerId };
     case 'reader/SET_TARGET':
       return { ...state, target: action.target };
-    case 'reader/TOGGLE_NIGHT':
-      return { ...state, night: !state.night };
     default:
       return state;
   }

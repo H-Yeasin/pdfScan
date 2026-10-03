@@ -1,0 +1,90 @@
+import type { DocFormat, LibraryDocument } from '../../types/models';
+import { getProFeature } from '../pro/proFeatures';
+import type { ProTaskFeature } from '../pro/proTask';
+import { canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRasterFormat, isPdfLevel } from './formatCapabilities';
+
+// §12 D2: which actions the Reader shows, and where. Study actions sit in the bottom tool bar, one
+// tap away; managing the file (share, sign, export, print, submit, edit pages, type, delete) is in
+// More. Pure, so the rules per format and Pro state are tested without rendering the Reader.
+
+// D4 adds 'notes' (the notes panel) between Select text and Pages.
+export type ReaderToolId = 'mark' | 'selectText' | 'pages' | 'convertEdit';
+// `pro`: show the Pro badge (the tool runs a Pro task, and the student has no day pass).
+export type ReaderTool = { id: ReaderToolId; pro: boolean };
+
+export type ReaderMoreItemId =
+  | 'addToLibrary'
+  | 'submit'
+  | 'share'
+  | 'export'
+  | 'print'
+  | 'sign'
+  | 'editPages'
+  | 'bookmarks'
+  | 'copyText'
+  | 'extractText'
+  | 'readingSettings'
+  | 'changeType'
+  | 'delete';
+
+// What the Reader has open: a library document, or a file from outside (not in the library yet).
+export type ReaderSubject = { doc: LibraryDocument; external?: undefined } | { doc?: undefined; external: { format: DocFormat } };
+
+function formatOf(subject: ReaderSubject): DocFormat {
+  return subject.doc ? subject.doc.format : subject.external.format;
+}
+
+const isLiveFeature = (id: ProTaskFeature) => getProFeature(id).status === 'live';
+
+// The Pro tasks this file allows (each through D1's gate). A feature counts once its step has
+// built it (`status: 'live'` in PRO_FEATURES); until then, none, and the Convert/Edit tool stays
+// hidden. Conversions and edits never change the original, so a file from outside allows them too.
+export function readerProTasks(subject: ReaderSubject, isLive: (id: ProTaskFeature) => boolean = isLiveFeature): ProTaskFeature[] {
+  const format = formatOf(subject);
+  const tasks: ProTaskFeature[] = [];
+  if (format === 'PDF' || format === 'JPG') {
+    // D6: scan/PDF → Word. A password-protected PDF can't be read.
+    if (!subject.doc || canUsePageTools(subject.doc)) tasks.push('convert');
+    // D10: fill forms and add text, on a PDF that isn't a scan (a scan has no form fields).
+    if (format === 'PDF' && (!subject.doc || (isPdfLevel(subject.doc) && canUsePageTools(subject.doc)))) tasks.push('pdfForms');
+  } else if (format === 'DOCX' || format === 'XLSX' || format === 'XLS' || format === 'CSV' || format === 'TXT') {
+    // D5: Office → PDF.
+    tasks.push('convert');
+    // D7–D9: edit TXT, CSV, XLSX and Word text (an old .xls is converted, not edited).
+    if (format !== 'XLS') tasks.push('editFiles');
+  }
+  return tasks.filter(isLive);
+}
+
+export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly ProTaskFeature[]; isPro: boolean }): ReaderTool[] {
+  const { doc } = subject;
+  const tools: ReaderTool[] = [];
+  // Mark (T4's annotate, D3's Mark mode) and Select text work on a scan's page masters.
+  if (doc && hasPageMasters(doc)) {
+    tools.push({ id: 'mark', pro: false }, { id: 'selectText', pro: false });
+  }
+  // R4's thumbnails strip.
+  if (doc && isPageRasterFormat(doc.format) && doc.pages.length > 1) tools.push({ id: 'pages', pro: false });
+  if (opts.proTasks.length > 0) tools.push({ id: 'convertEdit', pro: !opts.isPro });
+  return tools;
+}
+
+export function readerMoreItems(subject: ReaderSubject): ReaderMoreItemId[] {
+  const { doc } = subject;
+  const raster = isPageRasterFormat(formatOf(subject));
+  const items: ReaderMoreItemId[] = [];
+  if (!doc) items.push('addToLibrary');
+  if (doc && canSubmit(doc)) items.push('submit');
+  items.push('share');
+  // Export shares the PDF; other formats have none (Share sends the file itself).
+  if (raster) items.push('export');
+  items.push('print');
+  if (doc && canSign(doc)) items.push('sign');
+  if (doc && canUsePageTools(doc)) items.push('editPages');
+  if (doc && raster) items.push('bookmarks');
+  if (doc && hasPageMasters(doc)) items.push('copyText', 'extractText');
+  items.push('readingSettings');
+  // Library documents only: a file from outside has no type and nothing to delete until it's added.
+  if (doc) items.push('changeType', 'delete');
+  return items;
+}

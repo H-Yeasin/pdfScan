@@ -9,6 +9,13 @@ type ReaderTopChromeProps = {
   name: string;
   onBack: () => void;
   onOverflow: () => void;
+  // §12 D2: "12 / 40" next to the title; tap to type a page (R4). Hidden while pageCount is 0
+  // (still loading, or a viewer without pages).
+  pageCount: number;
+  activeIndex: number;
+  onJump?: () => void;
+  // Undefined: the format has no Find (DOCX, XLSX).
+  onFind?: () => void;
   findOpen: boolean;
   findQuery: string;
   onChangeFindQuery: (value: string) => void;
@@ -28,6 +35,10 @@ export function ReaderTopChrome({
   name,
   onBack,
   onOverflow,
+  pageCount,
+  activeIndex,
+  onJump,
+  onFind,
   findOpen,
   findQuery,
   onChangeFindQuery,
@@ -84,9 +95,32 @@ export function ReaderTopChrome({
           </View>
         )}
         {findOpen ? (
-          <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
+          <>
+            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
+            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+              <Ionicons name="close" size={20} color={tokens.ink} />
+            </Pressable>
+          </>
         ) : (
           <>
+            {pageCount > 0 ? (
+              <Pressable
+                style={styles.indicator}
+                onPress={onJump}
+                disabled={!onJump}
+                accessibilityRole="button"
+                accessibilityLabel={t('reader.pageA11y', { page: activeIndex + 1, count: pageCount })}
+              >
+                <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.indicatorText, { color: tokens.ink }]} numberOfLines={1}>
+                  {t('reader.pageIndicator', { page: activeIndex + 1, count: pageCount })}
+                </Text>
+              </Pressable>
+            ) : null}
+            {onFind ? (
+              <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} accessibilityRole="button" accessibilityLabel={t('reader.find')}>
+                <Ionicons name="search" size={19} color={tokens.ink} />
+              </Pressable>
+            ) : null}
             {bookmarked !== undefined && onBookmark ? (
               <Pressable hitSlop={touchSlop(44)}
                 style={styles.iconButton}
@@ -148,5 +182,15 @@ const styles = StyleSheet.create({
   matchCount: {
     fontSize: 13,
     paddingHorizontal: spacing.sm,
+  },
+  indicator: {
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  indicatorText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -11,6 +11,12 @@ type PdfPageViewProps = {
   pdfId: string;
   password?: string;
   night: boolean;
+  // §12 D2: the night overlay's opacity, and the reading settings' layout, fit and spacing
+  // (readingSettings.pdfViewOptions).
+  nightAlpha: number;
+  enablePaging: boolean;
+  fitPolicy: 0 | 2;
+  spacing: number;
   onLoad: (pageCount: number) => void;
   onPageChanged: (page: number, pageCount: number) => void; // 1-indexed
   onTap?: (page: number) => void;
@@ -25,7 +31,7 @@ type PdfPageViewProps = {
 // invert/night/dark/grayscale - zero matches), so night mode here is a dim overlay rather than a
 // true color invert - an accepted MVP simplification, not a bug.
 export const PdfPageView = forwardRef<PdfPageViewHandle, PdfPageViewProps>(function PdfPageView(
-  { uri, pdfId, password, night, onLoad, onPageChanged, onTap, onError, highlightRects },
+  { uri, pdfId, password, night, nightAlpha, enablePaging, fitPolicy, spacing, onLoad, onPageChanged, onTap, onError, highlightRects },
   ref
 ) {
   const innerRef = useRef<Pdf>(null);
@@ -48,14 +54,16 @@ export const PdfPageView = forwardRef<PdfPageViewHandle, PdfPageViewProps>(funct
         style={styles.pdf}
         enableDoubleTapZoom
         enableAnnotationRendering
-        fitPolicy={0}
+        fitPolicy={fitPolicy}
+        enablePaging={enablePaging}
+        spacing={spacing}
         highlightRects={highlightRects}
         onLoadComplete={(numberOfPages) => onLoad(numberOfPages)}
         onPageChanged={(page, numberOfPages) => onPageChanged(page, numberOfPages)}
         onPageSingleTap={(page) => onTap?.(page)}
         onError={(error) => onError(errorMessage(error))}
       />
-      {night && <View pointerEvents="none" style={styles.nightOverlay} />}
+      {night && <View pointerEvents="none" style={[styles.nightOverlay, { backgroundColor: `rgba(10,8,6,${nightAlpha})` }]} />}
     </View>
   );
 });
@@ -79,6 +87,5 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(10,8,6,0.72)',
   },
 });

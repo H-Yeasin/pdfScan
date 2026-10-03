@@ -61,6 +61,8 @@ export type PersistedSettings = {
   appLock?: unknown;
   // Optional: added in §10 M5.
   appSessions?: number;
+  // Optional: added in §12 D2 (read by normalizeReading).
+  reading?: unknown;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

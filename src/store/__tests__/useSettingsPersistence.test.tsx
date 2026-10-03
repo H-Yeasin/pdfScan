@@ -164,3 +164,40 @@ describe('privacy choices (§10 M1)', () => {
     expect((await mount())().state.settings).toMatchObject({ personalizedAdsEnabled: true, usageStatsEnabled: false });
   });
 });
+
+describe('§12 D2 reading settings', () => {
+  it('keeps the reading settings across a restart', async () => {
+    const first = await mount();
+    expect(first().state.settings.reading).toEqual({
+      layout: 'continuous',
+      fit: 'width',
+      spacing: 'small',
+      night: false,
+      nightStrength: 'medium',
+      keepAwake: false,
+    });
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_READING', reading: { layout: 'paged', keepAwake: true } });
+      first().dispatch({ type: 'settings/SET_READING', reading: { night: true, nightStrength: 'high' } });
+    });
+    await flush();
+    const second = await mount();
+    expect(second().state.settings.reading).toEqual({
+      layout: 'paged',
+      fit: 'width',
+      spacing: 'small',
+      night: true,
+      nightStrength: 'high',
+      keepAwake: true,
+    });
+  });
+
+  it('reads damaged reading settings field by field', async () => {
+    await AsyncStorage.setItem(
+      'app:settings',
+      JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin', reading: { layout: 'sideways', fit: 'page', night: 'yes' } })
+    );
+    const ctx = await mount();
+    expect(ctx().state.settings.reading).toMatchObject({ layout: 'continuous', fit: 'page', night: false });
+  });
+});

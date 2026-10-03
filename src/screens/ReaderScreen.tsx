@@ -1,36 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { searchTextDirect, type PDFSearchResultItem } from 'react-native-pdf-jsi';
-import { File } from 'expo-file-system';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { DocTypePickerModal } from '../components/courses/DocTypeChips';
 import { OverflowSheet, type OverflowItemId } from '../components/reader/OverflowSheet';
 import { docTypeOf, getDocType } from '../services/courses/docTypes';
 import { PdfPageView, type PdfPageViewHandle } from '../components/reader/PdfPageView';
-import { ReaderActionBar } from '../components/reader/ReaderActionBar';
-import { ReaderBottomChrome } from '../components/reader/ReaderBottomChrome';
+import { ReaderToolBar } from '../components/reader/ReaderToolBar';
 import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
+import { ReadingSettingsSheet } from '../components/reader/ReadingSettingsSheet';
+import { useReaderChrome } from '../components/reader/useReaderChrome';
+import { useReaderDocument } from '../components/reader/useReaderDocument';
+import { useReaderFind } from '../components/reader/useReaderFind';
 import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
-import { classifyPdfError, parseJumpInput, resumePage } from '../services/documents/readerPosition';
+import { parseJumpInput } from '../services/documents/readerPosition';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
-import { useBackHandler } from '../navigation/useBackHandler';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import {
   applySignedPage,
   applySignatureToDocument,
   promoteExternalToLibrary,
 } from '../services/persistence/libraryOperations';
-import { ensureDocumentPdf } from '../services/pdf/pdfService';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { canFindInDoc, canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRasterFormat } from '../services/documents/formatCapabilities';
+import { canFindInDoc, canSign } from '../services/documents/formatCapabilities';
+import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../services/documents/readerTools';
+import { NIGHT_OVERLAY_ALPHA, pdfViewOptions, type ReadingSettings } from '../services/documents/readingSettings';
+import { useIsPro } from '../services/pro/entitlement';
 import { useShareSubmission, useSubmitDocument } from '../store/useSubmitDocument';
 import { SubmissionsSheet } from '../components/submit/SubmissionsSheet';
 import { submittedSummary } from '../services/submit/history';
@@ -53,20 +55,53 @@ import { Hint } from '../components/shared/Hint';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHint } from '../components/shared/useHint';
 
-const SEARCH_DEBOUNCE_MS = 200;
-// §7 R4: how long the page must stay on screen before it's saved as "where I left off".
-const LAST_PAGE_SAVE_MS = 800;
-
+// §12 D2: the Reader, laid out for studying. Top: Back, title, page "12 / 40", Find, Bookmark,
+// More. Bottom: the study tool bar (readerTools). Tap the page to hide both bars. The document
+// and its viewer state live in useReaderDocument, Find in useReaderFind, the bars in
+// useReaderChrome; this screen wires them to the sheets.
 export function ReaderScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   // Back returns to wherever the document was opened from: Home, Library or a course page.
   const { go, hub } = useRouter();
   const dispatch = useAppDispatch();
-  const state = useAppSlices('library', 'reader', 'signature');
+  const state = useAppSlices('library', 'reader', 'signature', 'settings');
+  const reading = state.settings.reading;
+  const isPro = useIsPro();
 
-  const external = state.reader.external;
-  const doc = state.library.files.find((f) => f.id === state.reader.readerId);
+  const pdfRef = useRef<PdfPageViewHandle>(null);
+  const goToPage = useCallback((page: number) => pdfRef.current?.goToPage(page), []);
+  const {
+    doc,
+    external,
+    format,
+    isPageRaster,
+    pdfUri,
+    nativeUri,
+    title,
+    pdfId,
+    contentKey,
+    fileMissing,
+    backfilling,
+    pageCount,
+    activeIndex,
+    password,
+    passwordDraft,
+    setPasswordDraft,
+    needsPassword,
+    loadProblem,
+    reloadKey,
+    reload,
+    handleLoad,
+    handlePageChanged,
+    handlePdfError,
+    submitPassword,
+  } = useReaderDocument(goToPage);
+  const find = useReaderFind({ pdfUri, pdfId, pageCount, contentKey, goToPage });
+  const chrome = useReaderChrome(reading.keepAwake);
+  const { reset: resetChrome, onPage: onChromePage } = chrome;
+  useEffect(() => resetChrome(), [contentKey, resetChrome]);
+
   const submit = useSubmitDocument();
   const shareSubmission = useShareSubmission();
   const [submissionsOpen, setSubmissionsOpen] = useState(false);
@@ -74,50 +109,25 @@ export function ReaderScreen() {
     () => (doc ? state.library.submissions.filter((s) => s.documentId === doc.id) : []),
     [doc, state.library.submissions]
   );
-  const night = state.reader.night;
-  const format = external?.format ?? doc?.format;
-  const isPageRaster = format ? isPageRasterFormat(format) : false;
+  const night = reading.night;
   const signVisible = !external && !!doc && canSign(doc);
+  const subject = useMemo<ReaderSubject | null>(() => (doc && !external ? { doc } : external ? { external } : null), [doc, external]);
+  const tools = useMemo(() => (subject ? readerTools(subject, { proTasks: readerProTasks(subject), isPro }) : []), [subject, isPro]);
+  const moreItems = useMemo(() => (subject ? readerMoreItems(subject) : []), [subject]);
 
-  const chromeVisible = useRef(new Animated.Value(1)).current;
-  const [chrome, setChrome] = useState(true);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const [readingOpen, setReadingOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
-  const [findOpen, setFindOpen] = useState(false);
-  // §9 O1: Android back closes the find bar before leaving the Reader.
-  useBackHandler(() => setFindOpen(false), findOpen);
-  const [findQuery, setFindQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<PDFSearchResultItem[]>([]);
-  const [pageCount, setPageCount] = useState(0);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [backfilling, setBackfilling] = useState(false);
-  const [password, setPassword] = useState<string | undefined>(undefined);
-  const [passwordDraft, setPasswordDraft] = useState('');
-  const [needsPassword, setNeedsPassword] = useState(false);
-  // §7 R4: how the last load failed. 'password': the prompt says a password is needed (and, after
-  // a try, that it didn't work); 'damaged': no password can help - "Can't open this file".
-  const [loadProblem, setLoadProblem] = useState<'password' | 'wrongPassword' | 'unknown' | 'damaged' | null>(null);
   const [jumpOpen, setJumpOpen] = useState(false);
   const [scrubberOpen, setScrubberOpen] = useState(false);
-  // §7 R4: the saved page has been jumped to (or there was none); until then, page changes
-  // (the viewer starting on page 1) aren't saved over it.
-  const restored = useRef(false);
-  const [reloadKey, setReloadKey] = useState(0);
   // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it.
-  const editPages = useEditPages(
-    doc && !external ? doc : undefined,
-    useCallback(() => setReloadKey((k) => k + 1), [])
-  );
+  const editPages = useEditPages(doc && !external ? doc : undefined, reload);
   const [signing, setSigning] = useState(false);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
-  const [localMatchCount, setLocalMatchCount] = useState(0);
-  // §5 T2: the PDF page a page search result opened on. While set, Find searches only that page
-  // (fast) and stays there; typing a new query searches the whole document again.
-  const [targetPage, setTargetPage] = useState<number | null>(null);
   // §5 T3: the library page open in "Select text", or null.
   const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
-  // §5 T4: the library page "Annotate" opened on, or null.
+  // §5 T4: the library page "Mark" opened on, or null.
   const [annotateIdx, setAnnotateIdx] = useState<number | null>(null);
   // §5 T5: bookmarks of this document, and the one on the page on screen.
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
@@ -128,11 +138,11 @@ export function ReaderScreen() {
   // §9 O3: one-time hints. The bookmark hint waits until nothing covers the top bar; the Submit
   // hint shows inside the overflow sheet, next to Submit, the first time it's there.
   const sheetOpen =
-    overflowOpen || typePickerOpen || jumpOpen || scrubberOpen || submissionsOpen || bookmarksOpen || labelling ||
+    overflowOpen || readingOpen || typePickerOpen || jumpOpen || scrubberOpen || submissionsOpen || bookmarksOpen || labelling ||
     signing || signStep !== null || selectTextIdx !== null || annotateIdx !== null || needsPassword;
   const canBookmark = !!doc && !external && isPageRaster;
-  const bookmarkHint = useHint('readerBookmark', canBookmark && chrome && !findOpen && !sheetOpen);
-  const showSubmit = !external && !!doc && canSubmit(doc);
+  const bookmarkHint = useHint('readerBookmark', canBookmark && chrome.shown && !find.open && !sheetOpen);
+  const showSubmit = moreItems.includes('submit');
   const insets = useSafeAreaInsets();
   const submitHint = useHint('submit', overflowOpen && showSubmit);
   const addBookmark = (label?: string) => {
@@ -142,175 +152,47 @@ export function ReaderScreen() {
       bookmark: { id: createId('bookmark'), documentId: doc.id, pageId: doc.pages[currentIdx].id, label: label?.trim() || undefined, createdAt: Date.now() },
     });
   };
-  const pdfRef = useRef<PdfPageViewHandle>(null);
-
-  // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
-  // compiled PDF, see buildPdfFromPages). nativeUri is for every other format's own viewer, reading
-  // straight from the copied source file instead of a PDF conversion that doesn't exist for them.
-  const pdfUri = isPageRaster ? (external?.uri ?? doc?.pdfUri) : undefined;
-  const nativeUri = !isPageRaster ? (external?.uri ?? doc?.contentUri) : undefined;
-  const title = external?.name ?? doc?.name ?? '';
-  const pdfId = external?.uri ?? doc?.id ?? '';
-  const contentKey = pdfUri ?? nativeUri;
-  // §8 B1: the file to show was deleted outside the app (or a restore didn't bring it back). Said
-  // plainly here, rather than left to the viewer to fail on. Re-checked when the integrity check
-  // changes the document's flag.
-  const fileMissing = useMemo(() => {
-    if (!doc || external || !contentKey) return false;
-    try {
-      return !new File(contentKey).exists;
-    } catch {
-      return true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentKey, doc?.missingFiles, external]);
-
-  useEffect(() => {
-    Animated.timing(chromeVisible, { toValue: chrome ? 1 : 0, duration: 180, useNativeDriver: true }).start();
-  }, [chrome, chromeVisible]);
-
-  // Backfills document.pdf for a library doc saved before every doc always got one. A no-op for
-  // anything saved after that change shipped (doc.pdfUri is already set), and for any non-raster
-  // format (DOCX/XLSX/CSV/TXT), which never gets a pdfUri at all - ensureDocumentPdf assumes a
-  // pages[] of real raster images to compile, which those formats don't have.
-  useEffect(() => {
-    if (!doc || external || doc.pdfUri || !isPageRaster) return;
-    let cancelled = false;
-    setBackfilling(true);
-    ensureDocumentPdf(doc).then((updated) => {
-      if (cancelled) return;
-      dispatch({ type: 'library/UPDATE_FILE', id: updated.id, patch: updated });
-      setBackfilling(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [doc, external, isPageRaster, dispatch]);
-
-  // Resets all per-document viewer state when a different document/external file is opened.
-  useEffect(() => {
-    setPageCount(0);
-    setActiveIndex(0);
-    setFindOpen(false);
-    setFindQuery('');
-    setSearchResults([]);
-    setLocalMatchCount(0);
-    setPassword(undefined);
-    setPasswordDraft('');
-    setNeedsPassword(false);
-    setLoadProblem(null);
-    setReloadKey(0);
-    setTargetPage(null);
-    restored.current = false;
-  }, [contentKey]);
-
-  // §7 R4: resume where the student left off, once the PDF has loaded - unless a search hit or a
-  // bookmark is being opened (the effect below handles that; it runs after this one, so the
-  // target is still set here).
-  useEffect(() => {
-    if (pageCount === 0 || restored.current) return;
-    restored.current = true;
-    const page = doc && !external ? resumePage(doc.lastPage, pageCount, !!state.reader.target) : null;
-    if (page) pdfRef.current?.goToPage(page);
-  }, [pageCount, doc, external, state.reader.target]);
-
-  // Saves the page on screen (debounced: flicking through pages writes once), and on leaving.
-  const lastSeenPage = useRef<number | null>(null);
-  const docId = !external ? doc?.id : undefined;
-  useEffect(() => {
-    if (!docId || pageCount === 0 || !restored.current) return;
-    const page = activeIndex + 1;
-    lastSeenPage.current = page;
-    const timer = setTimeout(() => dispatch({ type: 'library/SET_LAST_PAGE', id: docId, page }), LAST_PAGE_SAVE_MS);
-    return () => clearTimeout(timer);
-  }, [docId, activeIndex, pageCount, dispatch]);
-  useEffect(
-    () => () => {
-      if (docId && lastSeenPage.current) dispatch({ type: 'library/SET_LAST_PAGE', id: docId, page: lastSeenPage.current });
-      lastSeenPage.current = null;
-    },
-    [docId, dispatch]
-  );
 
   // A page search result: once the PDF has loaded, jump to that library page's PDF page and
   // highlight the query there.
   const target = state.reader.target;
+  const { openOnPage } = find;
   useEffect(() => {
     if (!target || !doc || pageCount === 0) return;
     dispatch({ type: 'reader/SET_TARGET', target: null });
     const idx = doc.pages.findIndex((p) => p.id === target.pageId);
     if (idx < 0) return;
     const { page } = pdfPageFor(doc, idx);
-    setTargetPage(page);
-    pdfRef.current?.goToPage(page);
-    if (target.query) {
-      setFindOpen(true);
-      setFindQuery(target.query);
-    }
-  }, [target, doc, pageCount, dispatch]);
+    openOnPage(page, target.query);
+    goToPage(page);
+  }, [target, doc, pageCount, dispatch, openOnPage, goToPage]);
 
-  useEffect(() => {
-    const query = findQuery.trim();
-    if (!query || !pdfUri) {
-      setSearchResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const [from, to] = targetPage ? [targetPage, targetPage] : [1, Math.max(pageCount, 1)];
-        const results = await searchTextDirect(pdfId, query, from, to);
-        setSearchResults(results);
-        if (targetPage) pdfRef.current?.goToPage(targetPage);
-        else if (results[0]) pdfRef.current?.goToPage(results[0].page);
-      } catch (e) {
-        console.warn('ReaderScreen: searchTextDirect failed', e);
-        setSearchResults([]);
-      }
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [findQuery, pdfUri, pdfId, pageCount, targetPage]);
-
-  const highlightRects = useMemo(
-    () => searchResults.map((r) => ({ page: r.page, rect: r.rect })),
-    [searchResults]
-  );
-
-  const handleLoad = useCallback((count: number) => {
-    setPageCount(count);
-    setNeedsPassword(false);
-    setLoadProblem(null);
-  }, []);
-
-  const handlePageChanged = useCallback((page: number, count: number) => {
-    setActiveIndex(page - 1);
-    setPageCount(count);
-  }, []);
-
-  const handleTap = useCallback(() => setChrome((v) => !v), []);
-
-  // §7 R4: pdf-jsi says when a password is missing or wrong (readerPosition.classifyPdfError);
-  // any other failure is a file no password will open. With no message to go by, the prompt is
-  // offered as before, and a failure after a password was tried is taken as a damaged file.
-  const handlePdfError = useCallback(
-    (message: string) => {
-      const kind = classifyPdfError(message);
-      const tried = password !== undefined;
-      if (kind === 'damaged' || (kind === 'unknown' && tried)) {
-        setNeedsPassword(false);
-        setLoadProblem('damaged');
-        return;
-      }
-      setLoadProblem(kind === 'password' ? (tried ? 'wrongPassword' : 'password') : 'unknown');
-      setNeedsPassword(true);
+  const onPageChanged = useCallback(
+    (page: number, count: number) => {
+      handlePageChanged(page, count);
+      onChromePage(page);
     },
-    [password]
+    [handlePageChanged, onChromePage]
   );
 
-  const handleSubmitPassword = useCallback(() => {
-    setPassword(passwordDraft);
-    setNeedsPassword(false);
-    setReloadKey((k) => k + 1);
-  }, [passwordDraft]);
+  const setReading = useCallback(
+    (patch: Partial<ReadingSettings>) => dispatch({ type: 'settings/SET_READING', reading: patch }),
+    [dispatch]
+  );
+
+  const handleTool = useCallback(
+    (id: ReaderToolId) => {
+      if (!doc) return;
+      // The library page on screen (on a 2-up sheet, its left page).
+      const idx = libraryIdxFor(doc, activeIndex + 1);
+      if (id === 'mark') setAnnotateIdx(idx);
+      else if (id === 'selectText') setSelectTextIdx(idx);
+      else if (id === 'pages') setScrubberOpen(true);
+      // 'convertEdit' only shows once a Pro task is live (readerProTasks); D5–D10 add the sheet
+      // that picks one, run through D1's useProTask.
+    },
+    [doc, activeIndex]
+  );
 
   const handleOverflowSelect = useCallback(
     async (id: OverflowItemId) => {
@@ -351,15 +233,13 @@ export function ReaderScreen() {
         setBookmarksOpen(true);
       } else if (id === 'editPages') {
         editPages.open();
-      } else if (id === 'annotate') {
-        if (doc) setAnnotateIdx(libraryIdxFor(doc, activeIndex + 1));
-      } else if (id === 'selectText' || id === 'copyText' || id === 'extractText') {
+      } else if (id === 'readingSettings') {
+        setReadingOpen(true);
+      } else if (id === 'copyText' || id === 'extractText') {
         if (!doc) return;
         // The library page on screen (on a 2-up sheet, its left page).
         const idx = libraryIdxFor(doc, activeIndex + 1);
-        if (id === 'selectText') {
-          setSelectTextIdx(idx);
-        } else if (id === 'copyText') {
+        if (id === 'copyText') {
           const text = doc.pages[idx]?.ocr?.text.trim() ?? '';
           if (!text) {
             dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noPageText') });
@@ -400,7 +280,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -489,7 +369,7 @@ export function ReaderScreen() {
     );
   }
 
-  const matchCount = isPageRaster ? searchResults.length : localMatchCount;
+  const pdfOptions = pdfViewOptions(reading);
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
@@ -501,10 +381,14 @@ export function ReaderScreen() {
           pdfId={pdfId}
           password={password}
           night={night}
-          highlightRects={highlightRects}
+          nightAlpha={NIGHT_OVERLAY_ALPHA[reading.nightStrength]}
+          enablePaging={pdfOptions.enablePaging}
+          fitPolicy={pdfOptions.fitPolicy}
+          spacing={pdfOptions.spacing}
+          highlightRects={find.highlightRects}
           onLoad={handleLoad}
-          onPageChanged={handlePageChanged}
-          onTap={handleTap}
+          onPageChanged={onPageChanged}
+          onTap={chrome.toggle}
           onError={handlePdfError}
         />
       ) : format === 'CSV' || format === 'XLSX' || format === 'XLS' ? (
@@ -513,18 +397,18 @@ export function ReaderScreen() {
           uri={nativeUri!}
           format={format}
           night={night}
-          findQuery={findQuery}
-          onMatchCount={setLocalMatchCount}
-          onTap={handleTap}
+          findQuery={find.query}
+          onMatchCount={find.setLocalMatchCount}
+          onTap={chrome.toggle}
         />
       ) : format === 'TXT' ? (
         <TxtView
           key={nativeUri}
           uri={nativeUri!}
           night={night}
-          findQuery={findQuery}
-          onMatchCount={setLocalMatchCount}
-          onTap={handleTap}
+          findQuery={find.query}
+          onMatchCount={find.setLocalMatchCount}
+          onTap={chrome.toggle}
         />
       ) : format === 'DOCX' ? (
         <DocxView key={nativeUri} uri={nativeUri!} night={night} />
@@ -565,13 +449,13 @@ export function ReaderScreen() {
               secureTextEntry
               value={passwordDraft}
               onChangeText={setPasswordDraft}
-              onSubmitEditing={handleSubmitPassword}
+              onSubmitEditing={submitPassword}
             />
             <View style={styles.passwordActions}>
               <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')}>
                 <Text style={{ color: tokens.muted }}>{t('common.cancel')}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={handleSubmitPassword}>
+              <Pressable accessibilityRole="button" onPress={submitPassword}>
                 <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('reader.unlock')}</Text>
               </Pressable>
             </View>
@@ -580,17 +464,18 @@ export function ReaderScreen() {
       )}
 
       <ReaderTopChrome
-        visible={chromeVisible}
+        visible={chrome.visible}
         name={title}
         onBack={() => go(hub, 'back')}
         onOverflow={() => setOverflowOpen(true)}
-        findOpen={findOpen}
-        findQuery={findQuery}
-        onChangeFindQuery={(value) => {
-          setTargetPage(null);
-          setFindQuery(value);
-        }}
-        matchCount={matchCount}
+        pageCount={pageCount}
+        activeIndex={activeIndex}
+        onJump={isPageRaster ? () => setJumpOpen(true) : undefined}
+        onFind={format && canFindInDoc(format) ? () => find.setOpen((v) => !v) : undefined}
+        findOpen={find.open}
+        findQuery={find.query}
+        onChangeFindQuery={find.changeQuery}
+        matchCount={find.matchCount}
         subtitle={submittedSummary(docSubmissions, formatShortDate)}
         onSubtitlePress={() => setSubmissionsOpen(true)}
         bookmarked={canBookmark ? !!currentBookmark : undefined}
@@ -612,19 +497,6 @@ export function ReaderScreen() {
         />
       ) : null}
 
-      <ReaderBottomChrome
-        visible={chromeVisible}
-        pageCount={pageCount}
-        activeIndex={activeIndex}
-        onFind={() => setFindOpen((v) => !v)}
-        findOpen={findOpen}
-        showFind={!!format && canFindInDoc(format)}
-        onNight={() => dispatch({ type: 'reader/TOGGLE_NIGHT' })}
-        nightOn={night}
-        onJump={isPageRaster ? () => setJumpOpen(true) : undefined}
-        onPages={doc && !external && isPageRaster && doc.pages.length > 1 ? () => setScrubberOpen(true) : undefined}
-      />
-
       {/* §7 R4: any page two taps away - type its number, or pick its thumbnail. */}
       <TextPromptModal
         visible={jumpOpen}
@@ -638,7 +510,7 @@ export function ReaderScreen() {
           // The snack would sit under the prompt, so the prompt closes either way.
           setJumpOpen(false);
           if (page === null) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noSuchPage', { count: pageCount }) });
-          else pdfRef.current?.goToPage(page);
+          else goToPage(page);
         }}
       />
 
@@ -649,16 +521,20 @@ export function ReaderScreen() {
           currentIdx={currentIdx}
           onPick={(idx) => {
             setScrubberOpen(false);
-            pdfRef.current?.goToPage(pdfPageFor(doc, idx).page);
+            goToPage(pdfPageFor(doc, idx).page);
           }}
           onClose={() => setScrubberOpen(false)}
         />
       ) : null}
 
-      <ReaderActionBar
-        visible={chromeVisible}
-        onPress={handleOverflowSelect}
-        hiddenIds={[...(signVisible ? [] : (['sign'] as const)), ...(isPageRaster ? [] : (['export'] as const))]}
+      <ReaderToolBar visible={chrome.visible} tools={tools} onPress={handleTool} />
+
+      <ReadingSettingsSheet
+        visible={readingOpen}
+        reading={reading}
+        showPageOptions={isPageRaster}
+        onChange={setReading}
+        onClose={() => setReadingOpen(false)}
       />
 
       {doc ? (
@@ -688,12 +564,8 @@ export function ReaderScreen() {
         visible={overflowOpen}
         onClose={() => setOverflowOpen(false)}
         onSelect={handleOverflowSelect}
-        showDelete={!external}
-        showAddToLibrary={!!external}
-        showSubmit={showSubmit}
+        items={moreItems}
         submitHint={submitHint.visible ? { text: t('shared.hint.submit'), onDismiss: submitHint.dismiss } : undefined}
-        showText={!external && !!doc && hasPageMasters(doc)}
-        showEditPages={!external && !!doc && canUsePageTools(doc)}
       />
 
       <BookmarksSheet
@@ -701,7 +573,7 @@ export function ReaderScreen() {
         items={docBookmarks}
         onOpen={(item) => {
           setBookmarksOpen(false);
-          if (doc) pdfRef.current?.goToPage(pdfPageFor(doc, item.idx).page);
+          if (doc) goToPage(pdfPageFor(doc, item.idx).page);
         }}
         onRemove={(item) => dispatch({ type: 'library/REMOVE_BOOKMARK', id: item.bookmark.id })}
         onClose={() => setBookmarksOpen(false)}
@@ -728,7 +600,7 @@ export function ReaderScreen() {
           onClose={(changed) => {
             setAnnotateIdx(null);
             // The PDF view caches the file; reload it to show the new annotations.
-            if (changed) setReloadKey((k) => k + 1);
+            if (changed) reload();
           }}
         />
       ) : null}

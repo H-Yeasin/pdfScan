@@ -1,113 +1,89 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Fragment } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import { Hint } from '../shared/Hint';
+import type { ReaderMoreItemId } from '../../services/documents/readerTools';
 
-export type OverflowItemId =
-  | 'share'
-  | 'sign'
-  | 'export'
-  | 'print'
-  | 'delete'
-  | 'addToLibrary'
-  | 'changeType'
-  | 'submit'
-  | 'selectText'
-  | 'copyText'
-  | 'extractText'
-  | 'annotate'
-  | 'bookmarks'
-  | 'editPages';
+export type OverflowItemId = ReaderMoreItemId;
 
-type Item = { id: OverflowItemId; icon: keyof typeof Ionicons.glyphMap; destructive?: boolean };
-
-// Share/Sign/Export/Print live in the persistent ReaderActionBar; management/destructive actions
-// stay here so there's exactly one, deliberately-gated path to each.
-const DELETE_ITEM: Item = { id: 'delete', icon: 'trash-outline', destructive: true };
-const CHANGE_TYPE_ITEM: Item = { id: 'changeType', icon: 'pricetag-outline' };
-// §4 S6: rebuild and share the teacher's copy with the course's preset.
-const SUBMIT_ITEM: Item = { id: 'submit', icon: 'paper-plane-outline' };
-// §5 T3: the OCR text of scanned pages.
-const TEXT_ITEMS: Item[] = [
-  // §5 T4.
-  { id: 'annotate', icon: 'color-fill-outline' },
+const ICONS: Record<OverflowItemId, keyof typeof Ionicons.glyphMap> = {
+  addToLibrary: 'add-circle-outline',
+  // §4 S6: rebuild and share the teacher's copy with the course's preset.
+  submit: 'paper-plane-outline',
+  share: 'share-outline',
+  export: 'download-outline',
+  print: 'print-outline',
+  sign: 'create-outline',
+  // §7 R3: reorder, rotate, delete, extract and add pages of a saved document.
+  editPages: 'albums-outline',
   // §5 T5.
-  { id: 'bookmarks', icon: 'bookmarks-outline' },
-  { id: 'selectText', icon: 'text-outline' },
-  { id: 'copyText', icon: 'copy-outline' },
-  { id: 'extractText', icon: 'document-text-outline' },
-];
-const ADD_TO_LIBRARY_ITEM: Item = { id: 'addToLibrary', icon: 'add-circle-outline' };
-// §7 R3: reorder, rotate, delete, extract and add pages of a saved document.
-const EDIT_PAGES_ITEM: Item = { id: 'editPages', icon: 'albums-outline' };
+  bookmarks: 'bookmarks-outline',
+  // §5 T3: the OCR text of scanned pages.
+  copyText: 'copy-outline',
+  extractText: 'document-text-outline',
+  // §12 D2.
+  readingSettings: 'options-outline',
+  changeType: 'pricetag-outline',
+  delete: 'trash-outline',
+};
 
 type OverflowSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSelect: (id: OverflowItemId) => void;
-  // An externally-opened PDF (not yet in the library) has nothing to delete and needs the promote
-  // action instead - these two are mutually exclusive in practice (see ReaderScreen's usage).
-  showDelete?: boolean;
-  showAddToLibrary?: boolean;
-  showSubmit?: boolean;
-  showText?: boolean;
-  showEditPages?: boolean;
+  // In order: services/documents/readerTools.readerMoreItems decides which apply.
+  items: OverflowItemId[];
   // §9 O3: the one-time hint shown under Submit (inside this sheet, never over it).
   submitHint?: { text: string; onDismiss: () => void };
 };
 
-export function OverflowSheet({
-  visible,
-  onClose,
-  onSelect,
-  showDelete = true,
-  showAddToLibrary = false,
-  showSubmit = false,
-  showText = false,
-  showEditPages = false,
-  submitHint,
-}: OverflowSheetProps) {
+// §12 D2: the Reader's More sheet. Study actions are in the bottom tool bar; sharing and managing
+// the file are here, with Delete last as the one, deliberately-gated path to a destructive action.
+export function OverflowSheet({ visible, onClose, onSelect, items, submitHint }: OverflowSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const items: Item[] = [
-    ...(showAddToLibrary ? [ADD_TO_LIBRARY_ITEM] : []),
-    ...(showSubmit ? [SUBMIT_ITEM] : []),
-    ...(showEditPages ? [EDIT_PAGES_ITEM] : []),
-    ...(showText ? TEXT_ITEMS : []),
-    // Library documents only, like Delete: an external file has no type until it's added.
-    ...(showDelete ? [CHANGE_TYPE_ITEM, DELETE_ITEM] : []),
-  ];
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
         <View
-          style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.md }]}
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: tokens.surface,
+              paddingBottom: insets.bottom + spacing.md,
+            },
+          ]}
         >
           <View style={[styles.handle, { backgroundColor: tokens.edge }]} />
-          {items.map((item) => (
-            <Fragment key={item.id}>
-              <Pressable accessibilityRole="button"
-                style={styles.item}
-                onPress={() => {
-                  onClose();
-                  onSelect(item.id);
-                }}
-              >
-                <Ionicons name={item.icon} size={20} color={item.destructive ? tokens.danger : tokens.ink} />
-                <Text style={[styles.itemLabel, { color: item.destructive ? tokens.danger : tokens.ink }]}>
-                  {t(`reader.actions.${item.id}`)}
-                </Text>
-              </Pressable>
-              {item.id === 'submit' && submitHint ? (
-                <Hint text={submitHint.text} onDismiss={submitHint.onDismiss} arrow="up" arrowAlign="left" style={styles.hint} />
-              ) : null}
-            </Fragment>
-          ))}
+          {/* A scan has a dozen items: on a small phone they scroll. */}
+          <ScrollView style={styles.list} bounces={false}>
+            {items.map((id) => {
+              const destructive = id === 'delete';
+              return (
+                <Fragment key={id}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.item}
+                    onPress={() => {
+                      onClose();
+                      onSelect(id);
+                    }}
+                  >
+                    <Ionicons name={ICONS[id]} size={20} color={destructive ? tokens.danger : tokens.ink} />
+                    <Text style={[styles.itemLabel, { color: destructive ? tokens.danger : tokens.ink }]}>{t(`reader.actions.${id}`)}</Text>
+                  </Pressable>
+                  {id === 'submit' && submitHint ? (
+                    <Hint text={submitHint.text} onDismiss={submitHint.onDismiss} arrow="up" arrowAlign="left" style={styles.hint} />
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </ScrollView>
         </View>
       </Pressable>
     </Modal>
@@ -125,6 +101,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radii.card * 2,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.sm,
+    maxHeight: '90%',
+  },
+  list: {
+    flexGrow: 0,
   },
   hint: {
     marginHorizontal: spacing.md,

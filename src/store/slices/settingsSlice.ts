@@ -6,6 +6,7 @@ import { EMPTY_PROFILE } from '../../services/submit/profile';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 import type { AutoBackupFrequency } from '../../services/backup/schedule';
 import { DEFAULT_APP_LOCK, type AppLockSettings } from '../../services/security/appLock';
+import { DEFAULT_READING, type ReadingSettings } from '../../services/documents/readingSettings';
 
 export type SettingsState = {
   // False until persisted settings have been read, so first-run-dependent behaviour (like the
@@ -80,6 +81,8 @@ export type SettingsState = {
   // §10 M5: cold starts so far, this one included (counted once settings are read). Banners wait
   // for the third (services/ads/adPolicy.MIN_SESSIONS_FOR_ADS).
   appSessions: number;
+  // §12 D2: the Reader's layout, night overlay and keep-awake (services/documents/readingSettings).
+  reading: ReadingSettings;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -114,6 +117,7 @@ export const initialSettingsState: SettingsState = {
   institutionLogo: null,
   appLock: DEFAULT_APP_LOCK,
   appSessions: 0,
+  reading: DEFAULT_READING,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -160,7 +164,9 @@ export type SettingsAction =
   // A partial patch: each app lock option changes on its own.
   | { type: 'settings/SET_APP_LOCK'; appLock: Partial<AppLockSettings> }
   // The stored count plus this start.
-  | { type: 'settings/COUNT_SESSION'; stored: number };
+  | { type: 'settings/COUNT_SESSION'; stored: number }
+  // A partial patch: each reading option changes on its own.
+  | { type: 'settings/SET_READING'; reading: Partial<ReadingSettings> };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -226,6 +232,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, appSessions: action.stored + 1 };
     case 'settings/SET_APP_LOCK':
       return { ...state, appLock: { ...state.appLock, ...action.appLock } };
+    case 'settings/SET_READING':
+      return { ...state, reading: { ...state.reading, ...action.reading } };
     default:
       return state;
   }
