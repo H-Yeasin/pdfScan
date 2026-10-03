@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D10** (PDF: fill forms and add text). D1–D9 are done in code.
+- **Next: D11** (reading updates for Word and Excel). D1–D10 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -558,7 +558,62 @@ another app comes in as plain text; the keyboard doesn't hide the toolbar).
 - Tests: HTML → DOCX → mammoth round trip keeps headings, lists, bold/italic, tables.
 
 ### D10 · PDF: fill forms and add text *(M)*
-Status: not started.
+Status: done in code (commit fa91352); device check open (a form PDF from the library and from
+"Open with": text, multi-line, checkbox, radio, dropdown; save with and without Flatten and open the
+copy in another PDF app and a browser; a Bangla answer in a field and in a text box; a text box on a
+scan and on an imported PDF with `/Rotate`; the native viewer shows the text box after Mark mode
+closes; with and without an ad; a remembered Text tool reopens without an ad inside the session).
+
+**As built:**
+- `pdfForms` is `status: 'live'` (Pro screen: "Fill in PDF forms and add text to PDFs"). It's a
+  session grant (D1's `grantKindFor`), shared by both halves: unlocking one on a document unlocks
+  the other there. Neither has a restart runner (kinds `fillForm`, `addText`, like D7's `editFile`).
+- **Forms:** `services/edit/pdfForm.ts`. `readPdfForm` lists text fields (multi-line, max length),
+  checkboxes, and one-of choices (radio groups, dropdowns, list boxes, as chips); read-only fields,
+  buttons and signature fields are left out. Labels come from the tooltip (`/TU`), else the
+  name's last part ("…Student_name[0]" → "Student name"). It runs **before** the gate, so a PDF
+  with no fields says so (an Alert pointing at Mark → Text) and nobody watches an ad for nothing;
+  a password (`PdfFormLockedError`) or over `PDF_FORM_MAX_BYTES` (25 MB) gives a snack.
+  `components/reader/FormFillSheet.tsx` (full screen, discard guard, Flatten off by default with a
+  hint) and `useFillForm.tsx`. Entry points: Convert/Edit on a PDF (picker: Convert to Word / Fill in
+  form) and More → **Fill in form** (`fillForm`); not on scans (`readerProTasks`, as planned).
+- Saving: `fillPdfForm` sets values, draws each changed field's appearance itself and saves with
+  `updateFieldAppearances: false` (pdf-lib would redraw in Helvetica and throw on Bangla); flatten
+  the same way. `saveFilledForm` writes `cache/edit/`, then `addPdfFileToLibrary` as
+  "<name> (filled)" (course and type kept), deleting the temp file; the Reader switches to the copy
+  and `carryProTaskGrant` gives it the session. The app's own marks in the copy lose their
+  `/NM` (they'd otherwise be removed as "ours" by the copy's first Mark session, which has no
+  records of them): they stay as plain PDF annotations.
+- **Any script:** `services/pdf/textAppearance.ts` draws lines for appearance streams
+  synchronously (writeAnnotations runs in the builder's sync `beforeSave`): WinAnsi text as
+  Helvetica (a standard font dict, nothing embedded), anything else as an image in the text colour
+  masked by a Skia-shaped run's alpha (`skiaText.rasterizeShapedAlpha`, raw pixels into Flate
+  streams; a PNG would need pdf-lib's async embedder). Used by text boxes and by form fields that
+  Helvetica can't encode (`setTextRaster` for tests).
+- **Text tool:** a new annotation kind `'text'` (`data: { box, size }` in master pixels, the text in
+  `text`; `libraryRepo` reads it; no migration). In Mark mode it sits after Note, with a PRO badge
+  without Pro; tapping it while locked runs the gate (the sheet shows over Mark mode) and selects it
+  once through; the Reader checks the grant silently (`checkProTask`) when Mark mode opens, so a
+  remembered Text tool comes back without asking. Tap: type (a multi-line `TextPromptModal`); tap
+  a box: edit; drag a box: move (kept on the page, `moveBox`); the eraser removes it (free). Colours:
+  the pen palette; sizes S/M/L as a share of the page width (`TEXT_SIZES`, about 10/13/18 pt on
+  A4). Outlines show while the tool is on. Undo/redo cover add, edit and move. The box is measured
+  like the PDF draws it (`visibleText.measureText`).
+- In the PDF: `/FreeText` with `/Contents`, `/DA`, no background (`C []`) and an appearance whose
+  frame is mapped corner by corner, so on a turned page or a 2-in-1 sheet the text runs with the
+  page's words; `removeOurAnnotations` also deletes the appearance's own objects (font dict, image
+  and mask).
+- Text boxes are on scans and imported PDFs alike (wherever Mark is). They aren't in the notes
+  panel (D4 lists highlights, underlines, strikes, notes and bookmarks).
+- Known, not from D10: each `updatePdfAnnotations` rewrite keeps pdf-lib's previous object and
+  xref streams (+2 objects per save, notes too), so `document.pdf` grows a little with every Mark
+  session. Worth a small fix (drop `/ObjStm` and `/XRef` streams after load) on its own.
+- Tests: `src/services/edit/__tests__/pdfForm.test.ts` (fields and labels, no form, locked, too
+  large; every field kind filled, max length, read-only kept; flatten; Bangla appearance and flatten;
+  marks released; the copy for a library and an outside PDF, originals unchanged, temp cleaned),
+  `src/services/annotations/__tests__/textBox.test.ts` (FreeText at the box via pdf.js, DA and
+  colour, a `/Rotate` page, a shaped line's image and mask, no leftover objects, empty skipped; box
+  sizing, moving, font size, remembered prefs, hit test), `readerTools.test.ts` (Fill in form).
 
 **Pro: `pdfForms`.** Two fixes to the first version: filled forms **always save a copy** (the original first version wrote into an imported PDF, against the "never change the original" rule), and the text-box tool lives in **D3's Mark palette** (marked Pro there; highlights, pen and notes stay free).
 

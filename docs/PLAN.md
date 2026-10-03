@@ -281,7 +281,7 @@ ad (or the day pass); marking, OCR and copy/extract text stay free.
 - [x] D7 Edit TXT and CSV (Pro, 30-minute session per document) — done in code; device check open
 - [x] D8 Edit XLSX cells (Pro; after R5's SheetJS swap) — done in code; device check open
 - [x] D9 Edit Word text (Pro) — done in code; device check open
-- [ ] D10 PDF forms and text boxes (Pro; saves a copy)
+- [x] D10 PDF forms and text boxes (Pro; saves a copy) — done in code; device check open
 - [ ] D11 Reading updates for Word and Excel (free)
 
 **Done when:** a teacher's DOCX or XLSX from WhatsApp becomes a submitted PDF, a scanned page
