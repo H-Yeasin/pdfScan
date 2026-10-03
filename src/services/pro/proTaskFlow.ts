@@ -5,6 +5,7 @@ import { createId } from '../../utils/id';
 import type { AppStore } from '../../store/AppStateContext';
 import { getEntitlement, isProActive } from './entitlement';
 import {
+  carryGrant,
   clearPendingTask,
   consumeGrant,
   decide,
@@ -152,4 +153,10 @@ export async function resumeProTask(task: PendingProTask, store: AppStore, now: 
     return;
   }
   await completeProTask({ feature: task.feature, docId: task.docId, run: () => runner(task, { store }) }, task.id, now);
+}
+
+// §12 D7: see proTask.carryGrant.
+export async function carryProTaskGrant(feature: ProTaskFeature, fromDocId: string, toDocId: string, now: () => number = Date.now): Promise<void> {
+  const at = now();
+  await updateTaskState(at, (s) => ({ ...s, grants: carryGrant(s.grants, feature, fromDocId, toDocId, at) }));
 }

@@ -41,12 +41,12 @@ export const PRO_FEATURES: readonly ProFeature[] = [
   { id: 'pdfPasswords', status: 'planned', labelKey: 'pro.features.pdfPasswords', lapse: 'keepExisting' },
   { id: 'driveBackup', status: 'planned', labelKey: 'pro.features.driveBackup', lapse: 'pause' },
   // §12 Pro tasks, unlocked one task at a time by a rewarded ad (services/pro/proTask.ts) or by a
-  // day pass. What was converted or edited stays. 'planned' until D7 (editFiles) and D10
-  // (pdfForms) build them.
+  // day pass. What was converted or edited stays. 'planned' until its step builds it
+  // (pdfForms: D10).
   // Office → PDF (D5); scan/PDF → Word joins it in D6 (readerTools.BUILT_CONVERSIONS).
   { id: 'convert', status: 'live', labelKey: 'pro.features.convert', lapse: 'keepExisting' },
-  // Edit TXT, CSV, XLSX and Word files.
-  { id: 'editFiles', status: 'planned', labelKey: 'pro.features.editFiles', lapse: 'keepExisting' },
+  // Edit TXT and CSV files (D7); XLSX (D8) and Word (D9) join it (readerTools.BUILT_EDITS).
+  { id: 'editFiles', status: 'live', labelKey: 'pro.features.editFiles', lapse: 'keepExisting' },
   // Fill PDF forms and add typed text boxes.
   { id: 'pdfForms', status: 'planned', labelKey: 'pro.features.pdfForms', lapse: 'keepExisting' },
 ];

@@ -65,6 +65,15 @@ export function consumeGrant(grants: readonly ProTaskGrant[], feature: ProTaskFe
   return grants.filter((g) => !(g.kind === 'once' && g.feature === feature && g.docId === docId));
 }
 
+// §12 D7: a file from outside, edited and saved, becomes a library document with a new id. The
+// session the ad unlocked goes with it (same end time), so the student isn't asked again for the
+// file they're still editing.
+export function carryGrant(grants: readonly ProTaskGrant[], feature: ProTaskFeature, fromDocId: string, toDocId: string, now: number): ProTaskGrant[] {
+  const grant = findGrant(grants, feature, fromDocId, now);
+  if (!grant || grant.kind !== 'session' || findGrant(grants, feature, toDocId, now)) return grants.slice();
+  return [...grants, { ...grant, docId: toDocId }];
+}
+
 export function offlineRunsOnDay(log: readonly number[], now: number): number {
   const today = dayKey(now);
   return log.filter((at) => dayKey(at) === today).length;

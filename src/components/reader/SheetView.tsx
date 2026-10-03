@@ -4,15 +4,15 @@ import { spacing, useTheme } from '../../theme';
 import { loadSheets, PreviewTooLargeError, type Sheet } from '../../services/documents/sheetService';
 import { useT } from '../../i18n/useT';
 
-const MAX_COLUMNS = 200;
+export const MAX_COLUMNS = 200;
 const SAMPLE_ROWS_FOR_WIDTH = 50;
 const MIN_COL_WIDTH = 60;
 const MAX_COL_WIDTH = 240;
 const CHAR_WIDTH = 8;
 
 // Computed once per sheet load and kept static rather than live-measured per cell - real
-// auto-fit text measurement would defeat FlatList's row virtualization.
-function computeColumnWidths(rows: string[][]): { widths: number[]; totalColumns: number } {
+// auto-fit text measurement would defeat FlatList's row virtualization. Also §12 D7's CSV editor.
+export function computeColumnWidths(rows: string[][]): { widths: number[]; totalColumns: number } {
   const sample = rows.slice(0, SAMPLE_ROWS_FOR_WIDTH);
   const totalColumns = sample.reduce((max, row) => Math.max(max, row.length), 0);
   const colCount = Math.min(totalColumns, MAX_COLUMNS);

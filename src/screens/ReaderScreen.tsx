@@ -15,6 +15,7 @@ import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
 import { useConvertToPdf } from '../components/reader/useConvertToPdf';
 import { useConvertToWord } from '../components/reader/useConvertToWord';
+import { useEditFile } from '../components/reader/useEditFile';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
@@ -142,6 +143,14 @@ export function ReaderScreen() {
     if (external) startWord({ uri: external.uri, name: external.name, title: external.name, grantId: external.uri });
     else if (doc) startWord({ docId: doc.id, title: doc.name, grantId: doc.id });
   }, [doc, external, startWord]);
+  // §12 D7: edit a TXT or CSV file (one ad unlocks the document for a while). Preloading is
+  // shared with the conversion gate's (rewarded.preloadRewarded keeps one ad).
+  const edit = useEditFile({ preload: proTasks.includes('editFiles') });
+  const { start: startEdit } = edit;
+  const editFile = useCallback(() => {
+    if (external) startEdit({ external });
+    else if (doc) startEdit({ doc });
+  }, [doc, external, startEdit]);
 
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [readingOpen, setReadingOpen] = useState(false);
@@ -229,12 +238,19 @@ export function ReaderScreen() {
 
   const handleTool = useCallback(
     (id: ReaderToolId) => {
-      // Today a file's only Pro task is one conversion: Office → PDF (D5) for an office file,
-      // scan/PDF → Word (D6) for a scan or PDF. D7's editing adds a picker.
+      // A file's Pro tasks: one conversion (Office → PDF, D5, or scan/PDF → Word, D6) and, for a
+      // TXT or CSV, editing (D7). With both, a picker; with one, it runs straight away.
       if (id === 'convertEdit') {
-        if (!proTasks.includes('convert')) return;
-        if (toWord) convertToWord();
-        else convertToPdf();
+        const canConvert = proTasks.includes('convert');
+        const convertNow = toWord ? convertToWord : convertToPdf;
+        if (canConvert && proTasks.includes('editFiles')) {
+          Alert.alert(t('reader.convertEdit.title'), undefined, [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t(toWord ? 'reader.actions.convertToWord' : 'reader.actions.convertToPdf'), onPress: convertNow },
+            { text: t('reader.convertEdit.edit'), onPress: editFile },
+          ]);
+        } else if (canConvert) convertNow();
+        else if (proTasks.includes('editFiles')) editFile();
         return;
       }
       if (!doc) return;
@@ -245,7 +261,7 @@ export function ReaderScreen() {
       else if (id === 'notes') setNotesOpen(true);
       else if (id === 'pages') setScrubberOpen(true);
     },
-    [doc, activeIndex, proTasks, toWord, convertToPdf, convertToWord]
+    [doc, activeIndex, proTasks, toWord, convertToPdf, convertToWord, editFile, t]
   );
 
   const handleOverflowSelect = useCallback(
@@ -265,6 +281,8 @@ export function ReaderScreen() {
         convertToPdf();
       } else if (id === 'convertToWord') {
         convertToWord();
+      } else if (id === 'editFile') {
+        editFile();
       } else if (id === 'sign') {
         if (!doc || !signVisible) return;
         if (doc.format === 'PDF') {
@@ -338,7 +356,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -716,6 +734,7 @@ export function ReaderScreen() {
 
       {convert.element}
       {word.element}
+      {edit.element}
 
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />

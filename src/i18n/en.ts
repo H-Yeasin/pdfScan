@@ -483,6 +483,8 @@ export const en = {
       convertToPdf: 'Convert to PDF',
       // §12 D6.
       convertToWord: 'Convert to Word',
+      // §12 D7.
+      editFile: 'Edit',
     },
     // §12 D2: the bottom tool bar.
     tools: {
@@ -535,6 +537,34 @@ export const en = {
       done: 'Saved as a Word file in your Library',
       doneInLibrary: "'{name}' is now a Word file in your Library",
       failed: "Couldn't convert this document.",
+    },
+    // §12 D7: Convert/Edit on a file that has both.
+    convertEdit: {
+      title: 'Convert or edit',
+      edit: 'Edit',
+    },
+    // §12 D7: the TXT/CSV editor (Pro). TXT and CSV lose nothing, so the library file is updated.
+    editFile: {
+      save: 'Save',
+      saved: 'Saved',
+      savedToLibrary: 'Saved to your Library',
+      failedTitle: "Couldn't save",
+      failed: 'Your edits are still here. Try again.',
+      tooLarge: 'This file is too large to edit.',
+      discardTitle: 'Discard your edits?',
+      discardBody: "What you changed since the last save won't be kept.",
+      discard: 'Discard',
+      keepEditing: 'Keep editing',
+      monospace: 'Monospace',
+      placeholder: 'Type here',
+      notUtf8: "This file isn't in UTF-8. It will be saved as UTF-8, which every app can read.",
+      outsideNote: "Saving puts the edited copy in your Library. The file you opened doesn't change.",
+      rowTitle: 'Row {row}',
+      cellTitle: 'Row {row}, column {col}',
+      insertBelow: 'Insert row below',
+      deleteRow: 'Delete row',
+      addRow: 'Add row',
+      done: 'Done',
     },
     noPageText: 'No text found on this page',
     copiedPage: 'Copied the text of page {page}',
@@ -692,7 +722,7 @@ export const en = {
       pdfPasswords: 'Password-protected PDFs',
       driveBackup: 'Automatic backup to your Google Drive',
       convert: 'Convert Word, Excel and text files to PDF, and scans to Word',
-      editFiles: 'Edit text, CSV, Excel and Word files',
+      editFiles: 'Edit text and CSV files',
       pdfForms: 'Fill in PDF forms and add text to PDFs',
     },
     // §12 D1: the sheet before a Pro task, and what follows the ad. {name}: the document's name.

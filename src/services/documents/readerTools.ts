@@ -29,6 +29,8 @@ export type ReaderMoreItemId =
   | 'convertToPdf'
   // §12 D6: scan/PDF → Word (Pro), also from the tool bar's Convert.
   | 'convertToWord'
+  // §12 D7: edit a TXT or CSV file (Pro), also from the tool bar's Convert/Edit.
+  | 'editFile'
   | 'print'
   | 'sign'
   | 'editPages'
@@ -52,13 +54,18 @@ const isLiveFeature = (id: ProTaskFeature) => getProFeature(id).status === 'live
 // (D6). Both are built; kept so the rules per format stay testable on their own.
 export const BUILT_CONVERSIONS = { officeToPdf: true, pdfToWord: true };
 
+// `editFiles` covers editors built in three steps: TXT and CSV (D7), XLSX (D8), Word (D9). The
+// feature is live once the first is; a format whose editor isn't built yet doesn't offer it.
+export const BUILT_EDITS = { text: true, sheet: false, docx: false };
+
 // The Pro tasks this file allows (each through D1's gate). A feature counts once its step has
 // built it (`status: 'live'` in PRO_FEATURES); until then, none, and the Convert/Edit tool stays
 // hidden. Conversions and edits never change the original, so a file from outside allows them too.
 export function readerProTasks(
   subject: ReaderSubject,
   isLive: (id: ProTaskFeature) => boolean = isLiveFeature,
-  built: typeof BUILT_CONVERSIONS = BUILT_CONVERSIONS
+  built: typeof BUILT_CONVERSIONS = BUILT_CONVERSIONS,
+  edits: typeof BUILT_EDITS = BUILT_EDITS
 ): ProTaskFeature[] {
   const format = formatOf(subject);
   const tasks: ProTaskFeature[] = [];
@@ -71,7 +78,8 @@ export function readerProTasks(
     // D5: Office → PDF.
     if (built.officeToPdf && canConvertToPdf(format)) tasks.push('convert');
     // D7–D9: edit TXT, CSV, XLSX and Word text (an old .xls is converted, not edited).
-    if (format !== 'XLS') tasks.push('editFiles');
+    const editable = format === 'TXT' || format === 'CSV' ? edits.text : format === 'XLSX' ? edits.sheet : format === 'DOCX' ? edits.docx : false;
+    if (editable) tasks.push('editFiles');
   }
   return tasks.filter(isLive);
 }
@@ -93,7 +101,7 @@ export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly P
 }
 
 // `proTasks`: readerProTasks for this subject; Convert to PDF is listed when `convert` is one of
-// them on an office file, Convert to Word when it is on a scan or PDF.
+// them on an office file, Convert to Word when it is on a scan or PDF, Edit when `editFiles` is.
 export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: readonly ProTaskFeature[] } = {}): ReaderMoreItemId[] {
   const { doc } = subject;
   const raster = isPageRasterFormat(formatOf(subject));
@@ -105,6 +113,7 @@ export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: reado
   if (raster) items.push('export');
   if (canConvertToPdf(formatOf(subject)) && opts.proTasks?.includes('convert')) items.push('convertToPdf');
   if (raster && opts.proTasks?.includes('convert')) items.push('convertToWord');
+  if (opts.proTasks?.includes('editFiles')) items.push('editFile');
   items.push('print');
   if (doc && canSign(doc)) items.push('sign');
   if (doc && canUsePageTools(doc)) items.push('editPages');

@@ -40,21 +40,26 @@ describe('§12 D2 reader tool bar', () => {
   });
 
   const allBuilt = { officeToPdf: true, pdfToWord: true };
+  const allEdits = { text: true, sheet: true, docx: true };
 
   it('offers the Pro tasks each format allows', () => {
     expect(readerProTasks({ doc: scan }, allLive, allBuilt)).toEqual(['convert']);
     expect(readerProTasks({ doc: imported }, allLive, allBuilt)).toEqual(['convert', 'pdfForms']);
     expect(readerProTasks({ doc: locked }, allLive, allBuilt)).toEqual([]);
     expect(readerProTasks({ external: { format: 'PDF' } }, allLive, allBuilt)).toEqual(['convert', 'pdfForms']);
-    expect(readerProTasks({ doc: docx }, allLive)).toEqual(['convert', 'editFiles']);
+    expect(readerProTasks({ doc: docx }, allLive, allBuilt, allEdits)).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ external: { format: 'CSV' } }, allLive)).toEqual(['convert', 'editFiles']);
-    expect(readerProTasks({ doc: xls }, allLive)).toEqual(['convert']);
+    // An old .xls is converted, never edited.
+    expect(readerProTasks({ doc: xls }, allLive, allBuilt, allEdits)).toEqual(['convert']);
   });
 
   it('shows no Pro task until its step is built', () => {
-    // §12 D5: Office → PDF is live; editing (D7) isn't yet.
+    // §12 D7: editing is live for TXT and CSV; XLSX (D8) and Word (D9) aren't built yet.
+    expect(readerProTasks({ doc: makeDoc({ format: 'TXT' }) })).toEqual(['convert', 'editFiles']);
+    expect(readerProTasks({ external: { format: 'CSV' } })).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ doc: docx })).toEqual(['convert']);
-    expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles')).toEqual(['editFiles']);
+    expect(readerProTasks({ doc: makeDoc({ format: 'XLSX', pages: [] }) })).toEqual(['convert']);
+    expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles', allBuilt, allEdits)).toEqual(['editFiles']);
     // D6 (scan/PDF → Word) is built: a scan and a PDF have Convert once `convert` is live.
     expect(readerProTasks({ doc: scan })).toEqual(['convert']);
     expect(readerProTasks({ external: { format: 'PDF' } })).toEqual(['convert']);
@@ -77,6 +82,23 @@ describe('§12 D2 reader tool bar', () => {
     expect(readerMoreItems({ external: { format: 'PDF' } }, { proTasks: ['convert'] })).toContain('convertToWord');
     expect(readerMoreItems({ doc: scan })).not.toContain('convertToWord');
     expect(readerMoreItems({ doc: docx }, { proTasks: ['convert'] })).not.toContain('convertToWord');
+  });
+});
+
+describe('§12 D7 Edit in More', () => {
+  it('lists Edit once `editFiles` is one of the file\'s Pro tasks', () => {
+    const txt = makeDoc({ format: 'TXT' });
+    expect(readerMoreItems({ doc: txt }, { proTasks: ['convert', 'editFiles'] })).toEqual([
+      'share',
+      'convertToPdf',
+      'editFile',
+      'print',
+      'readingSettings',
+      'changeType',
+      'delete',
+    ]);
+    expect(readerMoreItems({ external: { format: 'CSV' } }, { proTasks: ['editFiles'] })).toContain('editFile');
+    expect(readerMoreItems({ doc: txt }, { proTasks: ['convert'] })).not.toContain('editFile');
   });
 });
 
