@@ -18,6 +18,7 @@ import { ZipAbortedError } from '../../services/backup/zip';
 import { deriveFolderLabel, saveFileToFolder } from '../../services/export/deviceExportService';
 import { shareFileUri } from '../../services/sharing/shareService';
 import { useAppDispatch, useAppSelector } from '../../store/AppStateContext';
+import { logUsage } from '../../services/telemetry/usage';
 import { BackupSheet, type BackupSheetPhase } from './BackupSheet';
 
 const ZIP_MIME = 'application/zip';
@@ -91,7 +92,10 @@ export function useBackupExport() {
 
   const recordHandover = useCallback(
     (result: BackupResult, full: boolean) => {
-      if (full) dispatch({ type: 'settings/SET_LAST_BACKUP', at: result.manifest.createdAt, bytes: result.bytes });
+      if (full) {
+        dispatch({ type: 'settings/SET_LAST_BACKUP', at: result.manifest.createdAt, bytes: result.bytes });
+        logUsage('backup_made');
+      }
     },
     [dispatch]
   );

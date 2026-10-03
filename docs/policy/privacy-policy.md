@@ -40,8 +40,10 @@ information. Nothing about your documents is sent.
 
 ## Optional: usage counts (Firebase Analytics)
 **Off by default.** If you turn on Settings → Privacy → **Help improve PDF Scan**, the app
-sends anonymous counts such as "a scan was completed (3 pages)" or "a document was saved".
-These never include names, course names, file names or any text. Turn it off at any time.
+sends anonymous counts of six things only: the app was opened, a scan was completed (with its
+number of pages), a document was saved, a document was submitted, a Pro day pass was started,
+and a backup was made. These never include names, course names, file names or any text. Turn
+it off at any time; turning it off also clears the anonymous app id Analytics kept.
 
 ## Optional: crash reports (Sentry)
 **Off by default.** If you turn on Settings → Privacy → **Send anonymous crash reports**, the

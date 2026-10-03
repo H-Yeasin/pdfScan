@@ -44,6 +44,7 @@ import { useDeadlineReminders } from '../store/useDeadlines';
 import { useStorageIntegrity } from '../store/useStorageIntegrity';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { initCrashReporting } from '../services/telemetry/crash';
+import { logUsage, setUsageCollection } from '../services/telemetry/usage';
 import { useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
 
@@ -113,6 +114,19 @@ export function AppNavigator() {
   useEffect(() => {
     if (afterBoot) initCrashReporting(crashReportsEnabled);
   }, [afterBoot, crashReportsEnabled]);
+  // §10 M8: usage counts follow "Help improve PDF Scan", after the first frame like Sentry. One
+  // app_open per run, sent once collection is on.
+  const { usageStatsEnabled } = state.settings;
+  const openLogged = useRef(false);
+  useEffect(() => {
+    if (!afterBoot || !state.settings.loaded) return;
+    void setUsageCollection(usageStatsEnabled).then(() => {
+      if (usageStatsEnabled && !openLogged.current) {
+        openLogged.current = true;
+        logUsage('app_open');
+      }
+    });
+  }, [afterBoot, state.settings.loaded, usageStatsEnabled]);
   // §10 M3: one small secure-store read, not deferred, so Pro features and the banner policy
   // (M5) see the pass as soon as they render.
   useEffect(() => {

@@ -40,6 +40,7 @@ import { submitDocument, type SubmitResult } from '../services/submit/submitDocu
 import { submissionRecord } from '../services/submit/history';
 import { institutionLogoUri } from '../services/submit/institutionLogo';
 import { useIsPro } from '../services/pro/entitlement';
+import { logUsage } from '../services/telemetry/usage';
 import { matchDeadline } from '../services/submit/deadlines';
 import type { Submission } from '../types/models';
 import type { PageSizeId } from '../services/pdf/pageSize';
@@ -355,6 +356,7 @@ export function DeliverScreen() {
         }
 
         dispatch({ type: 'library/ADD_FILE', file: doc });
+        logUsage('document_saved');
 
         // §4 S6: the teacher's copy, built while this screen still shows progress. The library
         // document is already saved, so a failure here only loses the submission.
@@ -382,6 +384,7 @@ export function DeliverScreen() {
             });
             record = submissionRecord(doc, submission, currentPreset, typeNumber);
             dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
+            logUsage('document_submitted');
           } catch (error) {
             console.warn('DeliverScreen: submission build failed', error);
             submitFailed = true;

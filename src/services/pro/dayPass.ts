@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { getEntitlement, grantPass, setEntitlement, type Entitlement } from './entitlement';
+import { logUsage } from '../telemetry/usage';
 
 // §10 M6: the rewarded "Pro day pass". Watching one ad to the end gives `pass_hours` (Remote
 // Config, 24 by default) of every Pro feature, at most `pass_max_per_day` times a calendar day
@@ -63,6 +64,7 @@ export async function claimDayPass(now: number, hours: number, maxPerDay: number
   const result = applyReward(getEntitlement(), await loadPassLog(), now, hours, maxPerDay);
   if ('capped' in result) return false;
   await setEntitlement(result.entitlement);
+  logUsage('pass_started');
   try {
     await SecureStore.setItemAsync(LOG_KEY, JSON.stringify(result.log));
   } catch (e) {

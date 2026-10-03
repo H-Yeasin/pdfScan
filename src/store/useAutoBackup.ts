@@ -7,6 +7,7 @@ import { autoBackupDue } from '../services/backup/schedule';
 import { getDb } from '../services/persistence/dbService';
 import { libraryChangedAt } from '../services/persistence/libraryRepo';
 import { useAppDispatch, useAppSelector } from './AppStateContext';
+import { logUsage } from '../services/telemetry/usage';
 
 // §8 B5, Android: when the app opens (after boot) and an automatic backup is due, makes one in the
 // background into the backup folder, with a small progress chip (ui.autoBackupProgress). Never
@@ -43,6 +44,7 @@ export function useAutoBackup(ready: boolean): void {
         },
       });
       dispatch({ type: 'settings/AUTO_BACKUP_DONE', at: Date.now(), bytes: result.bytes, uris: result.uris });
+      logUsage('backup_made');
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('backup.auto.done', { size: formatBytes(result.bytes) }) });
     })()
       .catch((error) => {

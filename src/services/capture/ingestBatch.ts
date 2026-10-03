@@ -14,6 +14,7 @@ import { detectDocumentQuad } from './quadDetector';
 import { ingestPage, pageFromMaster } from './ingest';
 import { beginProcessing, endProcessing } from './processingSession';
 import { processSequentially } from './processSequentially';
+import { logUsage } from '../telemetry/usage';
 
 export type IngestBatchOptions = {
   script: OcrScript;
@@ -149,6 +150,8 @@ export async function ingestBatch(
   }
 
   hapticSuccess();
+  // §10 M8: the page count only.
+  logUsage('scan_completed', { pages: pages.length });
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'success' });
   dispatch({
     type: 'ui/SHOW_SNACK',

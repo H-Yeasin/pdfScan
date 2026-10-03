@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
 import { hapticSuccess, hapticWarning } from '../services/feedback/haptics';
 import { useIsPro } from '../services/pro/entitlement';
+import { logUsage } from '../services/telemetry/usage';
 import { institutionLogoUri } from '../services/submit/institutionLogo';
 
 // "Submit" for a document saved earlier (Library selection, Reader): rebuilds the teacher's copy
@@ -47,6 +48,7 @@ export function useSubmitDocument() {
         });
         const record = submissionRecord(doc, result, preset, n);
         dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
+        logUsage('document_submitted');
         const msg = !result.fits
           ? tooLargeMessage(result, preset.sizeLimitBytes ?? 0)
           : result.rasterized

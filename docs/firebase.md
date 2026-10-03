@@ -45,16 +45,30 @@ The app reads the values fetched last time a moment after start (they're cached,
 works offline), then fetches new ones (at most once an hour; every start in dev builds) and
 applies them. A console change shows up on the next start.
 
-## Analytics stays off
+## Analytics: off unless the student opts in (§10 M8)
 
-`remote-config` declares `@react-native-firebase/analytics` as a peer, so npm installs it and
-the Analytics SDK is linked. `firebase.json` turns its automatic collection off at build time
+`firebase.json` turns Analytics' automatic collection off at build time
 (`analytics_auto_collection_enabled: false`, no advertising ID or SSAID, no screen reporting,
-no ad-related consent defaults). M8 turns collection on only for students who opt in.
+no ad-related consent defaults). The app turns collection on only while Settings → Privacy →
+"Help improve PDF Scan" is on (`services/telemetry/usage.ts`), and logs only these events:
+
+| Event | Parameters |
+|---|---|
+| `app_open` | none (once per run) |
+| `scan_completed` | `pages` |
+| `document_saved` | none |
+| `document_submitted` | none |
+| `pass_started` | none |
+| `backup_made` | none |
+
+Turning the toggle off stops collection and resets the Analytics app instance id. To see the
+events while testing: `adb shell setprop debug.firebase.analytics.app <package>` and open
+DebugView in the console.
 
 ## Verify
 
 - Without the files: the app starts, nothing Firebase-related in logcat, ads stay off.
 - With them: set `ads_enabled` to `true` in the console and publish; after the next start,
   `getRemoteConfig().adsEnabled` is true (M5 shows the banner).
-- Before M8: no requests to `app-measurement.com` in a proxy.
+- With "Help improve PDF Scan" off: no requests to `app-measurement.com` in a proxy. With it
+  on: the events above appear in DebugView.
