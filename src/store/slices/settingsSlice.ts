@@ -77,6 +77,9 @@ export type SettingsState = {
   institutionLogo: string | null;
   // §10 M4: app lock (services/security/appLock.ts). Turning it on needs Pro; it stays on after.
   appLock: AppLockSettings;
+  // §10 M5: cold starts so far, this one included (counted once settings are read). Banners wait
+  // for the third (services/ads/adPolicy.MIN_SESSIONS_FOR_ADS).
+  appSessions: number;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -110,6 +113,7 @@ export const initialSettingsState: SettingsState = {
   hintsSeen: [],
   institutionLogo: null,
   appLock: DEFAULT_APP_LOCK,
+  appSessions: 0,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -154,7 +158,9 @@ export type SettingsAction =
   | { type: 'settings/LOAD_HINTS_SEEN'; ids: string[] }
   | { type: 'settings/SET_INSTITUTION_LOGO'; name: string | null }
   // A partial patch: each app lock option changes on its own.
-  | { type: 'settings/SET_APP_LOCK'; appLock: Partial<AppLockSettings> };
+  | { type: 'settings/SET_APP_LOCK'; appLock: Partial<AppLockSettings> }
+  // The stored count plus this start.
+  | { type: 'settings/COUNT_SESSION'; stored: number };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -216,6 +222,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, documentLanguage: action.language };
     case 'settings/SET_INSTITUTION_LOGO':
       return { ...state, institutionLogo: action.name };
+    case 'settings/COUNT_SESSION':
+      return { ...state, appSessions: action.stored + 1 };
     case 'settings/SET_APP_LOCK':
       return { ...state, appLock: { ...state.appLock, ...action.appLock } };
     default:

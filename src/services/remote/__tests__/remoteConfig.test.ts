@@ -48,6 +48,8 @@ describe('parseRemoteConfig', () => {
       parseRemoteConfig({
         ads_enabled: 'true',
         ads_banner_screens: '["home"]',
+        ads_banner_unit_android: 'ca-app-pub-1234567890123456/1234567890',
+        ads_banner_unit_ios: 'not-a-unit',
         pass_hours: '12',
         pass_max_per_day: '0',
         support_whatsapp: '8801700000000',
@@ -58,6 +60,8 @@ describe('parseRemoteConfig', () => {
     ).toEqual({
       adsEnabled: true,
       adsBannerScreens: ['home'],
+      adsBannerUnitAndroid: 'ca-app-pub-1234567890123456/1234567890',
+      adsBannerUnitIos: '',
       passHours: 12,
       passMaxPerDay: 0,
       supportWhatsapp: '8801700000000',

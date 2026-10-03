@@ -21,6 +21,7 @@ import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { useDocumentListActions } from '../components/library/useDocumentListActions';
 import { TabBar } from '../components/shared/TabBar';
+import { BannerSlot } from '../components/ads/BannerSlot';
 import { useRouter } from '../navigation/router';
 import { startScan } from '../services/courses/startScan';
 import { searchDocumentsByText } from '../services/persistence/dbService';
@@ -333,13 +334,17 @@ export function LibraryScreen() {
       {selMode ? (
         <SelectionBar selectedDocs={selectedDocs} onPress={handleSelectionTool} />
       ) : (
-        <TabBar
-          active="library"
-          background={tokens.surface}
-          activeColor={tokens.ink}
-          inactiveColor={tokens.muted}
-          accent={tokens.accent}
-        />
+        <>
+          {/* §10 M5: the only ad in the Library, above the tab bar, never among the documents. */}
+          <BannerSlot screen="library" />
+          <TabBar
+            active="library"
+            background={tokens.surface}
+            activeColor={tokens.ink}
+            inactiveColor={tokens.muted}
+            accent={tokens.accent}
+          />
+        </>
       )}
 
       {overlays}

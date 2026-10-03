@@ -14,6 +14,10 @@ export type RemoteConfig = {
   adsEnabled: boolean;
   // Screens a banner may show on (M5's adPolicy); never capture, review, deliver or the reader.
   adsBannerScreens: string[];
+  // M5: the AdMob banner unit per platform ('ca-app-pub-…/…'). '' = no banner in release builds;
+  // development builds always use Google's test unit.
+  adsBannerUnitAndroid: string;
+  adsBannerUnitIos: string;
   // Length of a rewarded Pro day pass (M6) and how many a day.
   passHours: number;
   passMaxPerDay: number;
@@ -29,6 +33,8 @@ export type RemoteConfig = {
 export const REMOTE_DEFAULTS: RemoteConfig = {
   adsEnabled: false,
   adsBannerScreens: ['home', 'library'],
+  adsBannerUnitAndroid: '',
+  adsBannerUnitIos: '',
   passHours: 24,
   passMaxPerDay: 3,
   supportWhatsapp: '8801645724080',
@@ -77,6 +83,8 @@ const stringList: Parser<string[]> = (raw) => {
 const KEYS: { [K in keyof RemoteConfig]: { key: string; parse: Parser<RemoteConfig[K]> } } = {
   adsEnabled: { key: 'ads_enabled', parse: bool },
   adsBannerScreens: { key: 'ads_banner_screens', parse: stringList },
+  adsBannerUnitAndroid: { key: 'ads_banner_unit_android', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
+  adsBannerUnitIos: { key: 'ads_banner_unit_ios', parse: matching(/^ca-app-pub-\d+\/\d+$/) },
   passHours: { key: 'pass_hours', parse: int(1, 168) },
   passMaxPerDay: { key: 'pass_max_per_day', parse: int(0, 10) },
   // An empty number would leave Help & feedback without a contact, so it isn't accepted.

@@ -79,6 +79,9 @@ export function useSettingsPersistence() {
           dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: settings.lastCaptureMode });
         }
       }
+      // §10 M5: this start counts once, whether or not anything was stored.
+      const sessions = settings?.appSessions;
+      dispatch({ type: 'settings/COUNT_SESSION', stored: typeof sessions === 'number' && Number.isInteger(sessions) && sessions > 0 ? sessions : 0 });
       // Only after the stored values are in state, so the save effect below never writes the
       // defaults over them.
       dispatch({ type: 'settings/SET_LOADED' });
@@ -119,6 +122,7 @@ export function useSettingsPersistence() {
       hintsSeen: state.settings.hintsSeen,
       institutionLogo: state.settings.institutionLogo,
       appLock: state.settings.appLock,
+      appSessions: state.settings.appSessions,
     });
   }, [
     loaded,
@@ -153,6 +157,7 @@ export function useSettingsPersistence() {
     state.settings.hintsSeen,
     state.settings.institutionLogo,
     state.settings.appLock,
+    state.settings.appSessions,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.

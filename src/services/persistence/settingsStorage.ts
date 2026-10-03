@@ -59,6 +59,8 @@ export type PersistedSettings = {
   accent?: string;
   institutionLogo?: string | null;
   appLock?: unknown;
+  // Optional: added in §10 M5.
+  appSessions?: number;
 };
 
 export async function loadSettings(): Promise<PersistedSettings | null> {

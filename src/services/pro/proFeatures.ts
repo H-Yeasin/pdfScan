@@ -23,12 +23,12 @@ export type ProFeature = {
   lapse: LapseRule;
 };
 
-// M4 built templates, accents and app lock; M5 builds the banners; R6 and B6 the last two.
+// M4 built templates, accents and app lock; M5 the banners; R6 and B6 build the last two.
 export const PRO_FEATURES: readonly ProFeature[] = [
   { id: 'coverTemplates', status: 'live', labelKey: 'pro.features.coverTemplates', lapse: 'keepExisting' },
   { id: 'themeAccents', status: 'live', labelKey: 'pro.features.themeAccents', lapse: 'stop' },
   { id: 'appLock', status: 'live', labelKey: 'pro.features.appLock', lapse: 'keepUntilOff' },
-  { id: 'noBanners', status: 'planned', labelKey: 'pro.features.noBanners', lapse: 'stop' },
+  { id: 'noBanners', status: 'live', labelKey: 'pro.features.noBanners', lapse: 'stop' },
   { id: 'pdfPasswords', status: 'planned', labelKey: 'pro.features.pdfPasswords', lapse: 'keepExisting' },
   { id: 'driveBackup', status: 'planned', labelKey: 'pro.features.driveBackup', lapse: 'pause' },
 ];

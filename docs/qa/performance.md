@@ -67,3 +67,19 @@ so they're saved like real documents. Do this in a dev build, then install the r
 | Date | Phone | Commit | Cold start (median) | Library jank % | Course jank % | Search | Scan progress | Memory (20 pages) |
 |---|---|---|---|---|---|---|---|---|
 | | | | | | | | | |
+
+## §10 M5: ads before and after
+
+The ads SDK starts only after the first frame and only when a banner could show (ads on in
+Remote Config, introduction done, third start or later, no Pro pass), so cold start should not
+move. Measure it anyway, on the same phone, with a release build:
+
+- **Before:** the commit before M5 (`80456a1`). **After:** the M5 commit, with `ads_enabled` on
+  and a third start (so the SDK and consent step run), and once with `ads_enabled` off.
+- Cold start as in "How to measure" (median of 5). Budget: still under 2 s.
+- APK size: `ls -l` of the release APK (or the AAB's download size in Play Console).
+
+| Date | Phone | Build | Cold start, ads off | Cold start, ads on | APK size |
+|---|---|---|---|---|---|
+| | | before M5 (`80456a1`) | | n/a | |
+| | | M5 | | | |

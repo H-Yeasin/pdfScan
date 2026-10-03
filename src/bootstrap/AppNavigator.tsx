@@ -6,8 +6,10 @@ import { resolveBack, type BackContext } from '../navigation/backHandling';
 import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
-import { loadRemoteConfig } from '../services/remote/remoteConfig';
-import { loadEntitlement } from '../services/pro/entitlement';
+import { loadRemoteConfig, useRemoteConfig } from '../services/remote/remoteConfig';
+import { loadEntitlement, useIsPro } from '../services/pro/entitlement';
+import { startAds } from '../services/ads/adsSdk';
+import { MIN_SESSIONS_FOR_ADS } from '../services/ads/adPolicy';
 import { RESTING_STYLE, runSlide, transitionStyle } from '../navigation/transitions';
 import { useReducedMotion } from '../theme/useReducedMotion';
 import type { NavDir, ScreenName } from '../types/navigation';
@@ -123,6 +125,15 @@ export function AppNavigator() {
   useEffect(() => {
     if (afterBoot) void loadRemoteConfig();
   }, [afterBoot]);
+  // §10 M5: the ads SDK (and its consent form, where the law needs one) only once a banner could
+  // show: ads switched on in the console, the introduction done, from the third start, no Pro.
+  // Before that the SDK is never loaded.
+  const { adsEnabled } = useRemoteConfig();
+  const isPro = useIsPro();
+  const adsCould = afterBoot && adsEnabled && !isPro && state.settings.onboardingDone && state.settings.appSessions >= MIN_SESSIONS_FOR_ADS;
+  useEffect(() => {
+    if (adsCould) void startAds();
+  }, [adsCould]);
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 

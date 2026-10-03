@@ -17,6 +17,8 @@ module.exports = {
     '^expo-secure-store$': '<rootDir>/src/test/mocks/expoSecureStore.ts',
     '^expo-local-authentication$': '<rootDir>/src/test/mocks/expoLocalAuthentication.ts',
     '^expo-screen-capture$': '<rootDir>/src/test/mocks/expoScreenCapture.ts',
+    '^expo-network$': '<rootDir>/src/test/mocks/expoNetwork.ts',
+    '^react-native-google-mobile-ads$': '<rootDir>/src/test/mocks/googleMobileAds.ts',
     '^expo-localization$': '<rootDir>/src/test/mocks/expoLocalization.ts',
     '^@shopify/react-native-skia$': '<rootDir>/src/test/mocks/skia.ts',
     '^react-native-document-scanner-plugin$': '<rootDir>/src/test/mocks/documentScanner.ts',
