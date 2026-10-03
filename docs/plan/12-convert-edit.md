@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D6** (PDF/scan → Word). D1–D5 are done in code.
+- **Next: D7** (edit TXT and CSV). D1–D6 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -357,7 +357,41 @@ Status: done in code (commit 58f09ba); device check open (each format from the l
   `expo-print` mocked as in `shareService.test.ts`.
 
 ### D6 · PDF/scan → Word *(M–L)*
-Status: not started.
+Status: done in code (commit 6ebed74); device check open (a scan, an imported PDF with a text
+layer, a scanned PDF from outside; the DOCX opened in Word, Google Docs and the app's DocxView;
+with and without an ad).
+
+**As built:**
+- `readerTools.BUILT_CONVERSIONS.pdfToWord` is true: Convert/Edit on a scan (PDF or JPG) or a PDF
+  (library or "Open with", not one that needs a password) runs Convert to Word; More has
+  **Convert to Word** (`convertToWord`). The Pro screen's label is "…to PDF, and scans to Word".
+- `services/convert/docxWriter.ts`: `writeDocx(dest, blocks)` through the backup code's
+  `createZip` (store-only). Blocks: paragraphs (heading 1/2, `\n` → `<w:br/>`, tabs →
+  `<w:tab/>`) and page breaks; A4 with 2.54 cm margins; styles named "heading 1/2" (Word's
+  navigation pane, mammoth's `<h1>`/`<h2>`). `xmlText` escapes and drops what XML 1.0 forbids
+  (controls, U+FFFE/U+FFFF, lone surrogates).
+- `services/convert/toDocx.ts`: a library page uses the text it has (`page.ocr`: a scan's OCR, or
+  the text R1 already read from an imported PDF, which is `getPageText` → `pdfTextToOcr`), so
+  `getPageText` runs only for pages R1 hasn't read; a page without text gets OCR (a scan's
+  master, or an imported/outside PDF page rendered at master size and deleted). A PDF from
+  outside is read page by page with `getPageCount`/`getPageText`. A password or a build without
+  `modules/pdf-native` stops the conversion; other per-page failures give "Page N: no text
+  found" (`document.word.noText`, through `tDoc`).
+- Lines come from OCR lines (an imported PDF's are rebuilt from word boxes by `pdfTextToOcr`);
+  consecutive lines on the same row that OCR split are joined (`readingLines`). Paragraphs break
+  at a new OCR block, a gap over 0.8 × the median line height, a jump back up (next column) or a
+  heading edge; end-of-line hyphens before a lower-case letter are mended. Headings: ≥ 1.35 ×
+  median → heading 2, ≥ 1.8 × → heading 1, only on pages with 3+ lines and lines ≤ 120 chars.
+- The temp DOCX (`cache/convert/`) goes in through `promoteExternalToLibrary`'s DOCX branch
+  (mammoth text → search), then is deleted. Named like the source.
+- Reader: `components/reader/useConvertToWord.tsx` says what's lost (an Alert) **before** the
+  gate, then shows "Converting to Word… page N of M" (D5's `Converting` overlay) and a snack with
+  **Open**. The OCR script is the document's course's, else the app setting. Only one of the two
+  conversion gates preloads an ad (the one the open file's format uses).
+- Pro task kind `pdfToWord` in `convertTask.ts`: params `{ docId }` (looked up again at the
+  restart; a deleted document is skipped) or `{ uri, name }` for an outside PDF's app-owned copy.
+- Tests: `src/services/convert/__tests__/toDocx.test.ts` (mammoth round trip, the package's parts,
+  escaping, line/paragraph/heading grouping from fixture boxes, the three sources, the runner).
 
 **Pro: `convert`** (scan/PDF → Word is the one "OCR conversion" that is Pro; OCR itself, copy and extract text stay free).
 - Show the "keeps the text and its order, not the exact layout" notice **before** the ad, so nobody watches an ad and then cancels.

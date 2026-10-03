@@ -277,7 +277,7 @@ ad (or the day pass); marking, OCR and copy/extract text stay free.
 - [x] D3 Mark mode: highlight, underline, strikethrough, pen and notes while reading (free) — done in code (imported PDFs too); device check open
 - [x] D4 Notes panel and notes export (free) — done in code; device check open
 - [x] D5 Office → PDF (Pro) — done in code; device check open
-- [ ] D6 PDF/scan → Word (Pro)
+- [x] D6 PDF/scan → Word (Pro) — done in code; device check open
 - [ ] D7 Edit TXT and CSV (Pro, 30-minute session per document)
 - [ ] D8 Edit XLSX cells (Pro; after R5's SheetJS swap)
 - [ ] D9 Edit Word text (Pro)
