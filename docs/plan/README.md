@@ -21,6 +21,7 @@ code **when the section was planned**, and are kept as history.
 | §9 Onboarding and UX polish | [09-onboarding.md](09-onboarding.md) | O1–O6 | O1 done in code (device checks open; needs a new dev build for the splash and predictive back). O2, O3 and O4 done in code. **O5 and O6 in progress:** their code is done; what's left is on a device: the measurements in `docs/qa/performance.md` and the walkthrough in `docs/qa/walkthrough.md`. |
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1–M8 done in code (open for the owner: the Play Console checklist in `docs/policy/play-console.md`, the Firebase project and EAS file variables in `docs/firebase.md`, AdMob in `docs/ads.md`; M2–M6 need a new dev build, M4–M8 have device checks open, M5 its before/after numbers). M9–M11 (paid Pro) are parked until a merchant route exists. Next: §11 (plan `docs/plan/11-launch.md`). |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
+| §12 Convert and light edit | [12-convert-edit.md](12-convert-edit.md) | D1–D11 | **Planned 2026-10-03, revised the same day**, not started. Study-first reader (D2–D4, free), conversions and file editing behind a per-task full-screen rewarded ad (D1 gate, D5–D10 Pro). Next: D1. |
 
 ## Phases (from `docs/PLAN.md` §5)
 
@@ -33,14 +34,14 @@ checks pass on a device.
 | **P0: Foundation** | §0 | §0 F1–F8 done in code | **Done in code**, device checks open (upgrade from an AsyncStorage-era build keeps every document) |
 | **P1: Student MVP** | §1, §2 (Ink + Board), §3, §4, §9 onboarding | §1, §2 (E1–E6), §3, §4 done in code; E7 benchmark run open | **Not complete**: §9 is done in code; its device work is open (O5 measurements, the O6 walkthrough, O4's TalkBack pass), with the other device checks |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | §5 T1–T6, §6 L1–L4 and §8 B1–B5 done in code | **Done in code**; device checks open (L3's font spike, §8's backup and restore on a phone included) |
-| **P3: Grow** | §10 Pro, §8 Drive, §11, iOS parity | — | Not started (§7 R1–R4 done in code, R5 all but the SheetJS swap; R6 waits for Pro) |
+| **P3: Grow** | §10 Pro, §8 Drive, §11, §12 convert + light edit, iOS parity | — | Not started (§7 R1–R4 done in code, R5 all but the SheetJS swap; R6 waits for Pro) |
 | **P4: Expand** | Bengali (§6 L5–L6), flashcards (§5 T7), more templates | Groundwork in place (script registry, OCR engines, any-script PDF text, i18n) | Not started |
 
 **Next to unblock the phases:** §9 is done in code, so P1 and P2 are done in code. What's left is
 on a device: the checks for P0–P2, §9's walkthrough (`docs/qa/walkthrough.md`) and performance
 budget (`docs/qa/performance.md`).
 
-The product-level checklist is `docs/PLAN.md` (§0–§11). Keep its ticks in step with the `Status:`
+The product-level checklist is `docs/PLAN.md` (§0–§12). Keep its ticks in step with the `Status:`
 lines here.
 
 ### Step by step

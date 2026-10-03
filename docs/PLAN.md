@@ -28,8 +28,9 @@ who:
 | Messy file names, everything in one pile | Course-based organization and auto naming |
 | Generic tool, not built for school | Cover pages, page numbers, 2-up, roll number on every page |
 
-**What we do NOT try to be:** a general office suite, a cloud drive, or a full PDF editor. Every
-feature must answer "does this help a student scan, submit, or study?"
+**What we do NOT try to be:** a full office suite, a cloud drive, or a full PDF editor. Light
+conversions and edits for coursework are in (§12, decided 2026-10-03). Every feature must answer
+"does this help a student scan, submit, or study?"
 
 ---
 
@@ -191,7 +192,7 @@ Goal: fix the gaps and risks in the existing tools; no new tool families.
 - [x] R2 Page-level tools for imported PDFs (merge, split, sign, submit) without losing vector text
 - [x] R3 Edit pages after saving (reorder, lossless rotate, delete, extract, add pages)
 - [x] R4 Reader conveniences (resume at last page, page jump, thumbnail scrubber)
-- [ ] R5 Office formats read-only, safe and honest (fixed SheetJS, DOCX preview, drop .doc) — in progress: all but the SheetJS 0.20.3 swap
+- [ ] R5 Office formats read-only, safe and honest (fixed SheetJS, DOCX preview, drop .doc) — in progress: all but the SheetJS 0.20.3 swap (editing and conversion moved to §12)
 - [ ] R6 *(Later, with Pro)* Real PDF passwords
 
 **Done when:** a teacher's PDF can be searched, merged with a scanned answer, signed and
@@ -231,7 +232,8 @@ reaches their first scan in under 90 s, and a TalkBack user can scan and submit.
 Free forever: scan, all filters, OCR in every language, Submit, courses, search, study tools
 (annotations, bookmarks, exam packs), backups to a file or folder. No watermark. **No ads while
 you work:** a small banner on the Home and Library lists only, never in capture, review, saving,
-submitting or reading, and no full-screen ads.
+submitting or reading. Full-screen ads appear only when a free student taps a Pro task (a
+conversion or file editing, §12) and chooses "Watch ad"; never automatically, no interstitials.
 
 Google Play can't pay out to developers in Bangladesh, and Play policy forbids sending users to
 pay outside Play (so no "WhatsApp us to buy Pro"). **Pro for now = a rewarded "Pro day pass"**:
@@ -262,6 +264,30 @@ Rule: never take away a feature that was free.
       when sharing. (S)
 - [ ] Campus ambassador / referral programme once retention is proven. (L)
 
+### §12 Convert and light edit *(planned 2026-10-03, revised the same day)*
+Goal: one app for a student's files: a study-first reader, conversions (Word/Excel/CSV/TXT →
+PDF, scans and PDFs → Word) and simple edits. Never changes the original; says what formatting
+is lost. **Conversions and file editing are Pro**, unlocked per task by one full-screen rewarded
+ad (or the day pass); marking, OCR and copy/extract text stay free.
+
+**Detailed steps:** [`docs/plan/12-convert-edit.md`](plan/12-convert-edit.md)
+
+- [ ] D1 Pro task gate: a full-screen ad, then the task continues (no broken flow, app lock safe, fail-open offline)
+- [ ] D2 Reader layout for studying (tool bar: Mark, Select text, Notes, Pages, Convert/Edit; reading settings)
+- [ ] D3 Mark mode: highlight, underline, strikethrough, pen and notes while reading (free)
+- [ ] D4 Notes panel and notes export (free)
+- [ ] D5 Office → PDF (Pro)
+- [ ] D6 PDF/scan → Word (Pro)
+- [ ] D7 Edit TXT and CSV (Pro, 30-minute session per document)
+- [ ] D8 Edit XLSX cells (Pro; after R5's SheetJS swap)
+- [ ] D9 Edit Word text (Pro)
+- [ ] D10 PDF forms and text boxes (Pro; saves a copy)
+- [ ] D11 Reading updates for Word and Excel (free)
+
+**Done when:** a teacher's DOCX or XLSX from WhatsApp becomes a submitted PDF, a scanned page
+becomes an editable Word file, and a typo in a CSV, TXT, XLSX or Word file can be fixed, all
+offline.
+
 ---
 
 ## 5. Phases
@@ -271,7 +297,7 @@ Rule: never take away a feature that was free.
 | **P0: Foundation** | §0 | Trustworthy, tested, store-ready core |
 | **P1: Student MVP** | §1 (modes + gallery batch), §2 (Ink + Board filters), §3, §4, §9 onboarding | Play Store closed beta (ads off through Remote Config) |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | Public Android launch |
-| **P3: Grow** | §10 ads + Pro day pass, §8 Drive, §11, iOS parity | Revenue + growth (paid Pro when a merchant route exists) |
+| **P3: Grow** | §10 ads + Pro day pass, §8 Drive, §11, §12 convert + light edit, iOS parity | Revenue + growth (paid Pro when a merchant route exists) |
 | **P4: Expand** | Bengali via §6, flashcards, more templates | Regional #1 |
 
 Rule: don't start a phase until the "done when" checks of the previous phase pass.

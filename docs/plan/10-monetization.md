@@ -28,6 +28,10 @@ directing users of a Play app to pay outside Google Play for in-app features. So
 2. **Ads are light.** One small banner on the Home and Library lists, plus rewarded ads the
    student chooses to watch. **Never** in Capture, Review, Deliver/Submit, Reader or while
    anything is processing, and no full-screen interstitials.
+   **Amended 2026-10-03 (§12):** a full-screen **rewarded** ad may also appear when a free
+   student taps a Pro task (a conversion or file editing) and confirms "Watch ad" in the
+   task sheet, including from the Reader; it is never shown automatically. After the ad the
+   task continues on the same screen (§12 D1).
 3. **Backend: Firebase, free Spark plan, no login yet.** Remote Config (ads on/off, reward
    length, support contact, feature flags, without an app update) and opt-in usage counts.
    Firebase Auth comes only with real sales (M10). Supabase was considered; its free projects
@@ -36,6 +40,10 @@ directing users of a Play app to pay outside Google Play for in-app features. So
    courses, search, study tools (annotations, bookmarks, exam packs), backups to a file or
    folder. **Pro:** extra cover templates and theme accents, app lock, no banners; later PDF
    passwords (§7 R6) and Google Drive backup (§8 B6). Never take away a feature that was free.
+   **Added 2026-10-03 (§12):** `convert` (Office → PDF, scan/PDF → Word), `editFiles`
+   (TXT, CSV, Excel, Word) and `pdfForms` (fill forms, typed text boxes) are Pro, unlocked per
+   task by one rewarded ad (editing: one ad per document per 30 minutes), or by the day pass.
+   OCR, copy/extract text, and marking (highlight, underline, strike, pen, notes) stay free.
 
 ### What the code looks like today (checked while planning, 2026-10-02)
 - `src/config/features.ts`: `FEATURES.pro = false`; `AppNavigator` maps `'pro'` to the Library
