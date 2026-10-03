@@ -29,7 +29,8 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   `components/reader/NotesSheet.tsx`, `services/annotations/notesPanel.ts`) and D5 (Office → PDF:
   `services/convert/{toPdf,convertTask}.ts`, `components/reader/useConvertToPdf.tsx`) and D6 (scan/PDF → Word:
   `services/convert/{toDocx,docxWriter}.ts`, `components/reader/useConvertToWord.tsx`) and D7 (edit TXT/CSV:
-  `services/edit/textEdit.ts`, `components/reader/{FileEditor,CsvGrid,useEditFile}.tsx`) are done in code; next: D9 (D8 needs the SheetJS swap). Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
+  `services/edit/textEdit.ts`, `components/reader/{FileEditor,CsvGrid,useEditFile}.tsx`) and D8 (edit XLSX/XLS cells, saved
+  as a copy: `services/edit/sheetEdit.ts`, FileEditor's sheet mode) are done in code; next: D9. Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
   **§10 was revised (2026-10-02):** light ads + a rewarded "Pro day pass" + Firebase Remote Config,
   no login; paid Pro is parked (no Play payouts in Bangladesh). Never add text that sends users to
   pay outside Google Play (Play Payments policy); WhatsApp 01645724080 is a support contact only.

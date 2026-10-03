@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D9** (edit Word text; D8 waits for §7 R5's SheetJS 0.20.3 swap). D1–D7 are done in code.
+- **Next: D9** (edit Word text). D1–D8 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -458,7 +458,41 @@ with unsaved edits asks first; a semicolon CSV and a Latin-1 TXT).
 - Tests: the CSV round trip keeps quotes, commas and newlines; the TXT encoding stays UTF-8.
 
 ### D8 · Edit XLSX cells *(M)*
-Status: not started. **Needs §7 R5's SheetJS 0.20.3 swap first** (0.18.5 has known advisories).
+Status: done in code (commit bb2872d; SheetJS 0.20.3 swap in 2c18c33); device check open (an XLSX
+and an XLS from the library and from "Open with": edit a number, a percentage, a formula and a
+text cell, add a row, save; open the copy in Excel or Google Sheets and check the formulas compute;
+a multi-sheet file; Back with unsaved edits asks first).
+
+**As built:**
+- `readerTools.BUILT_EDITS.sheet` is on, for **XLSX and XLS** (the D7 comment said an .xls would
+  only be converted; the plan here says it's saved as XLSX, so it's edited too). The Pro screen's
+  label is "Edit text, CSV and Excel files".
+- Not edit-in-place in `SheetView` (it stays read-only, like for D7's CSV): D7's full-screen
+  `FileEditor` has a sheet mode (sheet tabs like SheetView's) that reuses `CsvGrid` with
+  `rowActions={false}`, an `editValue` for the prompt and `onCellChange`. **No row insert or
+  delete in a sheet:** shifting cells would break the formulas and merges that point at them
+  (SheetJS doesn't rewrite references). Add row (at the end) stays. The cell prompt has a hint
+  ("Start with = for a formula, or with an apostrophe to keep it as text").
+- `services/edit/sheetEdit.ts`: the editor holds what it shows plus the edits per sheet and cell
+  address (`SheetEdits`); saving **reads the file again** with formulas and number formats
+  (`sheetService.readWorkbook`, shared with the viewer and its caps), applies only the edited
+  cells to that workbook and writes it (`bookType: 'xlsx'`, compressed). Untouched cells keep
+  their values, formulas and number formats; merges and every sheet survive.
+- Typed input is read like a spreadsheet (`cellFromInput`): `=…` a formula, a plain number a
+  number (keeping the old cell's number format unless it was a date's), `12%` 0.12 with a percent
+  format, a leading apostrophe forces text, anything else is text; empty clears the cell.
+- **Known limit:** SheetJS computes no formulas and its writer has no `calcPr`, so a formula typed
+  in the editor has no cached value, and formulas over an edited cell keep their old cached value
+  until the spreadsheet app recalculates (Excel and Sheets do on open; the device check confirms).
+  The save warning covers it ("some formulas may be lost").
+- The copy goes in through `promoteExternalToLibrary` from a temp file (`cache/edit/`), named
+  `reader.editFile.copyName` ("<name> (edited)"); a library document's copy keeps its `courseId`
+  and `docType`. The Reader switches to the copy and `carryProTaskGrant` gives it the session, so
+  further edits there don't ask again (the original's session stays too).
+- Tests: `src/services/edit/__tests__/sheetEdit.test.ts` (load with formulas shown in the prompt;
+  both caps; typed values incl. formats; range growth; the copy's round trip: values, a kept and a
+  new formula, percent format, cleared cell, merges, second sheet, original bytes unchanged,
+  course/type kept, temp cleaned; an .xls from outside saved as .xlsx).
 
 **Pro: `editFiles`** (same session rule as D7).
 
