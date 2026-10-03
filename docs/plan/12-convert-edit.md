@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D5** (Office → PDF). D1–D4 are done in code.
+- **Next: D6** (PDF/scan → Word). D1–D5 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -300,7 +300,38 @@ Status: done in code (commit 4a51962); device check open (the flash, and the exp
 - Tests: grouping and order; filters; the export format.
 
 ### D5 · Office → PDF (Word, Excel/XLS/CSV, TXT) *(M)*
-Status: not started.
+Status: done in code (commit 58f09ba); device check open (each format from the library and from
+"Open with", with and without an ad; the printed margins and landscape sheets on paper size A4).
+
+**As built:**
+- `convert` is `status: 'live'`. It also covers D6 (scan/PDF → Word), so
+  `readerTools.BUILT_CONVERSIONS.pdfToWord` (false until D6) keeps Convert off PDFs and scans;
+  the Pro screen's label drops "and scans to Word" until then.
+- `services/convert/toPdf.ts`: `printHtmlFor` (`docxPrintHtml`, `sheetPrintHtml`,
+  `txtPrintHtml`) and `convertToPdf` (→ `Print.printToFileAsync` on A4, 595×842 pt →
+  `addPdfFileToLibrary` → the temp file deleted in `finally`). The paper is **white** with the
+  light theme's ink (the light theme's beige background would waste toner). DOCX uses
+  `docxPageHtml(body, paper, { print: true })`, which adds `PRINT_PAGE_CSS` (`@page` margins,
+  full-width tables, no row or picture cut across pages); sheets and TXT use the same CSS and CSP.
+- Landscape is for the **whole** PDF when any sheet has more than 8 columns (per-sheet page
+  orientation needs CSS named pages, which the print WebViews don't honour). A CSV gets no sheet
+  heading (its "Sheet1" name is made up). Short rows are padded so tables stay rectangular.
+- TXT had no size cap; printing holds it all in one WebView, so `TXT_PRINT_MAX_BYTES` (2 MB)
+  throws `PreviewTooLargeError` like the sheet and DOCX caps.
+- "Say what's lost": DOCX, XLSX and XLS ask first (an Alert: layout, fonts, headers for Word;
+  colours, formulas, merged cells, charts for sheets). TXT and CSV, which lose nothing, don't.
+- `addPdfFileToLibrary(uri, name, pageCount)` in `libraryOperations` (the PDF branch of
+  `promoteExternalToLibrary`, which now calls it); it removes the new folder if the copy fails.
+  The page count comes from expo-print's `numberOfPages`; R1's indexer corrects it anyway.
+- Reader: `components/reader/useConvertToPdf.tsx` (gate + "Converting to PDF…" overlay + snack
+  with **Open**, which switches the Reader to the new PDF). The tool bar's Convert/Edit runs it
+  directly (the only live task for an office file; D7 adds the picker), and More has
+  **Convert to PDF** (`readerMoreItems(subject, { proTasks })`). The grant's `docId` is the
+  library id, or the outside file's app-owned copy's uri.
+- Pro task: `services/convert/convertTask.ts` (kind `officeToPdf`, params `uri`/`name`/`format`,
+  validated by `sourceFromParams`) registers the restart runner; `ProTaskResumeHost` imports it.
+  A failed conversion rethrows so the once grant isn't used up; `useProTask`'s Watch path now
+  catches that instead of leaving an unhandled rejection.
 
 **Pro: `convert`, one full-screen ad per conversion** (through D1's `useProTask('convert')`; day-pass holders see none).
 - The Reader entry point is D2's tool-bar **Convert** button (and More), not only the overflow item.
