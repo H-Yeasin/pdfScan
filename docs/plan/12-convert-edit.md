@@ -5,13 +5,13 @@
 - Read `AGENTS.md` (auto-loaded), `docs/plan/README.md` (progress), and only the step you are
   implementing. Open only the files it names unless something unexpected comes up.
 - **Prerequisites:** §7 R1 (imported PDFs indexed by `modules/pdf-native`), §7 R5 (office
-  viewers), §6 L4 (i18n). D4 also needs R5's SheetJS 0.20.3 swap. All new UI text goes through
+  viewers), §6 L4 (i18n). D8 also needs R5's SheetJS 0.20.3 swap. All new UI text goes through
   `src/i18n/en.ts`.
 - When you finish a step, update its `Status:` line (`done (commit <sha>)`), add short "As
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D4** (Notes panel). D1–D3 are done in code.
+- **Next: D5** (Office → PDF). D1–D4 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -274,7 +274,23 @@ Replaces the `AnnotateSheet` modal (free, `annotations` stays in `FREE_FOREVER`)
   document, and the marks show in the Reader and in other PDF apps.
 
 ### D4 · Notes panel *(S)*
-Status: not started.
+Status: done in code (commit 4a51962); device check open (the flash, and the export in another app).
+
+**As built:**
+- `services/annotations/notesPanel.ts` (pure): `documentNotes` (page order; on a page a bookmark
+  first, then top to bottom, then oldest first), `filterNotes`, `notesFilterOptions` (only the kinds
+  and mark colours present; none when there's a single one), `groupNotesByPage`,
+  `formatNotesExport` with `notesExportLabels` (`document.notesExport.*`, the document language).
+  Pen strokes aren't listed (nothing to read). A colour filter shows marks only.
+- `components/reader/NotesSheet.tsx`, opened from the tool bar's **Notes** (`readerTools`: any
+  library PDF/JPG, so an unindexed or locked PDF still lists its bookmarks). More → Bookmarks stays
+  (it can remove bookmarks).
+- Flash: the viewer draws PDF-space rects only, so `useMarkFlash` searches the PDF's text on that
+  page for the mark's first five words (`flashQuery`; a scan's OCR layer or an imported PDF's text)
+  and shows the hits for 1.6 s through `highlightRects`. No text, no flash; notes and bookmarks
+  just jump.
+- Export: a `.txt` of what the filter shows, `<name> notes.txt`, through `shareAs`
+  (`textExport.writeExportText`).
 
 - A sheet listing the document's highlights, underlines, notes and bookmarks by page: colour
   dot, the marked text (from the snap text), the note text; filter by colour or kind; tap to jump

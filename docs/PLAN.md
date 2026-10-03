@@ -275,7 +275,7 @@ ad (or the day pass); marking, OCR and copy/extract text stay free.
 - [x] D1 Pro task gate: a full-screen ad, then the task continues (no broken flow, app lock safe, fail-open offline) — done in code; device check open
 - [x] D2 Reader layout for studying (tool bar: Mark, Select text, Notes, Pages, Convert/Edit; reading settings) — done in code (Notes waits for D4); device check open
 - [x] D3 Mark mode: highlight, underline, strikethrough, pen and notes while reading (free) — done in code (imported PDFs too); device check open
-- [ ] D4 Notes panel and notes export (free)
+- [x] D4 Notes panel and notes export (free) — done in code; device check open
 - [ ] D5 Office → PDF (Pro)
 - [ ] D6 PDF/scan → Word (Pro)
 - [ ] D7 Edit TXT and CSV (Pro, 30-minute session per document)
