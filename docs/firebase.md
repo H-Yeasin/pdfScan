@@ -45,6 +45,22 @@ The app reads the values fetched last time a moment after start (they're cached,
 works offline), then fetches new ones (at most once an hour; every start in dev builds) and
 applies them. A console change shows up on the next start.
 
+## Cost: stay on Spark (checked 2026-10-03)
+
+Since 2026-09-01 Remote Config is billed by use, but every project (Spark or Blaze) gets
+**100,000 fetch requests a day free**; on Blaze the rest is $0.06 per 10K. Firebase's banner
+asking to "upgrade to Blaze by 2026-11-15" only matters for projects that go over that.
+
+- One device makes at most one fetch an hour (`FETCH_INTERVAL_MS`), and in practice about one
+  per app start. At ~3 starts a day that is roughly **30,000 daily users** before the limit.
+- On Spark, fetches over the limit fail. `loadRemoteConfig` then keeps the values cached from
+  the last good fetch (or the bundled defaults), so nothing breaks; console changes just reach
+  fewer devices that day.
+- If daily users approach that number: first raise `FETCH_INTERVAL_MS` (e.g. 12 h; ads and
+  pass settings rarely change), and only then think about Blaze (it needs a billing card).
+- Watch usage in the console: Remote Config ▸ Usage, or Google Cloud ▸ APIs ▸
+  Firebase Remote Config API ▸ Metrics.
+
 ## Analytics: off unless the student opts in (§10 M8)
 
 `firebase.json` turns Analytics' automatic collection off at build time

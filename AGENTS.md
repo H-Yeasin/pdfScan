@@ -116,6 +116,10 @@ package, check whether the patch still applies (and is still needed) and regener
 - `react-native-document-scanner-plugin@2.0.4`: adds `galleryImportAllowed` and `scannerMode`
   to the scan options (TS spec in `src/`, its compiled `lib/typescript` types, and the Android
   `DocumentScannerModule.kt`). iOS (VisionKit) ignores them.
+- `react-native-google-mobile-ads@17.2.0`: fixes a typo in `android/app-json.gradle`
+  (`ext.googleAdsJson` → `ext.googleMobileAdsJson`). Without it, an `app.json` with no top-level
+  `react-native-google-mobile-ads` key (ours: config goes through the Expo plugin) breaks the
+  Gradle build with "Cannot get property 'googleMobileAdsJson'".
 
 ## Security
 - `metro.config.js` once carried a hidden malicious payload (removed in 24f5ccf). Any change to
