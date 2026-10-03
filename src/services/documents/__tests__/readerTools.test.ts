@@ -39,19 +39,32 @@ describe('§12 D2 reader tool bar', () => {
     expect(readerTools({ doc: scan }, { proTasks, isPro: false }).every((t) => t.pro === (t.id === 'convertEdit'))).toBe(true);
   });
 
+  const allBuilt = { officeToPdf: true, pdfToWord: true };
+
   it('offers the Pro tasks each format allows', () => {
-    expect(readerProTasks({ doc: scan }, allLive)).toEqual(['convert']);
-    expect(readerProTasks({ doc: imported }, allLive)).toEqual(['convert', 'pdfForms']);
-    expect(readerProTasks({ doc: locked }, allLive)).toEqual([]);
-    expect(readerProTasks({ external: { format: 'PDF' } }, allLive)).toEqual(['convert', 'pdfForms']);
+    expect(readerProTasks({ doc: scan }, allLive, allBuilt)).toEqual(['convert']);
+    expect(readerProTasks({ doc: imported }, allLive, allBuilt)).toEqual(['convert', 'pdfForms']);
+    expect(readerProTasks({ doc: locked }, allLive, allBuilt)).toEqual([]);
+    expect(readerProTasks({ external: { format: 'PDF' } }, allLive, allBuilt)).toEqual(['convert', 'pdfForms']);
     expect(readerProTasks({ doc: docx }, allLive)).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ external: { format: 'CSV' } }, allLive)).toEqual(['convert', 'editFiles']);
     expect(readerProTasks({ doc: xls }, allLive)).toEqual(['convert']);
   });
 
   it('shows no Pro task until its step is built', () => {
-    expect(readerProTasks({ doc: docx })).toEqual([]);
+    // §12 D5: Office → PDF is live; editing (D7) isn't yet.
+    expect(readerProTasks({ doc: docx })).toEqual(['convert']);
     expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles')).toEqual(['editFiles']);
+    // D6 (scan/PDF → Word) isn't built: a scan has no Convert yet, even with `convert` live.
+    expect(readerProTasks({ doc: scan }, allLive)).toEqual([]);
+    expect(readerProTasks({ doc: imported }, allLive)).toEqual(['pdfForms']);
+  });
+
+  it('lists Convert to PDF in More for office files once `convert` is live', () => {
+    expect(readerMoreItems({ doc: docx }, { proTasks: ['convert'] })).toContain('convertToPdf');
+    expect(readerMoreItems({ external: { format: 'CSV' } }, { proTasks: ['convert'] })).toContain('convertToPdf');
+    expect(readerMoreItems({ doc: docx })).not.toContain('convertToPdf');
+    expect(readerMoreItems({ doc: scan }, { proTasks: ['convert'] })).not.toContain('convertToPdf');
   });
 });
 

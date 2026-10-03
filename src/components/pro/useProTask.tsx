@@ -92,7 +92,8 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
     <>
       <ProTaskSheet
         task={request ? { feature: request.feature, title: request.title } : null}
-        onWatch={() => void watch()}
+        // A task that fails after the ad has shown its own error (the screen's `run`).
+        onWatch={() => void watch().catch((e: unknown) => console.warn('useProTask: the task failed', e))}
         onGetPass={() => {
           setRequest(null);
           go('pro');

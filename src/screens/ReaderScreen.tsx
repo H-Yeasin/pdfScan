@@ -13,6 +13,7 @@ import { useReaderFind } from '../components/reader/useReaderFind';
 import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
 import { DocxView } from '../components/reader/DocxView';
+import { useConvertToPdf } from '../components/reader/useConvertToPdf';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
@@ -117,8 +118,20 @@ export function ReaderScreen() {
   const night = reading.night;
   const signVisible = !external && !!doc && canSign(doc);
   const subject = useMemo<ReaderSubject | null>(() => (doc && !external ? { doc } : external ? { external } : null), [doc, external]);
-  const tools = useMemo(() => (subject ? readerTools(subject, { proTasks: readerProTasks(subject), isPro }) : []), [subject, isPro]);
-  const moreItems = useMemo(() => (subject ? readerMoreItems(subject) : []), [subject]);
+  const proTasks = useMemo(() => (subject ? readerProTasks(subject) : []), [subject]);
+  const tools = useMemo(() => (subject ? readerTools(subject, { proTasks, isPro }) : []), [subject, proTasks, isPro]);
+  const moreItems = useMemo(() => (subject ? readerMoreItems(subject, { proTasks }) : []), [subject, proTasks]);
+  // §12 D5: Office → PDF, through D1's gate; an ad is loaded ahead while a convertible file is open.
+  const convert = useConvertToPdf({ preload: proTasks.includes('convert') });
+  const { start: startConvert } = convert;
+  const convertSource = useMemo(() => {
+    if (external) return { uri: external.uri, name: external.name, format: external.format, docId: external.uri };
+    if (doc?.contentUri) return { uri: doc.contentUri, name: doc.name, format: doc.format, docId: doc.id };
+    return null;
+  }, [doc, external]);
+  const convertToPdf = useCallback(() => {
+    if (convertSource) startConvert(convertSource);
+  }, [convertSource, startConvert]);
 
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [readingOpen, setReadingOpen] = useState(false);
@@ -206,6 +219,11 @@ export function ReaderScreen() {
 
   const handleTool = useCallback(
     (id: ReaderToolId) => {
+      // Today the only Pro task an office file has is Office → PDF (D5); D7's editing adds a picker.
+      if (id === 'convertEdit') {
+        if (proTasks.includes('convert')) convertToPdf();
+        return;
+      }
       if (!doc) return;
       // The library page on screen (on a 2-up sheet, its left page).
       const idx = libraryIdxFor(doc, activeIndex + 1);
@@ -213,10 +231,8 @@ export function ReaderScreen() {
       else if (id === 'selectText') setSelectTextIdx(idx);
       else if (id === 'notes') setNotesOpen(true);
       else if (id === 'pages') setScrubberOpen(true);
-      // 'convertEdit' only shows once a Pro task is live (readerProTasks); D5–D10 add the sheet
-      // that picks one, run through D1's useProTask.
     },
-    [doc, activeIndex]
+    [doc, activeIndex, proTasks, convertToPdf]
   );
 
   const handleOverflowSelect = useCallback(
@@ -232,6 +248,8 @@ export function ReaderScreen() {
         // shareAs); an external file already has its own name.
         if (external && pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
         else if (pdfUri) await shareAs(pdfUri, shareFileName(title, 'pdf'), 'application/pdf');
+      } else if (id === 'convertToPdf') {
+        convertToPdf();
       } else if (id === 'sign') {
         if (!doc || !signVisible) return;
         if (doc.format === 'PDF') {
@@ -305,7 +323,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -680,6 +698,8 @@ export function ReaderScreen() {
           }}
         />
       ) : null}
+
+      {convert.element}
 
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />

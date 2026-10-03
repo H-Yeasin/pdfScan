@@ -1,7 +1,16 @@
 import type { DocFormat, LibraryDocument } from '../../types/models';
 import { getProFeature } from '../pro/proFeatures';
 import type { ProTaskFeature } from '../pro/proTask';
-import { canMark, canSign, canSubmit, canUsePageTools, hasPageMasters, isPageRasterFormat, isPdfLevel } from './formatCapabilities';
+import {
+  canConvertToPdf,
+  canMark,
+  canSign,
+  canSubmit,
+  canUsePageTools,
+  hasPageMasters,
+  isPageRasterFormat,
+  isPdfLevel,
+} from './formatCapabilities';
 
 // §12 D2: which actions the Reader shows, and where. Study actions sit in the bottom tool bar, one
 // tap away; managing the file (share, sign, export, print, submit, edit pages, type, delete) is in
@@ -16,6 +25,8 @@ export type ReaderMoreItemId =
   | 'submit'
   | 'share'
   | 'export'
+  // §12 D5: Office → PDF (Pro), also from the tool bar's Convert.
+  | 'convertToPdf'
   | 'print'
   | 'sign'
   | 'editPages'
@@ -35,20 +46,28 @@ function formatOf(subject: ReaderSubject): DocFormat {
 
 const isLiveFeature = (id: ProTaskFeature) => getProFeature(id).status === 'live';
 
+// `convert` covers two conversions built in different steps: Office → PDF (D5, built) and
+// scan/PDF → Word (D6, not yet). D6 flips this.
+export const BUILT_CONVERSIONS = { officeToPdf: true, pdfToWord: false };
+
 // The Pro tasks this file allows (each through D1's gate). A feature counts once its step has
 // built it (`status: 'live'` in PRO_FEATURES); until then, none, and the Convert/Edit tool stays
 // hidden. Conversions and edits never change the original, so a file from outside allows them too.
-export function readerProTasks(subject: ReaderSubject, isLive: (id: ProTaskFeature) => boolean = isLiveFeature): ProTaskFeature[] {
+export function readerProTasks(
+  subject: ReaderSubject,
+  isLive: (id: ProTaskFeature) => boolean = isLiveFeature,
+  built: typeof BUILT_CONVERSIONS = BUILT_CONVERSIONS
+): ProTaskFeature[] {
   const format = formatOf(subject);
   const tasks: ProTaskFeature[] = [];
   if (format === 'PDF' || format === 'JPG') {
     // D6: scan/PDF → Word. A password-protected PDF can't be read.
-    if (!subject.doc || canUsePageTools(subject.doc)) tasks.push('convert');
+    if (built.pdfToWord && (!subject.doc || canUsePageTools(subject.doc))) tasks.push('convert');
     // D10: fill forms and add text, on a PDF that isn't a scan (a scan has no form fields).
     if (format === 'PDF' && (!subject.doc || (isPdfLevel(subject.doc) && canUsePageTools(subject.doc)))) tasks.push('pdfForms');
   } else if (format === 'DOCX' || format === 'XLSX' || format === 'XLS' || format === 'CSV' || format === 'TXT') {
     // D5: Office → PDF.
-    tasks.push('convert');
+    if (built.officeToPdf && canConvertToPdf(format)) tasks.push('convert');
     // D7–D9: edit TXT, CSV, XLSX and Word text (an old .xls is converted, not edited).
     if (format !== 'XLS') tasks.push('editFiles');
   }
@@ -71,7 +90,9 @@ export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly P
   return tools;
 }
 
-export function readerMoreItems(subject: ReaderSubject): ReaderMoreItemId[] {
+// `proTasks`: readerProTasks for this subject; Convert to PDF is listed when `convert` is one of
+// them on an office file.
+export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: readonly ProTaskFeature[] } = {}): ReaderMoreItemId[] {
   const { doc } = subject;
   const raster = isPageRasterFormat(formatOf(subject));
   const items: ReaderMoreItemId[] = [];
@@ -80,6 +101,7 @@ export function readerMoreItems(subject: ReaderSubject): ReaderMoreItemId[] {
   items.push('share');
   // Export shares the PDF; other formats have none (Share sends the file itself).
   if (raster) items.push('export');
+  if (canConvertToPdf(formatOf(subject)) && opts.proTasks?.includes('convert')) items.push('convertToPdf');
   items.push('print');
   if (doc && canSign(doc)) items.push('sign');
   if (doc && canUsePageTools(doc)) items.push('editPages');

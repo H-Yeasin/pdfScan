@@ -479,6 +479,8 @@ export const en = {
       editPages: 'Edit pages',
       // §12 D2.
       readingSettings: 'Reading settings',
+      // §12 D5.
+      convertToPdf: 'Convert to PDF',
     },
     // §12 D2: the bottom tool bar.
     tools: {
@@ -509,6 +511,19 @@ export const en = {
       keepAwakeHint: 'While a document is open',
     },
     addedToLibrary: 'Added to Library',
+    // §12 D5: Office → PDF. The original is never changed; the PDF is a new library document.
+    convert: {
+      title: 'Convert to PDF',
+      lossDocx: "The PDF keeps the text, tables and pictures, but not the exact layout, fonts, headers or footers. Your original file doesn't change.",
+      lossSheet: "The PDF keeps the cell values, one table per sheet, but not colours, formulas, merged cells or charts. Your original file doesn't change.",
+      confirm: 'Convert',
+      progress: 'Converting to PDF…',
+      done: 'Saved as a PDF in your Library',
+      doneInLibrary: "'{name}' is now a PDF in your Library",
+      open: 'Open',
+      failed: "Couldn't convert this file.",
+      tooLarge: 'This file is too large to convert.',
+    },
     noPageText: 'No text found on this page',
     copiedPage: 'Copied the text of page {page}',
     extractTitle: 'Extract text',
@@ -664,7 +679,8 @@ export const en = {
       noBanners: 'No banner ads',
       pdfPasswords: 'Password-protected PDFs',
       driveBackup: 'Automatic backup to your Google Drive',
-      convert: 'Convert Word, Excel and text files to PDF, and scans to Word',
+      // §12 D6 adds "and scans to Word".
+      convert: 'Convert Word, Excel and text files to PDF',
       editFiles: 'Edit text, CSV, Excel and Word files',
       pdfForms: 'Fill in PDF forms and add text to PDFs',
     },

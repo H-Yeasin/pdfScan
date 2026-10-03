@@ -73,6 +73,13 @@ export function canMarkPage(page: Pick<LibraryPage, 'fileUri' | 'thumbUri'>): bo
   return !!page.fileUri || !!page.thumbUri;
 }
 
+// §12 D5: the office formats printed to a PDF (services/convert/toPdf). A legacy .doc has no reader.
+export const CONVERTIBLE_TO_PDF: readonly DocFormat[] = ['DOCX', 'XLSX', 'XLS', 'CSV', 'TXT'];
+
+export function canConvertToPdf(format: DocFormat): boolean {
+  return CONVERTIBLE_TO_PDF.includes(format);
+}
+
 export function canFindInDoc(format: DocFormat): boolean {
   return IN_READER_FIND_FORMATS.includes(format);
 }

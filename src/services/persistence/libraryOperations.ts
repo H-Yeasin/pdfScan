@@ -398,10 +398,9 @@ export async function applySignedPage(
 
 // Promotes an ephemerally-opened external file (§4 of the PDF-reader plan) into a real, permanent
 // library document. Branches by format:
-//  - PDF: copied as-is, with one placeholder page per PDF page (sized from the import probe) so
-//    FileRow's "N pages" reads correctly. Thumbnails and text come afterwards from the background
-//    indexer (§7 R1, store/useImportedPdfIndexing → documents/importedPdfIndex), which picks up
-//    any imported PDF whose indexedAt is unset - so saving stays instant even for a 300-page file.
+//  - PDF: addPdfFileToLibrary, with the page count from the import probe. Thumbnails and text
+//    come afterwards from the background indexer (§7 R1, store/useImportedPdfIndexing →
+//    documents/importedPdfIndex) - so saving stays instant even for a 300-page file.
 //  - CSV/TXT: a single synthetic page whose ocr.text holds the whole file's decoded text, reusing
 //    the existing OCR-text search plumbing (buildHaystack, dbService's FTS indexing) for free.
 //  - DOCX (§7 R5): the same single synthetic page, holding the document's text from mammoth.
@@ -409,41 +408,12 @@ export async function applySignedPage(
 //  - XLSX/XLS: no text extraction - pages stays empty and search is filename-only (title-LIKE
 //    search still finds it).
 export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promise<LibraryDocument> {
-  const documentId = createId('doc');
-  const dir = getDocumentDir(documentId);
   const name = ext.name.trim() || t('library.importedFile');
 
-  if (ext.format === 'PDF') {
-    const dest = new File(dir, 'document.pdf');
-    new File(ext.uri).copySync(dest);
+  if (ext.format === 'PDF') return addPdfFileToLibrary(ext.uri, name, ext.pageCount);
 
-    const pageCount = ext.pageCount && ext.pageCount > 0 ? ext.pageCount : 1;
-    const pages: LibraryPage[] = Array.from({ length: pageCount }, () => ({
-      id: createId('page'),
-      fileUri: '',
-      width: 850,
-      height: 1100,
-    }));
-
-    return {
-      id: documentId,
-      name,
-      format: 'PDF',
-      mode: 'doc',
-      sourceKind: 'imported_pdf',
-      // Its pages are the PDF's pages, one each, no cover (documents/pageMap).
-      pdfLayout: 'standard',
-      pages,
-      pdfUri: dest.uri,
-      sizeBytes: dest.size ?? 0,
-      createdAt: Date.now(),
-      star: false,
-      tag: 'PDF',
-      locked: false,
-      searchHaystack: name.toLowerCase(),
-    };
-  }
-
+  const documentId = createId('doc');
+  const dir = getDocumentDir(documentId);
   const dest = new File(dir, `document${EXTENSION_BY_FORMAT[ext.format]}`);
   new File(ext.uri).copySync(dest);
 
@@ -488,6 +458,50 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
     createdAt: Date.now(),
     star: false,
     tag: ext.format,
+    locked: false,
+    searchHaystack: name.toLowerCase(),
+  };
+}
+
+// A PDF file (from outside, or one the app just made: §12 D5's Office → PDF) as a new imported
+// library document. The file is copied as-is into library/<docId>/document.pdf, with one
+// placeholder page per PDF page (`pageCount`, when known; the indexer corrects it) so FileRow's
+// "N pages" reads correctly. Thumbnails and text come afterwards from the background indexer
+// (§7 R1), which picks up any imported PDF whose indexedAt is unset.
+export function addPdfFileToLibrary(uri: string, name: string, pageCount?: number): LibraryDocument {
+  const documentId = createId('doc');
+  const dir = getDocumentDir(documentId);
+  const dest = new File(dir, 'document.pdf');
+  try {
+    new File(uri).copySync(dest);
+  } catch (e) {
+    // Nothing half-written stays in library/.
+    if (dir.exists) dir.delete();
+    throw e;
+  }
+
+  const count = pageCount && pageCount > 0 ? pageCount : 1;
+  const pages: LibraryPage[] = Array.from({ length: count }, () => ({
+    id: createId('page'),
+    fileUri: '',
+    width: 850,
+    height: 1100,
+  }));
+
+  return {
+    id: documentId,
+    name,
+    format: 'PDF',
+    mode: 'doc',
+    sourceKind: 'imported_pdf',
+    // Its pages are the PDF's pages, one each, no cover (documents/pageMap).
+    pdfLayout: 'standard',
+    pages,
+    pdfUri: dest.uri,
+    sizeBytes: dest.size ?? 0,
+    createdAt: Date.now(),
+    star: false,
+    tag: 'PDF',
     locked: false,
     searchHaystack: name.toLowerCase(),
   };

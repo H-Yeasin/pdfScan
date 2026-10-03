@@ -4,6 +4,8 @@ import { t } from '../../i18n';
 import { pendingTaskToResume, resumeProTask } from '../../services/pro/proTaskFlow';
 import { clearPendingTask } from '../../services/pro/proTask';
 import { useAppStore } from '../../store/AppStateContext';
+// The runners of the Pro tasks, registered at module load so a pending task finds its runner.
+import '../../services/convert/convertTask';
 
 // §12 D1: Android may kill the app during a long ad. If the student watched to the end, the
 // task they asked for is offered once at the next start ("Finish converting 'Handout.docx'?"),

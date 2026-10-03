@@ -4,7 +4,8 @@ import { PreviewTooLargeError } from './sheetService';
 
 // §7 R5: DOCX is preview-only - mammoth turns it into plain semantic HTML (headings, lists,
 // tables, bold/italic) shown in a locked-down WebView (components/reader/DocxView), and its text
-// goes into the page text so library search finds it. No editing, no conversion to PDF.
+// goes into the page text so library search finds it. No editing; §12 D5 prints the same HTML to
+// a PDF (services/convert/toPdf).
 
 // §9 O5: loaded on first use - only the DOCX preview and its text extraction need mammoth.
 let mammothModule: typeof MammothTypes | null = null;
@@ -44,9 +45,22 @@ export async function extractDocxText(uri: string): Promise<string> {
   return result.value.replace(/\n{3,}/g, '\n\n').trim();
 }
 
+// The page's own print rules (§12 D5, Office → PDF): the paper's margins instead of the screen
+// padding, tables laid out in full (not scrolled), and a row or picture never cut across pages.
+export const PRINT_PAGE_CSS = `
+  @page { margin: 16mm 14mm; }
+  body { padding: 0; font-size: 11pt; }
+  table { display: table; width: auto; max-width: 100%; }
+  tr, img { break-inside: avoid; page-break-inside: avoid; }`;
+
 // A complete page around docxToHtml's body. The CSP is the second lock after the WebView's own
 // settings (JavaScript off, navigation blocked): no scripts, no network, images only as data: URIs.
-export function docxPageHtml(body: string, colors: { bg: string; ink: string; muted: string; edge: string; accent: string }): string {
+// `print`: for expo-print (D5), which renders it the same locked-down way.
+export function docxPageHtml(
+  body: string,
+  colors: { bg: string; ink: string; muted: string; edge: string; accent: string },
+  opts: { print?: boolean } = {}
+): string {
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
@@ -60,7 +74,7 @@ export function docxPageHtml(body: string, colors: { bg: string; ink: string; mu
   table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0 0 1em; }
   td, th { border: 1px solid ${colors.edge}; padding: 4px 8px; vertical-align: top; }
   a { color: ${colors.accent}; }
-  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }
+  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }${opts.print ? PRINT_PAGE_CSS : ''}
 </style>
 </head><body>${body}</body></html>`;
 }
