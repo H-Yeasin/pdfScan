@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D9** (edit Word text). D1–D8 are done in code.
+- **Next: D10** (PDF: fill forms and add text). D1–D9 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -503,7 +503,47 @@ a multi-sheet file; Back with unsaved edits asks first).
 - Tests: values and formulas as text survive a round trip, and the cell cap applies.
 
 ### D9 · Edit Word text *(L)*
-Status: not started.
+Status: done in code (commit 369e6b7); device check open (a DOCX from the library and from "Open
+with": type, bold/italic, heading 1/2, both lists, undo, save; open the copy in Word, Google Docs
+and DocxView; a document with a table and photos; Back with unsaved edits asks first; pasting from
+another app comes in as plain text; the keyboard doesn't hide the toolbar).
+
+**As built:**
+- `readerTools.BUILT_EDITS.docx` is on; the Pro screen's label is "Edit text, CSV, Excel and Word
+  files". D7's `FileEditor` has a Word mode (its header, Save, the discard guard), with
+  `components/reader/DocxEditor.tsx` as the body: a WebView of its own (DocxView stays
+  JavaScript-free) and a **native** toolbar above it (MaterialCommunityIcons; injected commands,
+  only the seven known ones get through `commandScript`). The page's script keeps the last
+  selection and puts it back before a command, since tapping the toolbar may take it.
+- Lock-down: `docxEditorHtml`'s CSP allows only the inline script with a fresh nonce
+  (`script-src 'nonce-…'`, no network, `img-src data:`, `base-uri`/`form-action 'none'`); the
+  WebView refuses every navigation and has no file access. Messages are validated
+  (`parseEditorMessage`). **Paste is plain text** and drop is refused, so nothing from the web
+  gets in. Enter makes a `<p>` (`defaultParagraphSeparator`).
+- Pictures cross the bridge once: `tagImages` gives each mammoth `<img>` a `data-img` id, and the
+  page sends a kept picture back without its `src`; the save looks it up by id.
+- **No DOM in React Native**, so `services/edit/htmlToDocx.ts` is a small, tolerant HTML reader
+  (never throws: unknown tags read for their text, unmatched end tags skipped). It reads
+  whitespace like a browser, keeps a blank line the student typed (`<p><br></p>`), b/strong,
+  i/em, u, s/del, sup/sub, h1–h2 (h3–h6 as heading 3), nested lists (each `<ol>` restarts),
+  tables (header rows, `colspan`; a `rowspan` is a plain cell, a table in a cell becomes its
+  paragraphs) and data: URI PNG/JPEG/GIF pictures (size from the file header). Links keep their
+  text.
+- `docxWriter` gained runs (bold, italic, underline, strike, super/subscript), heading 3, a
+  numbering part (only when a list is there; bullets and numbers, 9 levels), bordered tables
+  (`tblHeader`, `gridSpan`, short rows padded) and inline pictures (`word/media/`, scaled to the
+  text width). D6's plain-text paragraphs are unchanged.
+- Saving: an Alert says what's kept and that fonts, colours and layout may change **before** the
+  copy is written; the banner says so from the start. `saveEditCopy` (moved out of D8's
+  `saveEditedSheet`, shared) writes "<name> (edited)" through `promoteExternalToLibrary`'s DOCX
+  branch, so the copy's synthetic page holds its text (mammoth) and search finds it; course and
+  type are kept, the Reader switches to the copy and the session carries. Editing cap
+  `DOCX_EDIT_MAX_BYTES` 10 MB (the viewer's is 20 MB).
+- Tests: `src/services/edit/__tests__/docxEdit.test.ts` (HTML → DOCX → mammoth keeps headings,
+  bold/italic/sub/sup/strike, nested lists, tables with a header row and a span, pictures by id
+  and inline; a mammoth-written document saved unchanged comes back identical; whitespace,
+  broken HTML, list numbering, picture sizes; the page's CSP and nonce; commands and messages;
+  the saved copy, original unchanged, temp cleaned; optional parts; the cap).
 
 **Pro: `editFiles`** (same session rule as D7). Needs D6's `docxWriter`.
 
