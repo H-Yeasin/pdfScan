@@ -217,6 +217,20 @@ export const en = {
       usageStats: 'Help improve PDF Scan',
       usageStatsSubtitle: 'Send anonymous usage counts, like how many pages were scanned. Never names or text.',
     },
+    // §10 M7: support only. Never say the contact sells or unlocks Pro (Play Payments policy).
+    help: {
+      section: 'Help & feedback',
+      intro: 'Questions, problems or ideas? Message us.',
+      whatsapp: 'WhatsApp: {number}',
+      email: 'Email: {address}',
+      note: 'The message starts with the app version and phone model, so we can help faster. Nothing else is sent.',
+      openFailed: "Couldn't open {app}. Is it installed?",
+      appVersion: 'PDF Scan {version}',
+      prefill: 'Hi! ({context})\n\n',
+      emailSubject: 'PDF Scan {version}: question or feedback',
+      whatsappApp: 'WhatsApp',
+      emailApp: 'an email app',
+    },
     about: {
       showIntro: 'Show the introduction again',
       section: 'About',

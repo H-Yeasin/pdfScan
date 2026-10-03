@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Linking, Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TimetableEditor } from '../components/courses/TimetableEditor';
@@ -20,9 +20,9 @@ import { fontFamily, spacing, typeScale, useTheme, type ThemePref, touchSlop } f
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
 import { passEndLabel } from '../components/pro/passEndLabel';
-
-
-const APP_VERSION = '1.0';
+import { APP_VERSION } from '../config/appInfo';
+import { useRemoteConfig } from '../services/remote/remoteConfig';
+import { deviceInfo, supportContacts, type SupportContact } from '../services/support/supportLinks';
 
 export function SettingsScreen() {
   const { tokens, themePref, setThemePref } = useTheme();
@@ -38,6 +38,17 @@ export function SettingsScreen() {
   const state = useAppSlices('library', 'settings');
   const entitlement = useEntitlement();
   const isPro = useIsPro();
+  const remote = useRemoteConfig();
+  const contacts = useMemo(() => supportContacts(remote, deviceInfo()), [remote]);
+  // §10 M7: WhatsApp or the email app, with the prefilled message.
+  const openContact = useCallback(
+    (contact: SupportContact) => {
+      Linking.openURL(contact.url).catch(() =>
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('settings.help.openFailed', { app: t(contact.kind === 'whatsapp' ? 'settings.help.whatsappApp' : 'settings.help.emailApp') }) })
+      );
+    },
+    [dispatch, t]
+  );
   // Class times of active courses only: an archived course's classes are over.
   const classCount = state.library.timetable.filter((slot) =>
     state.library.courses.some((c) => c.id === slot.courseId && !c.archived)
@@ -266,6 +277,20 @@ export function SettingsScreen() {
               onChange: (enabled) => dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled }),
             }}
           />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.help.section')}</Text>
+          <Text style={[styles.aboutText, { color: tokens.muted }]}>{t('settings.help.intro')}</Text>
+          {contacts.map((contact) => (
+            <SettingRow
+              key={contact.kind}
+              title={contact.kind === 'whatsapp' ? t('settings.help.whatsapp', { number: contact.label }) : t('settings.help.email', { address: contact.label })}
+              chevron
+              onPress={() => openContact(contact)}
+            />
+          ))}
+          <Text style={[styles.footnote, { color: tokens.muted }]}>{t('settings.help.note')}</Text>
         </View>
 
         <View style={styles.section}>
