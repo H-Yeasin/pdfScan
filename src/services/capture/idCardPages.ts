@@ -1,5 +1,5 @@
 import DocumentScanner, { ResponseType, ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
-import type { EnhanceMode, OcrScript, SessionPage, SourceImage } from '../../types/models';
+import type { EnhanceMode, IdCardSize, OcrScript, SessionPage, SourceImage } from '../../types/models';
 import { composeIdCard } from '../enhance/composeIdCard';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
 import { ingestPage, pageFromMaster } from './ingest';
@@ -8,17 +8,18 @@ function filesOf(page: SessionPage): string[] {
   return page.thumbUri ? [page.uri, page.thumbUri] : [page.uri];
 }
 
-// Composes one ID card page from its card images: a true-size A4 canvas (one encode), with a
-// thumbnail and OCR of the composed page, laid out full-page so it prints at real size.
+// Composes one ID card page from its card images: an A4 canvas (one encode), with a thumbnail and
+// OCR of the composed page, laid out full-page so a 'real' size card prints at real size.
 export async function composeIdCardPage(
   front: SourceImage,
   back: SourceImage | undefined,
   script: OcrScript,
-  enhance: EnhanceMode
+  enhance: EnhanceMode,
+  size?: IdCardSize
 ): Promise<SessionPage> {
-  const composed = await composeIdCard(front, back);
+  const composed = await composeIdCard(front, back, size);
   const page = await pageFromMaster(composed, script, { enhance });
-  return { ...page, layout: 'fullPage', idCard: { front, back } };
+  return { ...page, layout: 'fullPage', idCard: { front, back, size } };
 }
 
 // ID card mode post-processing for a batch: every two scanned pages become one composed page
@@ -47,14 +48,14 @@ export async function composeIdCardPages(pages: SessionPage[], script: OcrScript
   return result;
 }
 
-// Swap front/back, or replace the back, of an ID card page: recompose from the kept card images
+// Swap front/back, replace the back, or change the size of an ID card page: recompose from the kept card images
 // and return the patch for capture/UPDATE_PAGE. The old composed files are deleted.
 export async function recomposeIdCard(
   page: SessionPage,
-  next: { front: SourceImage; back?: SourceImage },
+  next: { front: SourceImage; back?: SourceImage; size?: IdCardSize },
   script: OcrScript
 ): Promise<Partial<SessionPage>> {
-  const card = await composeIdCardPage(next.front, next.back, script, page.enhance);
+  const card = await composeIdCardPage(next.front, next.back, script, page.enhance, next.size);
   cleanTemporaryCache(filesOf(page));
   return { uri: card.uri, thumbUri: card.thumbUri, width: card.width, height: card.height, ocr: card.ocr, idCard: card.idCard };
 }

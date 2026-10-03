@@ -50,7 +50,7 @@ src/services/ads/       adPolicy (banner rules), adsSdk (consent + init), reward
 src/config/             appInfo (APP_VERSION); runtime switches come from services/remote/remoteConfig (Firebase Remote Config, §10 M2)
 src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, docFormat
 modules/pdf-native/     local Expo module (§7 R1): PDF page count/size, render page → JPEG, page text + word boxes
-plugins/                local config plugins (withBackupRules: Android Auto Backup rules, §8 B1)
+plugins/                local config plugins (withBackupRules: Android Auto Backup rules, §8 B1; withDocumentIntentFilters: strips the dev-client scheme from "Open with" filters)
 ```
 
 ## Main pipeline

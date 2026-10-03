@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import { FilterMode, ImageFormat, MipmapMode, Skia } from '@shopify/react-native-skia';
 import { createId } from '../../utils/id';
+import type { IdCardSize } from '../../types/models';
 import { MASTER_JPEG_Q } from '../capture/imageSpec';
 import { ID_CANVAS_HEIGHT, ID_CANVAS_WIDTH, idCardPlacements } from './idCardLayout';
 
@@ -12,16 +13,16 @@ async function decode(uri: string) {
   return image;
 }
 
-// Composes an ID card's front (and back, if scanned) onto one white A4 page at true size - see
-// idCardLayout.ts - in one Skia pass and one encode. Never touches the source images, which the
+// Composes an ID card's front (and back, if scanned) onto one white A4 page, at true size or
+// enlarged (`size`) - see idCardLayout.ts - in one Skia pass and one encode. Never touches the source images, which the
 // session page keeps (SessionPage.idCard) for "Swap front/back" / "Retake back".
-export async function composeIdCard(front: CardImage, back?: CardImage): Promise<CardImage> {
+export async function composeIdCard(front: CardImage, back?: CardImage, size?: IdCardSize): Promise<CardImage> {
   const surface = Skia.Surface.MakeOffscreen(ID_CANVAS_WIDTH, ID_CANVAS_HEIGHT);
   if (!surface) throw new Error('composeIdCard: Skia failed to create an offscreen surface');
   const canvas = surface.getCanvas();
   canvas.drawColor(Skia.Color('#ffffff'));
 
-  const placements = idCardPlacements(front, back);
+  const placements = idCardPlacements(front, back, size);
   const draw = async (card: CardImage, at: { origin: { x: number; y: number }; width: number; height: number }) => {
     const image = await decode(card.uri);
     canvas.drawImageRectOptions(

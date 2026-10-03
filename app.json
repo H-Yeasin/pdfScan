@@ -127,6 +127,7 @@
         }
       ],
       "./plugins/withBackupRules",
+      "./plugins/withDocumentIntentFilters",
       [
         "expo-splash-screen",
         {

@@ -77,8 +77,9 @@ export type SessionPage = {
   // can "Undo split" without re-encoding anything. Halves of one spread share `groupId`.
   splitFrom?: { groupId: string; uri: string; thumbUri?: string; width: number; height: number };
   // ID card mode (C4): the scanned card images this page was composed from, kept so Review can
-  // swap front/back or retake the back and recompose from the originals.
-  idCard?: { front: SourceImage; back?: SourceImage };
+  // swap front/back or retake the back and recompose from the originals. `size` is the layout
+  // (undefined = 'real'), kept so a swap or retake recomposes at the size the user picked.
+  idCard?: { front: SourceImage; back?: SourceImage; size?: IdCardSize };
   // See PageLayout.
   layout?: PageLayout;
   // Gallery import (C5) couldn't crop this page confidently; Review's "Check crops" goes through
@@ -91,6 +92,10 @@ export type SessionPage = {
 export type CropPoint = { x: number; y: number };
 
 export type SourceImage = { uri: string; width: number; height: number };
+
+// ID card page layout: 'real' draws each card at its ISO size so it prints at 100 %; 'large'
+// enlarges both sides to fill the page, for reading on screen or a bigger printout.
+export type IdCardSize = 'real' | 'large';
 
 // How a page image goes onto its PDF page. undefined = fit inside the standard margin (every
 // normal page). 'fullPage' = edge to edge on A4 at 100 % - for images that are already a

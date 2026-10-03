@@ -35,10 +35,10 @@ import { applySignatureToPage } from '../services/signature/signatureCompositeSe
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { useScanOcrScript } from '../store/useScanOcrScript';
-import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
+import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 import { createId } from '../utils/id';
 import { useResolvedAcademicConfig } from '../store/useDeliverContext';
-import type { AdjustValues, EnhanceMode, FilterOptions, SessionPage, SourceImage } from '../types/models';
+import type { AdjustValues, EnhanceMode, FilterOptions, IdCardSize, SessionPage, SourceImage } from '../types/models';
 import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/shared/Hint';
 import { useHint } from '../components/shared/useHint';
@@ -420,10 +420,13 @@ export function ReviewScreen() {
 
   const showErrHint = !!selectedPage?.err && selectedPage.enhance !== 'bw';
 
-  // ID card mode: recompose the true-size page from its kept card images.
+  // ID card mode: recompose the page (real size or large) from its kept card images.
   const [idCardBusy, setIdCardBusy] = useState(false);
   const updateIdCard = useCallback(
-    async (getNext: () => Promise<{ front: SourceImage; back?: SourceImage } | null>, doneMsg: string) => {
+    async (
+      getNext: () => Promise<{ front: SourceImage; back?: SourceImage; size?: IdCardSize } | null>,
+      doneMsg: string
+    ) => {
       if (!selectedPage?.idCard || idCardBusy) return;
       setIdCardBusy(true);
       try {
@@ -445,7 +448,7 @@ export function ReviewScreen() {
   const handleSwapIdSides = useCallback(() => {
     const card = selectedPage?.idCard;
     if (!card?.back) return;
-    void updateIdCard(async () => ({ front: card.back!, back: card.front }), t('review.idCardSwapped'));
+    void updateIdCard(async () => ({ front: card.back!, back: card.front, size: card.size }), t('review.idCardSwapped'));
   }, [selectedPage, updateIdCard]);
 
   const handleRetakeIdBack = useCallback(() => {
@@ -453,9 +456,19 @@ export function ReviewScreen() {
     if (!card) return;
     void updateIdCard(async () => {
       const back = await scanIdCardSide(ocrScript);
-      return back ? { front: card.front, back } : null;
+      return back ? { front: card.front, back, size: card.size } : null;
     }, card.back ? t('review.idBackReplaced') : t('review.idBackAdded'));
   }, [selectedPage, updateIdCard, ocrScript]);
+
+  const handleToggleIdSize = useCallback(() => {
+    const card = selectedPage?.idCard;
+    if (!card) return;
+    const size: IdCardSize = card.size === 'large' ? 'real' : 'large';
+    void updateIdCard(
+      async () => ({ ...card, size }),
+      size === 'large' ? t('review.idCardEnlarged') : t('review.idCardRealSize')
+    );
+  }, [selectedPage, updateIdCard]);
 
   // Book mode split this page out of a two-page spread; put the pair back together. The halves'
   // own files are no longer referenced afterwards, so they're deleted.
@@ -509,17 +522,12 @@ export function ReviewScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button"
-          style={styles.headerButton}
-          onPress={() => {
-            dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
-            go('capture', 'back');
-          }}
-        >
-          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>{t('review.title')}</Text>
+        {/* No on-screen Back: it only reached the in-app Capture screen, never the native scanner
+            (a finished activity that can only be relaunched, which "+" already does). Android's
+            back still returns to Capture with the session kept (navigation/backHandling.ts). */}
+        <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
+          {t('review.title')}
+        </Text>
         <View style={styles.headerRight}>
           <Pressable accessibilityRole="button"
             style={styles.historyButton}
@@ -632,10 +640,19 @@ export function ReviewScreen() {
       )}
 
       {selectedPage.idCard && (
-        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+        <View style={[styles.splitChip, styles.chipWrap, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
-            {idCardBusy ? t('review.idCardUpdating') : t('review.idCardInfo')}
+            {idCardBusy
+              ? t('review.idCardUpdating')
+              : selectedPage.idCard.size === 'large'
+                ? t('review.idCardInfoLarge')
+                : t('review.idCardInfo')}
           </Text>
+          <Pressable onPress={handleToggleIdSize} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
+            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
+              {selectedPage.idCard.size === 'large' ? t('review.idCardMakeReal') : t('review.idCardMakeLarge')}
+            </Text>
+          </Pressable>
           {selectedPage.idCard.back && (
             <Pressable onPress={handleSwapIdSides} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
               <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('review.swapSides')}</Text>
@@ -790,21 +807,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
   },
-  headerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    paddingHorizontal: spacing.sm,
-  },
-  headerButtonLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  // In the row (not absolutely centred) so it can never sit under undo/redo/grid/Next.
   title: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
+    flex: 1,
+    paddingHorizontal: spacing.sm,
     fontFamily: fontFamily.heading,
     fontSize: typeScale.title.fontSize,
   },
@@ -858,6 +864,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Room for three actions (size, swap, retake) on a narrow phone.
+  chipWrap: { flexWrap: 'wrap', rowGap: spacing.xs },
   splitChip: {
     flexDirection: 'row',
     alignItems: 'center',
