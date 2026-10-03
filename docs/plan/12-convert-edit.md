@@ -11,7 +11,7 @@
   built" notes where the code differs, tick it in `docs/PLAN.md`, and update the tables in
   `docs/plan/README.md`.
 - Step prefix is **D** (documents). C is §1 Capture.
-- **Next: D7** (edit TXT and CSV). D1–D6 are done in code.
+- **Next: D9** (edit Word text; D8 waits for §7 R5's SheetJS 0.20.3 swap). D1–D7 are done in code.
 
 ## Context
 **Planned 2026-10-03; revised the same day** (study-first reader, Pro tasks behind a full-screen ad). Since the "Open with" fix (the `withDocumentIntentFilters` plugin), file
@@ -412,7 +412,40 @@ with and without an ad).
   from fixture boxes.
 
 ### D7 · Edit TXT and CSV *(M)*
-Status: not started.
+Status: done in code (commit bfcba77); device check open (a TXT and a CSV from the library and
+from "Open with", with and without an ad; re-opening Edit inside the 30 minutes shows no ad; Back
+with unsaved edits asks first; a semicolon CSV and a Latin-1 TXT).
+
+**As built:**
+- `editFiles` is `status: 'live'`. It also covers D8 (XLSX) and D9 (Word), so
+  `readerTools.BUILT_EDITS` (`text: true`, `sheet`/`docx` false) keeps Edit off XLSX and DOCX;
+  the Pro screen's label is "Edit text and CSV files" until then.
+- The gate covers **opening** the editor (Pro task kind `editFile`); saving never checks again,
+  so an editor still open when the session ends still saves. No restart runner: the session grant
+  is saved on the reward, so after a process death tapping Edit opens the editor without an ad
+  (the pending task is dropped as one with no runner).
+- One full-screen `components/reader/FileEditor.tsx` for both formats (not edit-in-place in
+  `SheetView`, which stays read-only): Close/Back asks before discarding, Save closes it with a
+  snack. TXT is a multiline `TextInput` (monospace toggle, on by default like TxtView; the system
+  font otherwise, for every script), capped at `TXT_EDIT_MAX_BYTES` (1 MB). CSV is
+  `CsvGrid.tsx` (SheetView's `computeColumnWidths`, a row-number column): tap a cell to edit it
+  in a multiline prompt (a cell may be cleared or hold commas, quotes, line breaks), tap a row
+  number to insert a row below or delete it, **Add row** at the end. Same caps as the viewer.
+- `services/edit/textEdit.ts`: CSV is parsed like the viewer (Papa, blank lines skipped) and
+  written with `Papa.unparse` using the **delimiter and line ending it was read with**; values are
+  quoted only where needed. Everything is written UTF-8 (a Latin-1 fallback read says so first).
+- Saving a library document writes `document-<id>.<ext>` beside the old file and patches
+  `contentUri`, `sizeBytes`, the synthetic page's `ocr.text` (same page id) and
+  `searchHaystack`; the viewer remounts on the new uri. Older copies are removed at the next save
+  (by file name), never the one the stored document still points at.
+- A file from outside goes through `promoteExternalToLibrary` from a temp copy (`cache/edit/`,
+  deleted after); the Reader switches to the new document, and `proTask.carryGrant` moves the
+  edit session to its id so the student isn't asked again. The editor says up front that the
+  edit goes into the Library.
+- Convert/Edit on a TXT/CSV asks "Convert or edit" (an Alert); More has **Edit** (`editFile`).
+- Tests: `src/services/edit/__tests__/textEdit.test.ts` (CSV round trip with quotes, commas, line
+  breaks and `\r\n`; semicolons; row/cell edits; caps; UTF-8 output incl. after a Latin-1 read;
+  the swap and the pruning; an outside file never written; carrying the session).
 
 **Pro: `editFiles`, one ad unlocks editing that document for 30 minutes** (Remote Config `edit_unlock_minutes`); saving inside the session never shows an ad.
 
