@@ -485,6 +485,8 @@ export const en = {
       convertToWord: 'Convert to Word',
       // §12 D7.
       editFile: 'Edit',
+      // §12 D10.
+      fillForm: 'Fill in form',
     },
     // §12 D2: the bottom tool bar.
     tools: {
@@ -542,6 +544,29 @@ export const en = {
     convertEdit: {
       title: 'Convert or edit',
       edit: 'Edit',
+    },
+    // §12 D10: filling in a PDF form (Pro). Always saved as a copy.
+    form: {
+      title: 'Fill in form',
+      checking: 'Reading the form…',
+      noFieldsTitle: 'No form to fill in',
+      noFieldsBody: 'This PDF has no form fields. To type on it, use Mark, then Text.',
+      locked: "This PDF needs a password, so its form can't be filled in.",
+      tooLarge: 'This PDF is too large to fill in.',
+      readFailed: "Couldn't read this PDF's form.",
+      copyNote: "Saving makes a filled copy in your Library. The PDF you opened doesn't change.",
+      flatten: 'Flatten',
+      flattenHint: "Makes the answers part of the page, so they can't be changed. Some submission portals ask for this.",
+      none: 'None',
+      save: 'Save copy',
+      saved: 'Filled copy saved to your Library',
+      failed: "Couldn't save the filled form. Your answers are still here.",
+      discardTitle: 'Discard your answers?',
+      discardBody: "What you filled in won't be kept.",
+      discard: 'Discard',
+      keepEditing: 'Keep filling in',
+      fieldCount: { one: '{count} field', other: '{count} fields' },
+      copyName: '{name} (filled)',
     },
     // §12 D7: the TXT/CSV editor (Pro). TXT and CSV lose nothing, so the library file is updated;
     // §12 D8's Excel and D9's Word edits are saved as a copy.
@@ -673,10 +698,17 @@ export const en = {
       redo: 'Redo',
       pageOf: 'p. {page} / {total}',
       done: 'Done',
-      tools: { highlight: 'Highlight', underline: 'Underline', strike: 'Strike', pen: 'Pen', note: 'Note', eraser: 'Eraser', hand: 'Hand' },
+      tools: { highlight: 'Highlight', underline: 'Underline', strike: 'Strike', pen: 'Pen', note: 'Note', text: 'Text', eraser: 'Eraser', hand: 'Hand' },
       colourHighlighter: '{colour} highlighter',
       colourLine: '{colour} line',
       colourPen: '{colour} pen',
+      // §12 D10: the Text tool (Pro).
+      colourText: '{colour} text',
+      textSizes: { small: 'Small', medium: 'Medium', large: 'Large' },
+      textHint: 'Tap to type; tap a box to edit it, drag it to move it.',
+      addText: 'Add text',
+      editText: 'Edit text',
+      textPlaceholder: 'Type here',
       colours: { yellow: 'Yellow', green: 'Green', pink: 'Pink', blue: 'Blue', black: 'Black', red: 'Red' },
       thin: 'Thin',
       thick: 'Thick',

@@ -3,12 +3,13 @@ import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFRef, PDFString, type PD
 import { pdfRectFor, type PdfRect } from '../documents/pageMap';
 import { isPdfLevel } from '../documents/formatCapabilities';
 import { imagePlacement } from '../pdf/pdfService';
+import { HELV, textLinesAppearance } from '../pdf/textAppearance';
 import type { Annotation, LibraryDocument, OcrBounding } from '../../types/models';
 import { isRectMark, markLine } from './marks';
 import { annotationColor, rgb01 } from './palette';
 
 // §5 T4: annotations are data (master pixels); every PDF of a document gets them as real PDF
-// annotation objects - /Highlight, /Underline, /StrikeOut (§12 D3), /Ink, /Text - so other PDF apps show them, can hide or delete
+// annotation objects - /Highlight, /Underline, /StrikeOut (§12 D3), /Ink, /Text, /FreeText (§12 D10) - so other PDF apps show them, can hide or delete
 // them, and they survive rebuilds (the builder writes them again). Each carries
 // /NM (pdfscan:<id>) so ours can be found and replaced, and an appearance stream (/AP) so viewers
 // that don't draw annotations themselves still show them.
@@ -217,9 +218,76 @@ export function writeAnnotations(pdfDoc: PDFDocument, doc: MappedDoc, annotation
         { Name: 'Comment', Open: false }
       );
       written += 1;
+    } else if ('box' in a.data && a.kind === 'text') {
+      if (writeTextBox(pdfDoc, pages, a, idx, a.data, point)) written += 1;
     }
   }
   return written;
+}
+
+type Point = { page: number; x: number; y: number };
+
+// §12 D10: a typed text box as /FreeText. Its frame is mapped corner by corner (like QuadPoints),
+// so on a turned page or a 2-in-1 sheet the text runs the way the page's words do; the font size
+// scales with the frame. /Contents holds the text and /DA the font, for apps that redraw it.
+function writeTextBox(
+  pdfDoc: PDFDocument,
+  pages: PDFPage[],
+  a: Annotation,
+  idx: number,
+  data: { box: OcrBounding; size: number },
+  point: (idx: number, x: number, y: number) => Point | null
+): boolean {
+  const { box, size } = data;
+  const lines = (a.text ?? '').split('\n');
+  if (!lines.some((l) => l.trim())) return false;
+  const tl = point(idx, box.left, box.top);
+  const tr = point(idx, box.left + box.width, box.top);
+  const bl = point(idx, box.left, box.top + box.height);
+  const br = point(idx, box.left + box.width, box.top + box.height);
+  const page = tl && pages[tl.page - 1];
+  if (!tl || !tr || !bl || !br || !page) return false;
+  const across = Math.hypot(tr.x - tl.x, tr.y - tl.y);
+  const down = Math.hypot(bl.x - tl.x, bl.y - tl.y);
+  if (across <= 0 || down <= 0) return false;
+  // Points per master pixel, and the frame's axes: x along the text, y up the page as it reads.
+  const k = across / Math.max(1, box.width);
+  const ux = [(tr.x - tl.x) / across, (tr.y - tl.y) / across];
+  const uy = [(tl.x - bl.x) / down, (tl.y - bl.y) / down];
+  const sizePt = size * k;
+  const rgb = rgb01(annotationColor(a.color));
+  const look = textLinesAppearance(pdfDoc, lines, { sizePt, color: rgb });
+  const bounds = boundsOf([tl, tr, bl, br].map((p) => ({ x: p.x, y: p.y, width: 0, height: 0 })));
+  const frame = [ux[0], ux[1], uy[0], uy[1], tl.x, tl.y].map(fmt).join(' ');
+  addAnnot(pdfDoc, page, a, 'FreeText', bounds, `q ${frame} cm\n${look.content}\nQ`, {
+    DA: PDFString.of(`/${HELV} ${fmt(sizePt)} Tf ${color(a.color)} rg`),
+    // No background or border (an empty colour array), whatever the viewer's default.
+    C: [],
+    BS: { W: 0 },
+  }, look.resources);
+  return true;
+}
+
+// A text box's appearance has its own objects (the Helvetica dict, a shaped line's image and its
+// mask). pdf-lib writes every registered object, used or not, so they go with the annotation, or
+// each Mark session would leave a copy behind in document.pdf.
+function deleteAppearanceResources(pdfDoc: PDFDocument, normal: PDFRef) {
+  const ctx = pdfDoc.context;
+  const stream = ctx.lookup(normal);
+  const dict = stream && 'dict' in stream ? (stream as { dict: PDFDict }).dict : undefined;
+  const resources = dict?.lookup(PDFName.of('Resources'));
+  if (!(resources instanceof PDFDict)) return;
+  for (const key of ['Font', 'XObject']) {
+    const group = resources.lookup(PDFName.of(key));
+    if (!(group instanceof PDFDict)) continue;
+    for (const value of group.values()) {
+      if (!(value instanceof PDFRef)) continue;
+      const object = ctx.lookup(value);
+      const mask = object && 'dict' in object ? (object as { dict: PDFDict }).dict.get(PDFName.of('SMask')) : undefined;
+      if (mask instanceof PDFRef) ctx.delete(mask);
+      ctx.delete(value);
+    }
+  }
 }
 
 // Removes the annotations we wrote (by /NM), leaving any others in the file alone.
@@ -238,7 +306,10 @@ export function removeOurAnnotations(pdfDoc: PDFDocument): number {
       page.node.removeAnnot(ref);
       const ap = dict.lookup(PDFName.of('AP'));
       const normal = ap instanceof PDFDict ? ap.get(PDFName.of('N')) : undefined;
-      if (normal instanceof PDFRef) pdfDoc.context.delete(normal);
+      if (normal instanceof PDFRef) {
+        deleteAppearanceResources(pdfDoc, normal);
+        pdfDoc.context.delete(normal);
+      }
       pdfDoc.context.delete(ref);
       removed += 1;
     }

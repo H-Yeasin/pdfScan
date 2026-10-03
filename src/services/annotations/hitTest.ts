@@ -11,6 +11,9 @@ export function annotationAt(annotations: readonly Annotation[], x: number, y: n
     } else if ('strokes' in d) {
       const reach = d.width / 2 + slop;
       if (d.strokes.some((s) => s.some(([px, py], k) => near(x, y, px, py, s[k - 1], reach)))) return a;
+    } else if ('box' in d) {
+      const r = d.box;
+      if (x >= r.left - slop && x <= r.left + r.width + slop && y >= r.top - slop && y <= r.top + r.height + slop) return a;
     } else if (Math.hypot(x - d.x, y - d.y) <= NOTE_ICON / 2 + slop) {
       return a;
     }

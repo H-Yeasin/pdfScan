@@ -31,6 +31,8 @@ export type ReaderMoreItemId =
   | 'convertToWord'
   // §12 D7: edit a TXT or CSV file (Pro), also from the tool bar's Convert/Edit; D8: XLSX/XLS.
   | 'editFile'
+  // §12 D10: fill in a PDF's form (Pro), also from the tool bar's Convert/Edit.
+  | 'fillForm'
   | 'print'
   | 'sign'
   | 'editPages'
@@ -72,7 +74,8 @@ export function readerProTasks(
   if (format === 'PDF' || format === 'JPG') {
     // D6: scan/PDF → Word. A password-protected PDF can't be read.
     if (built.pdfToWord && (!subject.doc || canUsePageTools(subject.doc))) tasks.push('convert');
-    // D10: fill forms and add text, on a PDF that isn't a scan (a scan has no form fields).
+    // D10: fill in a form, on a PDF that isn't a scan (a scan has no form fields). D10's other
+    // half, Mark mode's Text tool, goes through the same feature's gate from Mark mode instead.
     if (format === 'PDF' && (!subject.doc || (isPdfLevel(subject.doc) && canUsePageTools(subject.doc)))) tasks.push('pdfForms');
   } else if (format === 'DOCX' || format === 'XLSX' || format === 'XLS' || format === 'CSV' || format === 'TXT') {
     // D5: Office → PDF.
@@ -102,7 +105,8 @@ export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly P
 }
 
 // `proTasks`: readerProTasks for this subject; Convert to PDF is listed when `convert` is one of
-// them on an office file, Convert to Word when it is on a scan or PDF, Edit when `editFiles` is.
+// them on an office file, Convert to Word when it is on a scan or PDF, Edit when `editFiles` is,
+// Fill in form when `pdfForms` is.
 export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: readonly ProTaskFeature[] } = {}): ReaderMoreItemId[] {
   const { doc } = subject;
   const raster = isPageRasterFormat(formatOf(subject));
@@ -115,6 +119,7 @@ export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: reado
   if (canConvertToPdf(formatOf(subject)) && opts.proTasks?.includes('convert')) items.push('convertToPdf');
   if (raster && opts.proTasks?.includes('convert')) items.push('convertToWord');
   if (opts.proTasks?.includes('editFiles')) items.push('editFile');
+  if (opts.proTasks?.includes('pdfForms')) items.push('fillForm');
   items.push('print');
   if (doc && canSign(doc)) items.push('sign');
   if (doc && canUsePageTools(doc)) items.push('editPages');

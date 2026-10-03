@@ -16,6 +16,7 @@ import { DocxView } from '../components/reader/DocxView';
 import { useConvertToPdf } from '../components/reader/useConvertToPdf';
 import { useConvertToWord } from '../components/reader/useConvertToWord';
 import { useEditFile } from '../components/reader/useEditFile';
+import { useFillForm } from '../components/reader/useFillForm';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
@@ -151,6 +152,14 @@ export function ReaderScreen() {
     if (external) startEdit({ external });
     else if (doc) startEdit({ doc });
   }, [doc, external, startEdit]);
+  // §12 D10: fill in a PDF's form, and Mark mode's Text tool; both `pdfForms` (one ad unlocks the
+  // document for a while).
+  const form = useFillForm({ preload: proTasks.includes('pdfForms') });
+  const { start: startForm, unlockText, isTextUnlocked } = form;
+  const fillForm = useCallback(() => {
+    if (external) void startForm({ external });
+    else if (doc) void startForm({ doc });
+  }, [doc, external, startForm]);
 
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [readingOpen, setReadingOpen] = useState(false);
@@ -166,6 +175,25 @@ export function ReaderScreen() {
   const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
   // §12 D3: the library page Mark mode opened on, or null.
   const [markIdx, setMarkIdx] = useState<number | null>(null);
+  // §12 D10: whether Mark mode's Text tool is open on this document (checked without asking when
+  // Mark mode opens, so a remembered Text tool comes back; else unlocked through the gate).
+  const [textUnlocked, setTextUnlocked] = useState(false);
+  const markOpen = markIdx !== null;
+  useEffect(() => {
+    if (!markOpen || !doc) {
+      setTextUnlocked(false);
+      return;
+    }
+    let cancelled = false;
+    isTextUnlocked(doc)
+      .then((on) => {
+        if (!cancelled && on) setTextUnlocked(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [markOpen, doc, isTextUnlocked]);
   // §12 D3: marks reach document.pdf in the background; the viewer then reloads on the page being
   // read (tagged with the reload it's for, so another reload doesn't reuse it).
   const [startPage, setStartPage] = useState<{ contentKey: string | undefined; reloadKey: number; page: number } | null>(null);
@@ -238,19 +266,18 @@ export function ReaderScreen() {
 
   const handleTool = useCallback(
     (id: ReaderToolId) => {
-      // A file's Pro tasks: one conversion (Office → PDF, D5, or scan/PDF → Word, D6) and, for a
-      // TXT, CSV, XLSX or XLS, editing (D7, D8). With both, a picker; with one, it runs straight away.
+      // A file's Pro tasks: one conversion (Office → PDF, D5, or scan/PDF → Word, D6), editing a
+      // TXT, CSV, XLSX, XLS or Word file (D7–D9), filling in a PDF's form (D10). With more than
+      // one, a picker (two at most per format); with one, it runs straight away.
       if (id === 'convertEdit') {
-        const canConvert = proTasks.includes('convert');
-        const convertNow = toWord ? convertToWord : convertToPdf;
-        if (canConvert && proTasks.includes('editFiles')) {
-          Alert.alert(t('reader.convertEdit.title'), undefined, [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t(toWord ? 'reader.actions.convertToWord' : 'reader.actions.convertToPdf'), onPress: convertNow },
-            { text: t('reader.convertEdit.edit'), onPress: editFile },
-          ]);
-        } else if (canConvert) convertNow();
-        else if (proTasks.includes('editFiles')) editFile();
+        const choices: { text: string; onPress: () => void }[] = [];
+        if (proTasks.includes('convert')) {
+          choices.push({ text: t(toWord ? 'reader.actions.convertToWord' : 'reader.actions.convertToPdf'), onPress: toWord ? convertToWord : convertToPdf });
+        }
+        if (proTasks.includes('editFiles')) choices.push({ text: t('reader.convertEdit.edit'), onPress: editFile });
+        if (proTasks.includes('pdfForms')) choices.push({ text: t('reader.actions.fillForm'), onPress: fillForm });
+        if (choices.length > 1) Alert.alert(t('reader.convertEdit.title'), undefined, [{ text: t('common.cancel'), style: 'cancel' }, ...choices]);
+        else choices[0]?.onPress();
         return;
       }
       if (!doc) return;
@@ -261,7 +288,7 @@ export function ReaderScreen() {
       else if (id === 'notes') setNotesOpen(true);
       else if (id === 'pages') setScrubberOpen(true);
     },
-    [doc, activeIndex, proTasks, toWord, convertToPdf, convertToWord, editFile, t]
+    [doc, activeIndex, proTasks, toWord, convertToPdf, convertToWord, editFile, fillForm, t]
   );
 
   const handleOverflowSelect = useCallback(
@@ -283,6 +310,8 @@ export function ReaderScreen() {
         convertToWord();
       } else if (id === 'editFile') {
         editFile();
+      } else if (id === 'fillForm') {
+        fillForm();
       } else if (id === 'sign') {
         if (!doc || !signVisible) return;
         if (doc.format === 'PDF') {
@@ -356,7 +385,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, fillForm, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -729,12 +758,14 @@ export function ReaderScreen() {
             goToPage(pdfPageFor(doc, lastIdx).page);
             if (changed) syncAnnotations(doc.id);
           }}
+          textTool={{ unlocked: isPro || textUnlocked, pro: !isPro, onUnlock: () => unlockText(doc, () => setTextUnlocked(true)) }}
         />
       ) : null}
 
       {convert.element}
       {word.element}
       {edit.element}
+      {form.element}
 
       {signStep === 'capture' && (
         <SignatureCaptureModal visible onCancel={() => setSignStep(null)} onCapture={handleSignatureCaptured} />

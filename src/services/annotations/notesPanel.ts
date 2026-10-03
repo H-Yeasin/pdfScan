@@ -40,6 +40,7 @@ function annotationY(a: Annotation): number {
   const data = a.data;
   if ('rects' in data) return data.rects.length ? Math.min(...data.rects.map((r) => r.top)) : 0;
   if ('y' in data) return data.y;
+  if ('box' in data) return data.box.top;
   return 0;
 }
 

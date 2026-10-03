@@ -10,6 +10,8 @@ type TextPromptModalProps = {
   placeholder?: string;
   submitLabel?: string;
   keyboardType?: KeyboardTypeOptions;
+  // §12 D10: several lines (a text box); Return makes a new line instead of submitting.
+  multiline?: boolean;
   onCancel: () => void;
   onSubmit: (value: string) => void;
 };
@@ -21,6 +23,7 @@ export function TextPromptModal({
   placeholder,
   submitLabel = 'Save',
   keyboardType,
+  multiline = false,
   onCancel,
   onSubmit,
 }: TextPromptModalProps) {
@@ -47,9 +50,10 @@ export function TextPromptModal({
             placeholderTextColor={tokens.muted}
             autoFocus
             keyboardType={keyboardType}
-            returnKeyType="done"
-            onSubmitEditing={() => trimmed && onSubmit(trimmed)}
-            style={[styles.input, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
+            multiline={multiline}
+            returnKeyType={multiline ? 'default' : 'done'}
+            onSubmitEditing={multiline ? undefined : () => trimmed && onSubmit(trimmed)}
+            style={[styles.input, multiline && styles.multiline, { color: tokens.ink, backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
           />
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={onCancel}>
@@ -95,6 +99,11 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.md,
     fontSize: 15,
+  },
+  multiline: {
+    height: 120,
+    paddingVertical: spacing.sm,
+    textAlignVertical: 'top',
   },
   actions: {
     flexDirection: 'row',

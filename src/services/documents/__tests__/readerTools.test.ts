@@ -65,11 +65,19 @@ describe('§12 D2 reader tool bar', () => {
     expect(readerProTasks({ doc: docx }, (id) => id === 'editFiles', allBuilt, allEdits)).toEqual(['editFiles']);
     // D6 (scan/PDF → Word) is built: a scan and a PDF have Convert once `convert` is live.
     expect(readerProTasks({ doc: scan })).toEqual(['convert']);
-    expect(readerProTasks({ external: { format: 'PDF' } })).toEqual(['convert']);
+    // D10: a PDF (not a scan) also has Fill in form.
+    expect(readerProTasks({ external: { format: 'PDF' } })).toEqual(['convert', 'pdfForms']);
+    expect(readerProTasks({ doc: imported })).toEqual(['convert', 'pdfForms']);
     expect(readerProTasks({ doc: locked })).toEqual([]);
     // Before D6 was built, a scan had none.
     expect(readerProTasks({ doc: scan }, allLive, { officeToPdf: true, pdfToWord: false })).toEqual([]);
     expect(readerProTasks({ doc: imported }, allLive, { officeToPdf: true, pdfToWord: false })).toEqual(['pdfForms']);
+  });
+
+  it('lists Fill in form in More for a PDF once `pdfForms` is live (§12 D10)', () => {
+    expect(readerMoreItems({ external: { format: 'PDF' } }, { proTasks: ['convert', 'pdfForms'] })).toContain('fillForm');
+    expect(readerMoreItems({ doc: imported }, { proTasks: readerProTasks({ doc: imported }) })).toContain('fillForm');
+    expect(readerMoreItems({ doc: scan }, { proTasks: readerProTasks({ doc: scan }) })).not.toContain('fillForm');
   });
 
   it('lists Convert to PDF in More for office files once `convert` is live', () => {

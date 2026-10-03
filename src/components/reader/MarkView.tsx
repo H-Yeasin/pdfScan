@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Image, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { cancelAnimation, runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withDecay } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Line, Path, Polyline, Rect } from 'react-native-svg';
+import Svg, { Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import { ProBadge } from '../pro/ProBadge';
 import { TextPromptModal } from '../shared/TextPromptModal';
 import { annotationAt, NOTE_ICON } from '../../services/annotations/hitTest';
 import { isRectMark, markLine } from '../../services/annotations/marks';
@@ -16,20 +17,28 @@ import {
   isDrawingTool,
   markWindow,
   MARK_TOOLS,
+  moveBox,
   pageAtY,
   screenToContent,
+  TEXT_LINE_HEIGHT,
+  TEXT_SIZES,
+  textBoxAt,
+  textSizeFor,
   viewForPage,
   zoomAbout,
   type ColumnView,
   type MarkPrefs,
   type MarkTool,
+  type TextSize,
 } from '../../services/annotations/markMode';
+import { measureText } from '../../services/pdf/visibleText';
+import { ASCENT } from '../../services/pdf/textAppearance';
 import { annotationColor, HIGHLIGHT_COLORS, HIGHLIGHTER_THICKNESS, NOTE_COLOR, PEN_COLORS, PEN_WIDTHS } from '../../services/annotations/palette';
 import { snapHighlight, type Point } from '../../services/annotations/snap';
 import { canMarkPage } from '../../services/documents/formatCapabilities';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, touchSlop, useTheme } from '../../theme';
-import type { Annotation, LibraryDocument, LibraryPage } from '../../types/models';
+import type { Annotation, LibraryDocument, LibraryPage, OcrBounding } from '../../types/models';
 import { createId } from '../../utils/id';
 import { useT } from '../../i18n/useT';
 import { useMarkPageImages } from './useMarkPageImages';
@@ -44,11 +53,16 @@ const HIGHLIGHT_ALPHA = 0.45;
 
 type Change = { kind: 'added'; annotation: Annotation } | { kind: 'removed'; annotation: Annotation } | { kind: 'edited'; before: Annotation; after: Annotation };
 type Stroke = { idx: number; points: Point[] };
+// §12 D10: a text box being dragged with the Text tool.
+type Moving = { idx: number; annotation: Annotation; box: OcrBounding; from: Point };
 
+// A constant rather than inline: `text: '…'` reads as UI text to the hard-coded strings test.
+const TEXT_ICON = 'text-outline';
 const TOOL_ICONS: Record<Exclude<MarkTool, 'underline' | 'strike'>, keyof typeof Ionicons.glyphMap> = {
   highlight: 'color-fill-outline',
   pen: 'brush-outline',
   note: 'chatbox-ellipses-outline',
+  text: TEXT_ICON,
   eraser: 'backspace-outline',
   hand: 'hand-left-outline',
 };
@@ -80,6 +94,10 @@ type MarkViewProps = {
   // `lastIdx`: the page last marked (or, with nothing marked, the page on screen), for the Reader
   // to return to. `changed`: whether document.pdf needs its annotations rewritten.
   onClose: (result: { lastIdx: number; changed: boolean }) => void;
+  // §12 D10: the Text tool is Pro (D1's gate, `pdfForms`). `unlocked`: Pro, or this document's
+  // session is on; `onUnlock` runs the gate (the Reader shows its sheet over Mark mode) and flips
+  // `unlocked` once it's through; `pro` shows the badge.
+  textTool: { unlocked: boolean; pro: boolean; onUnlock: () => void };
 };
 
 // §12 D3 Mark mode: the document's pages in one vertical column at screen width, to highlight,
@@ -87,14 +105,31 @@ type MarkViewProps = {
 // on screen and its neighbours hold an image (markWindow); the rest are empty boxes. One finger
 // marks, two fingers scroll and zoom; the Hand tool scrolls with one finger. Each mark goes to the
 // store at once; the Reader writes them into document.pdf when Mark mode closes.
-export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
+export function MarkView({ doc, startIdx, onClose, textTool }: MarkViewProps) {
   const { tokens: theme } = useTheme();
   const { t } = useT();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const prefs = state.settings.reading.mark;
-  const tool = prefs.tool;
+  // A remembered Text tool waits for the gate; until then the highlighter is on.
+  const tool: MarkTool = prefs.tool === 'text' && !textTool.unlocked ? 'highlight' : prefs.tool;
   const setPrefs = (patch: Partial<MarkPrefs>) => dispatch({ type: 'settings/SET_READING', reading: { mark: { ...prefs, ...patch } } });
+  // Text was tapped while locked: picked once the gate lets it through.
+  const wantText = useRef(false);
+  const { unlocked: textUnlocked } = textTool;
+  useEffect(() => {
+    if (!textUnlocked || !wantText.current) return;
+    wantText.current = false;
+    dispatch({ type: 'settings/SET_READING', reading: { mark: { ...prefs, tool: 'text' } } });
+  }, [textUnlocked, dispatch, prefs]);
+  const pickTool = (id: MarkTool) => {
+    if (id === 'text' && !textUnlocked) {
+      wantText.current = true;
+      textTool.onUnlock();
+      return;
+    }
+    setPrefs({ tool: id });
+  };
 
   const pageCount = doc.pages.length;
   const firstIdx = Math.min(Math.max(0, startIdx), pageCount - 1);
@@ -199,14 +234,33 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
 
   const strokeRef = useRef<Stroke | null>(null);
   const [stroke, setStroke] = useState<Stroke | null>(null);
+  const movingRef = useRef<Moving | null>(null);
+  const [moving, setMoving] = useState<Moving | null>(null);
   const beginStroke = (x0: number, y0: number, x: number, y: number) => {
     const start = locate(x0, y0);
     if (!start || notReady(start.page)) return;
+    if (tool === 'text') {
+      // Dragging a text box moves it; a drag anywhere else does nothing.
+      const hit = annotationAt(byPage.get(start.page.id) ?? [], start.point.x, start.point.y, TAP_SLOP);
+      if (hit?.kind !== 'text' || !('box' in hit.data)) return;
+      movingRef.current = { idx: start.idx, annotation: hit, box: hit.data.box, from: [start.point.x, start.point.y] };
+      setMoving(movingRef.current);
+      return;
+    }
     const end = locate(x, y, start.idx);
     strokeRef.current = { idx: start.idx, points: [[start.point.x, start.point.y], ...(end ? [[end.point.x, end.point.y] as Point] : [])] };
     setStroke(strokeRef.current);
   };
   const extendStroke = (x: number, y: number) => {
+    const m = movingRef.current;
+    if (m) {
+      const at = locate(x, y, m.idx);
+      const page = doc.pages[m.idx];
+      if (!at || !page || !('box' in m.annotation.data)) return;
+      movingRef.current = { ...m, box: moveBox(page, m.annotation.data.box, at.point.x - m.from[0], at.point.y - m.from[1]) };
+      setMoving(movingRef.current);
+      return;
+    }
     const s = strokeRef.current;
     const at = s && locate(x, y, s.idx);
     if (!s || !at) return;
@@ -215,6 +269,16 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
   };
   const endStroke = (x: number, y: number) => {
     extendStroke(x, y);
+    const m = movingRef.current;
+    if (m) {
+      movingRef.current = null;
+      setMoving(null);
+      const d = m.annotation.data;
+      if ('box' in d && (m.box.left !== d.box.left || m.box.top !== d.box.top)) {
+        record({ kind: 'edited', before: m.annotation, after: { ...m.annotation, data: { ...d, box: m.box }, updatedAt: Date.now() } }, m.idx);
+      }
+      return;
+    }
     const s = strokeRef.current;
     strokeRef.current = null;
     setStroke(null);
@@ -228,6 +292,27 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
   };
 
   const [noteDraft, setNoteDraft] = useState<{ idx: number; at?: { x: number; y: number }; editing?: Annotation } | null>(null);
+  const [textDraft, setTextDraft] = useState<{ idx: number; at?: { x: number; y: number }; editing?: Annotation } | null>(null);
+  // A box's size: the text measured the way the PDF draws it (Helvetica, or shaped by Skia).
+  const boxFor = (idx: number, text: string, at: { x: number; y: number }, size: number) => {
+    const page = doc.pages[idx];
+    return page ? textBoxAt(page, text, at, size, (line, s) => measureText(line, s, false)) : null;
+  };
+  const saveText = (text: string) => {
+    const draft = textDraft;
+    setTextDraft(null);
+    if (!draft) return;
+    const before = draft.editing;
+    if (before && 'box' in before.data) {
+      const box = boxFor(draft.idx, text, { x: before.data.box.left, y: before.data.box.top }, before.data.size);
+      if (box) record({ kind: 'edited', before, after: { ...before, text, data: { ...before.data, box }, updatedAt: Date.now() } }, draft.idx);
+    } else if (draft.at) {
+      const page = doc.pages[draft.idx];
+      const size = page ? textSizeFor(page, prefs.textSize) : 0;
+      const box = boxFor(draft.idx, text, draft.at, size);
+      if (box) add(draft.idx, { kind: 'text', color: prefs.textColor, data: { box, size }, text });
+    }
+  };
   const tapAt = (x: number, y: number) => {
     const at = locate(x, y);
     if (!at || notReady(at.page)) return;
@@ -236,6 +321,8 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
       if (hit) record({ kind: 'removed', annotation: hit }, at.idx);
     } else if (tool === 'note') {
       setNoteDraft(hit?.kind === 'note' ? { idx: at.idx, editing: hit } : { idx: at.idx, at: at.point });
+    } else if (tool === 'text') {
+      setTextDraft(hit?.kind === 'text' ? { idx: at.idx, editing: hit } : { idx: at.idx, at: at.point });
     } else if (tool === 'highlight' || tool === 'underline' || tool === 'strike') {
       // A tap marks the word under it; a tap beside the text does nothing (no free box).
       const { rects, text } = snapHighlight([[at.point.x, at.point.y]], at.page.ocr, HIGHLIGHTER_THICKNESS / 2);
@@ -366,6 +453,9 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
                   strokeTool={tool}
                   strokeColor={annotationColor(lineColor(tool))}
                   strokeWidth={tool === 'pen' ? PEN_WIDTHS[prefs.penWidth] : HIGHLIGHTER_THICKNESS}
+                  moved={moving?.idx === idx ? { id: moving.annotation.id, box: moving.box } : undefined}
+                  showTextBoxes={tool === 'text'}
+                  boxColor={theme.accent}
                   paper={theme.surface}
                 />
               ))}
@@ -399,12 +489,17 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
                 <Pressable
                   key={id}
                   style={[styles.tool, on && { backgroundColor: theme.accentSoft }]}
-                  onPress={() => setPrefs({ tool: id })}
+                  onPress={() => pickTool(id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
                 >
                   {id === 'underline' || id === 'strike' ? <LineToolIcon kind={id} color={color} /> : <Ionicons name={TOOL_ICONS[id]} size={20} color={color} />}
                   <Text style={[styles.toolLabel, { color }]}>{t(`reader.mark.tools.${id}`)}</Text>
+                  {id === 'text' && textTool.pro ? (
+                    <View style={styles.toolBadge} pointerEvents="none">
+                      <ProBadge />
+                    </View>
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -438,9 +533,29 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
                 ))}
               </>
             ) : null}
+            {tool === 'text' ? (
+              <>
+                {(Object.keys(PEN_COLORS) as (keyof typeof PEN_COLORS)[]).map((key) =>
+                  swatch(PEN_COLORS[key], prefs.textColor === key, () => setPrefs({ textColor: key }), t('reader.mark.colourText', { colour: colourName(key) }))
+                )}
+                {(Object.keys(TEXT_SIZES) as TextSize[]).map((key) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => setPrefs({ textSize: key })}
+                    style={[styles.widthChip, { borderColor: prefs.textSize === key ? theme.accent : theme.edge }]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: prefs.textSize === key }}
+                  >
+                    <Text style={[styles.widthLabel, { color: theme.ink }]}>{t(`reader.mark.textSizes.${key}`)}</Text>
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
             <Text style={[styles.hint, { color: theme.muted }]} numberOfLines={2}>
               {tool === 'pen'
                 ? t('reader.mark.penHint')
+                : tool === 'text'
+                  ? t('reader.mark.textHint')
                 : tool === 'note'
                   ? t('reader.mark.noteHint')
                   : tool === 'eraser'
@@ -470,6 +585,16 @@ export function MarkView({ doc, startIdx, onClose }: MarkViewProps) {
           setNoteDraft(null);
         }}
       />
+      <TextPromptModal
+        visible={textDraft !== null}
+        title={textDraft?.editing ? t('reader.mark.editText') : t('reader.mark.addText')}
+        initialValue={textDraft?.editing?.text ?? ''}
+        placeholder={t('reader.mark.textPlaceholder')}
+        submitLabel={t('reader.mark.save')}
+        multiline
+        onCancel={() => setTextDraft(null)}
+        onSubmit={saveText}
+      />
     </View>
   );
 }
@@ -487,11 +612,32 @@ type MarkPageProps = {
   strokeTool: MarkTool;
   strokeColor: string;
   strokeWidth: number;
+  // §12 D10: a text box being dragged (drawn at its new place), and the boxes' outlines while the
+  // Text tool is on, so the student sees what can be tapped and moved.
+  moved: { id: string; box: OcrBounding } | undefined;
+  showTextBoxes: boolean;
+  boxColor: string;
   paper: string;
 };
 
 // One page of the column, in master pixels through its SVG viewBox (like OCR boxes and marks).
-const MarkPage = memo(function MarkPage({ page, top, width, height, active, imageUri, annotations, stroke, strokeTool, strokeColor, strokeWidth, paper }: MarkPageProps) {
+const MarkPage = memo(function MarkPage({
+  page,
+  top,
+  width,
+  height,
+  active,
+  imageUri,
+  annotations,
+  stroke,
+  strokeTool,
+  strokeColor,
+  strokeWidth,
+  moved,
+  showTextBoxes,
+  boxColor,
+  paper,
+}: MarkPageProps) {
   // An imported page renders as shown now, which includes any turn added since it was indexed
   // (page.rotation); its marks live in the space it was indexed in, so the image is turned back.
   const turn = page.fileUri ? 0 : (page.rotation ?? 0);
@@ -527,6 +673,21 @@ const MarkPage = memo(function MarkPage({ page, top, width, height, active, imag
                   strokeLinejoin="round"
                 />
               ));
+            }
+            if ('box' in d) {
+              const box = moved?.id === a.id ? moved.box : d.box;
+              return (
+                <Fragment key={a.id}>
+                  {showTextBoxes ? (
+                    <Rect x={box.left} y={box.top} width={box.width} height={box.height} fill="none" stroke={boxColor} strokeWidth={2} strokeDasharray="8 6" />
+                  ) : null}
+                  {(a.text ?? '').split('\n').map((line, i) => (
+                    <SvgText key={i} x={box.left} y={box.top + d.size * (ASCENT + i * TEXT_LINE_HEIGHT)} fontSize={d.size} fill={fill}>
+                      {line}
+                    </SvgText>
+                  ))}
+                </Fragment>
+              );
             }
             if ('x' in d) {
               return (
@@ -630,6 +791,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radii.card,
+  },
+  toolBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
   },
   toolLabel: {
     fontSize: 11.5,

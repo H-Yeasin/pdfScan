@@ -84,3 +84,29 @@ export function rasterizeShaped(text: string, size: number, bold: boolean, pxPer
   const png = surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG, 100);
   return { png, run: { width: width / pxPerUnit, ascent: px.ascent / pxPerUnit, descent: (height - px.ascent) / pxPerUnit } };
 }
+
+// §12 D10: a run as an alpha mask (one byte per pixel, row by row from the top), for appearance
+// streams that pdf-lib builds synchronously (text boxes, form fields): an image's PNG can only be
+// embedded asynchronously, raw pixels can go straight into a Flate stream. Same size and metrics
+// as rasterizeShaped.
+export function rasterizeShapedAlpha(
+  text: string,
+  size: number,
+  pxPerUnit: number
+): { width: number; height: number; alpha: Uint8Array; run: ShapedRun } {
+  const paragraph = makeParagraph(text, size * pxPerUnit, false, INK);
+  const px = runOf(paragraph, size * pxPerUnit);
+  const width = Math.max(1, Math.ceil(px.width));
+  const height = Math.max(1, Math.ceil(px.ascent + px.descent));
+  const surface = Skia.Surface.MakeOffscreen(width, height);
+  if (!surface) throw new Error('skiaText: failed to create an offscreen surface');
+  const canvas = surface.getCanvas();
+  canvas.clear(Skia.Color('transparent'));
+  paragraph.paint(canvas, 0, px.ascent - baselineOf(paragraph, px));
+  surface.flush();
+  const rgba = surface.makeImageSnapshot().readPixels();
+  if (!(rgba instanceof Uint8Array)) throw new Error('skiaText: could not read the run back');
+  const alpha = new Uint8Array(width * height);
+  for (let i = 0; i < alpha.length; i++) alpha[i] = rgba[i * 4 + 3];
+  return { width, height, alpha, run: { width: width / pxPerUnit, ascent: px.ascent / pxPerUnit, descent: (height - px.ascent) / pxPerUnit } };
+}
