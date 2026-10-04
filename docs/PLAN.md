@@ -292,6 +292,24 @@ ad (or the Pro pass); marking, OCR and copy/extract text stay free.
 becomes an editable Word file, and a typo in a CSV, TXT, XLSX or Word file can be fixed, all
 offline.
 
+### §14 Pre-launch fixes *(planned 2026-10-04; blocks the Play release)*
+Goal: fix what the owner's pre-release test found: Pro tasks ran without an ad, no bulk delete, no
+cover for documents already in the Library, and the bottom of the app under the 3-button nav bar.
+
+**Detailed steps:** [`docs/plan/14-prelaunch-fixes.md`](plan/14-prelaunch-fixes.md)
+
+- [ ] Q1 Ad gate fails closed: no Pro task without a watched ad (Pro pass, live grant, or offline grace of 1 a day only)
+- [ ] Q2 Release AdMob config (real app ID, units in Remote Config) and "ad unavailable" diagnostics
+- [ ] Q3 Bottom insets on every screen (`BottomBar`, list padding, landscape, small screens)
+- [ ] Q4 Sheets, modals, snackbar and keyboard edge-to-edge; guard test
+- [ ] Q5 Bulk delete and Select all in the Library
+- [ ] Q6 Add a cover to a library PDF: service (copy or replace, index shift)
+- [ ] Q7 Add a cover to a library PDF: UI (Selection bar, Reader menu, "Save as a copy" / "Replace")
+
+**Done when:** on a release build with a 3-button nav bar, a conversion never runs without an ad
+(online), nothing sits under the system bar, five documents can be deleted at once, and a converted
+PDF gets a cover as a copy or in place.
+
 ---
 
 ## 5. Phases
