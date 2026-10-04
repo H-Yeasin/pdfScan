@@ -49,3 +49,5 @@ temp_interactive_push.bat
 # Firebase config files come from EAS file environment variables (docs/firebase.md)
 google-services.json
 GoogleService-Info.plist
+
+.env.local

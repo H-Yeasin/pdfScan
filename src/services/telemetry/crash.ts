@@ -72,3 +72,8 @@ export function initCrashReporting(enabled: boolean, dsn: string | undefined = p
 export function reportCrash(error: unknown): void {
   if (active) Sentry.captureException(error);
 }
+
+// For the dev-only "Send test error" row: tells whether that report actually went anywhere.
+export function isCrashReportingActive(): boolean {
+  return active;
+}

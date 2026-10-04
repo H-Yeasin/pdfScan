@@ -10,7 +10,7 @@
     "@react-native-firebase/analytics": "26.4.0",
     "@react-native-firebase/app": "26.4.0",
     "@react-native-firebase/remote-config": "26.4.0",
-    "@sentry/react-native": "8.28.0",
+    "@sentry/react-native": "^8.28.0",
     "@shopify/react-native-skia": "2.6.2",
     "expo": "~57.0.8",
     "expo-asset": "~57.0.8",

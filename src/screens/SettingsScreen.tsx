@@ -22,6 +22,7 @@ import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services
 import { passEndLabel } from '../components/pro/passEndLabel';
 import { APP_VERSION } from '../config/appInfo';
 import { useRemoteConfig } from '../services/remote/remoteConfig';
+import { isCrashReportingActive, reportCrash } from '../services/telemetry/crash';
 import { deviceInfo, supportContacts, type SupportContact } from '../services/support/supportLinks';
 
 export function SettingsScreen() {
@@ -245,6 +246,15 @@ export function SettingsScreen() {
                   : t('settings.developer.proPassInactive', { count: remote.passHours })
               }
               onPress={() => void setEntitlement(isPro ? null : grantPass(entitlement, Date.now(), remote.passHours))}
+            />
+            <SettingRow
+              title={t('settings.developer.testCrash')}
+              subtitle={t('settings.developer.testCrashSubtitle')}
+              onPress={() => {
+                const sent = isCrashReportingActive();
+                reportCrash(new Error('Sentry test error'));
+                dispatch({ type: 'ui/SHOW_SNACK', msg: t(sent ? 'settings.developer.testCrashSent' : 'settings.developer.testCrashOff') });
+              }}
             />
           </View>
         )}

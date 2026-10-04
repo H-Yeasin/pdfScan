@@ -6,7 +6,7 @@
     mergedManifest="build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml"
     proguardFiles="build/intermediates/default_proguard_files/global/proguard-android.txt-8.12.0"
     partialResultsDir="build/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out"
-    desugaredMethodsFiles="/Users/yeasin/.gradle/caches/9.3.1/transforms/6d19087a32d03555503016f793cdc411/transformed/D8BackportedDesugaredMethods.txt">
+    desugaredMethodsFiles="/Users/yeasin/.gradle/caches/9.3.1/transforms/f130df5b3984e9726b3fbf4ef453dabf/transformed/D8BackportedDesugaredMethods.txt">
   <buildFeatures
       namespacing="REQUIRED"/>
   <sourceProviders>
@@ -26,6 +26,6 @@
       applicationId="expo.modules.pdfnative"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out:build/generated/source/buildConfig/release"
       generatedResourceFolders="build/generated/res/resValues/release"
-      desugaredMethodsFiles="/Users/yeasin/.gradle/caches/9.3.1/transforms/6d19087a32d03555503016f793cdc411/transformed/D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="/Users/yeasin/.gradle/caches/9.3.1/transforms/f130df5b3984e9726b3fbf4ef453dabf/transformed/D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>

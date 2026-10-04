@@ -17,7 +17,9 @@
           {
             "CFBundleTypeName": "PDF Document",
             "LSHandlerRank": "Alternate",
-            "LSItemContentTypes": ["com.adobe.pdf"]
+            "LSItemContentTypes": [
+              "com.adobe.pdf"
+            ]
           }
         ]
       }
@@ -31,39 +33,87 @@
       },
       "predictiveBackGestureEnabled": true,
       "package": "com.yeasin.pdfscan",
-      "permissions": ["android.permission.CAMERA"],
-      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["DEFAULT", "BROWSABLE"],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
           "data": [
-            { "mimeType": "application/pdf" },
-            { "mimeType": "text/plain" },
-            { "mimeType": "text/csv" },
-            { "mimeType": "text/comma-separated-values" },
-            { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
-            { "mimeType": "application/vnd.ms-excel" },
-            { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-            { "mimeType": "application/zip" },
-            { "mimeType": "application/x-zip-compressed" }
+            {
+              "mimeType": "application/pdf"
+            },
+            {
+              "mimeType": "text/plain"
+            },
+            {
+              "mimeType": "text/csv"
+            },
+            {
+              "mimeType": "text/comma-separated-values"
+            },
+            {
+              "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            },
+            {
+              "mimeType": "application/vnd.ms-excel"
+            },
+            {
+              "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            },
+            {
+              "mimeType": "application/zip"
+            },
+            {
+              "mimeType": "application/x-zip-compressed"
+            }
           ]
         },
         {
           "action": "VIEW",
-          "category": ["DEFAULT", "BROWSABLE"],
-          "data": [{ "scheme": "file", "host": "*", "pathPattern": ".*\\\\.pdf" }]
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
+          "data": [
+            {
+              "scheme": "file",
+              "host": "*",
+              "pathPattern": ".*\\\\.pdf"
+            }
+          ]
         },
         {
           "action": "SEND",
-          "category": ["DEFAULT"],
+          "category": [
+            "DEFAULT"
+          ],
           "data": [
-            { "mimeType": "application/pdf" },
-            { "mimeType": "text/csv" },
-            { "mimeType": "text/comma-separated-values" },
-            { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
-            { "mimeType": "application/vnd.ms-excel" },
-            { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+            {
+              "mimeType": "application/pdf"
+            },
+            {
+              "mimeType": "text/csv"
+            },
+            {
+              "mimeType": "text/comma-separated-values"
+            },
+            {
+              "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            },
+            {
+              "mimeType": "application/vnd.ms-excel"
+            },
+            {
+              "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            }
           ]
         }
       ]
@@ -135,7 +185,17 @@
           "imageWidth": 160,
           "resizeMode": "contain",
           "backgroundColor": "#f5ead8",
-          "dark": { "backgroundColor": "#14120f" }
+          "dark": {
+            "backgroundColor": "#14120f"
+          }
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "pdfscan-gp"
         }
       ]
     ],

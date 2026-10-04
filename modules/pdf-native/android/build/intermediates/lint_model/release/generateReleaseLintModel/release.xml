@@ -26,6 +26,6 @@
       applicationId="expo.modules.pdfnative"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out:build/generated/source/buildConfig/release"
       generatedResourceFolders="build/generated/res/resValues/release"
-      desugaredMethodsFiles="/Users/yeasin/.gradle/caches/9.3.1/transforms/6d19087a32d03555503016f793cdc411/transformed/D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="/Users/yeasin/.gradle/caches/9.3.1/transforms/f130df5b3984e9726b3fbf4ef453dabf/transformed/D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>

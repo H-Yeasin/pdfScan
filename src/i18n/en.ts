@@ -180,6 +180,11 @@ export const en = {
       proPass: 'Grant a Pro pass',
       proPassActive: 'Pro until {time}. Tap to end it now.',
       proPassInactive: { one: 'No Pro. Tap for {count} hour of Pro.', other: 'No Pro. Tap for {count} hours of Pro.' },
+      // Checks the Sentry setup end to end (needs crash reports on and EXPO_PUBLIC_SENTRY_DSN).
+      testCrash: 'Send test error',
+      testCrashSubtitle: 'Reports a test error to Sentry',
+      testCrashSent: 'Test error sent to Sentry',
+      testCrashOff: 'Not sent: turn on crash reports and set EXPO_PUBLIC_SENTRY_DSN',
     },
     // §8 B1: Settings → Storage.
     storage: {
