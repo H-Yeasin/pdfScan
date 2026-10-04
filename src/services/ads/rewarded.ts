@@ -7,7 +7,7 @@ import { nonPersonalizedOnly, rewardedUnitId } from './adPolicy';
 import { getAdsSdkState, startAds } from './adsSdk';
 
 // Rewarded (full-screen) ads, only ever started by the student: §10 M6's "Watch an ad, get Pro
-// for 24 hours" on the Pro screen, and §12 D1's "Watch a short ad to convert" before a Pro task.
+// for `pass_hours`" on the Pro screen, and §12 D1's "Watch a short ad to convert" before a Pro task.
 // Never a popup, never during a scan, save or submit. The reward event (watched to the end) is
 // what counts; closing the ad before that gives nothing.
 
@@ -28,7 +28,7 @@ export type WatchResult =
   | 'capped'
   | Exclude<ShowResult, 'rewarded'>;
 
-// The day pass waits long enough for a slow network; a stuck load gives up rather than leaving
+// The Pro pass waits long enough for a slow network; a stuck load gives up rather than leaving
 // the button spinning. A task's ad waits far less (Remote Config `task_ad_timeout_ms`, 8 s): the
 // student asked to convert a file, and with no ad the task runs anyway (services/pro/proTask.ts).
 export const PASS_AD_TIMEOUT_MS = 30_000;

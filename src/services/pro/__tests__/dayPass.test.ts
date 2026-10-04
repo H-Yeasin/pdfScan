@@ -42,6 +42,15 @@ describe('daily cap', () => {
     expect(second.entitlement.expiresAt).toBe(NOON + 48 * HOUR);
   });
 
+  it('a 1-hour pass watched again while it runs ends an hour after the first end', () => {
+    const first = applyReward(null, [], NOON, 1, 3);
+    if ('capped' in first) throw new Error('capped');
+    expect(first.entitlement.expiresAt).toBe(NOON + HOUR);
+    const second = applyReward(first.entitlement, first.log, NOON + HOUR / 2, 1, 3);
+    if ('capped' in second) throw new Error('capped');
+    expect(second.entitlement.expiresAt).toBe(NOON + 2 * HOUR);
+  });
+
   it('reads a damaged log as empty', () => {
     expect(normalizePassLog('x')).toEqual([]);
     expect(normalizePassLog([1, 'a', NaN, 2])).toEqual([1, 2]);

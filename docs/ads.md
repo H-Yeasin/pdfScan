@@ -8,12 +8,12 @@ For the owner. The code is in place; ads stay off until the steps below are done
 - One adaptive banner above the tab bar on Home and Library. Never in Capture, Review,
   Deliver/Submit or the Reader, never while a scan is being processed, no full-screen ads.
 - No banner before the introduction is done, in a student's first two starts, offline, or
-  while a Pro day pass is active. All the rules: `src/services/ads/adPolicy.ts`.
+  while a Pro pass is active. All the rules: `src/services/ads/adPolicy.ts`.
 - The Google Mobile Ads SDK (and its consent form) loads only when a banner could show, after
   the first frame. In the EEA, UK and Switzerland Google's consent form (UMP) asks first;
   elsewhere Settings → Privacy → "Personalised ads" decides.
-- The Pro day pass (M6): on the Pro screen only, the student taps "Watch an ad, get Pro for 24
-  hours"; a rewarded ad watched to the end grants `pass_hours` of Pro, at most `pass_max_per_day`
+- The Pro pass (M6; 1 hour since 2026-10-04): on the Pro screen only, the student taps "Watch an
+  ad, get Pro for 1 hour"; a rewarded ad watched to the end grants `pass_hours` of Pro, at most `pass_max_per_day`
   times a day. Closing it early gives nothing. Never shown on its own.
 - Development builds always use Google's test units, so a dev phone never sees (or clicks) a
   real ad.
@@ -45,11 +45,11 @@ For the owner. The code is in place; ads stay off until the steps below are done
 - Banner on Home and Library only, above the tab bar; none in capture → review → deliver/submit
   or the Reader; none while a scan is processing.
 - None in the first two starts or before the introduction is done; none offline.
-- Settings (dev) "Pro day pass": banners disappear; ending it brings them back.
+- Settings (dev) "Grant a Pro pass": banners disappear; ending it brings them back.
 - `ads_enabled = false` in Remote Config: no banner after the next start, and no ads SDK
   requests in logcat.
 - With a VPN in an EEA country: the consent form shows once.
-- Pro screen: the test rewarded ad watched to the end gives Pro until now + 24 h (Settings
+- Pro screen: the test rewarded ad watched to the end gives Pro until now + 1 h (Settings
   shows "Pro until …", banners go, Pro covers, accents and app lock unlock); closing it early
   gives nothing; the fourth pass of a day is refused. When the pass ends: banners come back,
   the accent goes back to teal, an app lock stays on.

@@ -14,8 +14,8 @@ type ProTaskSheetProps = {
   onClose: () => void;
 };
 
-// §12 D1: shown before a Pro task for a student without a day pass or an unlocked session. One
-// choice to make: watch a short ad for this task, or the day pass (the Pro screen) for no ads.
+// §12 D1: shown before a Pro task for a student without a Pro pass or an unlocked session. One
+// choice to make: watch a short ad for this task, or the Pro pass (the Pro screen) for no ads.
 // The hook (useProTask) closes it before the ad goes on screen: an ad shown over an open modal
 // can fail or leave the modal stuck.
 export function ProTaskSheet({ task, onWatch, onGetPass, onClose }: ProTaskSheetProps) {

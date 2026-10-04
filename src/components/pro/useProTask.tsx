@@ -16,7 +16,7 @@ import { ProTaskSheet } from './ProTaskSheet';
 const SHEET_CLOSE_MS = 300;
 
 // §12 D1: the Pro task gate for one screen. `start(request)` runs the task straight away for a
-// day pass, an unlocked session or with ads switched off; otherwise it opens ProTaskSheet, and
+// Pro pass, an unlocked session or with ads switched off; otherwise it opens ProTaskSheet, and
 // after the ad (or with none to load, within today's allowance) runs the screen's own task on the
 // same screen, with the same progress UI. Render `element` once in the screen.
 //
@@ -26,7 +26,7 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
   const dispatch = useAppDispatch();
   const { go } = useRouter();
   const isPro = useIsPro();
-  const { adsEnabled } = useRemoteConfig();
+  const { adsEnabled, passHours } = useRemoteConfig();
   const sdk = useAdsSdk();
   const personalizedAdsEnabled = useAppSelector((s) => s.settings.personalizedAdsEnabled);
   const [request, setRequest] = useState<ProTaskRequest | null>(null);
@@ -45,8 +45,8 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
   }, [shouldPreload, personalizedAdsEnabled]);
 
   const offerPass = useCallback(() => {
-    dispatch({ type: 'ui/SHOW_SNACK', msg: t('pro.task.offlineUsed'), action: t('pro.task.getPro'), onAction: () => go('pro') });
-  }, [dispatch, go]);
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('pro.task.offlineUsed', { count: passHours }), action: t('pro.task.getPro'), onAction: () => go('pro') });
+  }, [dispatch, go, passHours]);
 
   const start = useCallback(
     async (req: Omit<ProTaskRequest, 'feature'>) => {

@@ -17,7 +17,7 @@ import {
 // More. Pure, so the rules per format and Pro state are tested without rendering the Reader.
 
 export type ReaderToolId = 'mark' | 'selectText' | 'notes' | 'pages' | 'convertEdit';
-// `pro`: show the Pro badge (the tool runs a Pro task, and the student has no day pass).
+// `pro`: show the Pro badge (the tool runs a Pro task, and the student has no Pro pass).
 export type ReaderTool = { id: ReaderToolId; pro: boolean };
 
 export type ReaderMoreItemId =

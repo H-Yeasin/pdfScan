@@ -42,7 +42,7 @@ type Loaded =
   | { kind: 'sheet'; sheets: EditableSheet[]; fallbackUsed: false }
   | { kind: 'docx'; html: string; images: string[]; fallbackUsed: false };
 
-// §12 D7: the full-screen editor for a TXT or CSV file, opened once D1's gate let it (a day pass,
+// §12 D7: the full-screen editor for a TXT or CSV file, opened once D1's gate let it (a Pro pass,
 // or an ad that unlocked this document for `edit_unlock_minutes`). Saving never asks again. Back
 // and Close ask before throwing edits away. The Reader's viewers stay read-only. §12 D8: an XLSX
 // or XLS file's cells, sheet by sheet, saved as a copy after a warning about what may be lost.

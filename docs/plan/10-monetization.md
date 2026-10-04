@@ -229,6 +229,9 @@ build, the device checks and the before/after numbers in `docs/qa/performance.md
     and the device checks in `docs/ads.md`.
 
 ### M6 · Rewarded "Pro day pass" and the new Pro screen *(M)*
+**Revised 2026-10-04:** one ad now gives **1 hour** of Pro (`pass_hours` = 1, cap still 3 a day) and the UI
+says "Pro pass"; see [13-pro-pass-one-hour.md](13-pro-pass-one-hour.md). The text below is kept as history.
+
 Status: done in code (commit 79325da); open: the rewarded units in AdMob and Remote Config
 (`docs/ads.md`) and the device checks.
 

@@ -40,7 +40,7 @@ afterEach(() => jest.restoreAllMocks());
 describe('parseRemoteConfig', () => {
   it('starts from safe defaults: ads and sales off', () => {
     expect(parseRemoteConfig({})).toEqual(REMOTE_DEFAULTS);
-    expect(REMOTE_DEFAULTS).toMatchObject({ adsEnabled: false, proSalesEnabled: false, passHours: 24, passMaxPerDay: 3 });
+    expect(REMOTE_DEFAULTS).toMatchObject({ adsEnabled: false, proSalesEnabled: false, passHours: 1, passMaxPerDay: 3 });
   });
 
   it('coerces console strings to their types', () => {

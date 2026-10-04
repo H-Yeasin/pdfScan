@@ -29,7 +29,7 @@ const base: DecideInput = {
 };
 
 describe('decide', () => {
-  it('runs for Pro (a day pass) without any ad', () => {
+  it('runs for Pro (a Pro pass) without any ad', () => {
     expect(decide({ ...base, isPro: true })).toBe('run');
     expect(decide({ ...base, isPro: true, adsAvailable: false, offlineRunsToday: 99 })).toBe('run');
   });
@@ -38,7 +38,7 @@ describe('decide', () => {
     expect(decide(base)).toBe('offerAd');
   });
 
-  it('runs without an ad when none can load, up to the daily allowance, then offers the day pass', () => {
+  it('runs without an ad when none can load, up to the daily allowance, then offers the Pro pass', () => {
     expect(decide({ ...base, adsAvailable: false, offlineRunsToday: 4 })).toBe('runWithoutAd');
     expect(decide({ ...base, adsAvailable: false, offlineRunsToday: 5 })).toBe('offerPro');
     expect(decide({ ...base, adsAvailable: false, offlineFreePerDay: 0 })).toBe('offerPro');

@@ -236,8 +236,9 @@ submitting or reading. Full-screen ads appear only when a free student taps a Pr
 conversion or file editing, §12) and chooses "Watch ad"; never automatically, no interstitials.
 
 Google Play can't pay out to developers in Bangladesh, and Play policy forbids sending users to
-pay outside Play (so no "WhatsApp us to buy Pro"). **Pro for now = a rewarded "Pro day pass"**:
-watch one ad, get every Pro feature for 24 hours (extra cover templates and accents, app lock,
+pay outside Play (so no "WhatsApp us to buy Pro"). **Pro for now = a rewarded "Pro pass"**:
+watch one ad, get every Pro feature for 1 hour (`pass_hours`; was 24 hours until the 2026-10-04
+revision, [`docs/plan/13-pro-pass-one-hour.md`](plan/13-pro-pass-one-hour.md)) (extra cover templates and accents, app lock,
 no banners; later PDF passwords and Drive backup). Paid Pro waits until a merchant route
 exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no login yet.
 
@@ -249,6 +250,9 @@ exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no
 - [x] M4 Pro features worth a pass: cover templates, theme accents, app lock
 - [x] M5 Banner ads, light and safe (Home and Library only; consent; cold-start budget kept)
 - [x] M6 Rewarded "Pro day pass" and the new Pro screen
+- [x] H1 Pro pass is 1 hour per ad (code default; the Firebase console `pass_hours` is open)
+- [x] H2 "day pass" → "Pro pass" in UI text
+- [x] H3 Docs for the 1-hour pass
 - [x] M7 Help & feedback contact (WhatsApp 01645724080, support only)
 - [x] M8 Opt-in usage counts (Firebase Analytics, off by default, allow-listed events)
 - [ ] M9–M11 *(Later)* Paid Pro, Firebase Auth, launch rules, when a merchant route exists
@@ -268,7 +272,7 @@ Rule: never take away a feature that was free.
 Goal: one app for a student's files: a study-first reader, conversions (Word/Excel/CSV/TXT →
 PDF, scans and PDFs → Word) and simple edits. Never changes the original; says what formatting
 is lost. **Conversions and file editing are Pro**, unlocked per task by one full-screen rewarded
-ad (or the day pass); marking, OCR and copy/extract text stay free.
+ad (or the Pro pass); marking, OCR and copy/extract text stay free.
 
 **Detailed steps:** [`docs/plan/12-convert-edit.md`](plan/12-convert-edit.md)
 
@@ -297,7 +301,7 @@ offline.
 | **P0: Foundation** | §0 | Trustworthy, tested, store-ready core |
 | **P1: Student MVP** | §1 (modes + gallery batch), §2 (Ink + Board filters), §3, §4, §9 onboarding | Play Store closed beta (ads off through Remote Config) |
 | **P2: Study** | §5, §6 groundwork, §8 zip export | Public Android launch |
-| **P3: Grow** | §10 ads + Pro day pass, §8 Drive, §11, §12 convert + light edit, iOS parity | Revenue + growth (paid Pro when a merchant route exists) |
+| **P3: Grow** | §10 ads + Pro pass, §8 Drive, §11, §12 convert + light edit, iOS parity | Revenue + growth (paid Pro when a merchant route exists) |
 | **P4: Expand** | Bengali via §6, flashcards, more templates | Regional #1 |
 
 Rule: don't start a phase until the "done when" checks of the previous phase pass.

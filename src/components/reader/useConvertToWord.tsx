@@ -8,7 +8,7 @@ import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 
 // §12 D6: the Reader's "Convert to Word" for scans and PDFs, through D1's gate (one rewarded ad per
-// conversion; none with a day pass). What's lost is said first, before the ad, so nobody watches
+// conversion; none with a Pro pass). What's lost is said first, before the ad, so nobody watches
 // an ad and then cancels. The DOCX is a new library document, offered with "Open" when it's ready;
 // the scan or PDF stays as it is. Render `element` once in the screen.
 //

@@ -70,7 +70,7 @@ export type TaskAdOutcome =
   | { outcome: 'closedEarly' }
   // No ad could load; today's offline allowance covers it: run it.
   | { outcome: 'runWithoutAd' }
-  // No ad, and the allowance is used up: offer the day pass.
+  // No ad, and the allowance is used up: offer the Pro pass.
   | { outcome: 'offerPro' };
 
 export async function watchAdForTask(

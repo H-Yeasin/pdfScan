@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 // §10 M2: settings the owner can change from the Firebase console without an app update (ads on
-// or off, the Pro day pass, the support contact). No login: Remote Config only needs Firebase's
+// or off, the Pro pass, the support contact). No login: Remote Config only needs Firebase's
 // installation id.
 //
 // The bundled defaults below are what the app does when Firebase isn't there at all (local dev
@@ -18,10 +18,10 @@ export type RemoteConfig = {
   // development builds always use Google's test unit.
   adsBannerUnitAndroid: string;
   adsBannerUnitIos: string;
-  // M6: the AdMob rewarded unit per platform, for the Pro day pass. Same rules as the banner's.
+  // M6: the AdMob rewarded unit per platform, for the Pro pass. Same rules as the banner's.
   adsRewardedUnitAndroid: string;
   adsRewardedUnitIos: string;
-  // Length of a rewarded Pro day pass (M6) and how many a day.
+  // Length of a rewarded Pro pass (M6), in hours, and how many a day.
   passHours: number;
   passMaxPerDay: number;
   // §12 D1, Pro tasks: how long one ad unlocks editing a document, how many tasks a day may run
@@ -45,7 +45,7 @@ export const REMOTE_DEFAULTS: RemoteConfig = {
   adsBannerUnitIos: '',
   adsRewardedUnitAndroid: '',
   adsRewardedUnitIos: '',
-  passHours: 24,
+  passHours: 1,
   passMaxPerDay: 3,
   editUnlockMinutes: 30,
   offlineFreeTasksPerDay: 5,

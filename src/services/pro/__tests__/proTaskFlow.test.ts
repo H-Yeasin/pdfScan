@@ -41,7 +41,7 @@ beforeEach(async () => {
 afterAll(() => setRemoteConfig(REMOTE_DEFAULTS));
 
 describe('checkProTask', () => {
-  it('offers the ad to a free student, and runs for a day pass or with ads switched off', async () => {
+  it('offers the ad to a free student, and runs for a Pro pass or with ads switched off', async () => {
     expect(await checkProTask(request(), NOON)).toBe('offerAd');
     await setEntitlement(grantPass(null, NOON, 24));
     expect(await checkProTask(request(), NOON)).toBe('run');
@@ -96,7 +96,7 @@ describe('watchAdForTask', () => {
     expect((await loadTaskState()).grants).toEqual([]);
   });
 
-  it('runs without an ad when none loads, up to offline_free_tasks_per_day, then offers the day pass', async () => {
+  it('runs without an ad when none loads, up to offline_free_tasks_per_day, then offers the Pro pass', async () => {
     mock.rewardedBehaviour.loads = false;
     expect(await watch(request())).toEqual({ outcome: 'runWithoutAd' });
     expect(await watch(request())).toEqual({ outcome: 'runWithoutAd' });

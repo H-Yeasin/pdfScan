@@ -242,9 +242,9 @@ export function SettingsScreen() {
               subtitle={
                 isPro && entitlement?.expiresAt
                   ? t('settings.developer.proPassActive', { time: passEndLabel(entitlement.expiresAt) })
-                  : t('settings.developer.proPassInactive')
+                  : t('settings.developer.proPassInactive', { count: remote.passHours })
               }
-              onPress={() => void setEntitlement(isPro ? null : grantPass(entitlement, Date.now(), 24))}
+              onPress={() => void setEntitlement(isPro ? null : grantPass(entitlement, Date.now(), remote.passHours))}
             />
           </View>
         )}

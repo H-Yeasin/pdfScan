@@ -14,7 +14,7 @@ import { radii, spacing, useTheme } from '../../theme';
 const LOSSY: ReadonlySet<string> = new Set(['DOCX', 'XLSX', 'XLS']);
 
 // §12 D5: the Reader's "Convert to PDF", through D1's gate (one rewarded ad per conversion; none
-// with a day pass). The original stays as it is; the PDF is a new library document, offered with
+// with a Pro pass). The original stays as it is; the PDF is a new library document, offered with
 // "Open" when it's ready. Render `element` once in the screen.
 //
 // `docId`: the library document, or for a file from outside its app-owned copy's uri (what the

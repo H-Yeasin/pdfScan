@@ -4,10 +4,10 @@ import type { AppStore } from '../../store/AppStateContext';
 import { dayKey } from './dayPass';
 import type { ProFeatureId } from './proFeatures';
 
-// §12 D1: the Pro task gate. Conversions and file editing are Pro; without a day pass, one
+// §12 D1: the Pro task gate. Conversions and file editing are Pro; without a Pro pass, one
 // rewarded (full-screen) ad unlocks one task: one conversion, or editing one document for
 // `edit_unlock_minutes` (Remote Config, 30 by default). If no ad can load (offline, no fill), the
-// task runs anyway, up to `offline_free_tasks_per_day`, so nobody is stuck; past that the day pass
+// task runs anyway, up to `offline_free_tasks_per_day`, so nobody is stuck; past that the Pro pass
 // is offered with a kind message, which stops airplane-mode abuse.
 //
 // The rules here are pure; components/pro/useProTask.tsx applies them. Grants and the offline
@@ -27,7 +27,7 @@ export function grantKindFor(feature: ProTaskFeature): 'once' | 'session' {
 }
 
 // `from`: when the reward came in. A grant is only good from then on, so setting the clock back
-// can't stretch a session (as with the day pass, services/pro/entitlement.isProActive).
+// can't stretch a session (as with the Pro pass, services/pro/entitlement.isProActive).
 export type ProTaskGrant =
   // One task on one document; used up when the task finishes. Kept if the task fails, so a retry
   // doesn't cost another ad.
@@ -84,13 +84,13 @@ export function recordOfflineRun(log: readonly number[], now: number): number[] 
 }
 
 export type ProTaskDecision =
-  // Pro (a day pass), an unlocked session or a once grant, or ads switched off: just run it.
+  // Pro (a Pro pass), an unlocked session or a once grant, or ads switched off: just run it.
   | 'run'
   // Show ProTaskSheet: "Watch a short ad to convert …".
   | 'offerAd'
   // No ad can load; run it and count it against today's offline allowance.
   | 'runWithoutAd'
-  // Today's offline allowance is used up: offer the day pass.
+  // Today's offline allowance is used up: offer the Pro pass.
   | 'offerPro';
 
 export type DecideInput = {

@@ -2,8 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import { getEntitlement, grantPass, setEntitlement, type Entitlement } from './entitlement';
 import { logUsage } from '../telemetry/usage';
 
-// §10 M6: the rewarded "Pro day pass". Watching one ad to the end gives `pass_hours` (Remote
-// Config, 24 by default) of every Pro feature, at most `pass_max_per_day` times a calendar day
+// §10 M6: the rewarded "Pro pass". Watching one ad to the end gives `pass_hours` (Remote
+// Config, 1 by default) of every Pro feature, at most `pass_max_per_day` times a calendar day
 // (local time). The reward is checked on the phone only: server-side verification needs a paid
 // Firebase plan, and the plan accepts the risk.
 //

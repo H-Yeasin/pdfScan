@@ -1,6 +1,6 @@
 # PDF Scan privacy policy
 
-*Draft for §10 M1, to be hosted with the store listing (§11). Last updated: 2026-10-02.*
+*Draft for §10 M1, to be hosted with the store listing (§11). Last updated: 2026-10-04.*
 
 PDF Scan is a document scanner for students. It works without an account, and your documents
 stay on your phone.
@@ -41,7 +41,7 @@ information. Nothing about your documents is sent.
 ## Optional: usage counts (Firebase Analytics)
 **Off by default.** If you turn on Settings → Privacy → **Help improve PDF Scan**, the app
 sends anonymous counts of six things only: the app was opened, a scan was completed (with its
-number of pages), a document was saved, a document was submitted, a Pro day pass was started,
+number of pages), a document was saved, a document was submitted, a Pro pass was started,
 and a backup was made. These never include names, course names, file names or any text. Turn
 it off at any time; turning it off also clears the anonymous app id Analytics kept.
 

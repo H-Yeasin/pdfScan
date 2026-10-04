@@ -32,12 +32,12 @@ wrong type or an out-of-range value uses the default.
 | `ads_banner_screens` | JSON | `["home","library"]` | Screens a banner may show on. Only `home` and `library` have a banner slot. |
 | `ads_banner_unit_android` | String | (empty) | AdMob banner unit `ca-app-pub-…/…`. Empty = no banner in release builds (dev builds use Google's test unit). |
 | `ads_banner_unit_ios` | String | (empty) | The same for iOS. |
-| `ads_rewarded_unit_android` | String | (empty) | AdMob rewarded unit for the Pro day pass (M6) and Pro tasks (§12 D1). Empty = no pass in release builds. |
+| `ads_rewarded_unit_android` | String | (empty) | AdMob rewarded unit for the Pro pass (M6) and Pro tasks (§12 D1). Empty = no pass in release builds. |
 | `ads_rewarded_unit_ios` | String | (empty) | The same for iOS. |
-| `pass_hours` | Number | `24` | Pro day pass length, 1–168. |
+| `pass_hours` | Number | `1` | Pro pass length (hours), 1–168. Was `24` until 2026-10-04 (`docs/plan/13-pro-pass-one-hour.md`); if the console still has `24`, change it to `1` and publish, or installed apps keep giving 24 hours. |
 | `pass_max_per_day` | Number | `3` | Passes a day, 0–10. |
 | `edit_unlock_minutes` | Number | `30` | §12 D1: how long one rewarded ad unlocks editing a document, 5–240. |
-| `offline_free_tasks_per_day` | Number | `5` | §12 D1: Pro tasks a day that run without an ad when none can load (offline, no fill), 0–50. Past that the day pass is offered. |
+| `offline_free_tasks_per_day` | Number | `5` | §12 D1: Pro tasks a day that run without an ad when none can load (offline, no fill), 0–50. Past that the Pro pass is offered. |
 | `task_ad_timeout_ms` | Number | `8000` | §12 D1: how long a Pro task waits for its ad before running without one, 2000–30000. |
 | `support_whatsapp` | String | `8801645724080` | Digits only, with country code (wa.me). Support only. |
 | `support_email` | String | (empty) | Empty = not shown. |

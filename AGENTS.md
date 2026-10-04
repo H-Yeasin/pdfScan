@@ -36,7 +36,7 @@ It needs a dev build (native modules), so it does not run in Expo Go.
   `'text'` annotations as /FreeText; any-script appearances: `services/pdf/textAppearance.ts`) and D11 (Find in DOCX via
   `services/documents/docxFind.ts`, XLSX/XLS Find, sheet pinch zoom and frozen first row/column in `SheetView`) are done
   in code; §12's device checks are open. Conversions and file editing are Pro (one rewarded ad per task); marking, OCR, copy/extract text stay free.
-  **§10 was revised (2026-10-02):** light ads + a rewarded "Pro day pass" + Firebase Remote Config,
+  **§10 was revised (2026-10-02):** light ads + a rewarded "Pro pass" (1 hour per ad since 2026-10-04, `docs/plan/13-pro-pass-one-hour.md`) + Firebase Remote Config,
   no login; paid Pro is parked (no Play payouts in Bangladesh). Never add text that sends users to
   pay outside Google Play (Play Payments policy); WhatsApp 01645724080 is a support contact only.
 
@@ -51,7 +51,7 @@ It needs a dev build (native modules), so it does not run in Expo Go.
 App.tsx                 AppProviders > AppNavigator + Snackbar
 src/bootstrap/          AppProviders (theme, ErrorBoundary, store), AppNavigator (screen switch, boot hooks)
 src/navigation/         router.tsx: custom state router, useRouter().go(screen) — NOT React Navigation; `hub`/`tabHub` = where Back returns
-src/screens/            Home (start screen once a course exists), Course, Capture, Review, Deliver, Library, Reader, Settings, Pro (day pass, §10 M6), ManageFolders (= courses), AcademicOptions
+src/screens/            Home (start screen once a course exists), Course, Capture, Review, Deliver, Library, Reader, Settings, Pro (Pro pass, 1 hour, §10 M6), ManageFolders (= courses), AcademicOptions
 src/components/<area>/  UI split by screen area (capture, review, deliver, library, reader, settings, shared)
 src/store/              AppStateContext (useAppSlices('library',…) / useAppSelector, useAppDispatch; useAppState is legacy and re-renders on everything), appReducer, slices/*, use*Persistence hooks
 src/services/           all logic, no UI (see pipeline below)
@@ -59,7 +59,7 @@ src/theme/              tokens, useTheme(), spacing/radii, fontFamily/typeScale 
 src/i18n/               en.ts catalog, t()/useT() (from i18n/useT), tDoc() for document text, formatDate/formatNumber; settings.uiLanguage/documentLanguage
 src/types/models.ts     SessionPage, LibraryDocument, LibraryPage, Course, Semester, DocType, PageOcr, OcrScript, DocFormat
 src/services/pro/       Pro registry (PRO_FEATURES, FREE_FOREVER, lapse rules), entitlement (useIsPro, useProFeature; §10 M3), dayPass (daily cap, M6)
-src/services/ads/       adPolicy (banner rules), adsSdk (consent + init), rewarded (day pass) - §10 M5/M6
+src/services/ads/       adPolicy (banner rules), adsSdk (consent + init), rewarded (Pro pass, 1 hour) - §10 M5/M6
 src/config/             appInfo (APP_VERSION); runtime switches come from services/remote/remoteConfig (Firebase Remote Config, §10 M2)
 src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, docFormat
 modules/pdf-native/     local Expo module (§7 R1): PDF page count/size, render page → JPEG, page text + word boxes

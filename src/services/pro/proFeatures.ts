@@ -1,6 +1,6 @@
 import type { TKey } from '../../i18n';
 
-// §10 M3: what Pro is, and what is free forever. Pro access today is the rewarded day pass (M6);
+// §10 M3: what Pro is, and what is free forever. Pro access today is the rewarded Pro pass (M6);
 // paid Pro (M9) unlocks the same list. The owner's rule: never take away a feature that was
 // free, so FREE_FOREVER only ever grows (__tests__/proFeatures.test.ts holds the baseline).
 
@@ -41,7 +41,7 @@ export const PRO_FEATURES: readonly ProFeature[] = [
   { id: 'pdfPasswords', status: 'planned', labelKey: 'pro.features.pdfPasswords', lapse: 'keepExisting' },
   { id: 'driveBackup', status: 'planned', labelKey: 'pro.features.driveBackup', lapse: 'pause' },
   // §12 Pro tasks, unlocked one task at a time by a rewarded ad (services/pro/proTask.ts) or by a
-  // day pass. What was converted or edited stays.
+  // Pro pass. What was converted or edited stays.
   // Office → PDF (D5); scan/PDF → Word joins it in D6 (readerTools.BUILT_CONVERSIONS).
   { id: 'convert', status: 'live', labelKey: 'pro.features.convert', lapse: 'keepExisting' },
   // Edit TXT and CSV files (D7), XLSX/XLS cells (D8) and Word text (D9) (readerTools.BUILT_EDITS).

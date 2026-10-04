@@ -177,9 +177,9 @@ export const en = {
       filterLab: 'Filter Lab',
       filterLabSubtitle: 'Compare every filter and tune its constants',
       // §10 M3: test Pro features before the rewarded ad (M6) exists.
-      proPass: 'Grant a Pro day pass',
+      proPass: 'Grant a Pro pass',
       proPassActive: 'Pro until {time}. Tap to end it now.',
-      proPassInactive: 'No Pro. Tap for 24 hours of Pro.',
+      proPassInactive: { one: 'No Pro. Tap for {count} hour of Pro.', other: 'No Pro. Tap for {count} hours of Pro.' },
     },
     // §8 B1: Settings → Storage.
     storage: {
@@ -785,14 +785,14 @@ export const en = {
         pdfForms: "Fill in '{name}'",
       },
       body: {
-        convert: 'Watch a short ad to convert this file. With a Pro day pass there are no ads.',
+        convert: 'Watch a short ad to convert this file. With a Pro pass there are no ads.',
         editFiles: {
-          one: 'Watch a short ad to edit this file for {count} minute. With a Pro day pass there are no ads.',
-          other: 'Watch a short ad to edit this file for {count} minutes. With a Pro day pass there are no ads.',
+          one: 'Watch a short ad to edit this file for {count} minute. With a Pro pass there are no ads.',
+          other: 'Watch a short ad to edit this file for {count} minutes. With a Pro pass there are no ads.',
         },
         pdfForms: {
-          one: 'Watch a short ad to fill in this PDF for {count} minute. With a Pro day pass there are no ads.',
-          other: 'Watch a short ad to fill in this PDF for {count} minutes. With a Pro day pass there are no ads.',
+          one: 'Watch a short ad to fill in this PDF for {count} minute. With a Pro pass there are no ads.',
+          other: 'Watch a short ad to fill in this PDF for {count} minutes. With a Pro pass there are no ads.',
         },
       },
       watch: 'Watch ad',
@@ -806,7 +806,10 @@ export const en = {
         editFiles: 'Watch to the end to edit.',
         pdfForms: 'Watch to the end to fill in the form.',
       },
-      offlineUsed: "No ad could load, and today's free tries without one are used up. A Pro day pass unlocks this for the day.",
+      offlineUsed: {
+        one: "No ad could load, and today's free tries without one are used up. A Pro pass unlocks this for {count} hour.",
+        other: "No ad could load, and today's free tries without one are used up. A Pro pass unlocks this for {count} hours.",
+      },
       getPro: 'Get Pro',
       resumeTitle: 'Finish your task?',
       resumeBody: {
