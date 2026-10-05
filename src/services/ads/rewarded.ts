@@ -11,15 +11,29 @@ import { getAdsSdkState, startAds } from './adsSdk';
 // Never a popup, never during a scan, save or submit. The reward event (watched to the end) is
 // what counts; closing the ad before that gives nothing.
 
+// §14 Q1: why no ad showed, so a task's sheet can say so (and services/pro/proTaskFlow can tell
+// an offline phone, which gets a small grace, from everything else, which gets none).
+export type AdUnavailableReason =
+  // Remote Config `ads_enabled` is off.
+  | 'adsOff'
+  // No rewarded unit for this platform in a release build.
+  | 'noUnit'
+  // The SDK didn't start, or the ad failed to show.
+  | 'sdk'
+  // Consent doesn't allow ads (services/ads/adsSdk).
+  | 'consent'
+  // The ad failed to load (no fill, offline).
+  | 'noFill'
+  // No ad came within the timeout.
+  | 'timeout';
+
 export type ShowResult =
   // Watched to the end (the reward came in) and closed.
   | 'rewarded'
   // Closed before the reward.
   | 'closedEarly'
-  // Ads are off in Remote Config, consent doesn't allow them, or no unit is set.
-  | 'unavailable'
-  // No ad came in time (no fill, offline, an SDK error).
-  | 'failed';
+  // No ad could be shown.
+  | { unavailable: AdUnavailableReason };
 
 export type WatchResult =
   // A pass was granted.
@@ -30,7 +44,7 @@ export type WatchResult =
 
 // The Pro pass waits long enough for a slow network; a stuck load gives up rather than leaving
 // the button spinning. A task's ad waits far less (Remote Config `task_ad_timeout_ms`, 8 s): the
-// student asked to convert a file, and with no ad the task runs anyway (services/pro/proTask.ts).
+// student asked to convert a file and is waiting on it.
 export const PASS_AD_TIMEOUT_MS = 30_000;
 
 // AdMob drops a loaded ad after about an hour; a preloaded one is used only while well inside
@@ -48,17 +62,20 @@ function adsModule(): Ads {
   return require('react-native-google-mobile-ads') as Ads;
 }
 
-// The unit and request for this phone, or null when no ad may be asked for.
-function createAd(personalizedAdsEnabled: boolean): RewardedAd | null {
+// The unit and request for this phone, or why no ad may be asked for.
+function createAd(personalizedAdsEnabled: boolean): { ad: RewardedAd } | { reason: AdUnavailableReason } {
   const remote = getRemoteConfig();
   const sdk = getAdsSdkState();
-  if (!remote.adsEnabled || sdk.status !== 'ready') return null;
+  if (!remote.adsEnabled) return { reason: 'adsOff' };
+  if (sdk.status !== 'ready') return { reason: sdk.reason ?? 'sdk' };
   const ads = adsModule();
   const unitId = rewardedUnitId(Platform.OS, remote, __DEV__, ads.TestIds.REWARDED);
-  if (!unitId) return null;
-  return ads.RewardedAd.createForAdRequest(unitId, {
-    requestNonPersonalizedAdsOnly: nonPersonalizedOnly(sdk.gdprApplies, personalizedAdsEnabled),
-  });
+  if (!unitId) return { reason: 'noUnit' };
+  return {
+    ad: ads.RewardedAd.createForAdRequest(unitId, {
+      requestNonPersonalizedAdsOnly: nonPersonalizedOnly(sdk.gdprApplies, personalizedAdsEnabled),
+    }),
+  };
 }
 
 // One ad loaded ahead, so a task's ad shows at once instead of after a wait.
@@ -72,8 +89,9 @@ let preloaded: Preloaded | null = null;
 export function preloadRewarded(opts: { personalizedAdsEnabled: boolean; now?: () => number }): void {
   const now = opts.now ?? Date.now;
   if (preloaded && !preloaded.failed && (preloaded.loadedAt === null || isPreloadFresh(preloaded.loadedAt, now()))) return;
-  const ad = createAd(opts.personalizedAdsEnabled);
-  if (!ad) return;
+  const created = createAd(opts.personalizedAdsEnabled);
+  if (!('ad' in created)) return;
+  const { ad } = created;
   const ads = adsModule();
   const entry: Preloaded = { ad, loadedAt: null, failed: false };
   const offLoaded = ad.addAdEventListener(ads.RewardedAdEventType.LOADED, () => {
@@ -110,18 +128,21 @@ export async function showRewarded(opts: {
   onShow?: () => void;
   now?: () => number;
 }): Promise<ShowResult> {
-  if (!getRemoteConfig().adsEnabled) return 'unavailable';
+  if (!getRemoteConfig().adsEnabled) return { unavailable: 'adsOff' };
   const now = opts.now ?? Date.now;
   // A preloaded ad has already loaded, so it shows at once.
-  let ad = takePreloaded(now());
-  const ready = ad !== null;
-  if (!ad) {
+  const preloadedAd = takePreloaded(now());
+  const ready = preloadedAd !== null;
+  let shown: RewardedAd;
+  if (preloadedAd) {
+    shown = preloadedAd;
+  } else {
     await startAds({ retry: true });
-    ad = createAd(opts.personalizedAdsEnabled);
+    const created = createAd(opts.personalizedAdsEnabled);
+    if (!('ad' in created)) return { unavailable: created.reason };
+    shown = created.ad;
   }
-  if (!ad) return 'unavailable';
   const ads = adsModule();
-  const shown = ad;
 
   return new Promise<ShowResult>((resolve) => {
     const unsubscribers: (() => void)[] = [];
@@ -140,9 +161,9 @@ export async function showRewarded(opts: {
       clearTimeout(timer);
       endExternal = beginExternalScreen();
       opts.onShow?.();
-      shown.show().catch(() => finish('failed'));
+      shown.show().catch(() => finish({ unavailable: 'sdk' }));
     };
-    const timer = setTimeout(() => finish('failed'), opts.timeoutMs);
+    const timer = setTimeout(() => finish({ unavailable: 'timeout' }), opts.timeoutMs);
 
     unsubscribers.push(
       shown.addAdEventListener(ads.RewardedAdEventType.EARNED_REWARD, () => {
@@ -150,7 +171,7 @@ export async function showRewarded(opts: {
         opts.onReward?.();
       }),
       shown.addAdEventListener(ads.AdEventType.CLOSED, () => finish(rewarded ? 'rewarded' : 'closedEarly')),
-      shown.addAdEventListener(ads.AdEventType.ERROR, () => finish('failed'))
+      shown.addAdEventListener(ads.AdEventType.ERROR, () => finish({ unavailable: 'noFill' }))
     );
     if (ready) {
       show();
@@ -162,7 +183,7 @@ export async function showRewarded(opts: {
 }
 
 export async function watchAdForPass(opts: { personalizedAdsEnabled: boolean; passesLeft: number; now?: () => number }): Promise<WatchResult> {
-  if (!getRemoteConfig().adsEnabled) return 'unavailable';
+  if (!getRemoteConfig().adsEnabled) return { unavailable: 'adsOff' };
   if (opts.passesLeft <= 0) return 'capped';
   const now = opts.now ?? Date.now;
   let granted: Promise<boolean> | null = null;

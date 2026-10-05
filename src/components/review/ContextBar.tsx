@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { spacing, typeScale, useTheme } from '../../theme';
+import { spacing, typeScale, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { BottomBar } from '../shared/BottomBar';
 
 type ContextBarItem = {
   id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'sign';
@@ -29,21 +30,31 @@ export function ContextBar({ onPress, ocrRunning }: ContextBarProps) {
   ];
 
   return (
-    <View style={[styles.row, { backgroundColor: tokens.surface, borderTopColor: tokens.edge }]}>
-      {items.map((item) => (
-        <Pressable key={item.id} style={styles.item} onPress={() => onPress(item.id)} accessibilityRole="button">
-          <Ionicons name={item.icon} size={21} color={item.active ? tokens.accent : tokens.ink} />
-          <Text style={[styles.label, { color: item.active ? tokens.accent : tokens.ink }]}>{item.label}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <BottomBar backgroundColor={tokens.surface} style={[styles.bar, { borderTopColor: tokens.edge }]}>
+      <View style={styles.row}>
+        {items.map((item) => (
+          <Pressable key={item.id} style={styles.item} onPress={() => onPress(item.id)} accessibilityRole="button">
+            <Ionicons name={item.icon} size={21} color={item.active ? tokens.accent : tokens.ink} />
+            <Text
+              maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}
+              numberOfLines={1}
+              style={[styles.label, { color: item.active ? tokens.accent : tokens.ink }]}
+            >
+              {item.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </BottomBar>
   );
 }
 
 const styles = StyleSheet.create({
+  bar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   row: {
     flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xs,
   },

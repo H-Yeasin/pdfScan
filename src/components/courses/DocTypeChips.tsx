@@ -83,7 +83,7 @@ export function DocTypePickerModal({
   const { t } = useT();
   const insets = useSafeAreaInsets();
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
         <Pressable accessible={false}
           style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge, paddingBottom: spacing.md + insets.bottom }]}

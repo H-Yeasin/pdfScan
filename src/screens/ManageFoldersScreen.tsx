@@ -26,7 +26,7 @@ export function ManageFoldersScreen() {
   const unsortedCount = useMemo(() => files.filter((f) => !f.courseId).length, [files]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />

@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CoverThumbnail } from '../components/deliver/CoverThumbnail';
 import { ProBadge } from '../components/pro/ProBadge';
@@ -18,6 +18,11 @@ import { renderPage } from '../services/enhance/skiaEnhance';
 import { exportPreset } from '../services/capture/imageSpec';
 import { buildPdfFromPages, fillPageNumbers } from '../services/pdf/pdfService';
 import type { AcademicConfig } from '../services/pdf/pdfService';
+import { defaultPageSize } from '../services/pdf/pageSize';
+import { pdfPageCount } from '../services/documents/pageMap';
+import { buildCoverPreview } from '../services/persistence/addCover';
+import { defaultSubmitPreset, presetAcademicConfig, type SubmitPreset } from '../services/submit/preset';
+import { useApplyCover } from '../components/library/useCoverTarget';
 import {
   COVER_FIELD_LABELS,
   COVER_TEMPLATES,
@@ -28,7 +33,13 @@ import {
   type CoverTemplateId,
   type CoverValues,
 } from '../services/pdf/coverTemplates';
-import { useCoverDefaults, useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
+import {
+  resolveAcademicConfig,
+  useCoverDefaults,
+  useDocumentNamingContext,
+  useNamingContext,
+  useResolvedAcademicConfig,
+} from '../store/useDeliverContext';
 import { footerPresetOf, footerPresetText, type FooterPreset } from '../services/submit/footerPresets';
 import { renderText } from '../services/submit/naming';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -90,14 +101,48 @@ function buildConfig(next: FieldState): AcademicConfig | null {
   return { enableBorder: next.enableBorder, headerText, footerText, coverPage };
 }
 
+// §14 Q7: where a library document's cover starts - its course's preset (border, footer, cover
+// template), the same defaults Deliver starts a scan for that course from - with a cover always
+// on, since a cover is what the student came for.
+export function initialCoverTargetConfig(preset: SubmitPreset): AcademicConfig {
+  const fromPreset = presetAcademicConfig(preset);
+  return {
+    enableBorder: fromPreset?.enableBorder ?? false,
+    footerText: fromPreset?.footerText,
+    coverPage: fromPreset?.coverPage ?? { mode: 'template', templateId: 'assignment', values: {} },
+  };
+}
+
+// Edits deliver.academicConfig for the scan session (from Review or Deliver) - or, in §14 Q7's
+// target mode (deliver.coverTarget, from the Selection bar or the Reader), a config of its own for
+// a library PDF, which Apply puts on that document as a copy or in place.
 export function AcademicOptionsScreen() {
   const { tokens } = useTheme();
   // t is imported (the module-level helpers use it too); this re-renders on a language change.
   useT();
   const { go, previousScreen } = useRouter();
   const dispatch = useAppDispatch();
-  const state = useAppSlices('capture', 'deliver');
-  const cfg = state.deliver.academicConfig;
+  const state = useAppSlices('capture', 'deliver', 'library');
+  const coverTarget = state.deliver.coverTarget;
+  const targetDoc = coverTarget ? state.library.files.find((f) => f.id === coverTarget.docId) : undefined;
+  const targetCourse = targetDoc?.courseId ? state.library.courses.find((c) => c.id === targetDoc.courseId) : undefined;
+  const targetCourseId = targetDoc?.courseId ?? null;
+  const targetPreset = useMemo(() => targetCourse?.submitPreset ?? defaultSubmitPreset(targetCourseId), [targetCourse, targetCourseId]);
+  // Target mode never touches the scan session's options.
+  const storedTargetCfg = coverTarget?.config;
+  const targetCfg = useMemo(
+    () => (storedTargetCfg === undefined ? initialCoverTargetConfig(targetPreset) : storedTargetCfg),
+    [storedTargetCfg, targetPreset]
+  );
+  const cfg = targetDoc ? targetCfg : state.deliver.academicConfig;
+  const setConfig = useCallback(
+    (config: AcademicConfig | null) =>
+      dispatch(targetDoc ? { type: 'deliver/SET_COVER_TARGET_CONFIG', config } : { type: 'deliver/SET_ACADEMIC_CONFIG', config }),
+    [targetDoc, dispatch]
+  );
+  // The document's PDF keeps its paper; a scan saved before sizes were stored gets its course's.
+  const targetPageSize = targetDoc?.pdfPageSize ?? targetPreset.pageSize ?? defaultPageSize();
+  const coverRun = useApplyCover(coverTarget, targetDoc);
   const [previewing, setPreviewing] = useState(false);
 
   const enableBorder = cfg?.enableBorder ?? false;
@@ -117,14 +162,21 @@ export function AcademicOptionsScreen() {
   const templateId = coverTemplateFor(cover?.mode === 'template' ? cover.templateId : lastTemplate.templateId, isPro);
   const coverValues = cover?.mode === 'template' ? cover.values : lastTemplate.coverValues;
   const importedUri = cover?.mode === 'imported_image' ? cover.importedUri : undefined;
-  const coverDefaults = useCoverDefaults();
+  const documentContext = useDocumentNamingContext(targetDoc);
+  const coverDefaults = useCoverDefaults(documentContext);
   const shownValues = resolveCoverValues(coverDefaults, coverValues);
   // What gets drawn: the stored edits on top of the defaults (Deliver does the same).
-  const resolvedCfg = useResolvedAcademicConfig();
-  const namingContext = useNamingContext();
+  const sessionResolved = useResolvedAcademicConfig();
+  const sessionContext = useNamingContext();
+  const namingContext = documentContext ?? sessionContext;
+  const resolvedCfg = useMemo(
+    () => (documentContext ? resolveAcademicConfig(targetCfg, documentContext, coverDefaults, isPro) : sessionResolved),
+    [documentContext, targetCfg, coverDefaults, isPro, sessionResolved]
+  );
   // Custom stays selected while its text happens to match a preset (e.g. right after choosing it).
   const [footerMode, setFooterMode] = useState<FooterPreset>(() => footerPresetOf(footerText));
-  const pageCount = state.capture.pages.length;
+  // The content pages the footer numbers: the session's, or the document's without its old cover.
+  const pageCount = targetDoc ? pdfPageCount(targetDoc) - (targetDoc.coverKind ? 1 : 0) : state.capture.pages.length;
   // The footer on the first content page, tokens and page numbers filled in.
   const footerSample = footerText ? fillPageNumbers(renderText(footerText, namingContext), 1, Math.max(1, pageCount)) : '';
 
@@ -143,9 +195,9 @@ export function AcademicOptionsScreen() {
       if (patch.templateId || patch.coverValues) {
         setLastTemplate({ templateId: patch.templateId ?? templateId, coverValues: patch.coverValues ?? coverValues });
       }
-      dispatch({ type: 'deliver/SET_ACADEMIC_CONFIG', config });
+      setConfig(config);
     },
-    [enableBorder, headerText, footerText, coverMode, templateId, coverValues, importedUri, dispatch]
+    [enableBorder, headerText, footerText, coverMode, templateId, coverValues, importedUri, setConfig]
   );
 
   const handlePickCoverImage = useCallback(async () => {
@@ -174,7 +226,7 @@ export function AcademicOptionsScreen() {
   const lastPreviewIdRef = useRef<string | null>(null);
 
   const handlePreview = useCallback(async () => {
-    if (pages.length === 0 || previewing) return;
+    if ((!targetDoc && pages.length === 0) || previewing) return;
     setPreviewing(true);
     if (lastPreviewIdRef.current) {
       deleteDocumentFiles(lastPreviewIdRef.current);
@@ -182,6 +234,13 @@ export function AcademicOptionsScreen() {
     }
     const previewId = createId('preview');
     try {
+      // §14 Q7: the library document's first page behind the cover, not the session's pages.
+      if (targetDoc) {
+        const uri = await buildCoverPreview(targetDoc, resolvedCfg ?? { enableBorder: false }, targetPageSize, previewId);
+        await Print.printAsync({ uri });
+        lastPreviewIdRef.current = previewId;
+        return;
+      }
       // Same single-pass render Deliver uses, one page at a time, straight to the export preset.
       const preset = exportPreset(state.deliver.quality);
       const bakedPages: { uri: string; width: number; height: number }[] = [];
@@ -214,64 +273,32 @@ export function AcademicOptionsScreen() {
     } finally {
       setPreviewing(false);
     }
-  }, [pages, previewing, state.deliver.quality, state.deliver.layoutMode, state.deliver.pageSize, resolvedCfg]);
+  }, [pages, previewing, state.deliver.quality, state.deliver.layoutMode, state.deliver.pageSize, resolvedCfg, targetDoc, targetPageSize]);
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go(previousScreen ?? 'deliver', 'back')}>
-          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.academic.title')}</Text>
-      </View>
+  // §14 Q7: the owner's choice - a copy next to the original, or the document itself.
+  const canApply = coverMode === 'template' || (coverMode === 'imported_image' && !!importedUri);
+  const { apply } = coverRun;
+  const handleApply = useCallback(() => {
+    if (!targetDoc || !resolvedCfg?.coverPage) return;
+    const run = (mode: 'copy' | 'replace') => apply(resolvedCfg, targetPageSize, mode);
+    Alert.alert(
+      t('library.cover.saveTitle'),
+      `${t('library.cover.saveCopyHint', { name: targetDoc.name })}\n\n${t('library.cover.replaceHint')}`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('library.cover.replace'), onPress: () => run('replace') },
+        { text: t('library.cover.saveCopy'), onPress: () => run('copy') },
+      ]
+    );
+  }, [targetDoc, resolvedCfg, targetPageSize, apply]);
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <View style={styles.row}>
-          <View style={styles.rowTextWrap}>
-            <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('deliver.academic.borderRow')}</Text>
-            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.borderHint')}</Text>
-          </View>
-          <Switch
-            value={enableBorder}
-            onValueChange={(value) => commit({ enableBorder: value })}
-            trackColor={{ true: tokens.accent, false: tokens.surface2 }}
-          />
-        </View>
+  const handleBack = useCallback(() => {
+    if (coverTarget) coverRun.leave();
+    else go(previousScreen ?? 'deliver', 'back');
+  }, [coverTarget, coverRun, go, previousScreen]);
 
-        <NameField
-          label={t('deliver.academic.header')}
-          value={headerText}
-          onChange={(value) => commit({ headerText: value })}
-          placeholder={t('deliver.academic.headerPlaceholder')}
-          helperText={t('deliver.academic.headerHint')}
-        />
-
-        <View style={styles.footerSection}>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.academic.footer')}</Text>
-          <SegmentedControl
-            segments={footerSegments()}
-            value={footerMode}
-            onChange={(mode) => {
-              setFooterMode(mode);
-              if (mode === 'none') commit({ footerText: '' });
-              else if (mode !== 'custom') commit({ footerText: footerPresetText(mode) });
-            }}
-          />
-          {footerMode === 'custom' && (
-            <NameField
-              label={t('deliver.academic.footerText')}
-              value={footerText}
-              onChange={(value) => commit({ footerText: value })}
-              placeholder={t('deliver.academic.footerPlaceholder')}
-              helperText={t('deliver.academic.footerHint')}
-            />
-          )}
-          {footerSample ? (
-            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.footerSample', { text: footerSample })}</Text>
-          ) : null}
-        </View>
-
+  const coverSection = (
+    <>
         <View>
           <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.academic.coverPage')}</Text>
           <SegmentedControl
@@ -345,18 +372,107 @@ export function AcademicOptionsScreen() {
           </View>
         )}
 
+    </>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={handleBack}>
+          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
+          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
+        </Pressable>
+        <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.academic.title')}</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {/* §14 Q7: for a library document the cover is what it's for, so it comes first. */}
+        {targetDoc ? coverSection : null}
+        <View style={styles.row}>
+          <View style={styles.rowTextWrap}>
+            <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('deliver.academic.borderRow')}</Text>
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.borderHint')}</Text>
+          </View>
+          <Switch
+            value={enableBorder}
+            onValueChange={(value) => commit({ enableBorder: value })}
+            trackColor={{ true: tokens.accent, false: tokens.surface2 }}
+          />
+        </View>
+
+        <NameField
+          label={t('deliver.academic.header')}
+          value={headerText}
+          onChange={(value) => commit({ headerText: value })}
+          placeholder={t('deliver.academic.headerPlaceholder')}
+          helperText={t('deliver.academic.headerHint')}
+        />
+
+        <View style={styles.footerSection}>
+          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.academic.footer')}</Text>
+          <SegmentedControl
+            segments={footerSegments()}
+            value={footerMode}
+            onChange={(mode) => {
+              setFooterMode(mode);
+              if (mode === 'none') commit({ footerText: '' });
+              else if (mode !== 'custom') commit({ footerText: footerPresetText(mode) });
+            }}
+          />
+          {footerMode === 'custom' && (
+            <NameField
+              label={t('deliver.academic.footerText')}
+              value={footerText}
+              onChange={(value) => commit({ footerText: value })}
+              placeholder={t('deliver.academic.footerPlaceholder')}
+              helperText={t('deliver.academic.footerHint')}
+            />
+          )}
+          {footerSample ? (
+            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.footerSample', { text: footerSample })}</Text>
+          ) : null}
+        </View>
+
+        {targetDoc ? null : coverSection}
+
         <Pressable accessibilityRole="button"
-          style={[styles.previewButton, { backgroundColor: tokens.accent, opacity: previewing ? 0.7 : 1 }]}
+          style={[
+            styles.previewButton,
+            targetDoc
+              ? { backgroundColor: tokens.surface, borderColor: tokens.edge, borderWidth: StyleSheet.hairlineWidth }
+              : { backgroundColor: tokens.accent },
+            { opacity: previewing ? 0.7 : 1 },
+          ]}
           onPress={handlePreview}
-          disabled={previewing || pages.length === 0}
+          disabled={previewing || (!targetDoc && pages.length === 0)}
         >
           {previewing ? (
-            <ActivityIndicator color={tokens.onAccent} />
+            <ActivityIndicator color={targetDoc ? tokens.accent : tokens.onAccent} />
           ) : (
-            <Text style={[styles.previewButtonLabel, { color: tokens.onAccent }]}>{t('deliver.academic.preview')}</Text>
+            <Text style={[styles.previewButtonLabel, { color: targetDoc ? tokens.accentInk : tokens.onAccent }]}>{t('deliver.academic.preview')}</Text>
           )}
         </Pressable>
+
+        {targetDoc ? (
+          <Pressable
+            accessibilityRole="button"
+            testID="cover-apply"
+            style={[styles.previewButton, { backgroundColor: tokens.accent, opacity: canApply ? 1 : 0.38 }]}
+            onPress={handleApply}
+            disabled={!canApply || coverRun.busy}
+            accessibilityState={{ disabled: !canApply || coverRun.busy }}
+          >
+            <Text style={[styles.previewButtonLabel, { color: tokens.onAccent }]}>{t('library.cover.apply')}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
+
+      {coverRun.busy ? (
+        <View style={[styles.busy, { backgroundColor: tokens.bg }]} accessibilityLiveRegion="polite">
+          <ActivityIndicator color={tokens.accent} size="large" />
+          <Text style={[styles.busyLabel, { color: tokens.ink }]}>{t('library.cover.adding')}</Text>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -462,5 +578,20 @@ const styles = StyleSheet.create({
   previewButtonLabel: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  busy: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    opacity: 0.94,
+  },
+  busyLabel: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -6,6 +6,7 @@ import { useAppDispatch, useAppStore } from '../../store/AppStateContext';
 import { radii, spacing, typeScale, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { TKey } from '../../i18n';
+import { useReportBottomBar } from './bottomBarHeight';
 
 type Tab = 'home' | 'capture' | 'library';
 
@@ -25,6 +26,7 @@ const TABS: { id: Tab; labelKey: TKey }[] = [
 
 export function TabBar({ active, background, activeColor, inactiveColor, accent }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const onLayout = useReportBottomBar();
   const { t } = useT();
   const { go } = useRouter();
   const dispatch = useAppDispatch();
@@ -41,7 +43,7 @@ export function TabBar({ active, background, activeColor, inactiveColor, accent 
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: background, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+    <View onLayout={onLayout} style={[styles.container, { backgroundColor: background, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       {TABS.map((tab) => (
         <Pressable key={tab.id} style={styles.tab} onPress={() => open(tab.id)} accessibilityRole="tab" accessibilityState={{ selected: tab.id === active }}>
           <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.label, { color: active === tab.id ? activeColor : inactiveColor }]}>{t(tab.labelKey)}</Text>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File } from 'expo-file-system';
 import { formatBytes, formatDate, t } from '../../i18n';
 import { useT } from '../../i18n/useT';
@@ -45,6 +46,7 @@ function errorMessage(error: unknown): string {
 // reloads the library and, after a full restore, offers the backup's settings once.
 export function RestoreHost() {
   const { tokens, themePref, setThemePref } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t: tr } = useT();
   const dispatch = useAppDispatch();
   const store = useAppStore();
@@ -237,8 +239,8 @@ export function RestoreHost() {
   const canStart = phase.kind === 'preview' && !!phase.preview && phase.preview.fits;
 
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={cancel}>
-      <View style={styles.backdrop}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible animationType="fade" onRequestClose={cancel}>
+      <View style={[styles.backdrop, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xl }]}>
         <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
           {body}

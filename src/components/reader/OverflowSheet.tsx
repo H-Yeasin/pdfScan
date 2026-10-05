@@ -27,6 +27,9 @@ const ICONS: Record<OverflowItemId, keyof typeof Ionicons.glyphMap> = {
   sign: 'create-outline',
   // §7 R3: reorder, rotate, delete, extract and add pages of a saved document.
   editPages: 'albums-outline',
+  // §14 Q7.
+  addCover: 'document-attach-outline',
+  changeCover: 'document-attach-outline',
   // §5 T5.
   bookmarks: 'bookmarks-outline',
   // §5 T3: the OCR text of scanned pages.
@@ -56,7 +59,7 @@ export function OverflowSheet({ visible, onClose, onSelect, items, submitHint }:
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
         <View
           style={[

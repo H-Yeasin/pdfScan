@@ -7,6 +7,7 @@ import { loadPassLog } from '../../pro/dayPass';
 import { REMOTE_DEFAULTS, setRemoteConfig } from '../../remote/remoteConfig';
 
 type Mock = typeof Ads & {
+  consent: { canRequestAds: boolean };
   rewardedBehaviour: { loads: boolean; script: string[] };
   lastRewarded: { unitId: string; requestOptions: unknown } | null;
 };
@@ -52,13 +53,31 @@ describe('watchAdForPass', () => {
     expect(await watch(1)).toBe('capped');
   });
 
-  it('is unavailable with ads switched off, and fails when no ad comes', async () => {
+  it('says why no ad came: ads off, no fill, consent', async () => {
     setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: false });
-    expect(await watch()).toBe('unavailable');
+    expect(await watch()).toEqual({ unavailable: 'adsOff' });
     setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: true });
     mock.rewardedBehaviour.loads = false;
-    expect(await watch()).toBe('failed');
+    expect(await watch()).toEqual({ unavailable: 'noFill' });
     expect(getEntitlement()).toBeNull();
+
+    resetAdsSdk();
+    mock.consent.canRequestAds = false;
+    try {
+      expect(await watch()).toEqual({ unavailable: 'consent' });
+    } finally {
+      mock.consent.canRequestAds = true;
+    }
+  });
+
+  it('times out when the ad never loads', async () => {
+    const load = jest.spyOn(Ads.RewardedAd, 'createForAdRequest');
+    load.mockImplementationOnce((unitId: string, options: unknown) => {
+      const ad = new (Ads as unknown as { FakeRewardedAd: new (u: string, o: unknown) => { load: jest.Mock } }).FakeRewardedAd(unitId, options);
+      ad.load = jest.fn();
+      return ad as never;
+    });
+    expect(await showRewarded({ timeoutMs: 20, personalizedAdsEnabled: true, now: () => NOON })).toEqual({ unavailable: 'timeout' });
   });
 });
 

@@ -99,7 +99,7 @@ export function StorageScreen() {
   const barTotal = courseRows.reduce((sum, row) => sum + row.bytes, 0) + (report?.otherLibraryBytes ?? 0) + (report?.cacheBytes ?? 0);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />

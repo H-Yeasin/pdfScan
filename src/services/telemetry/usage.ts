@@ -16,11 +16,17 @@ export const USAGE_EVENTS = {
   document_submitted: [],
   pass_started: [],
   backup_made: [],
-  // §12 D1: a Pro task's ad shown, watched to the end, or skipped because none could load.
-  // `feature` is services/pro/proTask.ts's PRO_TASK_FEATURE_CODES number, never a document.
+  // §12 D1: a Pro task's ad shown, or watched to the end. `feature` is services/pro/proTask.ts's
+  // PRO_TASK_FEATURE_CODES number, never a document.
   pro_task_ad_shown: ['feature'],
   pro_task_ad_rewarded: ['feature'],
-  pro_task_run_without_ad: ['feature'],
+  // §14 Q2: a task ran without an ad on a phone that was really offline (§14 Q1's daily grace).
+  // Since Q1 that's the only way a task runs without an ad, so it replaced D1's
+  // pro_task_run_without_ad (renamed before launch, so no counts were split).
+  pro_task_offline_free: ['feature'],
+  // §14 Q1: online, but no ad could show, so the task didn't run. `reason` is
+  // services/pro/proTaskFlow.ts's AD_UNAVAILABLE_CODES number.
+  pro_task_ad_unavailable: ['feature', 'reason'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UsageEvent = keyof typeof USAGE_EVENTS;

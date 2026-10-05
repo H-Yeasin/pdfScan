@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { columnCount, deleteRow, insertRow, setCell } from '../../services/edit/textEdit';
 import { useT } from '../../i18n/useT';
 import { MIN_TOUCH, radii, spacing, useTheme } from '../../theme';
@@ -153,6 +154,7 @@ function CellEditModal({
   onSubmit: (value: string) => void;
 }) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t } = useT();
   const [draft, setDraft] = useState(value);
   useEffect(() => {
@@ -160,8 +162,8 @@ function CellEditModal({
   }, [cell, value]);
 
   return (
-    <Modal transparent visible={cell !== null} animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={cell !== null} animationType="fade" onRequestClose={onCancel}>
+      <KeyboardAvoidingView style={[styles.backdrop, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }]} behavior="padding">
         <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.cardTitle, { color: tokens.ink }]}>
             {cell ? t('reader.editFile.cellTitle', { row: cell.row + 1, col: cell.col + 1 }) : ''}

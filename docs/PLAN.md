@@ -298,13 +298,13 @@ cover for documents already in the Library, and the bottom of the app under the 
 
 **Detailed steps:** [`docs/plan/14-prelaunch-fixes.md`](plan/14-prelaunch-fixes.md)
 
-- [ ] Q1 Ad gate fails closed: no Pro task without a watched ad (Pro pass, live grant, or offline grace of 1 a day only)
-- [ ] Q2 Release AdMob config (real app ID, units in Remote Config) and "ad unavailable" diagnostics
-- [ ] Q3 Bottom insets on every screen (`BottomBar`, list padding, landscape, small screens)
-- [ ] Q4 Sheets, modals, snackbar and keyboard edge-to-edge; guard test
-- [ ] Q5 Bulk delete and Select all in the Library
-- [ ] Q6 Add a cover to a library PDF: service (copy or replace, index shift)
-- [ ] Q7 Add a cover to a library PDF: UI (Selection bar, Reader menu, "Save as a copy" / "Replace")
+- [x] Q1 Ad gate fails closed: no Pro task without a watched ad (Pro pass, live grant, or offline grace of 1 a day only)
+- [x] Q2 Release AdMob config (real app ID, units in Remote Config) and "ad unavailable" diagnostics
+- [x] Q3 Bottom insets on every screen (`BottomBar`, list padding, landscape, small screens)
+- [x] Q4 Sheets, modals, snackbar and keyboard edge-to-edge; guard test
+- [x] Q5 Bulk delete and Select all in the Library
+- [x] Q6 Add a cover to a library PDF: service (copy or replace, index shift)
+- [x] Q7 Add a cover to a library PDF: UI (Selection bar, Reader menu, "Save as a copy" / "Replace")
 
 **Done when:** on a release build with a 3-button nav bar, a conversion never runs without an ad
 (online), nothing sits under the system bar, five documents can be deleted at once, and a converted

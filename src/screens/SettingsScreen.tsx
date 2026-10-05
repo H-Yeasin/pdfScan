@@ -21,7 +21,8 @@ import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
 import { passEndLabel } from '../components/pro/passEndLabel';
 import { APP_VERSION } from '../config/appInfo';
-import { useRemoteConfig } from '../services/remote/remoteConfig';
+import { useRemoteConfig, useRemoteConfigSource } from '../services/remote/remoteConfig';
+import { useAdsSdk } from '../services/ads/adsSdk';
 import { isCrashReportingActive, reportCrash } from '../services/telemetry/crash';
 import { deviceInfo, supportContacts, type SupportContact } from '../services/support/supportLinks';
 
@@ -40,6 +41,8 @@ export function SettingsScreen() {
   const entitlement = useEntitlement();
   const isPro = useIsPro();
   const remote = useRemoteConfig();
+  const remoteSource = useRemoteConfigSource();
+  const adsSdk = useAdsSdk();
   const contacts = useMemo(() => supportContacts(remote, deviceInfo()), [remote]);
   // §10 M7: WhatsApp or the email app, with the prefilled message.
   const openContact = useCallback(
@@ -81,7 +84,7 @@ export function SettingsScreen() {
   }, [dispatch, t]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go(hub, 'back')} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
@@ -246,6 +249,16 @@ export function SettingsScreen() {
                   : t('settings.developer.proPassInactive', { count: remote.passHours })
               }
               onPress={() => void setEntitlement(isPro ? null : grantPass(entitlement, Date.now(), remote.passHours))}
+            />
+            <SettingRow
+              title={t('settings.developer.adsSetup')}
+              subtitle={t('settings.developer.adsSetupLine', {
+                status: t(`settings.developer.adsStatus.${adsSdk.status}`, {
+                  reason: t(`settings.developer.adsReason.${adsSdk.reason ?? 'sdk'}`),
+                }),
+                unit: t((Platform.OS === 'ios' ? remote.adsRewardedUnitIos : remote.adsRewardedUnitAndroid) ? 'settings.developer.yes' : 'settings.developer.no'),
+                source: t(`settings.developer.remoteSource.${remoteSource}`),
+              })}
             />
             <SettingRow
               title={t('settings.developer.testCrash')}

@@ -74,6 +74,13 @@ export function canMarkPage(page: Pick<LibraryPage, 'fileUri' | 'thumbUri'>): bo
   return !!page.fileUri || !!page.thumbUri;
 }
 
+// §14 Q6: a cover page (and the preset's border, header, footer) on a library PDF - a scan, an
+// imported, merged or converted PDF. Not a password-protected one (pdf-lib can't open it), and not
+// a DOCX (§12 D6's output) or any other format: the UI says "Convert to PDF first".
+export function canAddCover(doc: Pick<LibraryDocument, 'format' | 'indexState' | 'pdfUri'>): boolean {
+  return doc.format === 'PDF' && !!doc.pdfUri && !isPasswordProtected(doc);
+}
+
 // §12 D5: the office formats printed to a PDF (services/convert/toPdf). A legacy .doc has no reader.
 export const CONVERTIBLE_TO_PDF: readonly DocFormat[] = ['DOCX', 'XLSX', 'XLS', 'CSV', 'TXT'];
 

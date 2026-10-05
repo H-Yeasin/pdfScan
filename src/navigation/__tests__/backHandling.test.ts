@@ -58,6 +58,9 @@ describe('resolveBack order', () => {
     expect(to({ screen: 'manageFolders' })).toBe('settings');
     expect(to({ screen: 'academicOptions', previousScreen: 'review' })).toBe('review');
     expect(to({ screen: 'academicOptions' })).toBe('deliver');
+    // §14 Q7: set up for a library document's cover, back where that started (after a Pro detour too).
+    expect(to({ screen: 'academicOptions', previousScreen: 'pro', coverTarget: { from: 'reader' } })).toBe('reader');
+    expect(to({ screen: 'academicOptions', previousScreen: 'library', coverTarget: { from: 'course' } })).toBe('course');
     // §10 M6: Pro goes back to where it was opened from.
     expect(to({ screen: 'pro', previousScreen: 'academicOptions' })).toBe('academicOptions');
     expect(to({ screen: 'pro' })).toBe('settings');
@@ -92,5 +95,17 @@ describe('resolveBack order', () => {
     });
     // Leaving Capture for Home keeps the pages, so no question there.
     expect(resolveBack(ctx({ screen: 'capture', sessionPageCount: 8 })).kind).toBe('go');
+  });
+});
+
+describe('§14 Q7 cover target', () => {
+  it('clears the target when leaving Academic options', () => {
+    expect(resolveBack(ctx({ screen: 'academicOptions', previousScreen: 'library', coverTarget: { from: 'library' } }))).toEqual({
+      kind: 'go',
+      to: 'library',
+      actions: [{ type: 'deliver/SET_COVER_TARGET', target: null }],
+    });
+    // The scan session's options: nothing to clear.
+    expect(resolveBack(ctx({ screen: 'academicOptions', previousScreen: 'deliver' }))).toEqual({ kind: 'go', to: 'deliver', actions: [] });
   });
 });

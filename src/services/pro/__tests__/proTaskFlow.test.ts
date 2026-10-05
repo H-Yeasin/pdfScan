@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Ads from 'react-native-google-mobile-ads';
 import * as SecureStore from 'expo-secure-store';
+import * as Network from 'expo-network';
 import { resetAdsSdk } from '../../ads/adsSdk';
 import { resetRewarded } from '../../ads/rewarded';
 import { REMOTE_DEFAULTS, setRemoteConfig } from '../../remote/remoteConfig';
@@ -10,8 +11,9 @@ import { loadPendingTask, loadTaskState, registerProTaskRunner, resetProTaskRunn
 import { checkProTask, completeProTask, pendingTaskToResume, resumeProTask, watchAdForTask, type ProTaskRequest } from '../proTaskFlow';
 import type { AppStore } from '../../../store/AppStateContext';
 
-type Mock = typeof Ads & { rewardedBehaviour: { loads: boolean; script: string[] } };
+type Mock = typeof Ads & { rewardedBehaviour: { loads: boolean; script: string[] }; consent: { canRequestAds: boolean } };
 const mock = Ads as unknown as Mock;
+const network = Network as unknown as { __setOnline(online: boolean | undefined): void };
 const EARNED = 'rewarded_earned_reward';
 const CLOSED = 'closed';
 const NOON = new Date(2026, 9, 3, 12, 0).getTime();
@@ -36,18 +38,28 @@ beforeEach(async () => {
   setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: true, offlineFreeTasksPerDay: 2, editUnlockMinutes: 30 });
   mock.rewardedBehaviour.loads = true;
   mock.rewardedBehaviour.script = [EARNED, CLOSED];
+  mock.consent.canRequestAds = true;
+  network.__setOnline(true);
 });
 
-afterAll(() => setRemoteConfig(REMOTE_DEFAULTS));
+afterAll(() => {
+  setRemoteConfig(REMOTE_DEFAULTS);
+  network.__setOnline(true);
+});
 
 describe('checkProTask', () => {
-  it('offers the ad to a free student, and runs for a Pro pass or with ads switched off', async () => {
+  it('offers the ad to a free student, and runs for a Pro pass or with pro_tasks_free', async () => {
     expect(await checkProTask(request(), NOON)).toBe('offerAd');
     await setEntitlement(grantPass(null, NOON, 24));
     expect(await checkProTask(request(), NOON)).toBe('run');
     await setEntitlement(null);
-    setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: false });
+    setRemoteConfig({ ...REMOTE_DEFAULTS, proTasksFree: true });
     expect(await checkProTask(request(), NOON)).toBe('run');
+  });
+
+  it('still offers the ad with ads switched off: that no longer makes tasks free', async () => {
+    setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: false });
+    expect(await checkProTask(request(), NOON)).toBe('offerAd');
   });
 });
 
@@ -96,8 +108,29 @@ describe('watchAdForTask', () => {
     expect((await loadTaskState()).grants).toEqual([]);
   });
 
-  it('runs without an ad when none loads, up to offline_free_tasks_per_day, then offers the Pro pass', async () => {
+  it('runs nothing when online and no ad loads, and says why', async () => {
     mock.rewardedBehaviour.loads = false;
+    const req = request();
+    expect(await watch(req)).toEqual({ outcome: 'adUnavailable', reason: 'noFill' });
+    expect(req.run).not.toHaveBeenCalled();
+    expect(await loadTaskState()).toEqual({ grants: [], offlineRuns: [] });
+    expect(await loadPendingTask()).toBeNull();
+    // Unknown network state counts as online.
+    network.__setOnline(undefined);
+    expect(await watch(req)).toEqual({ outcome: 'adUnavailable', reason: 'noFill' });
+  });
+
+  it('never runs free for consent, ads off or no unit when online', async () => {
+    mock.consent.canRequestAds = false;
+    expect(await watch(request())).toEqual({ outcome: 'adUnavailable', reason: 'consent' });
+    setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: false });
+    expect(await watch(request())).toEqual({ outcome: 'adUnavailable', reason: 'adsOff' });
+    expect((await loadTaskState()).offlineRuns).toEqual([]);
+  });
+
+  it('runs without an ad when really offline, up to offline_free_tasks_per_day, then offers the Pro pass', async () => {
+    mock.rewardedBehaviour.loads = false;
+    network.__setOnline(false);
     expect(await watch(request())).toEqual({ outcome: 'runWithoutAd' });
     expect(await watch(request())).toEqual({ outcome: 'runWithoutAd' });
     expect(await watch(request())).toEqual({ outcome: 'offerPro' });

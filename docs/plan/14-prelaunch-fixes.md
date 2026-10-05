@@ -110,7 +110,7 @@
 ---
 
 ## Q1 · Ad gate fails closed *(M)*
-Status: planned.
+Status: done in code (2026-10-04); device check open (see Verification).
 
 Goal: no Pro task runs without a rewarded ad watched to the end, except a Pro pass, a live grant, or
 a genuinely offline phone within the daily grace.
@@ -184,8 +184,41 @@ Tests:
   ad again.
 - Add `expo-network` to `src/test/mocks` if it isn't mocked yet.
 
+**As built:**
+- `remoteConfig.ts`: `proTasksFree` (`pro_tasks_free`, default false), `offlineFreeTasksPerDay`
+  default 1, `adsEnabled` default `!__DEV__` (tests and dev builds still start with ads off).
+- `decide()` takes `{ isPro, grants, feature, docId, now, proTasksFree }` and only returns `'run'` or
+  `'offerAd'`; `ProTaskDecision` lost `runWithoutAd`/`offerPro` (those are outcomes of
+  `watchAdForTask` now). `useProTask.start` no longer needs `offerPass`.
+- `rewarded.ts`: `ShowResult` is `'rewarded' | 'closedEarly' | { unavailable: AdUnavailableReason }`.
+  Load ERROR → `noFill`, the timeout → `timeout`, a `show()` rejection → `sdk`, the SDK not ready →
+  `AdsSdkState.reason` (`consent` | `sdk`, default `sdk`). `WatchResult` (the Pro pass) carries the
+  same object; `ProScreen` snacks `pro.task.adUnavailable.<reason>` (the old `pro.failed` key is
+  gone; `pro.unavailable` stays for the "ads off" status line).
+- `adsSdk.showAdChoices()`: `AdsConsent.showPrivacyOptionsForm()`, then `startAds({ retry: true })`.
+- `watchAdForTask`: offline = `(isInternetReachable ?? isConnected) === false` from
+  `getNetworkStateAsync()`; unknown or a read error counts as online. Online →
+  `{ outcome: 'adUnavailable', reason }` + `logUsage('pro_task_ad_unavailable', { feature, reason })`
+  with `AD_UNAVAILABLE_CODES` (adsOff 1, noUnit 2, sdk 3, consent 4, noFill 5, timeout 6). The event
+  had to go on the typed M8 allow-list here (with its test); Q2 still adds `pro_task_offline_free`
+  and the docs. Offline with `adsOff` also gets the grace (the plan only separates offline/online).
+- `useProTask`: `adError` state; `adUnavailable` re-opens the sheet with the request kept;
+  `runWithoutAd` shows `pro.task.offlineFree` before the task runs (a snack after it would replace
+  the task's own success snack). Closing the sheet clears both.
+- `ProTaskSheet`: `error?` and `onAdChoices?` props; title `pro.task.adUnavailable.title`, body by
+  reason, Watch becomes Try again (`refresh` icon), Ad choices only for `consent`.
+- Entry point audit: Convert to PDF/Word, edit file (library and "Open with" files: the grant id is
+  the external copy's uri), fill form and Mark mode's Text tool all go through `useProTask.start`;
+  `completeProTask` is only called from `useProTask` and `resumeProTask`; the dev Pro pass toggle in
+  Settings is inside `__DEV__`. No Library selection tool converts.
+- Tests: `proTask.test` (decide table), `proTaskFlow.test` (online no-fill/consent/ads-off → no run,
+  nothing recorded; unknown network = online; offline grace then `offerPro`), `rewarded.test`
+  (reasons incl. timeout), `adsSdk.test` (reason, Ad choices), `remoteConfig.test`,
+  `usage.test`, new `components/pro/__tests__/useProTask.test.tsx` (error state, Try again asks for
+  the ad again and then runs). The `googleMobileAds` mock gained `showPrivacyOptionsForm`.
+
 ## Q2 · Release ad config and diagnostics *(S)*
-Status: planned.
+Status: done in code (2026-10-04); the owner's checklist (`docs/ads.md` → Release checklist) is open.
 
 Goal: a release build serves real ads, and a broken setup is visible instead of silently blocking or
 freeing tasks.
@@ -215,8 +248,45 @@ Changes:
 
 Tests: telemetry allow-list test includes the new events. No UI test for the dev line.
 
+**As built:**
+- The real app ID goes in the EAS variable `ADMOB_ANDROID_APP_ID`, not `app.json`: `app.config.js`
+  (§10 M5) already swaps it into the plugin, so the public repo keeps Google's sample IDs and no
+  config file changes. The checklist (`docs/ads.md` → Release checklist, linked from
+  `docs/policy/play-console.md`'s new "Before the first release build") says so, and keeps the
+  review note in case the ID ever goes into `app.json`.
+- Telemetry: Q1 already put `pro_task_ad_unavailable` on the list. Since Q1 a task runs without an
+  ad only in the offline grace, so D1's `pro_task_run_without_ad` was **renamed** to
+  `pro_task_offline_free` (not added beside it: no counts exist before launch). `docs/firebase.md`
+  lists the four Pro task events and the reason codes.
+- `remoteConfig.ts`: `RemoteConfigSource` (`'defaults' | 'cached' | 'fetched'`),
+  `getRemoteConfigSource()` / `useRemoteConfigSource()`, and `resetRemoteConfig()` for tests.
+  `cached` only when the disk cache held console values; `fetched` once a fetch reached Firebase.
+- Settings ▸ Developer (`__DEV__` only) ▸ "Ads setup": `SDK: ready · Rewarded unit set: yes ·
+  Remote Config: fetched` (`settings.developer.adsSetupLine`; the SDK status shows its reason when
+  unavailable). "Unit set" is the console value for this platform: dev builds always use the test
+  unit.
+- Docs: `docs/firebase.md` key table (`ads_enabled` release default, `pro_tasks_free`,
+  `offline_free_tasks_per_day` 1, timeout = unavailable) and Verify; `docs/ads.md` intro, the Pro
+  task rules and phone checks; D1's "Changes made after this step was marked done" in
+  `docs/plan/12-convert-edit.md`.
+- Tests: `usage.test` (allow-list), `remoteConfig.test` (source after no Firebase, a fetch, the
+  offline cache, offline with nothing cached).
+
 ## Q3 · Bottom insets on every screen *(M)*
-Status: planned.
+Status: done in code (2026-10-04); device check open (3-button bar, gesture nav, 360 dp at font
+scale 1.3).
+
+Done: `shared/BottomBar.tsx` (`BottomBar` + `useBottomInset`) wraps `SelectionBar`, Review's
+`ContextBar` and Deliver's `StickyActions`. Settings, Pro, Storage, Backup, AcademicOptions and
+ManageFolders (scroll only) use `edges={['top', 'bottom']}`. `TabBar` and `ReaderToolBar` already
+padded by the inset; `ReaderToolBar` and `ReaderTopChrome` add the side insets. Course drops the Scan
+button's list padding while selecting. Home and Capture need nothing (TabBar is last; the camera
+area is full-bleed), and Review's `ThumbnailStrip`/`PreviewControls` aren't at the screen edge.
+`FileEditor`/`DocxEditor` sit in an all-edges `SafeAreaView` (their Modal gets Q4's translucency).
+The app is portrait-only (`app.json`), so landscape insets only matter if that changes. Small
+screens: `SelectionBar` and `ContextBar` labels cap the font scale and truncate; Deliver's and
+Pro's buttons grow (`minHeight`) and wrap. The test (`shared/__tests__/BottomBar.test.tsx`) passes
+the 48 dp inset through `SafeAreaProvider initialMetrics` instead of a global setup mock.
 
 Goal: with the 3-button bar or gesture navigation, nothing interactive sits under the system bar. Bar
 backgrounds continue under it, so the app looks finished edge to edge.
@@ -253,7 +323,29 @@ Tests:
 - The guard test is in Q4.
 
 ## Q4 · Sheets, modals, snackbar, keyboard and a guard test *(S–M)*
-Status: planned.
+Status: done in code (2026-10-04); device check open (Verification 8–10).
+
+Done: all 29 `<Modal>`s have `statusBarTranslucent navigationBarTranslucent`. The sheets that
+already padded by `insets.bottom` kept it; `FolderPickerModal` gained it. Centered cards
+(`CsvGrid`'s cell editor, `TextPromptModal`, `RestoreHost`, `BackupSheet`) add the top/bottom insets
+to their backdrop padding. The full-screen overlays (`SignatureModal`, `SignatureCaptureModal`,
+`SignaturePlacementOverlay`, `CropOverlay`) pad the backdrop by the insets and size the image from
+the height between the bars (gestures use local coordinates, so nothing else moved). Full-screen
+modals already used an all-edges `SafeAreaView`, except `GridPagesModal`: all edges unless
+selecting, when its merge bar is a `BottomBar`. **Snackbar:** bottom bars report their measured
+height to `shared/bottomBarHeight.ts` (`BottomBar`, `TabBar`, `ReaderToolBar` call
+`useReportBottomBar`), and the Snackbar, which lives once in `App.tsx`, floats above the tallest
+(else above the inset), so no screen passes an offset. **BannerSlot** needs nothing: it always sits
+above the `TabBar`, which pads. **Keyboard:** an edge-to-edge modal window isn't resized on Android,
+so `KeyboardAvoidingView` uses `behavior="padding"` on both platforms in `TextPromptModal`, `CsvGrid`,
+`CourseSheet` (the course editor), `DeadlineEditorSheet`, `FileEditor` (TXT) and `FormFillSheet`;
+`DocxEditor` wraps its WebView in one on Android only (iOS's WebView insets itself). Onboarding (a
+screen, not a modal) keeps its iOS-only behavior; check it on the device with the rest of item 10.
+The guard test `src/screens/__tests__/safeArea.test.ts` scans the source: screens pad the bottom
+(`'bottom'` edge, a `BottomBar`, `useBottomInset` or `insets.bottom`) or are allowlisted with the
+bar that pads them (Home, Library, Review, Deliver, Capture; the allowlist fails if that bar
+disappears), and every `<Modal` carries both translucency props. `BottomBar.test.tsx` checks the
+snackbar rises above a bar and drops back when it unmounts.
 
 Changes:
 - **Modals:** every `<Modal>` gets `statusBarTranslucent` and `navigationBarTranslucent` (so its
@@ -279,7 +371,27 @@ Changes:
   - every `<Modal` in `src/**/*.tsx` has `navigationBarTranslucent`.
 
 ## Q5 · Bulk delete and Select all *(S)*
-Status: planned.
+Status: done in code (2026-10-04); device check open (Verification 11–12).
+
+Done: `SelectionBar` ends with **Delete** (`trash-outline`, icon and label in `tokens.danger`, never
+disabled; each tool has `testID="selection-tool-<id>"`). `useDocumentListActions` exports
+`confirmDelete(docs, dispatch)`: one document uses the Reader's `reader.deleteTitle`/`deleteBody` with
+its name, several `library.deleteSelected.title`/`body` (plural); on confirm one `REMOVE_FILES` with
+all ids, then `deleteDocumentFiles` per id in a `for` loop (a throw is logged and the loop goes on),
+then `CLEAR_SELECTION` and the `library.deleted` snack. **Select all:** `library/SELECT_ALL { ids }`
+sets the selection to exactly `ids` and keeps `selMode` on (an empty array = Select none). The new
+`components/library/SelectAllButton.tsx` sits at the right of the Library and Course selection headers
+and gets the ids the `FlatList` renders (Library: `visibleFiles`, none on the Courses tab; Course:
+`shownDocs`), so archived-but-hidden documents and filtered-out search results are never selected.
+It reads "Select none" once all of them are selected, and hides when the list is empty. **FTS:** no
+change needed. `deleteDocuments` deletes the `documents` row, `pages` goes by `ON DELETE CASCADE`
+(`PRAGMA foreign_keys = ON` in `dbService`), and the cascade fires `pages_ad`, which removes the
+`pages_fts` row. Home's "Continue" card already skips a missing document (`continueDocument`).
+Tests: `store/__tests__/librarySlice.test.ts` (SELECT_ALL, select none, REMOVE_FILES with several ids
+cascading) and `components/library/__tests__/bulkDelete.test.tsx` (Delete last and enabled for PDF +
+DOCX + protected PDF; confirm → one REMOVE_FILES, files deleted in order after it, a failed folder
+doesn't stop the rest; Cancel → nothing; one document's wording; Select all in `LibraryScreen` skips a
+hidden archived document, then Select none).
 
 Files: `src/components/library/SelectionBar.tsx`, `src/components/library/useDocumentListActions.tsx`,
 `src/screens/LibraryScreen.tsx` (selection header), `src/screens/CourseScreen.tsx`,
@@ -317,7 +429,28 @@ Tests:
 - `hardcodedStrings` stays green.
 
 ## Q6 · Add a cover to a library PDF: the service *(M)*
-Status: planned.
+Status: done in code (2026-10-04); the UI is Q7.
+
+As built: `services/persistence/addCover.ts` (next to `libraryOperations`, whose `copyPageInto` and
+`pageFiles` it reuses) exports `addCoverToDocument(input)` with the API below, and `CoverPhotoError`
+for "The cover photo couldn't be used". `canAddCover(doc)` in `documents/formatCapabilities.ts`: a
+PDF with a `pdfUri` that isn't password-protected. `document.withCover` ("{name} (cover)") in `en.ts`.
+**Differs from the plan:** the cover **is** a page row here, as Deliver saves it (`pages[0]` with
+`coverKind` set; `documents/pageMap` counts it as PDF page 1). The new cover gets its own row (a scan:
+the rendered master + thumbnail from `renderCoverPageImage`; a PDF-level doc: a row measured at
+`MASTER_MAX_DIM` with a thumbnail rendered by `pdf-native`, best-effort). Annotations and bookmarks
+point at **page ids**, so the content pages' notes need no index shift; only `lastPage` (a PDF page
+number) moves +1 when there was no cover before. Replacing a cover gives the cover a new row and
+drops the annotations/bookmarks on the old one (returned only when that changes anything); the old
+cover's files are deleted. Scans are rebuilt at `'as-is'` from the masters in their own layout
+(2-in-1 kept) with annotations written again; a PDF-level doc removes its old cover page, then
+`decoratePdf`. Replace writes `document.cover.tmp.pdf`, then moves it over `document.pdf`; any error
+deletes what was written (a copy's whole folder) and rethrows. A cover skipped by `buildCoverPage`
+(page count off) or not rendered throws `CoverPhotoError`. Search: the new `searchHaystack` is built
+from the pages; the diff-sync re-indexes the page rows (the cover row has no text). Known limits: a
+scan's stamped display copies (Deliver's border/header pixels) are not redrawn, and a PDF-level doc
+given a cover twice gets the border/header stamped twice (vector stamps on an imported PDF can't be
+taken off). Tests: `persistence/__tests__/addCover.test.ts` (9).
 
 Goal: any PDF in the Library (scanned, imported, merged, converted from Word/Excel/CSV/TXT) can get a
 cover page (plus the preset's border, header and footer), saved as a copy or replacing the document.
@@ -389,7 +522,35 @@ Tests (`addCover.test.ts`, with the existing pdf-lib and file-system mocks):
 - `canAddCover`: pdf yes, protected pdf no, docx/xlsx/csv/txt no.
 
 ## Q7 · Add a cover to a library PDF: the UI *(M)*
-Status: planned.
+Status: done in code (2026-10-04); device check open (Verification 13–16).
+
+As built: `SelectionBar` has a **Cover** tool (`document-attach-outline`) before Delete: disabled
+unless exactly one document is selected; one that `canAddCover` refuses (a DOCX, a protected PDF)
+is dimmed but tappable. The new `components/library/useCoverTarget.ts` holds both sides:
+`useOpenCoverOptions()` (used by the Selection bar and the Reader's More: "Add cover page", or
+"Change cover page" when `coverKind` is set, `readerTools` ids `addCover`/`changeCover`) snacks
+`library.cover.convertFirst` or `library.passwordProtected`, else clears the selection, sets
+`deliver.coverTarget` and opens Academic options; `useApplyCover()` runs `addCoverToDocument`,
+dispatches (`ADD_FILE` for a copy, else `UPDATE_FILE` + `SET_ANNOTATIONS`/`SET_BOOKMARKS` when
+returned), clears the target and goes back, with a "Cover added" snack (**Open** unless it was a
+Replace from the Reader, which remounts on the new PDF). **Differs from the plan:**
+`coverTarget = { docId, from: ScreenName, config? }`: `from` is any screen (Home, Course and Storage
+select too), and the target's config lives there (`deliver/SET_COVER_TARGET_CONFIG`), not in
+component state, so a Pro detour for a locked template doesn't lose the edits; `deliver/RESET`
+keeps it. The config starts from the document's course preset (`initialCoverTargetConfig`: border,
+footer, the preset's template or Assignment), with the cover on. Header/footer tokens and the
+cover's defaults come from the document (`useDocumentNamingContext`: its course, type and
+`typeNumberOf`, its name as the title); `resolveAcademicConfig` is the pure half of
+`useResolvedAcademicConfig`. In target mode the cover section comes first, Preview builds the
+document's first content page with the cover and stamps (`buildCoverPreview` in `addCover.ts`),
+and **Apply** (disabled with no cover, or Photo with no photo) opens an `Alert`: Cancel / Replace /
+Save as a copy, the two hints in its body. The page size is the document's `pdfPageSize`, else its
+course preset's. An "Adding cover…" overlay covers the screen while it runs; a failure snacks
+`photoFailed` / `passwordProtected` / `toolFailed` and stays. Back (on screen and Android's,
+`backHandling` via `coverTarget.from`) clears the target. Tests:
+`components/library/__tests__/coverTarget.test.tsx` (Cover tool states; DOCX snack; Apply disabled
+without a cover and `deliver.academicConfig` untouched; copy → `ADD_FILE` at the top, back to the
+Library; Cancel/Replace), `backHandling.test.ts`, `readerTools.test.ts`.
 
 Files: `SelectionBar.tsx`, `useDocumentListActions.tsx`, `ReaderScreen.tsx` +
 `components/reader/OverflowSheet.tsx` (`services/documents/readerTools.ts` for the menu entry),

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg data-dc-tpl="44" xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" fill="none">
+        <rect data-dc-tpl="45" width="960" height="360" fill="#f5ead8"></rect>
+        <g data-dc-tpl="46" transform="translate(150 92) scale(0.342412)">
+          <path data-dc-tpl="47" fill="#201e1d" fill-rule="evenodd" d="M326 190C326 219.9 302.5 242 262 242H96C44.2 242 0 286.2 0 340V514H122V364H300C390 364 456 310 456 200V160L296 0H62C27.76 0 0 27.76 0 62V276.5L28 246.6V62C28 43.22 43.22 28 62 28H274V130C274 152.09 291.91 170 314 170H428V200C428 294 378 336 300 336H122V290H94V486H28V340C28 297.8 55.8 270 96 270H262C313.5 270 354 232.1 354 190ZM302 45.6L398.4 142H314C307.37 142 302 136.63 302 130Z"></path>
+          <path data-dc-tpl="48" fill="#16a085" d="M96 96H254V124H124V222H96Z"></path>
+        </g>
+        <text data-dc-tpl="49" x="342" y="217" font-family="Figtree" font-weight="600" font-size="128" letter-spacing="-3"><tspan data-dc-tpl="50" fill="#201e1d">pdf</tspan><tspan data-dc-tpl="51" fill="#16a085">scan</tspan></text>
+      </svg>

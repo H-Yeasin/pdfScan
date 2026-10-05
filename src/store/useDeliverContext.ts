@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
-import { defaultDocTypeFor, nextTypeNumber } from '../services/courses/docTypes';
+import { defaultDocTypeFor, docTypeOf, nextTypeNumber, typeNumberOf } from '../services/courses/docTypes';
 import { allowedCover, coverDefaults, withCoverDefaults, type CoverValues } from '../services/pdf/coverTemplates';
 import { useIsPro } from '../services/pro/entitlement';
 import { institutionLogoUri } from '../services/submit/institutionLogo';
 import type { AcademicConfig } from '../services/pdf/pdfService';
 import { firstLine, renderText, type NamingContext } from '../services/submit/naming';
+import type { LibraryDocument } from '../types/models';
 import { useAppSlices } from './AppStateContext';
 import { useFilingCourse } from './useFilingCourse';
 
@@ -32,12 +33,52 @@ export function useNamingContext(): NamingContext {
   );
 }
 
+// §14 Q7: the same for a document already in the Library that gets a cover: its course, its type
+// and the number it had among them (typeNumberOf, as a submission counts it), and its name as the
+// title. Undefined for no document (the hook is called either way).
+export function useDocumentNamingContext(doc: LibraryDocument | undefined): NamingContext | undefined {
+  const state = useAppSlices('library', 'settings');
+  const { courses, files } = state.library;
+  const { profile } = state.settings;
+  return useMemo(
+    () =>
+      doc && {
+        profile,
+        course: courses.find((c) => c.id === doc.courseId),
+        docType: docTypeOf(doc),
+        n: typeNumberOf(doc, files),
+        date: new Date(),
+        title: doc.name,
+      },
+    [doc, profile, courses, files]
+  );
+}
+
 // What a cover page shows before the student edits anything. Shared by Deliver (which draws the
-// cover) and Academic options (which shows the fields).
-export function useCoverDefaults(): CoverValues {
-  const ctx = useNamingContext();
+// cover) and Academic options (which shows the fields). `forDocument`: a library document's
+// context (useDocumentNamingContext) instead of the scan session's.
+export function useCoverDefaults(forDocument?: NamingContext): CoverValues {
+  const sessionCtx = useNamingContext();
+  const ctx = forDocument ?? sessionCtx;
   const logoName = useAppSlices('settings').settings.institutionLogo;
   return useMemo(() => coverDefaults({ ...ctx, logoUri: institutionLogoUri(logoName) }), [ctx, logoName]);
+}
+
+// A stored academic config as it will be drawn (see useResolvedAcademicConfig).
+export function resolveAcademicConfig(
+  stored: AcademicConfig | null,
+  ctx: NamingContext,
+  defaults: CoverValues,
+  isPro: boolean
+): AcademicConfig | null {
+  if (!stored) return null;
+  const cover = allowedCover(stored.coverPage, isPro);
+  return {
+    ...stored,
+    headerText: stored.headerText ? renderText(stored.headerText, ctx) || undefined : undefined,
+    footerText: stored.footerText ? renderText(stored.footerText, ctx) || undefined : undefined,
+    coverPage: cover ? withCoverDefaults(cover, defaults) : undefined,
+  };
 }
 
 // deliver.academicConfig as it will be drawn: a template cover's stored edits on top of its
@@ -50,14 +91,5 @@ export function useResolvedAcademicConfig(): AcademicConfig | null {
   const ctx = useNamingContext();
   const defaults = useCoverDefaults();
   const isPro = useIsPro();
-  return useMemo(() => {
-    if (!stored) return null;
-    const cover = allowedCover(stored.coverPage, isPro);
-    return {
-      ...stored,
-      headerText: stored.headerText ? renderText(stored.headerText, ctx) || undefined : undefined,
-      footerText: stored.footerText ? renderText(stored.footerText, ctx) || undefined : undefined,
-      coverPage: cover ? withCoverDefaults(cover, defaults) : undefined,
-    };
-  }, [stored, ctx, defaults, isPro]);
+  return useMemo(() => resolveAcademicConfig(stored, ctx, defaults, isPro), [stored, ctx, defaults, isPro]);
 }

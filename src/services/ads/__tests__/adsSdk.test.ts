@@ -1,5 +1,5 @@
 import * as Ads from 'react-native-google-mobile-ads';
-import { getAdsSdkState, resetAdsSdk, startAds } from '../adsSdk';
+import { getAdsSdkState, resetAdsSdk, showAdChoices, startAds } from '../adsSdk';
 
 const mock = Ads as unknown as { consent: { canRequestAds: boolean; gdprApplies: boolean } } & typeof Ads;
 
@@ -23,7 +23,7 @@ describe('startAds', () => {
     mock.consent.canRequestAds = false;
     mock.consent.gdprApplies = true;
     await startAds();
-    expect(getAdsSdkState()).toEqual({ status: 'unavailable', gdprApplies: true });
+    expect(getAdsSdkState()).toEqual({ status: 'unavailable', gdprApplies: true, reason: 'consent' });
     expect(Ads.default().initialize).not.toHaveBeenCalled();
   });
 
@@ -36,6 +36,16 @@ describe('startAds', () => {
   it('stays off on an error', async () => {
     (Ads.AdsConsent.gatherConsent as jest.Mock).mockRejectedValueOnce(new Error('no network'));
     await startAds();
-    expect(getAdsSdkState().status).toBe('unavailable');
+    expect(getAdsSdkState()).toMatchObject({ status: 'unavailable', reason: 'sdk' });
+  });
+
+  it('shows Ad choices, then starts again with the new answer', async () => {
+    mock.consent.canRequestAds = false;
+    await startAds();
+    expect(getAdsSdkState().reason).toBe('consent');
+    mock.consent.canRequestAds = true;
+    await showAdChoices();
+    expect(Ads.AdsConsent.showPrivacyOptionsForm).toHaveBeenCalledTimes(1);
+    expect(getAdsSdkState()).toMatchObject({ status: 'ready' });
   });
 });

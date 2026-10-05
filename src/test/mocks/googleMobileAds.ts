@@ -6,6 +6,7 @@ export const consent = { canRequestAds: true, gdprApplies: false };
 export const AdsConsent = {
   gatherConsent: jest.fn(async () => ({ canRequestAds: consent.canRequestAds })),
   getGdprApplies: jest.fn(async () => consent.gdprApplies),
+  showPrivacyOptionsForm: jest.fn(async () => ({ canRequestAds: consent.canRequestAds })),
 };
 const mobileAds = {
   initialize: jest.fn(async () => []),

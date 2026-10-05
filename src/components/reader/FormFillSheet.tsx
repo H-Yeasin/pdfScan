@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { FormField, FormValues } from '../../services/edit/pdfForm';
 import { useT } from '../../i18n/useT';
@@ -116,7 +116,7 @@ export function FormFillSheet({ form, onSave, onClose }: FormFillSheetProps) {
   };
 
   return (
-    <Modal visible={form !== null} animationType="slide" onRequestClose={close}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={form !== null} animationType="slide" onRequestClose={close}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={[styles.header, { borderBottomColor: tokens.edge }]}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={close} accessibilityLabel={t('common.close')}>
@@ -141,7 +141,7 @@ export function FormFillSheet({ form, onSave, onClose }: FormFillSheetProps) {
         <View style={[styles.banner, { backgroundColor: tokens.surface2 }]}>
           <Text style={[styles.bannerText, { color: tokens.muted }]}>{t('reader.form.copyNote')}</Text>
         </View>
-        <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.root} behavior="padding">
           <FlatList
             data={form?.fields ?? []}
             keyExtractor={(f) => f.name}

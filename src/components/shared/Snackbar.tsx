@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing } from '../../theme';
 import { announce } from '../../services/a11y/announce';
+import { useBottomBarHeight } from './bottomBarHeight';
 
 const AUTO_DISMISS_MS = 3200;
 
@@ -12,6 +13,9 @@ export function Snackbar() {
   const state = useAppSlices('ui');
   const { snack } = state.ui;
   const insets = useSafeAreaInsets();
+  // §14 Q4: above the screen's bottom bar (tab bar, selection bar, Reader tools) when there is one,
+  // otherwise above the navigation bar. The bar's height already includes the inset.
+  const barHeight = useBottomBarHeight();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -25,7 +29,7 @@ export function Snackbar() {
   if (!snack) return null;
 
   return (
-    <View style={[styles.container, { bottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: barHeight > 0 ? barHeight + spacing.sm : Math.max(insets.bottom, spacing.md) + spacing.sm }]} pointerEvents="box-none">
       <View style={styles.bar} accessibilityLiveRegion="polite">
         <Text style={styles.message} numberOfLines={2}>
           {snack.msg}

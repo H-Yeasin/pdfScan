@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 
@@ -28,6 +29,7 @@ export function TextPromptModal({
   onSubmit,
 }: TextPromptModalProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t } = useT();
   const [value, setValue] = useState(initialValue);
 
@@ -38,9 +40,9 @@ export function TextPromptModal({
   const trimmed = value.trim();
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
-      {/* §9 O6: on iOS the card moves up with the keyboard instead of sitting under it. */}
-      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
+      {/* §9 O6, §14 Q4: the card moves up with the keyboard. The modal is edge-to-edge, so Android no longer resizes its window and needs the padding too. */}
+      <KeyboardAvoidingView style={[styles.backdrop, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xl }]} behavior="padding">
         <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
           <TextInput

@@ -33,7 +33,7 @@ export function PageScrubberSheet({ visible, pages, currentIdx, onPick, onClose 
   }, [visible, currentIdx]);
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose}>
         <View style={[styles.sheet, { backgroundColor: tokens.surface, paddingBottom: insets.bottom + spacing.md }]}>
           <View style={[styles.handle, { backgroundColor: tokens.edge }]} />

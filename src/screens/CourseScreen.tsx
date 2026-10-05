@@ -9,6 +9,7 @@ import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { EmptyState } from '../components/shared/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
+import { SelectAllButton } from '../components/library/SelectAllButton';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
 import { useBackupExport } from '../components/backup/useBackupExport';
 import { SubmissionList } from '../components/submit/SubmissionList';
@@ -138,6 +139,7 @@ export function CourseScreen() {
             <Ionicons name="close" size={20} color={tokens.ink} />
           </Pressable>
           <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.length })}</Text>
+          <SelectAllButton visibleIds={shownDocs.map((d) => d.id)} selection={selection} />
         </View>
       ) : (
         <View style={styles.header}>
@@ -268,7 +270,9 @@ export function CourseScreen() {
             data={shownDocs}
             keyExtractor={(doc) => doc.id}
             {...DOC_LIST_TUNING}
-            contentContainerStyle={[styles.listContent, { paddingBottom: 96 + insets.bottom }]}
+            // Room for the floating Scan button above the navigation bar; while selecting, the
+            // SelectionBar (a BottomBar) sits below the list and clears the bar itself.
+            contentContainerStyle={[styles.listContent, { paddingBottom: selMode ? spacing.lg : 96 + insets.bottom }]}
             ListFooterComponent={
               <>
                 {archivedCount > 0 ? (

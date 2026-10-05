@@ -43,7 +43,7 @@ import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
 import { useDeadlineReminders } from '../store/useDeadlines';
 import { useStorageIntegrity } from '../store/useStorageIntegrity';
-import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
+import { useAppDispatch, useAppSelector, useAppSlices } from '../store/AppStateContext';
 import { initCrashReporting } from '../services/telemetry/crash';
 import { logUsage, setUsageCollection } from '../services/telemetry/usage';
 import { useTheme } from '../theme';
@@ -109,6 +109,8 @@ export function AppNavigator() {
 
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library', 'settings');
+  // §14 Q7: only this field of `deliver` (the rest changes with every keystroke in Deliver).
+  const coverTarget = useAppSelector((s) => s.deliver.coverTarget);
   const { crashReportsEnabled } = state.settings;
   // Deferred too (§9 O5): Sentry's init isn't free, and a crash before it still reaches the
   // ErrorBoundary.
@@ -207,6 +209,7 @@ export function AppNavigator() {
     sessionPageCount: state.capture.pages.length,
     retakeTargetId: state.capture.retakeTargetId,
     highlightDeadlineId: state.library.highlightDeadlineId,
+    coverTarget,
   };
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {

@@ -6,9 +6,11 @@ import type { ProFeatureId } from './proFeatures';
 
 // §12 D1: the Pro task gate. Conversions and file editing are Pro; without a Pro pass, one
 // rewarded (full-screen) ad unlocks one task: one conversion, or editing one document for
-// `edit_unlock_minutes` (Remote Config, 30 by default). If no ad can load (offline, no fill), the
-// task runs anyway, up to `offline_free_tasks_per_day`, so nobody is stuck; past that the Pro pass
-// is offered with a kind message, which stops airplane-mode abuse.
+// `edit_unlock_minutes` (Remote Config, 30 by default). §14 Q1: the gate fails closed. A task runs
+// without an ad only for a Pro pass, a live grant, Remote Config `pro_tasks_free`, or a phone that
+// is really offline, up to `offline_free_tasks_per_day` (1); past that the Pro pass is offered. A
+// broken SDK, a missing unit, consent or no fill never runs a task for free: the sheet says the ad
+// couldn't load and offers Try again.
 //
 // The rules here are pure; components/pro/useProTask.tsx applies them. Grants and the offline
 // log sit in expo-secure-store beside the entitlement (not in settings or a backup), so the
@@ -84,14 +86,12 @@ export function recordOfflineRun(log: readonly number[], now: number): number[] 
 }
 
 export type ProTaskDecision =
-  // Pro (a Pro pass), an unlocked session or a once grant, or ads switched off: just run it.
+  // Pro (a Pro pass), an unlocked session or a once grant, or Pro tasks made free: just run it.
   | 'run'
-  // Show ProTaskSheet: "Watch a short ad to convert …".
-  | 'offerAd'
-  // No ad can load; run it and count it against today's offline allowance.
-  | 'runWithoutAd'
-  // Today's offline allowance is used up: offer the Pro pass.
-  | 'offerPro';
+  // Show ProTaskSheet: "Watch a short ad to convert …". What happens when no ad can show
+  // (offline grace, or "The ad couldn't load") is decided after it was tried
+  // (proTaskFlow.watchAdForTask), when the reason is known.
+  | 'offerAd';
 
 export type DecideInput = {
   isPro: boolean;
@@ -99,22 +99,15 @@ export type DecideInput = {
   feature: ProTaskFeature;
   docId: string;
   now: number;
-  // Remote Config `ads_enabled`. Off means the owner switched ads off: there is no ad (and no day
-  // pass) to unlock anything with, so tasks run, uncounted.
-  adsEnabled: boolean;
-  // Whether an ad could still come: false once one failed to load or isn't allowed (consent).
-  adsAvailable: boolean;
-  offlineRunsToday: number;
-  // Remote Config `offline_free_tasks_per_day`.
-  offlineFreePerDay: number;
+  // Remote Config `pro_tasks_free`: the owner made Pro tasks free. `ads_enabled` off doesn't.
+  proTasksFree: boolean;
 };
 
 export function decide(input: DecideInput): ProTaskDecision {
   if (input.isPro) return 'run';
   if (findGrant(input.grants, input.feature, input.docId, input.now)) return 'run';
-  if (!input.adsEnabled) return 'run';
-  if (input.adsAvailable) return 'offerAd';
-  return input.offlineRunsToday < input.offlineFreePerDay ? 'runWithoutAd' : 'offerPro';
+  if (input.proTasksFree) return 'run';
+  return 'offerAd';
 }
 
 // --- Grants and the offline log (secure store) ---

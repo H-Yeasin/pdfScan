@@ -50,20 +50,23 @@ export function ProScreen() {
       reloadLog();
     }
     if (result === 'granted') hapticSuccess();
-    const messages: Record<Exclude<WatchResult, 'granted'>, string> = {
-      closedEarly: t('pro.closedEarly'),
-      capped: t('pro.noneLeft'),
-      unavailable: t('pro.unavailable'),
-      failed: t('pro.failed'),
-    };
     // Read after the grant, so the time shown is the new end.
     const end = getEntitlement()?.expiresAt;
-    dispatch({ type: 'ui/SHOW_SNACK', msg: result === 'granted' ? t('pro.granted', { time: end ? passEndLabel(end) : '' }) : messages[result] });
+    const msg =
+      result === 'granted'
+        ? t('pro.granted', { time: end ? passEndLabel(end) : '' })
+        : result === 'closedEarly'
+          ? t('pro.closedEarly')
+          : result === 'capped'
+            ? t('pro.noneLeft')
+            : // §14 Q1: the same reason a task's sheet gives.
+              t(`pro.task.adUnavailable.${result.unavailable}`);
+    dispatch({ type: 'ui/SHOW_SNACK', msg });
   };
 
   const hours = remote.passHours;
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable
           hitSlop={touchSlop(44)}
@@ -204,12 +207,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minHeight: 52,
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.md,
   },
   primaryLabel: {
+    // Wraps beside the icon at large font scales instead of running past the button.
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',

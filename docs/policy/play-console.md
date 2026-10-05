@@ -3,6 +3,11 @@
 Done by the owner in Play Console. Tick each line here when it's set. Re-check before turning
 on `ads_enabled` (M2/M5).
 
+## Before the first release build (§14 Q2)
+- [ ] **Ads release checklist** in [docs/ads.md](../ads.md#release-checklist) is done: the real
+      AdMob app ID (`ADMOB_ANDROID_APP_ID`), the rewarded and banner units in Remote Config,
+      `app-ads.txt`. Without it no real ad can show, and Pro tasks don't run at all (§14 Q1).
+
 ## App content
 - [ ] **Target audience and content:** ages **13–15, 16–17, 18 and over** (not under 13).
       Do **not** opt in to "Designed for Families". Appeal to children: no.
@@ -34,3 +39,5 @@ Collected = leaves the phone. "Optional" = only when the user turns it on.
       **never** "no ads".
 - [ ] No text anywhere (listing, app, screenshots) sends users to pay outside Google Play.
       WhatsApp 01645724080 appears only as a support contact.
+- [ ] App icon (512 x 512): upload `assets/store/playstore-icon.png` (made by
+      `scripts/make-icons.mjs` from `assets/brand/`).

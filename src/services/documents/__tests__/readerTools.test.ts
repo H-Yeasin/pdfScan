@@ -122,6 +122,7 @@ describe('§12 D2 More sheet', () => {
       'print',
       'sign',
       'editPages',
+      'addCover',
       'bookmarks',
       'copyText',
       'extractText',
@@ -129,6 +130,17 @@ describe('§12 D2 More sheet', () => {
       'changeType',
       'delete',
     ]);
+  });
+
+  it('offers Add cover page on a library PDF, Change cover page once it has one (§14 Q7)', () => {
+    expect(readerMoreItems({ doc: makeDoc({ coverKind: 'template' }) })).toContain('changeCover');
+    expect(readerMoreItems({ doc: makeDoc({ coverKind: 'template' }) })).not.toContain('addCover');
+    const imported = makeDoc({ sourceKind: 'imported_pdf', pages: [{ id: 'p', fileUri: '', width: 850, height: 1100 }] });
+    expect(readerMoreItems({ doc: imported })).toContain('addCover');
+    const covers = (items: string[]) => items.filter((id) => id === 'addCover' || id === 'changeCover');
+    expect(covers(readerMoreItems({ doc: { ...imported, indexState: 'encrypted' } }))).toEqual([]);
+    expect(covers(readerMoreItems({ doc: makeDoc({ format: 'DOCX', pages: [] }) }))).toEqual([]);
+    expect(covers(readerMoreItems({ external: { format: 'PDF' } }))).toEqual([]);
   });
 
   it('offers Add to Library, not Delete, for a file from outside', () => {

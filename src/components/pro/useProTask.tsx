@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { t } from '../../i18n';
 import { useRouter } from '../../navigation/router';
-import { preloadRewarded } from '../../services/ads/rewarded';
-import { useAdsSdk } from '../../services/ads/adsSdk';
+import { preloadRewarded, type AdUnavailableReason } from '../../services/ads/rewarded';
+import { showAdChoices, useAdsSdk } from '../../services/ads/adsSdk';
 import { useIsPro } from '../../services/pro/entitlement';
 import type { ProTaskFeature } from '../../services/pro/proTask';
 import { checkProTask, completeProTask, watchAdForTask, type ProTaskRequest, type TaskAdOutcome } from '../../services/pro/proTaskFlow';
@@ -16,9 +16,11 @@ import { ProTaskSheet } from './ProTaskSheet';
 const SHEET_CLOSE_MS = 300;
 
 // §12 D1: the Pro task gate for one screen. `start(request)` runs the task straight away for a
-// Pro pass, an unlocked session or with ads switched off; otherwise it opens ProTaskSheet, and
-// after the ad (or with none to load, within today's allowance) runs the screen's own task on the
-// same screen, with the same progress UI. Render `element` once in the screen.
+// Pro pass, an unlocked session or with Pro tasks made free (`pro_tasks_free`); otherwise it opens
+// ProTaskSheet, and after the ad runs the screen's own task on the same screen, with the same
+// progress UI. §14 Q1: with no ad, only a really offline phone runs it (within today's grace, with
+// a snack saying so); otherwise the sheet comes back in its error state with Try again. Render
+// `element` once in the screen.
 //
 // `preload`: the screen has Pro tasks on show (the Reader for a convertible or editable document,
 // a Library selection), so one ad is loaded ahead when the ads SDK is already running.
@@ -30,6 +32,8 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
   const sdk = useAdsSdk();
   const personalizedAdsEnabled = useAppSelector((s) => s.settings.personalizedAdsEnabled);
   const [request, setRequest] = useState<ProTaskRequest | null>(null);
+  // Set when the last ad couldn't show: the sheet shows why, and Try again uses `request`.
+  const [adError, setAdError] = useState<AdUnavailableReason | null>(null);
   const [loadingAd, setLoadingAd] = useState(false);
   const mounted = useRef(true);
   useEffect(
@@ -52,18 +56,26 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
     async (req: Omit<ProTaskRequest, 'feature'>) => {
       const full: ProTaskRequest = { ...req, feature };
       const decision = await checkProTask(full, Date.now());
-      if (decision === 'offerAd') setRequest(full);
-      else if (decision === 'offerPro') offerPass();
-      // 'run' (and 'runWithoutAd', which checkProTask doesn't give before an ad was tried).
-      else await completeProTask(full);
+      if (decision === 'offerAd') {
+        setAdError(null);
+        setRequest(full);
+      } else {
+        await completeProTask(full);
+      }
     },
-    [feature, offerPass]
+    [feature]
   );
+
+  const close = useCallback(() => {
+    setRequest(null);
+    setAdError(null);
+  }, []);
 
   const watch = useCallback(async () => {
     const req = request;
     if (!req) return;
     setRequest(null);
+    setAdError(null);
     setLoadingAd(true);
     let result: TaskAdOutcome;
     try {
@@ -77,7 +89,16 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
         await completeProTask(req, result.taskId);
         break;
       case 'runWithoutAd':
+        // Not silent, so the student knows the next one needs an ad.
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('pro.task.offlineFree') });
         await completeProTask(req);
+        break;
+      case 'adUnavailable':
+        // Back to the sheet, keeping the request, in its error state.
+        if (mounted.current) {
+          setAdError(result.reason);
+          setRequest(req);
+        }
         break;
       case 'closedEarly':
         dispatch({ type: 'ui/SHOW_SNACK', msg: t(`pro.task.closedEarly.${req.feature}`) });
@@ -92,13 +113,16 @@ export function useProTask(feature: ProTaskFeature, opts: { preload?: boolean } 
     <>
       <ProTaskSheet
         task={request ? { feature: request.feature, title: request.title } : null}
-        // A task that fails after the ad has shown its own error (the screen's `run`).
+        error={adError ?? undefined}
+        // A task that fails after the ad has shown its own error (the screen's `run`). Try again
+        // is the same call: the request is still there.
         onWatch={() => void watch().catch((e: unknown) => console.warn('useProTask: the task failed', e))}
         onGetPass={() => {
-          setRequest(null);
+          close();
           go('pro');
         }}
-        onClose={() => setRequest(null)}
+        onAdChoices={() => void showAdChoices()}
+        onClose={close}
       />
       {loadingAd ? <LoadingAd /> : null}
     </>

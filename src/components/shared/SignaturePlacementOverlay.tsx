@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
@@ -37,10 +38,12 @@ export function SignaturePlacementOverlay({
   const { tokens } = useTheme();
   const { t } = useT();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  // §14 Q4: the modal is edge-to-edge, so its controls keep clear of the system bars.
+  const insets = useSafeAreaInsets();
 
   const { displayWidth, displayHeight } = useMemo(() => {
     const maxWidth = screenWidth - spacing.xl * 2;
-    const maxHeight = screenHeight * 0.62;
+    const maxHeight = (screenHeight - insets.top - insets.bottom) * 0.62;
     const ratio = pageNaturalHeight / pageNaturalWidth;
     let w = maxWidth;
     let h = w * ratio;
@@ -49,7 +52,7 @@ export function SignaturePlacementOverlay({
       w = h / ratio;
     }
     return { displayWidth: w, displayHeight: h };
-  }, [screenWidth, screenHeight, pageNaturalWidth, pageNaturalHeight]);
+  }, [screenWidth, screenHeight, insets.top, insets.bottom, pageNaturalWidth, pageNaturalHeight]);
 
   const initialWidth = displayWidth * INITIAL_WIDTH_RATIO;
   const initialHeight = initialWidth * signatureAspectRatio;
@@ -115,8 +118,8 @@ export function SignaturePlacementOverlay({
   };
 
   return (
-    <Modal transparent animationType="fade" onRequestClose={onCancel}>
-      <GestureHandlerRootView style={styles.backdrop}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent animationType="fade" onRequestClose={onCancel}>
+      <GestureHandlerRootView style={[styles.backdrop, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri: pageUri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
 

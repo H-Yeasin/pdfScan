@@ -127,7 +127,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
   const noText = tokens.length === 0;
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={close}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={close}>
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]}>
           <View style={styles.header}>

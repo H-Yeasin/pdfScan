@@ -67,7 +67,7 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
         <Pressable accessible={false}
           style={[

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DocTypeSelector } from '../courses/DocTypeChips';
 import { NameField } from '../deliver/NameField';
@@ -118,9 +118,9 @@ export function DeadlineEditorSheet({ visible, onClose, deadline, courseId: fixe
   };
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* §9 O6: on iOS the sheet moves up with the keyboard (the title field is near its top). */}
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      {/* §9 O6, §14 Q4: the sheet moves up with the keyboard on both platforms (an edge-to-edge modal window is not resized on Android). */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
         <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{deadline ? t('deadlines.edit') : t('deadlines.add')}</Text>

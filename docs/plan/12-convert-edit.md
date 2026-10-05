@@ -132,6 +132,16 @@ Status: done in code (commit dc17a06); device check open (see "Done when").
 - Preloading only happens when the ads SDK is already running (banners started it), so opening
   the Reader never brings up the consent form. Nothing calls `useProTask` yet: D5 is the first.
 
+**Changes made after this step was marked done:**
+- **§14 Q1/Q2 (2026-10-04): fail-open became fail-closed; offline grace 1 a day.** `decide`
+  returns only `'run'` (Pro, a live grant, or Remote Config `pro_tasks_free`) or `'offerAd'`;
+  `ads_enabled` off no longer frees tasks. When no ad can show, `watchAdForTask` runs the task
+  only on a phone that is really offline, up to `offline_free_tasks_per_day` (default **1**,
+  was 5); online it returns `adUnavailable` and the sheet shows "The ad couldn't load" with Try
+  again. The telemetry event `pro_task_run_without_ad` became `pro_task_offline_free`, and
+  `pro_task_ad_unavailable` (`feature`, `reason`) was added. See
+  `docs/plan/14-prelaunch-fixes.md` Q1, Q2.
+
 - `PRO_FEATURES` gains `convert` (Office → PDF, scan/PDF → Word), `editFiles`
   (TXT/CSV/XLSX/Word) and `pdfForms` (fill forms, typed text boxes), all `lapse: 'keepExisting'`
   (what was made stays). `FREE_FOREVER` is unchanged (its baseline test must still pass).

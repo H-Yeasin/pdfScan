@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CourseBadge } from '../courses/CourseBadge';
 import { TextPromptModal } from '../shared/TextPromptModal';
 import { radii, spacing, useTheme } from '../../theme';
@@ -25,15 +26,16 @@ export function FolderPickerModal({
   onClose,
 }: FolderPickerModalProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t } = useT();
   const [creating, setCreating] = useState(false);
   // Archived courses can't be picked for new documents; the current choice stays visible though.
   const pickable = courses.filter((c) => !c.archived || c.id === selectedCourseId);
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
-        <Pressable accessible={false} style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
+        <Pressable accessible={false} style={[styles.sheet, { backgroundColor: tokens.surface, borderColor: tokens.edge, paddingBottom: insets.bottom + spacing.lg }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.picker.title')}</Text>
           <ScrollView style={styles.list} contentContainerStyle={{ gap: spacing.xs }}>
             <Pressable accessibilityRole="button"

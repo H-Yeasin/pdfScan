@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PreviewTooLargeError } from '../../services/documents/sheetService';
 import { csvToText, loadCsvForEdit, loadTextForEdit, type CsvTable, type EditFormat } from '../../services/edit/textEdit';
@@ -175,7 +175,7 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
   }, [dirty, saving, onClose, t]);
 
   return (
-    <Modal visible={file !== null} animationType="slide" onRequestClose={close}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={file !== null} animationType="slide" onRequestClose={close}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={[styles.header, { borderBottomColor: tokens.edge }]}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={close} accessibilityLabel={t('common.close')}>
@@ -225,7 +225,7 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
             <ActivityIndicator color={tokens.accent} />
           </View>
         ) : loaded.kind === 'txt' ? (
-          <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={styles.root} behavior="padding">
             <TextInput
               value={text}
               onChangeText={(next) => {

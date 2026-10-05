@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BottomBar } from '../shared/BottomBar';
 import { radii, spacing, fontFamily, typeScale, useTheme, touchSlop } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
@@ -63,8 +64,9 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={selectionMode ? handleCancelSelection : onClose}>
-      <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={selectionMode ? handleCancelSelection : onClose}>
+      {/* §14 Q4: while selecting, the merge bar pads itself (BottomBar); otherwise the grid stops above the navigation bar. */}
+      <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={selectionMode ? ['top'] : ['top', 'bottom']}>
         {selectionMode ? (
           <View style={styles.header}>
             <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.closeButton} onPress={handleCancelSelection} accessibilityLabel={t('common.cancel')}>
@@ -94,19 +96,21 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
         />
 
         {selectionMode && (
-          <View style={[styles.mergeBar, { backgroundColor: tokens.surface, borderTopColor: tokens.edge }]}>
-            <Pressable accessibilityRole="button"
-              style={[
-                styles.mergeButton,
-                { backgroundColor: tokens.accent, opacity: selectedIds.length === 2 ? 1 : 0.38 },
-              ]}
-              onPress={handleMergePress}
-              disabled={selectedIds.length !== 2}
-            >
-              <Ionicons name="git-merge-outline" size={18} color={tokens.onAccent} />
-              <Text style={[styles.mergeButtonLabel, { color: tokens.onAccent }]}>{t('review.grid.merge')}</Text>
-            </Pressable>
-          </View>
+          <BottomBar backgroundColor={tokens.surface} style={[styles.mergeBarEdge, { borderTopColor: tokens.edge }]}>
+            <View style={styles.mergeBar}>
+              <Pressable accessibilityRole="button"
+                style={[
+                  styles.mergeButton,
+                  { backgroundColor: tokens.accent, opacity: selectedIds.length === 2 ? 1 : 0.38 },
+                ]}
+                onPress={handleMergePress}
+                disabled={selectedIds.length !== 2}
+              >
+                <Ionicons name="git-merge-outline" size={18} color={tokens.onAccent} />
+                <Text style={[styles.mergeButtonLabel, { color: tokens.onAccent }]}>{t('review.grid.merge')}</Text>
+              </Pressable>
+            </View>
+          </BottomBar>
         )}
       </SafeAreaView>
     </Modal>
@@ -133,10 +137,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  mergeBarEdge: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   mergeBar: {
     flexDirection: 'row',
     justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },

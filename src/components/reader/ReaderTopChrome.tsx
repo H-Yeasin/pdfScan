@@ -61,6 +61,9 @@ export function ReaderTopChrome({
           backgroundColor: tokens.surface,
           borderBottomColor: tokens.edge,
           paddingTop: insets.top,
+          // §14 Q3: in landscape the 3-button bar sits on a side.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
           opacity: visible,
           transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [-110, 0] }) }],
         },

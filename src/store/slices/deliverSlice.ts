@@ -1,4 +1,5 @@
 import type { DocFormat, DocType } from '../../types/models';
+import type { ScreenName } from '../../types/navigation';
 import type { AcademicConfig, LayoutMode } from '../../services/pdf/pdfService';
 import { defaultPageSize, type PageSizeId } from '../../services/pdf/pageSize';
 import { presetAcademicConfig, type SubmitPreset } from '../../services/submit/preset';
@@ -46,7 +47,16 @@ export type DeliverState = {
   // §7 R3 "Add pages → From a new scan": the saved document the scanned pages go to the end of,
   // instead of becoming a new document. null = a normal save. Set by startScan.
   appendTo: string | null;
+  // §14 Q7: Academic options opened for a library PDF (Selection bar's Cover, the Reader's "Add
+  // cover page") instead of the scan session: the document, and the screen to return to (a list
+  // screen or the Reader). Set before go('academicOptions'), cleared on leaving it. The screen
+  // then edits the target's own `config` and never touches `academicConfig` above. Kept here, not
+  // in the screen, so a detour to Pro (a locked cover template) doesn't lose the edits.
+  coverTarget: CoverTarget | null;
 };
+
+// `config` undefined: not edited yet, the screen starts from the document's course preset.
+export type CoverTarget = { docId: string; from: ScreenName; config?: AcademicConfig | null };
 
 export const initialDeliverState: DeliverState = {
   name: '',
@@ -64,6 +74,7 @@ export const initialDeliverState: DeliverState = {
   pageSize: defaultPageSize(),
   rememberPreset: true,
   appendTo: null,
+  coverTarget: null,
 };
 
 export type DeliverAction =
@@ -89,6 +100,8 @@ export type DeliverAction =
   | { type: 'deliver/SET_NAME_TEMPLATE'; template: string | undefined }
   | { type: 'deliver/SET_INCLUDE_ANNOTATIONS'; include: boolean }
   | { type: 'deliver/SET_APPEND_TARGET'; documentId: string | null }
+  | { type: 'deliver/SET_COVER_TARGET'; target: CoverTarget | null }
+  | { type: 'deliver/SET_COVER_TARGET_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -152,8 +165,13 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, pageSize: action.pageSize };
     case 'deliver/SET_APPEND_TARGET':
       return { ...state, appendTo: action.documentId };
+    case 'deliver/SET_COVER_TARGET':
+      return { ...state, coverTarget: action.target };
+    case 'deliver/SET_COVER_TARGET_CONFIG':
+      return state.coverTarget ? { ...state, coverTarget: { ...state.coverTarget, config: action.config } } : state;
+    // A new scan session; a cover being set up for a library document isn't part of it.
     case 'deliver/RESET':
-      return initialDeliverState;
+      return { ...initialDeliverState, coverTarget: state.coverTarget };
     default:
       return state;
   }

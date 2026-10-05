@@ -22,30 +22,20 @@ const base: DecideInput = {
   feature: 'convert',
   docId: 'doc1',
   now: NOON,
-  adsEnabled: true,
-  adsAvailable: true,
-  offlineRunsToday: 0,
-  offlineFreePerDay: 5,
+  proTasksFree: false,
 };
 
 describe('decide', () => {
   it('runs for Pro (a Pro pass) without any ad', () => {
     expect(decide({ ...base, isPro: true })).toBe('run');
-    expect(decide({ ...base, isPro: true, adsAvailable: false, offlineRunsToday: 99 })).toBe('run');
   });
 
-  it('offers the ad to a free student when one could load', () => {
+  it('offers the ad to a free student', () => {
     expect(decide(base)).toBe('offerAd');
   });
 
-  it('runs without an ad when none can load, up to the daily allowance, then offers the Pro pass', () => {
-    expect(decide({ ...base, adsAvailable: false, offlineRunsToday: 4 })).toBe('runWithoutAd');
-    expect(decide({ ...base, adsAvailable: false, offlineRunsToday: 5 })).toBe('offerPro');
-    expect(decide({ ...base, adsAvailable: false, offlineFreePerDay: 0 })).toBe('offerPro');
-  });
-
-  it('runs, uncounted, when the owner switched ads off (no ad and no pass to unlock with)', () => {
-    expect(decide({ ...base, adsEnabled: false, adsAvailable: false, offlineRunsToday: 99 })).toBe('run');
+  it('runs when the owner made Pro tasks free (pro_tasks_free)', () => {
+    expect(decide({ ...base, proTasksFree: true })).toBe('run');
   });
 
   it('runs with a once grant for the same task and document only', () => {

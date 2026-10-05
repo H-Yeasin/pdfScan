@@ -185,6 +185,20 @@ export const en = {
       testCrashSubtitle: 'Reports a test error to Sentry',
       testCrashSent: 'Test error sent to Sentry',
       testCrashOff: 'Not sent: turn on crash reports and set EXPO_PUBLIC_SENTRY_DSN',
+      // §14 Q2: the owner's quick release check (docs/ads.md). Development builds always use
+      // Google's test units; "unit set" is about the console value a release build would use.
+      adsSetup: 'Ads setup',
+      adsSetupLine: 'SDK: {status} · Rewarded unit set: {unit} · Remote Config: {source}',
+      adsStatus: {
+        off: 'off',
+        starting: 'starting',
+        ready: 'ready',
+        unavailable: 'unavailable ({reason})',
+      },
+      adsReason: { consent: 'consent', sdk: 'SDK error' },
+      yes: 'yes',
+      no: 'no',
+      remoteSource: { defaults: 'bundled defaults', cached: 'cached', fetched: 'fetched' },
     },
     // §8 B1: Settings → Storage.
     storage: {
@@ -419,7 +433,36 @@ export const en = {
       compress: 'Compress',
       sign: 'Sign',
       export: 'Export',
+      // §14 Q7.
+      cover: 'Cover',
+      delete: 'Delete',
     },
+    // §14 Q7: a cover page on a PDF already in the Library, set up in Academic options.
+    cover: {
+      apply: 'Apply',
+      saveTitle: 'Add the cover',
+      saveCopy: 'Save as a copy',
+      saveCopyHint: "Save as a copy keeps the original and adds '{name} (cover)' to the Library.",
+      replace: 'Replace',
+      replaceHint: 'Replace changes this document. Its notes and bookmarks move with the pages.',
+      adding: 'Adding cover…',
+      added: 'Cover added',
+      open: 'Open',
+      convertFirst: 'Covers go on PDFs. Convert this file to PDF first.',
+      photoFailed: "The cover photo couldn't be used",
+    },
+    // §14 Q5: one document reuses the Reader's wording (reader.deleteTitle / deleteBody) with its name.
+    deleteSelected: {
+      title: { one: 'Delete {count} document?', other: 'Delete {count} documents?' },
+      body: {
+        one: "It and its files will be permanently removed from this phone. This can't be undone.",
+        other: "They and their files will be permanently removed from this phone. This can't be undone.",
+      },
+      confirm: 'Delete',
+    },
+    deleted: { one: 'Deleted {count} document', other: 'Deleted {count} documents' },
+    selectAll: 'Select all',
+    selectNone: 'Select none',
     archivedSnack: { one: '{count} document archived', other: '{count} documents archived' },
     unarchivedSnack: { one: '{count} document back from the archive', other: '{count} documents back from the archive' },
     merged: { one: '{count} file merged', other: '{count} files merged' },
@@ -492,6 +535,9 @@ export const en = {
       editFile: 'Edit',
       // §12 D10.
       fillForm: 'Fill in form',
+      // §14 Q7.
+      addCover: 'Add cover page',
+      changeCover: 'Change cover page',
     },
     // §12 D2: the bottom tool bar.
     tools: {
@@ -766,7 +812,6 @@ export const en = {
     activeBody: 'Every Pro feature is on until then.',
     granted: 'Pro is on until {time}. Enjoy!',
     closedEarly: 'The ad was closed before the end, so no pass this time.',
-    failed: "Couldn't load an ad. Check your connection and try again.",
     lapseNote: 'When a pass ends, your app lock stays on and covers you already made keep their design.',
     settingsRow: 'PDF Scan Pro',
     settingsRowSubtitle: 'Cover designs, accent colours, app lock and no banners.',
@@ -816,6 +861,20 @@ export const en = {
         other: "No ad could load, and today's free tries without one are used up. A Pro pass unlocks this for {count} hours.",
       },
       getPro: 'Get Pro',
+      // §14 Q1: offline, so this task ran without an ad (offline_free_tasks_per_day).
+      offlineFree: "Offline: this one's free. Next time it needs a short ad.",
+      // §14 Q1: online, but no ad could show, so the task didn't run. One body per reason.
+      adUnavailable: {
+        title: "The ad couldn't load",
+        noFill: 'No ad is available right now. Try again in a moment.',
+        timeout: 'The ad took too long to load. Check your connection and try again.',
+        sdk: "Ads couldn't start on this phone. Try again, or restart the app.",
+        consent: 'Your ad choices don\'t allow ads, so the ad can\'t show. You can change them in Ad choices.',
+        noUnit: 'Ads aren\'t set up in this version of the app yet. Try again later.',
+        adsOff: 'Ads are switched off right now, so this can\'t be unlocked with an ad. Try again later.',
+      },
+      tryAgain: 'Try again',
+      adChoices: 'Ad choices',
       resumeTitle: 'Finish your task?',
       resumeBody: {
         convert: "The app closed before converting '{name}'. Finish it now?",
@@ -845,6 +904,8 @@ export const en = {
     backupUnsorted: 'Unsorted',
     backupUntitled: 'Untitled',
     restoredSuffix: ' (restored)',
+    // §14 Q6: a library PDF saved again as a copy with a cover page.
+    withCover: '{name} (cover)',
     // §8 B3: backup and export zip names ({date}: YYYY-MM-DD).
     backupFileName: 'PDF Scan backup {date}',
     autoBackupFileName: 'PDF Scan auto-backup {date}',

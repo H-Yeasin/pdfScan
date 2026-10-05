@@ -1,6 +1,7 @@
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { BottomBar } from '../shared/BottomBar';
 
 type StickyActionsProps = {
   saving: boolean;
@@ -17,35 +18,37 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
   const { t } = useT();
 
   return (
-    <View style={[styles.container, { backgroundColor: tokens.bg }]}>
-      <Pressable accessibilityRole="button"
-        style={[styles.primary, { backgroundColor: tokens.accent, opacity: saving ? 0.7 : 1 }]}
-        onPress={onSubmit}
-        disabled={saving}
-        accessibilityLabel={t('deliver.actions.submitA11y')}
-      >
-        {saving ? <ActivityIndicator color={tokens.onAccent} /> : <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deliver.actions.submit')}</Text>}
-      </Pressable>
-      {saving && progress ? (
-        <Text style={[styles.progress, { color: tokens.muted }]} accessibilityLiveRegion="polite">
-          {progress}
-        </Text>
-      ) : null}
-      <View style={styles.secondaryRow}>
-        <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSave} disabled={saving}>
-          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.save')}</Text>
+    <BottomBar backgroundColor={tokens.bg}>
+      <View style={styles.container}>
+        <Pressable accessibilityRole="button"
+          style={[styles.primary, { backgroundColor: tokens.accent, opacity: saving ? 0.7 : 1 }]}
+          onPress={onSubmit}
+          disabled={saving}
+          accessibilityLabel={t('deliver.actions.submitA11y')}
+        >
+          {saving ? <ActivityIndicator color={tokens.onAccent} /> : <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deliver.actions.submit')}</Text>}
         </Pressable>
-        <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSaveShare} disabled={saving}>
-          <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.saveShare')}</Text>
-        </Pressable>
+        {saving && progress ? (
+          <Text style={[styles.progress, { color: tokens.muted }]} accessibilityLiveRegion="polite">
+            {progress}
+          </Text>
+        ) : null}
+        <View style={styles.secondaryRow}>
+          <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSave} disabled={saving}>
+            <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.save')}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSaveShare} disabled={saving}>
+            <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.saveShare')}</Text>
+          </Pressable>
+        </View>
+        {Platform.OS === 'ios' && (
+          <Text style={[styles.shareHint, { color: tokens.muted }]}>
+            {t('deliver.actions.shareHintIos')}
+          </Text>
+        )}
+        <Text style={[styles.footnote, { color: tokens.muted }]}>{t('deliver.actions.footnote')}</Text>
       </View>
-      {Platform.OS === 'ios' && (
-        <Text style={[styles.shareHint, { color: tokens.muted }]}>
-          {t('deliver.actions.shareHintIos')}
-        </Text>
-      )}
-      <Text style={[styles.footnote, { color: tokens.muted }]}>{t('deliver.actions.footnote')}</Text>
-    </View>
+    </BottomBar>
   );
 }
 
@@ -56,12 +59,15 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
   primary: {
-    height: 52,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryLabel: {
+    textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -75,11 +81,14 @@ const styles = StyleSheet.create({
   },
   ghost: {
     flex: 1,
-    height: 46,
+    minHeight: 46,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ghostLabel: {
+    textAlign: 'center',
     fontSize: 15,
     fontWeight: '600',
   },

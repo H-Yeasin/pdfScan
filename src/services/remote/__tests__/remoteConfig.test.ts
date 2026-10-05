@@ -1,10 +1,12 @@
 import {
   REMOTE_DEFAULTS,
   getRemoteConfig,
+  getRemoteConfigSource,
   isVersionBelow,
   loadRemoteConfig,
   parseRemoteConfig,
   remoteValuesOf,
+  resetRemoteConfig,
   setRemoteConfig,
 } from '../remoteConfig';
 
@@ -28,6 +30,7 @@ jest.mock('@react-native-firebase/remote-config', () => {
 });
 
 beforeEach(() => {
+  resetRemoteConfig();
   setRemoteConfig(REMOTE_DEFAULTS);
   mockApps.length = 0;
   mockStored = {};
@@ -38,9 +41,17 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('parseRemoteConfig', () => {
-  it('starts from safe defaults: ads and sales off', () => {
+  it('starts from safe defaults: sales off, Pro tasks never free, one offline task a day', () => {
     expect(parseRemoteConfig({})).toEqual(REMOTE_DEFAULTS);
-    expect(REMOTE_DEFAULTS).toMatchObject({ adsEnabled: false, proSalesEnabled: false, passHours: 1, passMaxPerDay: 3 });
+    expect(REMOTE_DEFAULTS).toMatchObject({ proSalesEnabled: false, proTasksFree: false, offlineFreeTasksPerDay: 1, passHours: 1, passMaxPerDay: 3 });
+    // Off in development builds (tests run as one); on in release builds (!__DEV__).
+    expect(REMOTE_DEFAULTS.adsEnabled).toBe(!__DEV__);
+  });
+
+  it('reads pro_tasks_free as a boolean', () => {
+    expect(parseRemoteConfig({ pro_tasks_free: 'true' }).proTasksFree).toBe(true);
+    expect(parseRemoteConfig({ pro_tasks_free: '0' }).proTasksFree).toBe(false);
+    expect(parseRemoteConfig({ pro_tasks_free: 'yes' }).proTasksFree).toBe(false);
   });
 
   it('coerces console strings to their types', () => {
@@ -67,8 +78,9 @@ describe('parseRemoteConfig', () => {
       passHours: 12,
       passMaxPerDay: 0,
       editUnlockMinutes: 30,
-      offlineFreeTasksPerDay: 5,
+      offlineFreeTasksPerDay: 1,
       taskAdTimeoutMs: 8_000,
+      proTasksFree: false,
       supportWhatsapp: '8801700000000',
       supportEmail: 'help@example.com',
       proSalesEnabled: true,
@@ -125,6 +137,7 @@ describe('loadRemoteConfig', () => {
   it('keeps the defaults when the build has no Firebase', async () => {
     await loadRemoteConfig();
     expect(getRemoteConfig()).toEqual(REMOTE_DEFAULTS);
+    expect(getRemoteConfigSource()).toBe('defaults');
   });
 
   it('applies freshly fetched values', async () => {
@@ -132,6 +145,7 @@ describe('loadRemoteConfig', () => {
     mockFetched = { ads_enabled: 'true', pass_hours: '48' };
     await loadRemoteConfig();
     expect(getRemoteConfig()).toMatchObject({ adsEnabled: true, passHours: 48 });
+    expect(getRemoteConfigSource()).toBe('fetched');
   });
 
   it('uses the values cached from the last fetch when offline', async () => {
@@ -140,6 +154,7 @@ describe('loadRemoteConfig', () => {
     mockFetched = 'offline';
     await loadRemoteConfig();
     expect(getRemoteConfig()).toEqual({ ...REMOTE_DEFAULTS, adsEnabled: true });
+    expect(getRemoteConfigSource()).toBe('cached');
   });
 
   it('keeps the defaults when offline with nothing cached', async () => {
@@ -147,5 +162,6 @@ describe('loadRemoteConfig', () => {
     mockFetched = 'offline';
     await loadRemoteConfig();
     expect(getRemoteConfig()).toEqual(REMOTE_DEFAULTS);
+    expect(getRemoteConfigSource()).toBe('defaults');
   });
 });

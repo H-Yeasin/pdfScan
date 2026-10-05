@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   type SharedValue,
@@ -71,10 +72,12 @@ export function CropOverlay({
   const { tokens } = useTheme();
   const { t } = useT();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  // §14 Q4: the modal is edge-to-edge, so its controls keep clear of the system bars.
+  const insets = useSafeAreaInsets();
 
   const { displayWidth, displayHeight } = useMemo(() => {
     const maxWidth = screenWidth - spacing.xl * 2;
-    const maxHeight = screenHeight * 0.62;
+    const maxHeight = (screenHeight - insets.top - insets.bottom) * 0.62;
     const ratio = naturalHeight / naturalWidth;
     let w = maxWidth;
     let h = w * ratio;
@@ -83,7 +86,7 @@ export function CropOverlay({
       w = h / ratio;
     }
     return { displayWidth: w, displayHeight: h };
-  }, [screenWidth, screenHeight, naturalWidth, naturalHeight]);
+  }, [screenWidth, screenHeight, insets.top, insets.bottom, naturalWidth, naturalHeight]);
 
   // Natural -> display coordinates for initialQuad, clamped to the image.
   const toDisplay = (p: Point | undefined, fallbackX: number, fallbackY: number): [number, number] => {
@@ -221,8 +224,8 @@ export function CropOverlay({
   };
 
   return (
-    <Modal transparent animationType="fade" onRequestClose={onCancel}>
-      <GestureHandlerRootView style={styles.backdrop}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent animationType="fade" onRequestClose={onCancel}>
+      <GestureHandlerRootView style={[styles.backdrop, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
 

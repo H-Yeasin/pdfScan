@@ -19,6 +19,7 @@ import { useEditFile } from '../components/reader/useEditFile';
 import { useFillForm } from '../components/reader/useFillForm';
 import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
+import { useOpenCoverOptions } from '../components/library/useCoverTarget';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
 import { parseJumpInput } from '../services/documents/readerPosition';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
@@ -168,6 +169,8 @@ export function ReaderScreen() {
   const [scrubberOpen, setScrubberOpen] = useState(false);
   // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it.
   const editPages = useEditPages(doc && !external ? doc : undefined, reload);
+  // §14 Q7: Academic options for this document; Back (or Apply) returns here.
+  const openCoverOptions = useOpenCoverOptions();
   const [signing, setSigning] = useState(false);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
@@ -338,6 +341,8 @@ export function ReaderScreen() {
         setBookmarksOpen(true);
       } else if (id === 'editPages') {
         editPages.open();
+      } else if (id === 'addCover' || id === 'changeCover') {
+        if (doc) openCoverOptions(doc);
       } else if (id === 'readingSettings') {
         setReadingOpen(true);
       } else if (id === 'copyText' || id === 'extractText') {
@@ -385,7 +390,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, fillForm, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, fillForm, openCoverOptions, t]
   );
 
   const handleSignConfirm = useCallback(

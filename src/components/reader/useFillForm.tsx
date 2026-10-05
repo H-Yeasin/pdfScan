@@ -93,7 +93,7 @@ export function useFillForm(opts: { preload: boolean }) {
     [startTask]
   );
 
-  // Whether the Text tool is already open on `doc` (Pro, a live session, or ads off), without
+  // Whether the Text tool is already open on `doc` (Pro, a live session, or Pro tasks free), without
   // asking: Mark mode can then open with a remembered Text tool.
   const isTextUnlocked = useCallback(async (doc: LibraryDocument) => (await checkProTask({ feature: 'pdfForms', docId: doc.id }, Date.now())) === 'run', []);
 

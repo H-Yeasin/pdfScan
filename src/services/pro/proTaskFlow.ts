@@ -1,4 +1,5 @@
-import { showRewarded } from '../ads/rewarded';
+import { getNetworkStateAsync } from 'expo-network';
+import { showRewarded, type AdUnavailableReason } from '../ads/rewarded';
 import { getRemoteConfig } from '../remote/remoteConfig';
 import { logUsage } from '../telemetry/usage';
 import { createId } from '../../utils/id';
@@ -32,6 +33,7 @@ import {
 // 2. watchAdForTask, after the student tapped "Watch ad" (and the sheet has closed): the pending
 //    task is written first, marked rewarded on the reward event, and the grant saved then too, so
 //    a process death during the ad loses nothing (resumePendingTask offers it at the next start).
+//    With no ad, only a phone that is really offline gets the daily grace (§14 Q1).
 // 3. completeProTask: the screen's own run (same progress UI as without an ad), then the once
 //    grant is used up and the pending task cleared.
 
@@ -47,20 +49,29 @@ export type ProTaskRequest = {
 };
 
 export async function checkProTask(req: Pick<ProTaskRequest, 'feature' | 'docId'>, now: number): Promise<ProTaskDecision> {
-  const remote = getRemoteConfig();
-  const { grants, offlineRuns } = await loadTaskState();
+  const { grants } = await loadTaskState();
   return decide({
     isPro: isProActive(getEntitlement(), now),
     grants,
     feature: req.feature,
     docId: req.docId,
     now,
-    adsEnabled: remote.adsEnabled,
-    // Not known until one is asked for; a failure comes back through watchAdForTask.
-    adsAvailable: true,
-    offlineRunsToday: offlineRunsOnDay(offlineRuns, now),
-    offlineFreePerDay: remote.offlineFreeTasksPerDay,
+    proTasksFree: getRemoteConfig().proTasksFree,
   });
+}
+
+// For the M8 event: a fixed number per reason, never anything about the document.
+export const AD_UNAVAILABLE_CODES: Record<AdUnavailableReason, number> = { adsOff: 1, noUnit: 2, sdk: 3, consent: 4, noFill: 5, timeout: 6 };
+
+// Really offline: the network says so. Unknown counts as online, so a phone whose network state
+// can't be read gets no free task (§14 Q1 fails closed).
+async function isOffline(): Promise<boolean> {
+  try {
+    const state = await getNetworkStateAsync();
+    return (state.isInternetReachable ?? state.isConnected) === false;
+  } catch {
+    return false;
+  }
 }
 
 export type TaskAdOutcome =
@@ -68,10 +79,12 @@ export type TaskAdOutcome =
   | { outcome: 'rewarded'; taskId: string }
   // Closed early: nothing runs, the screen stays as it was.
   | { outcome: 'closedEarly' }
-  // No ad could load; today's offline allowance covers it: run it.
+  // Offline, and today's offline allowance covers it: run it.
   | { outcome: 'runWithoutAd' }
-  // No ad, and the allowance is used up: offer the Pro pass.
-  | { outcome: 'offerPro' };
+  // Offline, and the allowance is used up: offer the Pro pass.
+  | { outcome: 'offerPro' }
+  // Online (or unknown) and no ad could show: nothing runs; the sheet says why, with Try again.
+  | { outcome: 'adUnavailable'; reason: AdUnavailableReason };
 
 export async function watchAdForTask(
   req: ProTaskRequest,
@@ -114,12 +127,18 @@ export async function watchAdForTask(
   await clearPendingTask(pending.id);
   if (result === 'closedEarly') return { outcome: 'closedEarly' };
 
-  // No ad (no fill, offline, consent): fail open, within today's allowance.
+  // No ad. Only a phone that is really offline gets today's grace; anything else (no fill, a
+  // broken SDK, no unit, consent) fails closed.
+  const reason = result.unavailable;
+  if (!(await isOffline())) {
+    logUsage('pro_task_ad_unavailable', { feature, reason: AD_UNAVAILABLE_CODES[reason] });
+    return { outcome: 'adUnavailable', reason };
+  }
   const at = now();
   const { offlineRuns } = await loadTaskState();
   if (offlineRunsOnDay(offlineRuns, at) >= remote.offlineFreeTasksPerDay) return { outcome: 'offerPro' };
   await updateTaskState(at, (s) => ({ ...s, offlineRuns: recordOfflineRun(s.offlineRuns, at) }));
-  logUsage('pro_task_run_without_ad', { feature });
+  logUsage('pro_task_offline_free', { feature });
   return { outcome: 'runWithoutAd' };
 }
 

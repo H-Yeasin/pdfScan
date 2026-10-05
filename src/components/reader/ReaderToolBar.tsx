@@ -5,6 +5,7 @@ import { spacing, typeScale, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme
 import { useT } from '../../i18n/useT';
 import type { ReaderTool, ReaderToolId } from '../../services/documents/readerTools';
 import { ProBadge } from '../pro/ProBadge';
+import { useReportBottomBar } from '../shared/bottomBarHeight';
 
 const ICONS: Record<ReaderToolId, keyof typeof Ionicons.glyphMap> = {
   mark: 'color-fill-outline',
@@ -27,6 +28,7 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  const onLayout = useReportBottomBar();
   if (tools.length === 0) return null;
 
   return (
@@ -36,12 +38,18 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
         {
           backgroundColor: tokens.surface,
           borderTopColor: tokens.edge,
+          // §14 Q3: the bar's background runs under the navigation bar; its buttons sit above it
+          // (and clear of a side 3-button bar in landscape). Animated, so it can't be a BottomBar.
           paddingBottom: Math.max(insets.bottom, spacing.sm),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
           opacity: visible,
           transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }],
         },
       ]}
       pointerEvents="box-none"
+      onLayout={onLayout}
+      testID="reader-tool-bar"
     >
       <View style={styles.row}>
         {tools.map((tool) => (

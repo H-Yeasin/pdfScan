@@ -12,6 +12,9 @@ export type AdsSdkState = {
   status: 'off' | 'starting' | 'ready' | 'unavailable';
   // The consent form's rules apply on this phone (services/ads/adPolicy.nonPersonalizedOnly).
   gdprApplies: boolean;
+  // Why it is 'unavailable' (§14 Q1: a task's ad sheet says which): consent doesn't allow ads,
+  // or the SDK failed to start (no Play services, no network for the consent step).
+  reason?: 'consent' | 'sdk';
 };
 
 const OFF: AdsSdkState = { status: 'off', gdprApplies: false };
@@ -49,7 +52,7 @@ export async function startAds({ retry = false }: { retry?: boolean } = {}): Pro
     const consent = await ads.AdsConsent.gatherConsent();
     const gdprApplies = await ads.AdsConsent.getGdprApplies().catch(() => false);
     if (!consent.canRequestAds) {
-      set({ status: 'unavailable', gdprApplies });
+      set({ status: 'unavailable', gdprApplies, reason: 'consent' });
       return;
     }
     // The audience is 13+ (§10 M1); keep ad content to what fits it.
@@ -58,8 +61,20 @@ export async function startAds({ retry = false }: { retry?: boolean } = {}): Pro
     set({ status: 'ready', gdprApplies });
   } catch (e) {
     console.warn('Ads not started', e);
-    set({ ...current, status: 'unavailable' });
+    set({ ...current, status: 'unavailable', reason: 'sdk' });
   }
+}
+
+// §14 Q1: "Ad choices" on a task's ad sheet when consent blocked the ad. The UMP privacy options
+// form lets the student change their answer; the SDK is then started again with it.
+export async function showAdChoices(): Promise<void> {
+  try {
+    const ads = require('react-native-google-mobile-ads') as typeof import('react-native-google-mobile-ads');
+    await ads.AdsConsent.showPrivacyOptionsForm();
+  } catch (e) {
+    console.warn('Ad choices not shown', e);
+  }
+  await startAds({ retry: true });
 }
 
 // For tests.

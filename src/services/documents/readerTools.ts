@@ -2,6 +2,7 @@ import type { DocFormat, LibraryDocument } from '../../types/models';
 import { getProFeature } from '../pro/proFeatures';
 import type { ProTaskFeature } from '../pro/proTask';
 import {
+  canAddCover,
   canConvertToPdf,
   canMark,
   canSign,
@@ -36,6 +37,9 @@ export type ReaderMoreItemId =
   | 'print'
   | 'sign'
   | 'editPages'
+  // §14 Q7: a cover page on a library PDF; "Change cover page" when it has one.
+  | 'addCover'
+  | 'changeCover'
   | 'bookmarks'
   | 'copyText'
   | 'extractText'
@@ -123,6 +127,7 @@ export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: reado
   items.push('print');
   if (doc && canSign(doc)) items.push('sign');
   if (doc && canUsePageTools(doc)) items.push('editPages');
+  if (doc && canAddCover(doc)) items.push(doc.coverKind ? 'changeCover' : 'addCover');
   if (doc && raster) items.push('bookmarks');
   if (doc && hasPageMasters(doc)) items.push('copyText', 'extractText');
   items.push('readingSettings');

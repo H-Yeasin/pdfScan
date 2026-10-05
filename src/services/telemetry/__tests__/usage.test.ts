@@ -80,10 +80,13 @@ describe('allow-list', () => {
         'scan_completed',
         'pro_task_ad_shown',
         'pro_task_ad_rewarded',
-        'pro_task_run_without_ad',
+        'pro_task_offline_free',
+        'pro_task_ad_unavailable',
       ].sort()
     );
     expect(USAGE_EVENTS.pro_task_ad_shown).toEqual(['feature']);
+    expect(USAGE_EVENTS.pro_task_ad_unavailable).toEqual(['feature', 'reason']);
+    expect(USAGE_EVENTS.pro_task_offline_free).toEqual(['feature']);
     expect(USAGE_EVENTS.scan_completed).toEqual(['pages']);
   });
 

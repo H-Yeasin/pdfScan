@@ -85,7 +85,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.cancel')} disabled={busy}>

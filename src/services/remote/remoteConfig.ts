@@ -6,11 +6,17 @@ import { useSyncExternalStore } from 'react';
 //
 // The bundled defaults below are what the app does when Firebase isn't there at all (local dev
 // builds without the config files), before the first fetch, and offline. They must always be a
-// safe state: ads off, sales off. A value from the console that has the wrong type or is out of
-// range is ignored and its default kept, so a typo can't turn into a broken app; keys this build
-// doesn't know (added for a newer version) are ignored too.
+// safe state: sales off, and Pro tasks never free (§14 Q1: they cost a rewarded ad unless the
+// owner turns `pro_tasks_free` on). Ads default to on in release builds so a phone that never
+// reached Firebase can still show a task's ad; development builds keep them off. A value from the
+// console that has the wrong type or is out of range is ignored and its default kept, so a typo
+// can't turn into a broken app; keys this build doesn't know (added for a newer version) are
+// ignored too.
 
 export type RemoteConfig = {
+  // The owner's switch for banners and the ads SDK. Turning it off in the console stops banners
+  // **and** makes Pro tasks unavailable (not free: no ad can unlock them) unless `pro_tasks_free`
+  // is on too. On by default in release builds (§14 Q1).
   adsEnabled: boolean;
   // Screens a banner may show on (M5's adPolicy); never capture, review, deliver or the reader.
   adsBannerScreens: string[];
@@ -25,10 +31,14 @@ export type RemoteConfig = {
   passHours: number;
   passMaxPerDay: number;
   // §12 D1, Pro tasks: how long one ad unlocks editing a document, how many tasks a day may run
-  // without an ad when none can load (offline, no fill), and how long to wait for a task's ad.
+  // without an ad on a phone that is really offline (§14 Q1: never for no fill, a broken SDK or
+  // consent), and how long to wait for a task's ad.
   editUnlockMinutes: number;
   offlineFreeTasksPerDay: number;
   taskAdTimeoutMs: number;
+  // §14 Q1: the owner's only switch to make Pro tasks free for everyone (a promotion, an ads
+  // outage). `ads_enabled` off no longer does.
+  proTasksFree: boolean;
   // M7's Help & feedback contact: international digits for wa.me, and an address ('' = none).
   supportWhatsapp: string;
   supportEmail: string;
@@ -39,7 +49,7 @@ export type RemoteConfig = {
 };
 
 export const REMOTE_DEFAULTS: RemoteConfig = {
-  adsEnabled: false,
+  adsEnabled: !__DEV__,
   adsBannerScreens: ['home', 'library'],
   adsBannerUnitAndroid: '',
   adsBannerUnitIos: '',
@@ -48,8 +58,9 @@ export const REMOTE_DEFAULTS: RemoteConfig = {
   passHours: 1,
   passMaxPerDay: 3,
   editUnlockMinutes: 30,
-  offlineFreeTasksPerDay: 5,
+  offlineFreeTasksPerDay: 1,
   taskAdTimeoutMs: 8_000,
+  proTasksFree: false,
   supportWhatsapp: '8801645724080',
   supportEmail: '',
   proSalesEnabled: false,
@@ -106,6 +117,7 @@ const KEYS: { [K in keyof RemoteConfig]: { key: string; parse: Parser<RemoteConf
   offlineFreeTasksPerDay: { key: 'offline_free_tasks_per_day', parse: int(0, 50) },
   // Under 2 s almost no ad loads; over 30 s the student has given up.
   taskAdTimeoutMs: { key: 'task_ad_timeout_ms', parse: int(2_000, 30_000) },
+  proTasksFree: { key: 'pro_tasks_free', parse: bool },
   // An empty number would leave Help & feedback without a contact, so it isn't accepted.
   supportWhatsapp: { key: 'support_whatsapp', parse: (raw) => (/^\d{8,15}$/.test(raw.trim()) ? raw.trim() : undefined) },
   supportEmail: { key: 'support_email', parse: matching(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) },
@@ -143,6 +155,14 @@ export function isVersionBelow(version: string, min: string): boolean {
 let current: RemoteConfig = REMOTE_DEFAULTS;
 const listeners = new Set<() => void>();
 
+// §14 Q2: where the values in use came from, for the dev diagnostics line in Settings (a release
+// check on a dev build: did this phone ever see the console's values?). 'defaults' = the bundled
+// ones (no Firebase in this build, not loaded yet, or an error before anything was read);
+// 'cached' = console values from the last fetch, read from disk; 'fetched' = a fetch just now
+// reached Firebase (even if the console sets nothing).
+export type RemoteConfigSource = 'defaults' | 'cached' | 'fetched';
+let source: RemoteConfigSource = 'defaults';
+
 export function getRemoteConfig(): RemoteConfig {
   return current;
 }
@@ -160,6 +180,26 @@ function subscribe(listener: () => void): () => void {
 
 export function useRemoteConfig(): RemoteConfig {
   return useSyncExternalStore(subscribe, getRemoteConfig, getRemoteConfig);
+}
+
+export function getRemoteConfigSource(): RemoteConfigSource {
+  return source;
+}
+
+function setSource(next: RemoteConfigSource): void {
+  if (next === source) return;
+  source = next;
+  listeners.forEach((l) => l());
+}
+
+export function useRemoteConfigSource(): RemoteConfigSource {
+  return useSyncExternalStore(subscribe, getRemoteConfigSource, getRemoteConfigSource);
+}
+
+// For tests.
+export function resetRemoteConfig(): void {
+  current = REMOTE_DEFAULTS;
+  source = 'defaults';
 }
 
 // Between fetches the cached values are used. An hour keeps a console change to "the next
@@ -191,9 +231,12 @@ export async function loadRemoteConfig(): Promise<void> {
     const remoteConfig = rc.getRemoteConfig();
     remoteConfig.settings = { minimumFetchIntervalMillis: FETCH_INTERVAL_MS, fetchTimeoutMillis: FETCH_TIMEOUT_MS };
     await rc.ensureInitialized(remoteConfig);
-    setRemoteConfig(parseRemoteConfig(remoteValuesOf(rc.getAll(remoteConfig))));
+    const cached = remoteValuesOf(rc.getAll(remoteConfig));
+    setRemoteConfig(parseRemoteConfig(cached));
+    if (Object.keys(cached).length > 0) setSource('cached');
     await rc.fetchAndActivate(remoteConfig);
     setRemoteConfig(parseRemoteConfig(remoteValuesOf(rc.getAll(remoteConfig))));
+    setSource('fetched');
   } catch (e) {
     console.warn('Remote Config not loaded; keeping the values in use', e);
   }

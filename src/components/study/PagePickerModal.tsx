@@ -35,7 +35,7 @@ export function PagePickerModal({
     setPicked((list) => (has(list, item.documentId, item.pageId) ? list.filter((x) => !(x.documentId === item.documentId && x.pageId === item.pageId)) : [...list, item]));
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={styles.header}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>

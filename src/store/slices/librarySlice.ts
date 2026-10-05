@@ -83,6 +83,8 @@ export type LibraryAction =
   | { type: 'library/TOGGLE_SELECTION'; id: string }
   | { type: 'library/SET_SEL_MODE'; on: boolean }
   | { type: 'library/CLEAR_SELECTION' }
+  // §14 Q5: selects exactly `ids` (the visible list); an empty array selects none but stays selecting.
+  | { type: 'library/SELECT_ALL'; ids: string[] }
   | { type: 'library/SET_TAB'; tab: LibraryTab }
   | { type: 'library/SET_SEARCH'; search: string }
   | { type: 'library/TOGGLE_SEARCH_OPEN' }
@@ -246,6 +248,8 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return { ...state, selMode: action.on, selection: action.on ? state.selection : [] };
     case 'library/CLEAR_SELECTION':
       return { ...state, selection: [], selMode: false };
+    case 'library/SELECT_ALL':
+      return { ...state, selection: [...action.ids], selMode: true };
     case 'library/SET_TAB':
       return { ...state, tab: action.tab, activeCourseId: null };
     case 'library/SET_SEARCH':

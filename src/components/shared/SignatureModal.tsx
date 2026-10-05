@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureSignedPage } from '../../services/signature/signatureService';
 import { radii, spacing, useTheme } from '../../theme';
@@ -19,6 +20,8 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
   const { tokens } = useTheme();
   const { t } = useT();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  // §14 Q4: the modal is edge-to-edge, so its controls keep clear of the system bars.
+  const insets = useSafeAreaInsets();
   const shotRef = useRef<View>(null);
   const [empty, setEmpty] = useState(true);
   const [padKey, setPadKey] = useState(0);
@@ -26,7 +29,7 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
   const [strokeColor, setStrokeColor] = useState(INK_COLORS[0]);
 
   const maxWidth = screenWidth - spacing.xl * 2;
-  const maxHeight = screenHeight * 0.6;
+  const maxHeight = (screenHeight - insets.top - insets.bottom) * 0.6;
   const ratio = naturalHeight / naturalWidth;
   let displayWidth = maxWidth;
   let displayHeight = displayWidth * ratio;
@@ -52,8 +55,8 @@ export function SignatureModal({ visible, uri, naturalWidth, naturalHeight, onCa
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
-      <GestureHandlerRootView style={styles.backdrop}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
+      <GestureHandlerRootView style={[styles.backdrop, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View ref={shotRef} collapsable={false} style={{ width: displayWidth, height: displayHeight }}>
           <Image source={{ uri }} style={{ width: displayWidth, height: displayHeight }} resizeMode="contain" />
           <SignaturePad key={padKey} strokeColor={strokeColor} onChangeEmpty={setEmpty} />

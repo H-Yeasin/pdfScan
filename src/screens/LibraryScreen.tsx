@@ -19,6 +19,7 @@ import type { DocType } from '../types/models';
 import { LibraryTabs } from '../components/library/LibraryTabs';
 import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar } from '../components/library/SelectionBar';
+import { SelectAllButton } from '../components/library/SelectAllButton';
 import { useDocumentListActions } from '../components/library/useDocumentListActions';
 import { TabBar } from '../components/shared/TabBar';
 import { BannerSlot } from '../components/ads/BannerSlot';
@@ -210,6 +211,7 @@ export function LibraryScreen() {
             <Ionicons name="close" size={20} color={tokens.ink} />
           </Pressable>
           <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.length })}</Text>
+          <SelectAllButton visibleIds={tab === 'courses' ? [] : visibleFiles.map((f) => f.id)} selection={selection} />
         </View>
       )}
 

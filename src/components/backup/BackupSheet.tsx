@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatBytes } from '../../i18n';
 import { useT } from '../../i18n/useT';
 import type { BackupInclude, BackupProgress, BackupResult } from '../../services/backup/createBackup';
@@ -28,6 +29,7 @@ type BackupSheetProps = {
 // Share / Save to folder / Done.
 export function BackupSheet({ phase, canSaveToFolder, onChoose, onShare, onSave, onCancel, onDone }: BackupSheetProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { t } = useT();
   if (phase.kind === 'idle') return null;
 
@@ -67,8 +69,8 @@ export function BackupSheet({ phase, canSaveToFolder, onChoose, onShare, onSave,
           : t('backup.ready', { size: formatBytes(phase.result.bytes) });
 
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onRequestClose}>
-      <View style={styles.backdrop}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent visible animationType="fade" onRequestClose={onRequestClose}>
+      <View style={[styles.backdrop, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xl }]}>
         <View style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
           <Text style={[styles.title, { color: tokens.ink }]}>{title}</Text>
 

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import { DocTypePickerModal } from '../courses/DocTypeChips';
 import { FolderPickerModal } from '../deliver/FolderPickerModal';
 import { createId } from '../../utils/id';
@@ -7,6 +8,7 @@ import { SignatureModal } from '../shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
 import type { SelectionToolId } from './SelectionBar';
 import { useBackupExport } from '../backup/useBackupExport';
+import { useOpenCoverOptions } from './useCoverTarget';
 import { useRouter } from '../../navigation/router';
 import { saveSignatureForReuse } from '../../services/signature/savedSignatureStorage';
 import {
@@ -71,6 +73,40 @@ export async function compressDocuments(
   return rasterized ? t('library.compressedAsImages') : notSmaller ? t('library.alreadySmall') : t('library.compressed');
 }
 
+// §14 Q5: asks, then removes the documents. The dispatch comes first so the list updates at once (and
+// persistence deletes the rows; the pages' FTS rows go with them via the cascade and its trigger);
+// the folders go after, one at a time. A folder that fails to delete is only an orphan, which
+// Settings → Storage can clean, never a row whose files are gone.
+export function confirmDelete(docs: readonly LibraryDocument[], dispatch: Dispatch<AppAction>): void {
+  if (docs.length === 0) return;
+  const count = docs.length;
+  const single = count === 1 ? docs[0] : null;
+  Alert.alert(
+    single ? t('reader.deleteTitle') : t('library.deleteSelected.title', { count }),
+    single ? t('reader.deleteBody', { name: single.name }) : t('library.deleteSelected.body', { count }),
+    [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('library.deleteSelected.confirm'),
+        style: 'destructive',
+        onPress: () => {
+          const ids = docs.map((d) => d.id);
+          dispatch({ type: 'library/REMOVE_FILES', ids });
+          for (const id of ids) {
+            try {
+              deleteDocumentFiles(id);
+            } catch (error) {
+              console.warn('confirmDelete: could not delete the files of', id, error);
+            }
+          }
+          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.deleted', { count }) });
+        },
+      },
+    ]
+  );
+}
+
 // What a document list does with its rows, shared by the Library and Course screens: tap opens
 // (or toggles, in selection mode), long-press starts selecting, and the SelectionBar's tools
 // (merge, split, compress, sign, set type). Selection lives in state.library, so it's one selection
@@ -87,6 +123,7 @@ export function useDocumentListActions() {
   const [movePickerOpen, setMovePickerOpen] = useState(false);
   const submit = useSubmitDocument();
   const { exportScope, overlay: backupOverlay } = useBackupExport();
+  const openCoverOptions = useOpenCoverOptions();
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
 
@@ -128,6 +165,18 @@ export function useDocumentListActions() {
 
       if (id === 'move') {
         setMovePickerOpen(true);
+        return;
+      }
+
+      // §14 Q7: Academic options for this document (or why it can't have a cover).
+      if (id === 'cover') {
+        if (selectedDocs.length === 1) openCoverOptions(selectedDocs[0]);
+        return;
+      }
+
+      // §14 Q5: any format, archived and password-protected ones too.
+      if (id === 'delete') {
+        confirmDelete(selectedDocs, dispatch);
         return;
       }
 
@@ -201,7 +250,7 @@ export function useDocumentListActions() {
         }
       }
     },
-    [selectedDocs, selection, dispatch, state.signature.saved, state.library.annotations, submit, exportScope]
+    [selectedDocs, selection, dispatch, state.signature.saved, state.library.annotations, submit, exportScope, openCoverOptions]
   );
 
   const handleSignConfirm = useCallback(

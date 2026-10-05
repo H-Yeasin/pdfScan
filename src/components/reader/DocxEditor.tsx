@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ComponentProps } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { commandScript, docxEditorHtml, parseEditorMessage, REQUEST_HTML_SCRIPT, type DocxCommand } from '../../services/edit/docxEdit';
 import { useT } from '../../i18n/useT';
@@ -99,7 +99,10 @@ export const DocxEditor = forwardRef<DocxEditorHandle, DocxEditorProps>(function
   }, []);
 
   return (
-    <View style={styles.root}>
+    // §14 Q4: the editor sits in an edge-to-edge modal, whose window Android doesn't resize for the
+    // keyboard, so the WebView shrinks above it here (and keeps the caret in view itself). iOS's
+    // WebView already insets its own scroll view.
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'android' ? 'padding' : undefined}>
       <View style={[styles.toolbar, { borderBottomColor: tokens.edge }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolRow} keyboardShouldPersistTaps="always">
           {TOOLS.map((tool) => {
@@ -138,7 +141,7 @@ export const DocxEditor = forwardRef<DocxEditorHandle, DocxEditorProps>(function
         hideKeyboardAccessoryView
         keyboardDisplayRequiresUserAction={false}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 });
 

@@ -28,7 +28,7 @@ wrong type or an out-of-range value uses the default.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `ads_enabled` | Boolean | `false` | Master switch for every ad (M5, M6). |
+| `ads_enabled` | Boolean | `true` in release builds, `false` in dev builds | Switch for banners and the ads SDK (M5, M6). Off also makes Pro tasks unavailable (not free) unless `pro_tasks_free` is on (§14 Q1). |
 | `ads_banner_screens` | JSON | `["home","library"]` | Screens a banner may show on. Only `home` and `library` have a banner slot. |
 | `ads_banner_unit_android` | String | (empty) | AdMob banner unit `ca-app-pub-…/…`. Empty = no banner in release builds (dev builds use Google's test unit). |
 | `ads_banner_unit_ios` | String | (empty) | The same for iOS. |
@@ -37,8 +37,9 @@ wrong type or an out-of-range value uses the default.
 | `pass_hours` | Number | `1` | Pro pass length (hours), 1–168. Was `24` until 2026-10-04 (`docs/plan/13-pro-pass-one-hour.md`); if the console still has `24`, change it to `1` and publish, or installed apps keep giving 24 hours. |
 | `pass_max_per_day` | Number | `3` | Passes a day, 0–10. |
 | `edit_unlock_minutes` | Number | `30` | §12 D1: how long one rewarded ad unlocks editing a document, 5–240. |
-| `offline_free_tasks_per_day` | Number | `5` | §12 D1: Pro tasks a day that run without an ad when none can load (offline, no fill), 0–50. Past that the Pro pass is offered. |
-| `task_ad_timeout_ms` | Number | `8000` | §12 D1: how long a Pro task waits for its ad before running without one, 2000–30000. |
+| `offline_free_tasks_per_day` | Number | `1` | §12 D1, §14 Q1: Pro tasks a day that run without an ad on a phone that is **really offline**, 0–50. Never for no fill, a broken SDK, no unit or consent while online (the task doesn't run). Past it the Pro pass is offered. Was `5` until 2026-10-04: if the console still has `5`, set `1` and publish. |
+| `task_ad_timeout_ms` | Number | `8000` | §12 D1: how long a Pro task waits for its ad, 2000–30000. A timeout counts as "the ad couldn't load" (§14 Q1). |
+| `pro_tasks_free` | Boolean | `false` | §14 Q1: the only switch that makes Pro tasks free for everyone (a promotion, an ads outage). Keep false. |
 | `support_whatsapp` | String | `8801645724080` | Digits only, with country code (wa.me). Support only. |
 | `support_email` | String | (empty) | Empty = not shown. |
 | `pro_sales_enabled` | Boolean | `false` | Paid Pro (M9). Keep false. |
@@ -79,6 +80,10 @@ no ad-related consent defaults). The app turns collection on only while Settings
 | `document_submitted` | none |
 | `pass_started` | none |
 | `backup_made` | none |
+| `pro_task_ad_shown` | `feature` (1 convert, 2 edit files, 3 PDF forms) |
+| `pro_task_ad_rewarded` | `feature` |
+| `pro_task_offline_free` | `feature` (ran without an ad: offline grace, §14 Q1) |
+| `pro_task_ad_unavailable` | `feature`, `reason` (1 ads off, 2 no unit, 3 SDK, 4 consent, 5 no fill, 6 timeout); online, so the task didn't run |
 
 Turning the toggle off stops collection and resets the Analytics app instance id. To see the
 events while testing: `adb shell setprop debug.firebase.analytics.app <package>` and open
@@ -86,8 +91,10 @@ DebugView in the console.
 
 ## Verify
 
-- Without the files: the app starts, nothing Firebase-related in logcat, ads stay off.
+- Without the files: the app starts, nothing Firebase-related in logcat, and the bundled
+  defaults apply (Settings ▸ Developer ▸ "Ads setup" says `Remote Config: bundled defaults`).
 - With them: set `ads_enabled` to `true` in the console and publish; after the next start,
-  `getRemoteConfig().adsEnabled` is true (M5 shows the banner).
+  `getRemoteConfig().adsEnabled` is true (M5 shows the banner) and "Ads setup" says
+  `Remote Config: fetched`.
 - With "Help improve PDF Scan" off: no requests to `app-measurement.com` in a proxy. With it
   on: the events above appear in DebugView.

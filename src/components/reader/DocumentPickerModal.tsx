@@ -18,7 +18,7 @@ export function DocumentPickerModal({ visible, title, docs, onPick, onClose }: D
   const { tokens } = useTheme();
   const { t } = useT();
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>{title}</Text>

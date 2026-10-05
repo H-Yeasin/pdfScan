@@ -22,6 +22,9 @@ export type BackContext = {
   sessionPageCount: number;
   retakeTargetId: string | null;
   highlightDeadlineId: string | null;
+  // §14 Q7: Academic options open for a library document's cover: Back returns to where that was
+  // started (a list screen or the Reader) and clears it.
+  coverTarget?: { from: ScreenName } | null;
 };
 
 export type BackStep =
@@ -62,7 +65,7 @@ function backTarget(ctx: BackContext): ScreenName {
     case 'pro':
       return ctx.previousScreen ?? 'settings';
     case 'academicOptions':
-      return ctx.previousScreen ?? 'deliver';
+      return ctx.coverTarget?.from ?? ctx.previousScreen ?? 'deliver';
     case 'examPack':
       return ctx.previousScreen ?? 'course';
     case 'home':
@@ -96,5 +99,6 @@ export function resolveBack(ctx: BackContext): BackStep {
   if (ctx.screen === 'course' && ctx.highlightDeadlineId) {
     actions.push({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null });
   }
+  if (ctx.screen === 'academicOptions' && ctx.coverTarget) actions.push({ type: 'deliver/SET_COVER_TARGET', target: null });
   return { kind: 'go', to: backTarget(ctx), actions };
 }
