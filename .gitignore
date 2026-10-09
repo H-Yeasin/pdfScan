@@ -46,6 +46,10 @@ temp_interactive_push.bat
 # Gradle caches from local native builds
 **/android/.gradle/
 
+# Build output of local Expo modules (§16 G1: a5e4cf8 committed 129 of these files)
+modules/*/android/build/
+modules/*/ios/build/
+
 # Firebase config files come from EAS file environment variables (docs/firebase.md)
 google-services.json
 GoogleService-Info.plist

@@ -327,6 +327,87 @@ to the logo's greens.
 and splash all show the new logo, the native → JS splash handoff can't be seen in a frame-by-frame
 recording, and the intro never delays the first usable screen by more than about 1.1 s.
 
+
+### §16 Speed and safety *(planned 2026-10-09; before §11)*
+Goal: the app feels fast on a mid-range phone, from cold start to scrolling a big library, and crash
+reports respect the opt-in.
+
+**Detailed steps:** [`docs/plan/16-speed.md`](plan/16-speed.md)
+
+- [x] G1 Privacy hotfix: one opt-in Sentry path (remove the wizard's init with session replay), untrack build output (done in code; the DSN rotation and Verification 1 are open)
+- [ ] G2 Router v2: a back stack, kept tab roots, keyed layers, a persistent tab bar, `useScreenRole`
+- [ ] G3 Boot diet: lazy screens; pdf-lib, xlsx, mammoth and the filter registry off the boot path
+- [ ] G4 Boot waterfall: embedded fonts, early DB and settings, a lighter `loadAll`, WAL (new dev build)
+- [ ] G5 Re-render hygiene: memo'd layers, `BootEffects`, UI fields out of `library`, reducer identity
+- [ ] G6 FlashList + `expo-image`, thumbnails never fall back to masters (new dev build)
+- [ ] G7 Heavy work off the hot path (Review sliders, progressive ingest, OCR reuse, indexing writes)
+- [ ] G8 Release build: R8 + resource shrinking, React Compiler trial (new dev build)
+- [ ] G9 Measure and record (`docs/qa/performance.md`)
+
+**Done when:** crash reports send nothing unless opted in (and never a replay), cold start is at least
+30% faster than the G9 baseline, Back never remounts a screen or loses a list's place, and Files scrolls
+500 documents with ≤ 5% janky frames.
+
+### §17 Design system and app flow *(planned 2026-10-09; before §11)*
+Goal: the app looks designed by one hand (a bolder student brand), and every feature is a tap or two
+away: Home · Files · [Scan] · Tools · Me.
+
+**Detailed steps:** [`docs/plan/17-design-flow.md`](plan/17-design-flow.md)
+
+- [ ] U1 Tokens v2 (highlight, semantic colours, type scale, elevation, motion, icon map)
+- [ ] U2 UI kit (`components/ui/`) + the ratchet test against hand-rolled styles
+- [ ] U3 Sheet, Dialog / `useConfirm`, Menu (every `Alert` and `Modal` migrated)
+- [ ] U4 Illustrations and brand moments
+- [ ] U5 The new shell: 4 tabs + the centre Scan button (Capture removed; Home always the start)
+- [ ] U6 Home
+- [ ] U7 Files: folders, filters, sort, grid, row menus, Rename, checkboxes, safe merge/split, import
+- [ ] U8 Tools hub
+- [ ] U9 Review → Save → Done (mode after scanning, Submit sheet, `saveScan.ts`)
+- [ ] U10 Me (Settings)
+- [ ] U11 Course, Exam pack, Pro, Onboarding
+- [ ] U12 Copy pass (UK spelling, sentence case, no jargon)
+- [ ] U13 Motion and feedback
+- [ ] U14 Usability check with students
+
+**Done when:** students in the U14 walkthrough meet the tap-count targets without help (scan → saved ≤ 3,
+import 2, rename 2, merge ≤ 4, sign 3, convert 3, exam pack 2, search 1), and the ratchet test counts no
+hand-rolled font sizes, `Alert`s or bare `Modal`s in redesigned screens.
+
+### §18 Reader v2 *(planned 2026-10-09; before §11)*
+Goal: a reader on par with Google's and Microsoft's for the tools we have: one page surface for PDFs and
+scans (read, Find, select, Mark, Sign on the same pages), true dark pages, links, contents, landscape,
+and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
+
+**Detailed steps:** [`docs/plan/18-reader.md`](plan/18-reader.md)
+
+- [ ] W1 Sign on the right page (2-in-1), keep the saved signature
+- [ ] W2 Find and chrome hygiene
+- [ ] W3 Atomic writes, preview preparation, native page count for outside PDFs
+- [ ] W4 Non-PDF quick fixes (sheet/TXT scroll, TXT cap, DOCX inset and tap)
+- [ ] W5 Position robustness (needs §16 G2)
+- [ ] W6 ReaderScreen split and the sheet state machine
+- [ ] W7 pdf-native v2 (pdfium sessions, tiles, dark, links, outline; iOS PDFKit) + `expo-screen-orientation` (new dev build)
+- [ ] W8 Surface geometry
+- [ ] W9 Render queue, page cache, dark matrix
+- [ ] W10 Read-only surface behind a flag
+- [ ] W11 Links, contents, landscape, TalkBack
+- [ ] W12 Find on the surface ("3 of 27")
+- [ ] W13 In-page text selection
+- [ ] W14 Exports carry the marks
+- [ ] W15 Mark mode on the surface
+- [ ] W16 Signatures as rows on the surface
+- [ ] W17 The surface becomes the reader (bake-ins removed)
+- [ ] W18 Remove react-native-pdf-jsi (new dev build)
+- [ ] W19 Viewer contract, parse cache, positions
+- [ ] W20 TXT
+- [ ] W21 Sheets
+- [ ] W22 DOCX
+- [ ] W23 Grouped More sheet + Rename, Move, Star (needs §17 U3)
+
+**Done when:** on a mid-range phone a 300-page textbook opens sharp in ≤ 1.2 s cold, flings with ≤ 5%
+janky frames, resumes on the right page with no jump, and zoom and position survive Find, selection,
+Mark and Sign; a 5 MB XLSX opens in under 3 s; Find shows "n of N" with prev/next in every format; and
+nothing is ever hidden under the bars, in portrait or landscape.
 ---
 
 ## 5. Phases
@@ -335,7 +416,7 @@ recording, and the intro never delays the first usable screen by more than about
 |---|---|---|
 | **P0: Foundation** | §0 | Trustworthy, tested, store-ready core |
 | **P1: Student MVP** | §1 (modes + gallery batch), §2 (Ink + Board filters), §3, §4, §9 onboarding | Play Store closed beta (ads off through Remote Config) |
-| **P2: Study** | §5, §6 groundwork, §8 zip export | Public Android launch |
+| **P2: Study** | §5, §6 groundwork, §8 zip export, §16–§18 (speed, design, reader v2) | Public Android launch |
 | **P3: Grow** | §10 ads + Pro pass, §8 Drive, §11, §12 convert + light edit, iOS parity | Revenue + growth (paid Pro when a merchant route exists) |
 | **P4: Expand** | Bengali via §6, flashcards, more templates | Regional #1 |
 
@@ -367,4 +448,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. §14 is planned in `docs/plan/14-prelaunch-fixes.md` (done in code; device checks open). §15 is planned in `docs/plan/15-brand-refresh.md`. Next: §15's device checks (V1–V5 are done in code; V2 needs `npx expo prebuild --clean` and a new dev build) and run §14's device checks, then plan §11 Launch and growth (`docs/plan/11-launch.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. §14 is planned in `docs/plan/14-prelaunch-fixes.md` (done in code; device checks open). §15 is planned in `docs/plan/15-brand-refresh.md`. §16–§18 are planned in `docs/plan/16-speed.md`, `docs/plan/17-design-flow.md` and `docs/plan/18-reader.md`. §16 G1 (privacy hotfix) is done in code (the owner rotates the Sentry DSN). Next: §18 W1–W4, then §16–§18 in the order in `docs/plan/README.md`; alongside, §15's device checks (V1–V5 are done in code; V2 needs `npx expo prebuild --clean` and a new dev build) and run §14's device checks, then plan §11 Launch and growth (`docs/plan/11-launch.md`).

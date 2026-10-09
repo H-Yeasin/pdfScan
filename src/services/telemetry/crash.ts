@@ -4,6 +4,12 @@ import * as Sentry from '@sentry/react-native';
 // all - until the user turns "Send anonymous crash reports" on in Settings. Even then, reports
 // carry stack traces only: the scrubbers below strip anything that could hold a document name,
 // a file path or scanned text.
+//
+// §16 G1: this is the only place Sentry starts (services/telemetry/__tests__/sentryInit.test.ts
+// fails on any other Sentry.init). Session replay, screenshots, the view hierarchy and
+// sendDefaultPii stay off for good, opted in or not: the screen and the pages are a student's
+// documents, and the IP address is personal data. Don't let the Sentry wizard add its own init
+// to App.tsx again.
 
 type Breadcrumb = Sentry.Breadcrumb;
 type ErrorEvent = Parameters<NonNullable<Sentry.ReactNativeOptions['beforeSend']>>[0];
