@@ -36,7 +36,7 @@ export function SettingsScreen() {
     { id: 'dark', label: t('settings.theme.dark') },
   ];
   const [timetableOpen, setTimetableOpen] = useState(false);
-  const { go, hub } = useRouter();
+  const { go, back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const entitlement = useEntitlement();
@@ -87,7 +87,7 @@ export function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go(hub, 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={back} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('settings.title')}</Text>

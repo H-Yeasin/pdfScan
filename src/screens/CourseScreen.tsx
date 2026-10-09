@@ -38,7 +38,7 @@ export function CourseScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const { go, tabHub } = useRouter();
+  const { go, back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'pack', 'settings');
   const store = useAppStore();
@@ -115,7 +115,7 @@ export function CourseScreen() {
   const goBack = () => {
     dispatch({ type: 'library/CLEAR_SELECTION' });
     if (highlightDeadlineId) dispatch({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null });
-    go(tabHub, 'back');
+    back();
   };
 
   const handleScan = () => {

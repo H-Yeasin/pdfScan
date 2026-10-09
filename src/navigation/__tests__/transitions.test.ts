@@ -18,6 +18,11 @@ describe('screen transitions', () => {
     expect(outgoing).not.toHaveProperty('transform');
   });
 
+  it('cross-fade a tab switch (§16 G2)', () => {
+    expect(transitionStyle(progress, 400, 'incoming', 'fwd', false, 'fade')).toEqual({ opacity: progress });
+    expect(transitionStyle(progress, 400, 'outgoing', 'fwd', false, 'fade')).not.toHaveProperty('transform');
+  });
+
   // Fabric asserts these keep their types after the native driver animated them (RN 0.86).
   it('keep transform an array and opacity a number at rest', () => {
     expect(Array.isArray(RESTING_STYLE.transform)).toBe(true);

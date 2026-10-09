@@ -1,5 +1,6 @@
 import { act, create } from 'react-test-renderer';
 import { RouterProvider, useRouter } from '../router';
+import { activeStack } from '../navStack';
 
 function mount() {
   let router: ReturnType<typeof useRouter> | null = null;
@@ -17,36 +18,56 @@ function mount() {
   return () => router!;
 }
 
-describe('router hubs', () => {
-  it('Reader goes back to the course page it was opened from, the course page to its tab', () => {
+const stack = (router: ReturnType<typeof useRouter>) => activeStack(router.nav).map((e) => e.screen);
+
+describe('router (§16 G2)', () => {
+  it('Back returns to where a screen was opened from', () => {
     const router = mount();
-    act(() => router().go('home'));
+    act(() => router().replace('home'));
     act(() => router().go('course'));
     act(() => router().go('reader'));
-    expect(router()).toMatchObject({ hub: 'course', tabHub: 'home' });
-
-    act(() => router().go('library'));
-    act(() => router().go('reader'));
-    expect(router()).toMatchObject({ hub: 'library', tabHub: 'library' });
+    expect(stack(router())).toEqual(['home', 'course', 'reader']);
+    act(() => router().back());
+    expect(router().screen).toBe('course');
+    act(() => router().back());
+    expect(router().screen).toBe('home');
   });
 
   it('replace switches screen without a transition tick or history', () => {
     const router = mount();
     const tick = router().navTick;
     act(() => router().replace('home'));
-    expect(router()).toMatchObject({ screen: 'home', previousScreen: null, navTick: tick, hub: 'home', tabHub: 'home' });
+    expect(router()).toMatchObject({ screen: 'home', tab: 'home', navTick: tick });
+    expect(stack(router())).toEqual(['home']);
   });
-});
 
-describe('the Pro detour (§10 M6)', () => {
-  it("returns to the screen Pro was opened from with that screen's own Back intact", () => {
+  it('records each change of top screen for the transition', () => {
+    const router = mount();
+    act(() => router().replace('home'));
+    act(() => router().go('settings'));
+    expect(router().transition).toMatchObject({ kind: 'slide', dir: 'fwd', from: { screen: 'home' } });
+    const tick = router().navTick;
+    act(() => router().back());
+    expect(router().transition).toMatchObject({ kind: 'slide', dir: 'back', from: { screen: 'settings' } });
+    expect(router().navTick).toBe(tick + 1);
+    act(() => router().switchTab('library'));
+    expect(router().transition).toMatchObject({ kind: 'fade', from: { screen: 'home' } });
+    // Nothing to do (the root already shows): no tick.
+    const still = router().navTick;
+    act(() => router().switchTab('library'));
+    act(() => router().back());
+    expect(router().navTick).toBe(still);
+  });
+
+  it("returns from Pro to the screen it was opened from with that screen's own Back intact (§10 M6)", () => {
     const router = mount();
     act(() => router().go('review'));
     act(() => router().go('academicOptions'));
     act(() => router().go('pro'));
-    expect(router()).toMatchObject({ screen: 'pro', previousScreen: 'academicOptions' });
-    act(() => router().go('academicOptions', 'back'));
+    act(() => router().back());
+    expect(router().screen).toBe('academicOptions');
     // Academic options' Back still goes to Review, not to Pro.
-    expect(router()).toMatchObject({ screen: 'academicOptions', previousScreen: 'review', detourFrom: null });
+    act(() => router().back());
+    expect(router().screen).toBe('review');
   });
 });

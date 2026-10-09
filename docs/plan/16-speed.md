@@ -197,7 +197,67 @@ Tests: `sentryInit.test.ts` (a source scan like `hardcodedStrings.test.ts`). `Se
 Device check: Verification 1.
 
 ## G2 · Router v2: a back stack, kept instances, a persistent tab bar *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: Verification 2–3 on a device, and the iOS check
+below.
+
+As built:
+- **Hiding: `display: 'none'`, not `<Activity>`.** RN 0.86's Fabric renderer supports Activity, but a
+  hidden Activity unmounts its effects and runs them again when shown. The screens reset state in
+  effects: `useReaderDocument`'s per-file reset (`[contentKey]`) would set the page count to 0 under a
+  PDF that's still open after only Reader → Pro → Back. So hidden layers keep their effects running,
+  and what must only happen on screen asks `useScreenRole()`: `useBackHandler` (an overlay left open
+  on a hidden screen doesn't take Back), `useHint` (a hidden screen can't use up a hint),
+  `useReportBottomBar` (only the active screen's bar counts for the Snackbar; it re-reports its last
+  height when shown, since a hidden view gets no new onLayout), `BannerSlot` (requests only while
+  active, keeps its ad while hidden), Capture's light `StatusBar`, and the Reader's keep-awake.
+  On Android, Fabric makes a `display: 'none'` view INVISIBLE and keeps its native children laid out
+  (`useTraitHiddenOnAndroid` is off in RN 0.86), so scroll positions and a loaded banner survive.
+  **iOS** culls hidden views: check there that scroll positions come back.
+- `navigation/navStack.ts` (pure): `{ tab, stacks, prevTab }`; `TABS` is the one tab list (order =
+  the tab bar's). Root entries have fixed keys (`root:<tab>`), so a reset gives back the same mounted
+  root. Beyond the plan:
+  - **one instance of a screen per stack**: pushing a screen that's lower down drops it and what's
+    above it, then pushes a fresh one. The Reader and a course page show the store's current
+    `readerId` / `activeCourseId`, so a hidden older copy would show the new document. Pushing the
+    screen already on top does nothing (an "Open with" file re-renders the Reader in place, as before);
+  - `resolveGo` is the router's `go` as a pure function: a tab root on its own tab = back to the root;
+    on another tab = a **jump** that leaves both tabs at their roots (Scan from a course page, the
+    Library after a save, Home after the introduction: what was open there is over) and cross-fades;
+    `'back'` to a screen on the stack = `popTo`; **course/reader/examPack from the Scan tab go to
+    `prevTab`** (a saved scan lands on its course page in Home or Library, and Back goes to that
+    tab's root, as before), the Scan tab starting at Capture again (until §17 U5);
+  - the tab bar uses `switchTab` (keeps each stack; a second tap resets). Today it's only shown on
+    roots, so the kept stacks matter from §17 U5 on.
+- `router.tsx`: `go`, `go(to, 'back')`, `screen`, `replace` and `navTick` kept; new `back()`,
+  `switchTab(tab)`, `tab`, `nav` and `transition` (`{ kind, dir, from }`). `previousScreen`, `hub`,
+  `tabHub`, `detourFrom` and `HubScreen`/`TabHub` are gone: every screen Back button that used them
+  (Settings, Reader, Course, Pro, Exam pack, Academic options, and Storage/Backup/Manage
+  courses/Filter lab, which went to Settings) calls `back()`. Deliver's `go('review', 'back')`, Review's
+  `go('capture', 'back')` and the cover target's `go(from, 'back')` stay (they resolve to `popTo`).
+- The layers live in `navigation/ScreenStack.tsx` (AppNavigator renders `<ScreenStack screens={SCREENS} />`
+  under `AppLockGate`; the screen map is a prop so the render test can pass mocks): the **shell**
+  (visited tab roots + the one `TabBar`) and the active tab's pushed entries, each a memo'd keyed
+  layer. Root ↔ root moves the two roots inside a still shell; any other transition moves the outer
+  layers, the shell standing in for a root. Inactive tabs' pushed entries aren't mounted (only a
+  content push from the Scan tab leaves any). `progress` rests at 0 so a transition's first frame
+  already draws both layers where they start; every layer keeps `RESTING_STYLE` under its animated
+  style (a layer can fade once and slide later).
+- `TabBar` takes no props: the shell renders it under the roots (hidden with the shell under a pushed
+  screen, absent while the Library is selecting), with Capture's chrome on the Scan tab
+  (`captureChromeStatic.tabBar`). Home, Library and Capture dropped theirs; `safeArea.test.ts`'s
+  allowlist now names `BannerSlot` / `SelectionBar`.
+- `backHandling.resolveBack` gets `tab` and `canPop` instead of the hubs and returns a new `pop`
+  step. Fixed targets: Review → Capture, Deliver → Review, Academic options → `coverTarget.from`.
+  Onboarding alone on its stack (the first-run boot screen) exits.
+- `useCoverTarget`: a Replace made from the Reader opens a fresh Reader (`go('reader')`), because the
+  kept one still has the old file open at the same path.
+- Tests: `navStack.test.ts`, `backHandling.test.ts` (rewritten: Capture → Settings → Back, the
+  low-space guard's Storage, the start tab, the discard confirm, the first-run introduction),
+  `router.test.tsx` (rewritten), `ScreenStack.test.tsx` (mocked screens: one mount each across
+  push → pop and tab switches, the leaving screen kept until its slide ends, roots mounted only once
+  shown, one tab bar).
+- Hidden screens still re-render on store changes (Activity would have deferred that). G5's
+  re-render work matters more now that Home and Library stay mounted.
 
 Goal: Back goes to where you came from, lists keep their scroll and filters, and no navigation ever
 remounts a screen. The shell is ready for §17 U5's tabs.

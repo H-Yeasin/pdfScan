@@ -11,7 +11,7 @@ import { useT } from '../i18n/useT';
 export function ManageFoldersScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go } = useRouter();
+  const { back } = useRouter();
   const state = useAppSlices('library');
   const { files } = state.library;
 
@@ -28,7 +28,7 @@ export function ManageFoldersScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={back} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('library.manageCourses')}</Text>

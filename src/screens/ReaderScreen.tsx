@@ -26,6 +26,7 @@ import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModa
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
+import { useScreenRole } from '../navigation/screenRole';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import {
   applySignedPage,
@@ -73,7 +74,7 @@ export function ReaderScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
   // Back returns to wherever the document was opened from: Home, Library or a course page.
-  const { go, hub } = useRouter();
+  const { go, back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'reader', 'signature', 'settings');
   const reading = state.settings.reading;
@@ -108,7 +109,9 @@ export function ReaderScreen() {
     submitPassword,
   } = useReaderDocument(goToPage);
   const find = useReaderFind({ pdfUri, pdfId, pageCount, contentKey, goToPage });
-  const chrome = useReaderChrome(reading.keepAwake);
+  // §16 G2: a Reader kept under a detour (Pro, a cover's options) doesn't hold the screen on.
+  const onScreen = useScreenRole() === 'active';
+  const chrome = useReaderChrome(reading.keepAwake && onScreen);
   const { reset: resetChrome, onPage: onChromePage } = chrome;
   useEffect(() => resetChrome(), [contentKey, resetChrome]);
 
@@ -383,14 +386,14 @@ export function ReaderScreen() {
               onPress: () => {
                 dispatch({ type: 'library/REMOVE_FILES', ids: [doc.id] });
                 deleteDocumentFiles(doc.id);
-                go(hub, 'back');
+                back();
               },
             },
           ]
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, go, hub, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, fillForm, openCoverOptions, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, back, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, fillForm, openCoverOptions, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -456,7 +459,7 @@ export function ReaderScreen() {
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         <Text style={[styles.passwordTitle, { color: tokens.ink }]}>{t('reader.filesMissing')}</Text>
         <Text style={{ color: tokens.muted, textAlign: 'center' }}>{t('reader.filesMissingBody')}</Text>
-        <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')} hitSlop={8}>
+        <Pressable accessibilityRole="button" onPress={() => back()} hitSlop={8}>
           <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('common.back')}</Text>
         </Pressable>
       </View>
@@ -536,7 +539,7 @@ export function ReaderScreen() {
             <Text style={[styles.passwordTitle, { color: tokens.ink }]}>{t('reader.cantOpen')}</Text>
             <Text style={{ color: tokens.muted }}>{t('reader.cantOpenBody')}</Text>
             <View style={styles.passwordActions}>
-              <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')}>
+              <Pressable accessibilityRole="button" onPress={() => back()}>
                 <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('common.back')}</Text>
               </Pressable>
             </View>
@@ -563,7 +566,7 @@ export function ReaderScreen() {
               onSubmitEditing={submitPassword}
             />
             <View style={styles.passwordActions}>
-              <Pressable accessibilityRole="button" onPress={() => go(hub, 'back')}>
+              <Pressable accessibilityRole="button" onPress={() => back()}>
                 <Text style={{ color: tokens.muted }}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={submitPassword}>
@@ -577,7 +580,7 @@ export function ReaderScreen() {
       <ReaderTopChrome
         visible={chrome.visible}
         name={title}
-        onBack={() => go(hub, 'back')}
+        onBack={() => back()}
         onOverflow={() => setOverflowOpen(true)}
         pageCount={pageCount}
         activeIndex={activeIndex}

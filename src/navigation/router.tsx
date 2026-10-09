@@ -1,29 +1,43 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useMemo, useState } from 'react';
-import type { HubScreen, NavDir, ScreenName, TabHub } from '../types/navigation';
+import type { NavDir, ScreenName } from '../types/navigation';
+import { createId } from '../utils/id';
+import {
+  initialNav,
+  pop,
+  replace as replaceNav,
+  resetTab,
+  resolveGo,
+  switchTab as switchNavTab,
+  topEntry,
+  type Entry,
+  type NavChange,
+  type NavState,
+  type TabId,
+} from './navStack';
+
+// §16 G2: a back stack per tab (navStack.ts). The API the screens use stayed the same - `go(to)`,
+// `go(to, 'back')`, `screen` - so the many go() calls kept working; `back()` is new. Detours like
+// Pro are plain pushes now, and `previousScreen`/`hub`/`tabHub` went: Back pops.
+
+// The last change of top screen, for AppNavigator to animate: `from` is the entry that was on top.
+export type Transition = { kind: 'slide' | 'fade' | 'none'; dir: NavDir; from: Entry | null };
 
 type RouterState = {
-  screen: ScreenName;
-  // The screen `go()` was called FROM, one hop back - lets a screen reachable from more than one
-  // place (e.g. academicOptions, opened from both Review and Deliver) send its own "Back" button
-  // to wherever the user actually came from, instead of a single hardcoded destination.
-  previousScreen: ScreenName | null;
-  navDir: NavDir;
+  nav: NavState;
+  transition: Transition;
+  // Counts changes of top screen (`replace` doesn't count). One-time hints use it as "a visit".
   navTick: number;
-  // The last hub (Home, Library or a Course page) and the last tab (Home or Library) visited.
-  // Reader and Settings go back to `hub`; a Course page goes back to `tabHub`. This replaces
-  // hardcoded "back to Library" now that documents are opened from Home and Course pages too.
-  hub: HubScreen;
-  tabHub: TabHub;
-  // §10 M6: the Pro screen is a detour, opened from wherever a Pro feature was touched. Going
-  // there remembers where we were (and that screen's own previousScreen); coming back restores
-  // it, so e.g. Academic options' Back still goes to Deliver, not to Pro.
-  detourFrom: { screen: ScreenName; previousScreen: ScreenName | null } | null;
 };
 
-const DETOURS: ReadonlySet<ScreenName> = new Set(['pro']);
-
 type RouterContextValue = RouterState & {
+  // The screen on top of the active tab's stack.
+  screen: ScreenName;
+  tab: TabId;
   go: (to: ScreenName, dir?: NavDir) => void;
+  // Pops the top screen (slides back); nothing when it's the only one.
+  back: () => void;
+  // The tab bar: keeps each tab's stack; tapping the active tab goes back to its root.
+  switchTab: (tab: TabId) => void;
   // Switches screen with no transition and no history - for the boot-time choice of start screen.
   replace: (to: ScreenName) => void;
 };
@@ -31,46 +45,49 @@ type RouterContextValue = RouterState & {
 const RouterContext = createContext<RouterContextValue | null>(null);
 
 const INITIAL_STATE: RouterState = {
-  screen: 'capture',
-  previousScreen: null,
-  navDir: 'fwd',
+  nav: initialNav('capture'),
+  transition: { kind: 'none', dir: 'fwd', from: null },
   navTick: 0,
-  hub: 'library',
-  tabHub: 'library',
-  detourFrom: null,
 };
 
-function withHubs(state: RouterState, to: ScreenName): Pick<RouterState, 'hub' | 'tabHub'> {
-  const isTab = to === 'home' || to === 'library';
-  return {
-    hub: isTab || to === 'course' ? to : state.hub,
-    tabHub: isTab ? to : state.tabHub,
-  };
+function applyChange(s: RouterState, change: NavChange): RouterState {
+  if (change.state === s.nav) return s;
+  const from = topEntry(s.nav);
+  // The stacks changed under the top screen: nothing to show.
+  if (topEntry(change.state).key === from.key) return { ...s, nav: change.state };
+  return { nav: change.state, transition: { kind: change.kind, dir: change.dir, from }, navTick: s.navTick + 1 };
 }
 
 export function RouterProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<RouterState>(INITIAL_STATE);
 
   const go = useCallback((to: ScreenName, dir: NavDir = 'fwd') => {
-    setState((s) => {
-      const back = DETOURS.has(s.screen) && s.detourFrom?.screen === to;
-      return {
-        ...s,
-        ...withHubs(s, to),
-        screen: to,
-        previousScreen: back ? s.detourFrom!.previousScreen : s.screen,
-        detourFrom: DETOURS.has(to) ? { screen: s.screen, previousScreen: s.previousScreen } : back ? null : s.detourFrom,
-        navDir: dir,
-        navTick: s.navTick + 1,
-      };
-    });
+    const key = createId('screen');
+    setState((s) => applyChange(s, resolveGo(s.nav, to, dir, key)));
+  }, []);
+
+  const back = useCallback(() => {
+    setState((s) => applyChange(s, { state: pop(s.nav), kind: 'slide', dir: 'back' }));
+  }, []);
+
+  const switchTab = useCallback((tab: TabId) => {
+    setState((s) =>
+      applyChange(
+        s,
+        tab === s.nav.tab ? { state: resetTab(s.nav, tab), kind: 'slide', dir: 'back' } : { state: switchNavTab(s.nav, tab), kind: 'fade', dir: 'fwd' }
+      )
+    );
   }, []);
 
   const replace = useCallback((to: ScreenName) => {
-    setState((s) => ({ ...s, ...withHubs(s, to), screen: to, previousScreen: null, detourFrom: null }));
+    const key = createId('screen');
+    setState((s) => ({ ...s, nav: replaceNav(s.nav, to, key) }));
   }, []);
 
-  const value = useMemo<RouterContextValue>(() => ({ ...state, go, replace }), [state, go, replace]);
+  const value = useMemo<RouterContextValue>(
+    () => ({ ...state, screen: topEntry(state.nav).screen, tab: state.nav.tab, go, back, switchTab, replace }),
+    [state, go, back, switchTab, replace]
+  );
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }

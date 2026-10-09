@@ -12,8 +12,9 @@ const SCREENS = join(SRC, 'screens');
 // Screens whose SafeAreaView pads only the top, because something at the bottom of the screen pads
 // itself. Each names the component that must still be rendered, so an entry goes stale loudly.
 const BOTTOM_PADDED_BY: Record<string, { renders: string; why: string }> = {
-  'HomeScreen.tsx': { renders: '<TabBar', why: 'TabBar is the last thing on screen and pads by the inset.' },
-  'LibraryScreen.tsx': { renders: '<SelectionBar', why: 'SelectionBar (a BottomBar) or TabBar is last.' },
+  // §16 G2: the shell's TabBar (navigation/ScreenStack) sits under the tab roots and pads by the inset.
+  'HomeScreen.tsx': { renders: '<BannerSlot', why: "The banner is last; the shell's TabBar is below it." },
+  'LibraryScreen.tsx': { renders: '<SelectionBar', why: "SelectionBar (a BottomBar) is last while selecting; otherwise the shell's TabBar is below." },
   'ReviewScreen.tsx': { renders: '<ContextBar', why: 'ContextBar is a BottomBar.' },
   'DeliverScreen.tsx': { renders: '<StickyActions', why: 'StickyActions is a BottomBar.' },
   'CaptureScreen.tsx': {

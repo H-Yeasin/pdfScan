@@ -15,6 +15,8 @@ export const captureChromeStatic = {
   textDim: 'rgba(255,255,255,.6)',
   frameIdle: 'rgba(255,255,255,.5)',
   scrim: 'rgba(0,0,0,.55)',
+  // The shell's tab bar while Capture shows (§16 G2), over `base`.
+  tabBar: 'rgba(0,0,0,.5)',
 } as const;
 
 export function useCaptureChrome() {

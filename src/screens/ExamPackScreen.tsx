@@ -20,7 +20,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 export function ExamPackScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go, previousScreen } = useRouter();
+  const { back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('deliver', 'library', 'pack');
   const openDocument = useOpenDocument();
@@ -93,7 +93,7 @@ export function ExamPackScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={() => go(previousScreen ?? 'course', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={back} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={22} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('study.pack.title')}</Text>

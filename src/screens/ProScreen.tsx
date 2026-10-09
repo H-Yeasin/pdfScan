@@ -22,7 +22,7 @@ import { hapticSuccess } from '../services/feedback/haptics';
 export function ProScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go, previousScreen } = useRouter();
+  const { back } = useRouter();
   const dispatch = useAppDispatch();
   const remote = useRemoteConfig();
   const entitlement = useEntitlement();
@@ -72,7 +72,7 @@ export function ProScreen() {
           hitSlop={touchSlop(44)}
           accessibilityRole="button"
           style={styles.headerButton}
-          onPress={() => go(previousScreen ?? 'settings', 'back')}
+          onPress={back}
           accessibilityLabel={t('common.back')}
         >
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />

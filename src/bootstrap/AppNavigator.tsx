@@ -1,8 +1,10 @@
 import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, BackHandler, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, BackHandler, StyleSheet, View } from 'react-native';
 import { useRouter } from '../navigation/router';
 import { resolveBack, type BackContext } from '../navigation/backHandling';
+import { activeStack } from '../navigation/navStack';
+import { ScreenStack, type ScreenMap } from '../navigation/ScreenStack';
 import { SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
@@ -10,9 +12,6 @@ import { loadRemoteConfig, useRemoteConfig } from '../services/remote/remoteConf
 import { loadEntitlement, useIsPro } from '../services/pro/entitlement';
 import { startAds } from '../services/ads/adsSdk';
 import { MIN_SESSIONS_FOR_ADS } from '../services/ads/adPolicy';
-import { RESTING_STYLE, runSlide, transitionStyle } from '../navigation/transitions';
-import { useReducedMotion } from '../theme/useReducedMotion';
-import type { NavDir, ScreenName } from '../types/navigation';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CourseScreen } from '../screens/CourseScreen';
 import { CaptureScreen } from '../screens/CaptureScreen';
@@ -50,24 +49,7 @@ import { logUsage, setUsageCollection } from '../services/telemetry/usage';
 import { useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
 
-// §9 O6: on a tablet, content stays at a readable width, centred, instead of stretching across the
-// screen. The camera, Review's page editor and the Reader use the whole screen.
-const CONTENT_MAX_WIDTH = 720;
-const FULL_BLEED: ReadonlySet<ScreenName> = new Set(['capture', 'review', 'reader']);
-
-function ScreenFrame({ name, background }: { name: ScreenName; background: string }) {
-  const Screen = SCREENS[name];
-  if (FULL_BLEED.has(name)) return <Screen />;
-  return (
-    <View style={[styles.frame, { backgroundColor: background }]}>
-      <View style={styles.content}>
-        <Screen />
-      </View>
-    </View>
-  );
-}
-
-const SCREENS: Record<ScreenName, React.ComponentType> = {
+const SCREENS: ScreenMap = {
   home: HomeScreen,
   course: CourseScreen,
   capture: CaptureScreen,
@@ -99,14 +81,8 @@ export function AppNavigator() {
   useImportedPdfIndexing(libraryAfterBoot);
   useStorageIntegrity(libraryAfterBoot);
   useAutoBackup(libraryAfterBoot);
-  const { screen, previousScreen, hub, tabHub, navDir, navTick, go, replace } = useRouter();
+  const { screen, nav, navTick, go, back, replace } = useRouter();
   const { tokens, theme } = useTheme();
-  const { width } = useWindowDimensions();
-  const reducedMotion = useReducedMotion();
-  const progress = useRef(new Animated.Value(1)).current;
-  const [outgoing, setOutgoing] = useState<{ screen: ScreenName; navDir: NavDir } | null>(null);
-  const prevTick = useRef(navTick);
-  const prevScreen = useRef<ScreenName>(screen);
 
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library', 'settings');
@@ -195,9 +171,8 @@ export function AppNavigator() {
   const backCtx = useRef<BackContext | null>(null);
   backCtx.current = {
     screen,
-    previousScreen,
-    hub,
-    tabHub,
+    tab: nav.tab,
+    canPop: activeStack(nav).length > 1,
     hasCourses: hasActiveCourse,
     selMode: state.library.selMode,
     searchOpen: state.library.searchOpen,
@@ -213,6 +188,10 @@ export function AppNavigator() {
       switch (step.kind) {
         case 'dispatch':
           step.actions.forEach(dispatch);
+          return true;
+        case 'pop':
+          step.actions.forEach(dispatch);
+          back();
           return true;
         case 'go':
           step.actions.forEach(dispatch);
@@ -237,13 +216,13 @@ export function AppNavigator() {
       }
     });
     return () => sub.remove();
-  }, [dispatch, go]);
+  }, [dispatch, go, back]);
 
-  // Lives here (always mounted) rather than on CaptureScreen/ReviewScreen, because both of those
-  // unmount/remount as the user navigates between tabs. Navigating to Review as soon as the raw
-  // scan lands - instead of waiting for the slow downscale/OCR loop to finish - shrinks the window
-  // where CaptureScreen sits mounted mid-pipeline, which is what let a stray remount there
-  // re-trigger runNativeScannerPipeline().
+  // Lives here (always mounted) rather than on CaptureScreen/ReviewScreen: neither is always on
+  // screen (and before §16 G2 both unmounted as the user moved between tabs). Navigating to
+  // Review as soon as the raw scan lands - instead of waiting for the slow downscale/OCR loop to
+  // finish - shrinks the window where CaptureScreen sits on screen mid-pipeline, which is what let
+  // a stray remount there re-trigger runNativeScannerPipeline().
   useEffect(() => {
     if (processingStatus === prevProcessingStatus.current) return;
     const prev = prevProcessingStatus.current;
@@ -260,19 +239,6 @@ export function AppNavigator() {
     }
   }, [processingStatus, errorMessage, dispatch, go]);
 
-  useEffect(() => {
-    // replace() changes screen without a tick: no transition, but the next one slides out from here.
-    if (navTick === prevTick.current) {
-      prevScreen.current = screen;
-      return;
-    }
-    const from = prevScreen.current;
-    prevTick.current = navTick;
-    prevScreen.current = screen;
-    setOutgoing({ screen: from, navDir });
-    runSlide(progress, () => setOutgoing(null));
-  }, [navTick, screen, navDir, progress]);
-
   return (
     <View style={[styles.container, booting ? { backgroundColor: tokens.bg } : null]}>
       {booting ? null : (
@@ -281,24 +247,8 @@ export function AppNavigator() {
           <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
           {/* §10 M4: with the app lock on, nothing below renders until it's unlocked. */}
           <AppLockGate>
-            {outgoing && (
-              <Animated.View
-                style={[
-                  styles.layer,
-                  transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
-                ]}
-              >
-                <ScreenFrame name={outgoing.screen} background={tokens.bg} />
-              </Animated.View>
-            )}
-            <Animated.View
-              style={[
-                styles.layer,
-                outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : RESTING_STYLE,
-              ]}
-            >
-              <ScreenFrame name={screen} background={tokens.bg} />
-            </Animated.View>
+            {/* §16 G2: the tab roots, the tab bar and each tab's stack, as kept, keyed layers. */}
+            <ScreenStack screens={SCREENS} />
             {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
             <RestoreHost />
             {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
@@ -321,7 +271,4 @@ export function AppNavigator() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  layer: StyleSheet.absoluteFill,
-  frame: { flex: 1, alignItems: 'center' },
-  content: { flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH },
 });

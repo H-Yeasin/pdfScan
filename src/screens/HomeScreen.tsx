@@ -11,7 +11,6 @@ import { useOpenDocument } from '../components/library/useDocumentListActions';
 import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
 import { DeadlineList } from '../components/deadlines/DeadlineList';
 import { dueSoon } from '../services/submit/deadlines';
-import { TabBar } from '../components/shared/TabBar';
 import { BannerSlot } from '../components/ads/BannerSlot';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
@@ -280,9 +279,8 @@ export function HomeScreen() {
         <Text style={[styles.scanLabel, { color: tokens.onAccent }]}>{t('common.scan')}</Text>
       </Pressable>
 
-      {/* §10 M5: the only ad on Home, above the tab bar; nothing when ads are off. */}
+      {/* §10 M5: the only ad on Home, above the tab bar (the shell's, §16 G2); nothing when ads are off. */}
       <BannerSlot screen="home" />
-      <TabBar active="home" background={tokens.surface} activeColor={tokens.ink} inactiveColor={tokens.muted} accent={tokens.accent} />
 
       <SemesterSwitcher visible={switcherOpen} shown={shown} current={current} onClose={() => setSwitcherOpen(false)} />
       <QuickSetupSheet visible={quickSetup} onClose={() => setQuickSetup(false)} />

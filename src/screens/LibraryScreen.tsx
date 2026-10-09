@@ -21,7 +21,6 @@ import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { SelectAllButton } from '../components/library/SelectAllButton';
 import { useDocumentListActions } from '../components/library/useDocumentListActions';
-import { TabBar } from '../components/shared/TabBar';
 import { BannerSlot } from '../components/ads/BannerSlot';
 import { useRouter } from '../navigation/router';
 import { startScan } from '../services/courses/startScan';
@@ -333,20 +332,12 @@ export function LibraryScreen() {
         </>
       )}
 
+      {/* In selection mode the selection bar takes the place of the shell's tab bar (§16 G2). */}
       {selMode ? (
         <SelectionBar selectedDocs={selectedDocs} onPress={handleSelectionTool} />
       ) : (
-        <>
-          {/* §10 M5: the only ad in the Library, above the tab bar, never among the documents. */}
-          <BannerSlot screen="library" />
-          <TabBar
-            active="library"
-            background={tokens.surface}
-            activeColor={tokens.ink}
-            inactiveColor={tokens.muted}
-            accent={tokens.accent}
-          />
-        </>
+        // §10 M5: the only ad in the Library, above the tab bar, never among the documents.
+        <BannerSlot screen="library" />
       )}
 
       {overlays}

@@ -128,7 +128,7 @@ async function exportContactSheet(lab: LabImage, overrides: OverridesByFilter, f
 
 export function FilterLabScreen() {
   const { tokens } = useTheme();
-  const { go } = useRouter();
+  const { back } = useRouter();
   const dispatch = useAppDispatch();
   const [lab, setLab] = useState<LabImage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -210,7 +210,7 @@ export function FilterLabScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => go('settings', 'back')}>
+        <Pressable style={styles.headerButton} onPress={back}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>Filter Lab</Text>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useNetworkState } from 'expo-network';
+import { useScreenRole } from '../../navigation/screenRole';
 import { bannerUnitId, nonPersonalizedOnly, shouldShowBanner, type BannerScreen } from '../../services/ads/adPolicy';
 import { useAdsSdk } from '../../services/ads/adsSdk';
 import { useIsPro } from '../../services/pro/entitlement';
@@ -11,7 +12,13 @@ import { useAppSelector } from '../../store/AppStateContext';
 // list of documents). It takes no space until an ad has loaded and disappears for good on a
 // failure, so the layout never shows an empty box. Whether it may show at all is
 // services/ads/adPolicy.ts; this only gathers the inputs.
+//
+// §16 G2: Home and Library stay mounted when another tab or screen is in front. A banner is
+// requested only while its screen is the active one, and then kept while the screen is hidden,
+// so switching tabs back and forth doesn't ask for a new ad each time.
 export function BannerSlot({ screen }: { screen: BannerScreen }) {
+  const role = useScreenRole();
+  const [requested, setRequested] = useState(false);
   const remote = useRemoteConfig();
   const sdk = useAdsSdk();
   const isPro = useIsPro();
@@ -34,7 +41,11 @@ export function BannerSlot({ screen }: { screen: BannerScreen }) {
     sdkReady: sdk.status === 'ready',
     unitId,
   });
-  if (!show) return null;
+  // Set during render (React's pattern for state derived from props), so the banner mounts in the
+  // same pass that makes it allowed.
+  if (show && role === 'active' && !requested) setRequested(true);
+  if (!show && requested) setRequested(false);
+  if (!show || !requested) return null;
   return <Banner unitId={unitId} nonPersonalized={nonPersonalizedOnly(sdk.gdprApplies, personalizedAdsEnabled)} />;
 }
 

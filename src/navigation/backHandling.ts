@@ -1,5 +1,6 @@
 import type { AppAction } from '../store/appReducer';
-import type { HubScreen, ScreenName, TabHub } from '../types/navigation';
+import type { ScreenName } from '../types/navigation';
+import type { TabId } from './navStack';
 
 // §9 O1: what the Android back button (hardware or gesture) does, as a pure function of the
 // navigation state, so the order is testable without a device.
@@ -7,14 +8,15 @@ import type { HubScreen, ScreenName, TabHub } from '../types/navigation';
 // The full order is: (1) an open sheet or modal closes - RN `Modal`s do this themselves through
 // `onRequestClose`, and inline overlays register with `useBackHandler`, both of which run before
 // the app-level handler that calls this; (2) selection or Library search is left; (3) the screen
-// goes back to where its own Back button goes (the router's `hub`/`tabHub`); (4) the app exits,
-// but only from the root tab - Home once a course exists, otherwise Capture.
+// goes back: since §16 G2 that's a pop to wherever it was opened from, apart from the few
+// screens below with a fixed way back; (4) on a tab's root: to the start tab (Home once a course
+// exists, otherwise Capture) from any other, and out of the app from the start tab.
 
 export type BackContext = {
+  // The screen on top, its tab, and whether there's a screen under it on that tab's stack.
   screen: ScreenName;
-  previousScreen: ScreenName | null;
-  hub: HubScreen;
-  tabHub: TabHub;
+  tab: TabId;
+  canPop: boolean;
   hasCourses: boolean;
   selMode: boolean;
   searchOpen: boolean;
@@ -30,6 +32,7 @@ export type BackContext = {
 export type BackStep =
   // `actions` are dispatched before navigating: the same clean-up the screen's Back button does.
   | { kind: 'dispatch'; actions: AppAction[] }
+  | { kind: 'pop'; actions: AppAction[] }
   | { kind: 'go'; to: ScreenName; actions: AppAction[] }
   | { kind: 'confirmDiscard'; count: number }
   | { kind: 'exit' };
@@ -37,42 +40,24 @@ export type BackStep =
 // Screens that show a document list with long-press selection (useDocumentListActions).
 // `selMode` is global, so it's only "the thing on screen" on one of these.
 const SELECTION_SCREENS: ReadonlySet<ScreenName> = new Set(['home', 'library', 'course', 'storage']);
-const TABS: ReadonlySet<ScreenName> = new Set(['home', 'library', 'capture']);
 
-export function rootScreen(hasCourses: boolean): ScreenName {
+export function rootScreen(hasCourses: boolean): TabId {
   return hasCourses ? 'home' : 'capture';
 }
 
-// Where each screen's on-screen Back button goes. Kept beside the screens' own handlers in spirit:
-// if a screen's Back changes, change it here too.
-function backTarget(ctx: BackContext): ScreenName {
+// The screens whose way back doesn't depend on how they were reached. Kept beside the screens'
+// own Back buttons in spirit: if one changes, change it here too.
+function fixedBackTarget(ctx: BackContext): ScreenName | null {
   switch (ctx.screen) {
+    // The scan flow, step by step (Review → Capture until §17 U5 removes the Capture screen).
     case 'review':
       return 'capture';
     case 'deliver':
       return 'review';
-    case 'course':
-      return ctx.tabHub;
-    case 'reader':
-    case 'settings':
-      return ctx.hub;
-    case 'manageFolders':
-    case 'storage':
-    case 'backup':
-    case 'filterLab':
-      return 'settings';
-    // §10 M6: back to wherever Pro was opened from (a cover picker, Settings, ...).
-    case 'pro':
-      return ctx.previousScreen ?? 'settings';
     case 'academicOptions':
-      return ctx.coverTarget?.from ?? ctx.previousScreen ?? 'deliver';
-    case 'examPack':
-      return ctx.previousScreen ?? 'course';
-    case 'home':
-    case 'library':
-    case 'capture':
-    case 'onboarding':
-      return rootScreen(ctx.hasCourses);
+      return ctx.coverTarget?.from ?? null;
+    default:
+      return null;
   }
 }
 
@@ -85,14 +70,9 @@ export function resolveBack(ctx: BackContext): BackStep {
   }
 
   // §9 O2: Onboarding's own pages step back with useBackHandler. On its first page: opened again
-  // from Settings, Back returns there; on first run (no previous screen) it leaves the app, so the
-  // introduction isn't skipped by accident and shows again next time.
-  if (ctx.screen === 'onboarding') {
-    return ctx.previousScreen ? { kind: 'go', to: ctx.previousScreen, actions: [] } : { kind: 'exit' };
-  }
-  if (TABS.has(ctx.screen) && ctx.screen === rootScreen(ctx.hasCourses)) {
-    return ctx.sessionPageCount > 0 ? { kind: 'confirmDiscard', count: ctx.sessionPageCount } : { kind: 'exit' };
-  }
+  // from Settings, Back returns there; on first run (the boot screen, alone on its stack) it
+  // leaves the app, so the introduction isn't skipped by accident and shows again next time.
+  if (ctx.screen === 'onboarding' && !ctx.canPop) return { kind: 'exit' };
 
   const actions: AppAction[] = [];
   if (ctx.screen === 'review' && ctx.retakeTargetId) actions.push({ type: 'capture/SET_RETAKE_TARGET', id: null });
@@ -100,5 +80,13 @@ export function resolveBack(ctx: BackContext): BackStep {
     actions.push({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null });
   }
   if (ctx.screen === 'academicOptions' && ctx.coverTarget) actions.push({ type: 'deliver/SET_COVER_TARGET', target: null });
-  return { kind: 'go', to: backTarget(ctx), actions };
+
+  const fixed = fixedBackTarget(ctx);
+  if (fixed) return { kind: 'go', to: fixed, actions };
+  if (ctx.canPop) return { kind: 'pop', actions };
+
+  // A tab's root.
+  const start = rootScreen(ctx.hasCourses);
+  if (ctx.tab !== start) return { kind: 'go', to: start, actions };
+  return ctx.sessionPageCount > 0 ? { kind: 'confirmDiscard', count: ctx.sessionPageCount } : { kind: 'exit' };
 }

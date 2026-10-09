@@ -21,8 +21,4 @@ export type ScreenName =
   // Dev-only (__DEV__): see src/dev/FilterLabScreen.tsx.
   | 'filterLab';
 export type NavDir = 'fwd' | 'back';
-
-// The screens a "back" from Reader or Settings returns to: wherever the user was browsing from.
-export type HubScreen = 'home' | 'library' | 'course';
-// The tabs a Course page goes back to.
-export type TabHub = 'home' | 'library';
+// The tabs and the back stacks are in navigation/navStack.ts (§16 G2).

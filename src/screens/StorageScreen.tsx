@@ -20,7 +20,7 @@ const BIGGEST_COUNT = 10;
 export function StorageScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go } = useRouter();
+  const { back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library');
   const { files, courses, annotations } = state.library;
@@ -101,7 +101,7 @@ export function StorageScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('settings', 'back')} accessibilityLabel={t('common.back')}>
+        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={back} accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={20} color={tokens.ink} />
         </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('settings.storage.title')}</Text>

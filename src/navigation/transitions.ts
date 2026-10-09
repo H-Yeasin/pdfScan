@@ -2,6 +2,11 @@ import { Animated, Easing } from 'react-native';
 import type { NavDir } from '../types/navigation';
 
 export const SLIDE_DURATION_MS = 240;
+// §16 G2: tab switches cross-fade, shorter: the tabs are siblings, not a hierarchy (§17 U13 tunes
+// both).
+export const FADE_DURATION_MS = 150;
+
+export type TransitionKind = 'slide' | 'fade';
 
 export function slideTransform(
   progress: Animated.Value,
@@ -17,33 +22,36 @@ export function slideTransform(
   return progress.interpolate({ inputRange: [0, 1], outputRange: [from, to] });
 }
 
-// The animated style of a screen during a transition: a horizontal slide, or (with the system's
-// reduce-motion setting on, §9 O4b) a cross-fade in place.
+// The animated style of a screen during a transition: a horizontal slide for push and pop, or a
+// cross-fade in place for a tab switch and (with the system's reduce-motion setting on, §9 O4b)
+// for everything.
 export function transitionStyle(
   progress: Animated.Value,
   width: number,
   kind: 'incoming' | 'outgoing',
   dir: NavDir,
-  reducedMotion: boolean
+  reducedMotion: boolean,
+  transition: TransitionKind = 'slide'
 ) {
-  if (reducedMotion) {
+  if (reducedMotion || transition === 'fade') {
     return { opacity: kind === 'incoming' ? progress : progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) };
   }
   return { transform: [{ translateX: slideTransform(progress, width, kind, dir) }] };
 }
 
-// The incoming layer's style when no transition runs. It must never be null: the native driver
-// leaves the animated transform/opacity on the view, and on the next prop update RN 0.86's Fabric
-// mounting (overridePropsReadableMap) asserts that React still sends `transform` as an array and
-// `opacity` as a number. Dropping them (style null) crashed the app at the end of every slide.
-// Both keys are always set, so switching reduce motion on or off between transitions is safe too.
+// Every layer's style at rest, and under the animated one during a transition. It must never be
+// missing: the native driver leaves the animated transform/opacity on the view, and on the next
+// prop update RN 0.86's Fabric mounting (overridePropsReadableMap) asserts that React still sends
+// `transform` as an array and `opacity` as a number. Dropping them (style null) crashed the app at
+// the end of every slide. Both keys are always set, so a layer that faded once and slides next
+// (§16 G2 keeps layers mounted), or reduce motion switching between transitions, is safe too.
 export const RESTING_STYLE = { opacity: 1, transform: [{ translateX: 0 }] };
 
-export function runSlide(progress: Animated.Value, onDone?: () => void) {
+export function runSlide(progress: Animated.Value, onDone?: () => void, duration = SLIDE_DURATION_MS) {
   progress.setValue(0);
   Animated.timing(progress, {
     toValue: 1,
-    duration: SLIDE_DURATION_MS,
+    duration,
     easing: Easing.inOut(Easing.ease),
     useNativeDriver: true,
   }).start(onDone);

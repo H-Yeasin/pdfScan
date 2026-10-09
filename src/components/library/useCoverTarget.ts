@@ -70,9 +70,16 @@ export function useApplyCover(target: CoverTarget | null, doc: LibraryDocument |
           if (result.annotations) dispatch({ type: 'library/SET_ANNOTATIONS', annotations: result.annotations });
           if (result.bookmarks) dispatch({ type: 'library/SET_BOOKMARKS', bookmarks: result.bookmarks });
         }
-        // Back to the Reader after a Replace shows the new PDF: the Reader mounts again on it.
+        // A Replace made from the Reader shows the new PDF in a fresh Reader: the one kept under
+        // Academic options (§16 G2) still has the old file open at the same path. Opening the
+        // Reader again drops that one from the stack (navStack.push keeps one per stack).
         const showingIt = target?.from === 'reader' && mode === 'replace';
-        leave();
+        if (showingIt) {
+          dispatch({ type: 'deliver/SET_COVER_TARGET', target: null });
+          go('reader');
+        } else {
+          leave();
+        }
         dispatch({
           type: 'ui/SHOW_SNACK',
           msg: t('library.cover.added'),
@@ -90,7 +97,7 @@ export function useApplyCover(target: CoverTarget | null, doc: LibraryDocument |
         dispatch({ type: 'ui/SHOW_SNACK', msg });
       }
     },
-    [doc, busy, annotations, bookmarks, dispatch, target, leave, openInReader]
+    [doc, busy, annotations, bookmarks, dispatch, go, target, leave, openInReader]
   );
 
   return { busy, apply, leave };

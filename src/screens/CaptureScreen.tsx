@@ -6,9 +6,9 @@ import { StatusBar } from 'expo-status-bar';
 import { CaptureControls } from '../components/capture/CaptureControls';
 import { CourseBadge } from '../components/courses/CourseBadge';
 import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
-import { TabBar } from '../components/shared/TabBar';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
+import { useScreenRole } from '../navigation/screenRole';
 import { runNativeScannerPipeline } from '../services/capture/scannerPipeline';
 import { resolveOcrScript } from '../services/scripts/registry';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
@@ -27,6 +27,7 @@ export function CaptureScreen() {
   const chrome = useCaptureChrome();
   const { t } = useT();
   const { go } = useRouter();
+  const role = useScreenRole();
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library', 'settings');
   const { pages, processingStatus, mode, scannerRequested } = state.capture;
@@ -69,9 +70,10 @@ export function CaptureScreen() {
   );
 
   // Success/error handling and the post-scan navigation to Review now live in AppNavigator
-  // (always mounted), not here - this screen unmounts as soon as the native scan hands off raw
-  // images (status flips to 'processing'), so it can no longer be the one reacting to the
-  // eventual 'success'/'error' that lands after the slow downscale/OCR loop finishes.
+  // (always mounted), not here - this screen leaves the screen as soon as the native scan hands
+  // off raw images (status flips to 'processing'; it used to unmount then, and since §16 G2 it
+  // stays mounted, hidden, under Review), so it isn't the one reacting to the eventual
+  // 'success'/'error' that lands after the slow downscale/OCR loop finishes.
 
   const handleImport = useGalleryImport(markPickerSeen);
 
@@ -104,7 +106,8 @@ export function CaptureScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: chrome.base }]}>
-      <StatusBar style="light" />
+      {/* §16 G2: this screen stays mounted under others; its light status bar is only for while it's on screen. */}
+      {role === 'active' ? <StatusBar style="light" /> : null}
 
       <SafeAreaView style={styles.overlay} edges={['top']}>
         <View style={styles.topRow}>
@@ -159,14 +162,6 @@ export function CaptureScreen() {
           />
         </View>
       </SafeAreaView>
-
-      <TabBar
-        active="capture"
-        background="rgba(0,0,0,.5)"
-        activeColor={chrome.text}
-        inactiveColor={chrome.textDim}
-        accent={chrome.accent}
-      />
 
       <FolderPickerModal
         visible={coursePickerOpen}

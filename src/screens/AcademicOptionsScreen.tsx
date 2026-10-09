@@ -120,7 +120,7 @@ export function AcademicOptionsScreen() {
   const { tokens } = useTheme();
   // t is imported (the module-level helpers use it too); this re-renders on a language change.
   useT();
-  const { go, previousScreen } = useRouter();
+  const { back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'deliver', 'library');
   const coverTarget = state.deliver.coverTarget;
@@ -294,8 +294,8 @@ export function AcademicOptionsScreen() {
 
   const handleBack = useCallback(() => {
     if (coverTarget) coverRun.leave();
-    else go(previousScreen ?? 'deliver', 'back');
-  }, [coverTarget, coverRun, go, previousScreen]);
+    else back();
+  }, [coverTarget, coverRun, back]);
 
   const coverSection = (
     <>
