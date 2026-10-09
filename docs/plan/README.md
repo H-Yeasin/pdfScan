@@ -5,7 +5,7 @@ its own steps. A step's `Status:` line and its "As built" notes describe the cod
 The "Context" and "What the code looks like today" sections at the top of each file describe the
 code **when the section was planned**, and are kept as history.
 
-## Where things stand (2026-10-02)
+## Where things stand (2026-10-09)
 
 | Section | File | Steps | State |
 |---|---|---|---|
@@ -22,6 +22,7 @@ code **when the section was planned**, and are kept as history.
 | §10 Monetization | [10-monetization.md](10-monetization.md) | M1–M8 (+ M9–M11 later) | **Revised 2026-10-02:** light ads + rewarded Pro day pass + Firebase Remote Config, no login. Paid Pro parked (no Play payouts in Bangladesh). M1–M8 done in code (open for the owner: the Play Console checklist in `docs/policy/play-console.md`, the Firebase project and EAS file variables in `docs/firebase.md`, AdMob in `docs/ads.md`; M2–M6 need a new dev build, M4–M8 have device checks open, M5 its before/after numbers). M9–M11 (paid Pro) are parked until a merchant route exists. Next: §11 (plan `docs/plan/11-launch.md`). |
 | §10 revision: 1-hour Pro pass | [13-pro-pass-one-hour.md](13-pro-pass-one-hour.md) | H1–H3 | **Planned 2026-10-04.** H1 done in code (code default `pass_hours` = 1; the Firebase console value is open for the owner). H2 done in code (UI text says "Pro pass"; the dev grant and the offline snack take the hours from `pass_hours`). H3 done (docs say 1 hour and "Pro pass"). All steps done in code; open for the owner: `pass_hours` = 1 in the Firebase console, and the device checks. One rewarded ad gives 1 hour of Pro instead of 24 (`pass_hours` default and the Firebase console), the cap stays at 3 a day, and the UI says "Pro pass" instead of "day pass". |
 | §14 Pre-launch fixes | [14-prelaunch-fixes.md](14-prelaunch-fixes.md) | Q1–Q7 | **Planned 2026-10-04. Blocks the Play release; do before §11.** Q1 ad gate fails closed (no task without a watched ad; offline grace 1 a day; `pro_tasks_free` switch). Q2 release AdMob config + diagnostics. Q3–Q4 bottom insets (3-button nav bar) on every screen, sheet and modal, with a guard test. Q5 bulk delete + Select all in the Library. Q6–Q7 add a cover to any library PDF (converted ones included), saved as a copy or replacing it. **Q1–Q7 done in code** (Q6: `persistence/addCover.ts`, `canAddCover`; Q7: `library/useCoverTarget.ts`, `deliver.coverTarget`, Academic options' target mode; device checks open; the owner's AdMob checklist in `docs/ads.md` is open). Next: §11, after the device checks. |
+| §15 Brand refresh | [15-brand-refresh.md](15-brand-refresh.md) | V1–V5 | **Planned 2026-10-09. Comes before §11** (with §14's device checks). V1 brand sources in `assets/brand/`, `BRAND` colours, mark geometry, sync test. V2 icons and splash images from the new logo (**needs one new dev build**). V3 default accent retuned to the logo's greens ("Forest"; the id stays `teal`). V4 `BrandMark` (Onboarding, Settings → About). V5 animated "Scan & assemble" splash overlay (about 1.1 s; Android's native splash always fades out, so the overlay holds an identical still frame through it). Nothing built yet. Next: V1. |
 | §11 Launch and growth | — | — | Not planned yet. Next to plan: `docs/plan/11-launch.md` (see `docs/PLAN.md` §11). |
 | §12 Convert and light edit | [12-convert-edit.md](12-convert-edit.md) | D1–D11 | **Planned 2026-10-03, revised the same day.** D1 (Pro task gate) done in code (dc17a06; device check open). D2 (study-first reader layout, reading settings) done in code (020361d; device check open). D3 (Mark mode: underline, strike, scans and imported PDFs) done in code (d41bfc0; device check open). D4 (notes panel, filters, notes export) done in code (4a51962; device check open). D5 (Office → PDF: Word, Excel/XLS/CSV, TXT; Pro) done in code (58f09ba; device check open). D6 (scan/PDF → Word; Pro) done in code (6ebed74; device check open). D7 (edit TXT and CSV; Pro, 30-minute session) done in code (bfcba77; device check open). D8 (edit XLSX/XLS cells, saved as a copy; Pro) done in code (bb2872d; device check open). D9 (edit Word text in a locked-down contenteditable WebView, saved as a copy; Pro) done in code (369e6b7; device check open). D10 (fill PDF forms, saved as a copy; Mark mode's Text tool; Pro) done in code (fa91352; device check open). D11 (Find in DOCX/XLSX/XLS, sheet pinch zoom and frozen first row/column; free) done in code (fa403f4; device check open). Study-first reader (D2–D4, D11, free), conversions and file editing behind a per-task full-screen rewarded ad (D1 gate, D5–D10 Pro). All steps done in code; device checks open. |
 
@@ -43,7 +44,7 @@ checks pass on a device.
 on a device: the checks for P0–P2, §9's walkthrough (`docs/qa/walkthrough.md`) and performance
 budget (`docs/qa/performance.md`).
 
-The product-level checklist is `docs/PLAN.md` (§0–§12). Keep its ticks in step with the `Status:`
+The product-level checklist is `docs/PLAN.md` (§0–§15). Keep its ticks in step with the `Status:`
 lines here.
 
 ### Step by step

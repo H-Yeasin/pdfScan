@@ -310,6 +310,23 @@ cover for documents already in the Library, and the bottom of the app under the 
 (online), nothing sits under the system bar, five documents can be deleted at once, and a converted
 PDF gets a cover as a copy or in place.
 
+### §15 Brand refresh *(planned 2026-10-09; before §11)*
+Goal: the owner's new logo everywhere (launcher, store, themed and notification icons, splash, in the
+app), an animated "Scan & assemble" splash, light and dark versions, and the default accent retuned
+to the logo's greens.
+
+**Detailed steps:** [`docs/plan/15-brand-refresh.md`](plan/15-brand-refresh.md)
+
+- [ ] V1 Brand sources in `assets/brand/`, `BRAND` colours, shared mark geometry, sync test
+- [ ] V2 Icons and splash images from the new logo (new dev build)
+- [ ] V3 Default accent retuned to the logo green ("Forest"; the id stays `teal`)
+- [ ] V4 `BrandMark` component (Onboarding, Settings → About)
+- [ ] V5 Animated splash overlay, "Scan & assemble" (about 1.1 s; skipped for reduced motion and "Open with")
+
+**Done when:** on a phone in light and dark mode, the launcher icon, themed icon, notification icon
+and splash all show the new logo, the native → JS splash handoff can't be seen in a frame-by-frame
+recording, and the intro never delays the first usable screen by more than about 1.1 s.
+
 ---
 
 ## 5. Phases
@@ -350,4 +367,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. Next to plan: §11 Launch and growth (`docs/plan/11-launch.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. §14 is planned in `docs/plan/14-prelaunch-fixes.md` (done in code; device checks open). §15 is planned in `docs/plan/15-brand-refresh.md`. Next: build §15 V1–V5 and run §14's device checks, then plan §11 Launch and growth (`docs/plan/11-launch.md`).
