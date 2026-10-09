@@ -23,7 +23,8 @@ import { t } from '../i18n';
 // build the launch URL is `exp+<slug>://expo-development-client/?url=...` - and passing those to
 // importExternalFile throws (expo-file-system: 'URI scheme is not "file"') and shows a bogus
 // "couldn't open" snackbar on every boot.
-function isFileUri(uri: string): boolean {
+// §15 V5: the splash intro uses it too, to skip itself on an "Open with" cold start.
+export function isFileUri(uri: string): boolean {
   return /^(file|content):\/\//i.test(uri);
 }
 

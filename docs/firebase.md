@@ -17,9 +17,11 @@ defaults in `src/services/remote/remoteConfig.ts` (ads off, sales off).
    - `GOOGLE_SERVICES_JSON`: the `google-services.json` file.
    - `GOOGLE_SERVICE_INFO_PLIST`: the `GoogleService-Info.plist` file (iOS).
    `app.config.js` passes their paths to the `@react-native-firebase/app` plugin, and leaves the
-   plugin out when neither is set. With only one set, prebuild for the other platform fails.
-4. For a local dev build with Firebase: put the file in the project root and run
-   `GOOGLE_SERVICES_JSON=./google-services.json npx expo run:android`.
+   plugin out when neither is set. With only one set, only that platform gets Firebase; the
+   other builds without it (since 2026-10-09; before, prebuild failed, `docs/build.md` §1).
+4. For a local dev build with Firebase: put the file in the project root and add
+   `GOOGLE_SERVICES_JSON=./google-services.json` to `.env.local` (or run
+   `GOOGLE_SERVICES_JSON=./google-services.json npx expo run:android`).
 
 ## Remote Config keys
 

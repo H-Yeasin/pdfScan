@@ -38,3 +38,16 @@ export enum TileMode {
 }
 export type SkImage = unknown;
 export type SkPaint = unknown;
+
+// §15 V4: Skia's drawing components as host elements, so a test can render a component that draws
+// (BrandMark) and look at what it draws. They render their children and draw nothing.
+export const Canvas = 'Canvas';
+export const Group = 'Group';
+export const Path = 'Path';
+export const RoundedRect = 'RoundedRect';
+export const LinearGradient = 'LinearGradient';
+export const Shadow = 'Shadow';
+export const Blur = 'Blur';
+export const Paint = 'Paint';
+export const vec = (x = 0, y = 0) => ({ x, y });
+export const Rect = 'Rect';

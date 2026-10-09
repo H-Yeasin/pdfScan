@@ -83,3 +83,23 @@ move. Measure it anyway, on the same phone, with a release build:
 |---|---|---|---|---|---|
 | | | before M5 (`80456a1`) | | n/a | |
 | | | M5 | | | |
+
+## §15 V5: the splash intro
+
+The native splash now goes as soon as the intro's overlay has drawn its first frame (an identical
+still logo); the app boots underneath, and the overlay leaves once boot is done and the intro has
+played (about 1.1 s from the release) or been skipped. Measure on the same phone, release build:
+
+- **Time to the first usable screen**, from a screen recording (step through it frame by frame):
+  from the tap on the launcher icon to the first frame where the start screen is fully shown (the
+  overlay gone). `am start -W` `TotalTime` too, as in "How to measure" (it now ends when the overlay
+  is first drawn, earlier than before, so it isn't comparable with the rows above).
+- **Intro skipped** (Settings → Accessibility → "Remove animations" on): must not be worse than
+  before V5 (the overlay's exit is a 150 ms crossfade; before it was the native splash's 400 ms
+  fade). **Intro played:** at most about 1.1 s more than the boot, and nothing when boot is slower.
+- Also check in the recording: no jump or colour flash where the native splash hands over (light and
+  dark system mode), and the overlay doesn't stutter while the app boots underneath.
+
+| Date | Phone | Build | First usable screen, before V5 | Intro skipped | Intro played | Handoff clean (light / dark) |
+|---|---|---|---|---|---|---|
+| | | | | | | |

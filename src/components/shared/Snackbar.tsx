@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
-import { radii, spacing } from '../../theme';
+import { radii, spacing, tokens } from '../../theme';
 import { announce } from '../../services/a11y/announce';
 import { useBottomBarHeight } from './bottomBarHeight';
 
@@ -71,7 +71,8 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
   },
   action: {
-    color: '#7fe3cd',
+    // The bar is dark in both themes, so the action takes the default accent's dark-theme ink.
+    color: tokens.dark.accentInk,
     fontSize: 14,
     fontWeight: '700',
   },

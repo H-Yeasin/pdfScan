@@ -40,4 +40,5 @@ Collected = leaves the phone. "Optional" = only when the user turns it on.
 - [ ] No text anywhere (listing, app, screenshots) sends users to pay outside Google Play.
       WhatsApp 01645724080 appears only as a support contact.
 - [ ] App icon (512 x 512): upload `assets/store/playstore-icon.png` (made by
-      `scripts/make-icons.mjs` from `assets/brand/`).
+      `scripts/make-icons.mjs` from `assets/brand/pdfscan-mark.svg` and `pdfscan-tile.svg`, §15 V2;
+      upload it again after the brand refresh).

@@ -28,11 +28,12 @@ const light: ThemeTokens = {
   ink: '#201e1d',
   muted: '#645c50',
   edge: 'rgba(32,30,29,.13)',
-  // §9 O4b: deepened from #16a085 so white labels on it reach 4.5:1.
-  accent: '#0f7f69',
-  accentInk: '#0e6655',
+  // §15 V3: the logo's greens (theme/brand.ts BRAND): accent is the bowl's solid green, accentInk
+  // the tile's dark corner. White labels on the accent reach 5.7:1.
+  accent: '#1e754a',
+  accentInk: '#155437',
   onAccent: '#ffffff',
-  accentSoft: '#dff0ea',
+  accentSoft: '#dfeee4',
   danger: '#c0392b',
   courseColors: {
     teal: '#0f766e',
@@ -55,11 +56,13 @@ const dark: ThemeTokens = {
   ink: '#f2eade',
   muted: '#a19786',
   edge: 'rgba(255,255,255,.14)',
-  accent: '#1abc9c',
-  accentInk: '#7fe3cd',
-  // §9 O4b: the bright dark-theme accent takes dark labels (white was 2.4:1).
-  onAccent: '#0b1f1a',
-  accentSoft: '#1d302c',
+  // §15 V3: the logo's light green (the fold's top stop), so it reads on the dark bg; accentInk is
+  // a paler tint of it for text.
+  accent: '#37ae79',
+  accentInk: '#8fdcb4',
+  // §9 O4b: the bright dark-theme accent takes dark labels (white on it is 2.8:1).
+  onAccent: '#0b1f14',
+  accentSoft: '#17291f',
   // §9 O4b: lightened from #e74c3c so error text reaches 4.5:1 on every dark surface.
   danger: '#f16253',
   courseColors: {
@@ -78,7 +81,8 @@ const dark: ThemeTokens = {
 
 export const tokens: Record<ThemeName, ThemeTokens> = { light, dark };
 
-// §10 M4: theme accents (Pro). 'teal' is the default above; each other accent swaps only the four
+// §10 M4: theme accents (Pro). 'teal' is the default above (shown as "Forest" since §15 V3, which
+// retuned it to the logo's greens; the id stays, it is stored in users' settings); each other accent swaps only the four
 // accent tokens, in both themes, and passes the same contrast rules (theme/__tests__/contrast.test.ts).
 export type AccentId = 'teal' | 'ocean' | 'plum' | 'rose' | 'amber';
 export type AccentTokens = Pick<ThemeTokens, 'accent' | 'accentInk' | 'onAccent' | 'accentSoft'>;

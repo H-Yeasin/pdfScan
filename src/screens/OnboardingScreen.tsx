@@ -13,6 +13,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BrandMark } from '../components/brand/BrandMark';
 import { CourseSetupFields, useCourseSetupForm } from '../components/courses/CourseSetupForm';
 import { NameField } from '../components/deliver/NameField';
 import { SettingRow } from '../components/settings/SettingRow';
@@ -97,6 +98,8 @@ export function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <ScrollView style={{ width }} contentContainerStyle={styles.page}>
+            {/* §15 V4: the logo where a new student first meets the app. */}
+            <BrandMark size={72} wordmark />
             <Text style={[styles.title, { color: tokens.ink }]}>{t('onboarding.what.title')}</Text>
             <View style={styles.steps}>
               {(

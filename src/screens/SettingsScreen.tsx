@@ -4,6 +4,7 @@ import { Linking, Platform, ScrollView, StyleSheet, Pressable, Text, View } from
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TimetableEditor } from '../components/courses/TimetableEditor';
+import { BrandMark } from '../components/brand/BrandMark';
 import { AccentPicker } from '../components/settings/AccentPicker';
 import { AppLockSection } from '../components/settings/AppLockSection';
 import { LanguageRow } from '../components/settings/LanguageRow';
@@ -318,7 +319,11 @@ export function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('settings.about.section')}</Text>
-          <Text style={[styles.aboutText, { color: tokens.muted }]}>{t('settings.about.text', { version: APP_VERSION })}</Text>
+          {/* §15 V4: the logo next to the version. */}
+          <View style={styles.aboutRow}>
+            <BrandMark size={32} />
+            <Text style={[styles.aboutText, styles.aboutRowText, { color: tokens.muted }]}>{t('settings.about.text', { version: APP_VERSION })}</Text>
+          </View>
           <SettingRow title={t('settings.about.showIntro')} chevron onPress={() => go('onboarding')} />
         </View>
       </ScrollView>
@@ -390,6 +395,14 @@ const styles = StyleSheet.create({
   aboutText: {
     fontSize: 13.5,
     lineHeight: 19,
+  },
+  aboutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  aboutRowText: {
+    flex: 1,
   },
   replayButton: {
     alignSelf: 'flex-start',

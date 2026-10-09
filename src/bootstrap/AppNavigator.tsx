@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, BackHandler, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useRouter } from '../navigation/router';
 import { resolveBack, type BackContext } from '../navigation/backHandling';
-import { releaseSplash, SPLASH_TIMEOUT_MS } from './splash';
+import { SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
 import { loadRemoteConfig, useRemoteConfig } from '../services/remote/remoteConfig';
@@ -31,6 +31,7 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
 import { AppLockGate } from '../components/security/AppLockGate';
+import { SplashIntro, SplashIntroBoundary } from '../components/brand/SplashIntro';
 import { ExportHost } from '../components/backup/ExportHost';
 import { ProTaskResumeHost } from '../components/pro/ProTaskResumeHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
@@ -153,8 +154,8 @@ export function AppNavigator() {
   const prevProcessingStatus = useRef(processingStatus);
 
   // Start screen (§9 O1, `chooseStartScreen`): picked once settings and the library index are in,
-  // before the first real render, while the native splash still covers the app - so Capture never
-  // flashes up on the way to Home. A failed library load falls through to Capture (with F3's
+  // before the first real render, while the splash still covers the app (the native one, then the
+  // splash intro's identical overlay, §15 V5) - so Capture never flashes up on the way to Home. A failed library load falls through to Capture (with F3's
   // load-error state on the Library); anything that already navigated (e.g. "Open with") wins.
   // If loading takes longer than SPLASH_TIMEOUT_MS the app shows anyway, and the start screen is
   // still corrected once loading finishes, as long as the user hasn't navigated yet.
@@ -186,12 +187,6 @@ export function AppNavigator() {
     if (!booting) return;
     const id = setTimeout(() => setBooting(false), SPLASH_TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [booting]);
-  // Hide the splash only once the chosen screen has had a frame to draw.
-  useEffect(() => {
-    if (booting) return;
-    const id = requestAnimationFrame(releaseSplash);
-    return () => cancelAnimationFrame(id);
   }, [booting]);
 
   // §9 O1: Android back. Open RN Modals and inline overlays (`useBackHandler`) get the press first;
@@ -278,40 +273,48 @@ export function AppNavigator() {
     runSlide(progress, () => setOutgoing(null));
   }, [navTick, screen, navDir, progress]);
 
-  if (booting) return <View style={[styles.container, { backgroundColor: tokens.bg }]} />;
-
   return (
-    <View style={styles.container}>
-      {/* §9 O6: follows the app's theme setting, not the system's (Capture sets its own). */}
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      {/* §10 M4: with the app lock on, nothing below renders until it's unlocked. */}
-      <AppLockGate>
-        {outgoing && (
-          <Animated.View
-            style={[
-              styles.layer,
-              transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
-            ]}
-          >
-            <ScreenFrame name={outgoing.screen} background={tokens.bg} />
-          </Animated.View>
-        )}
-        <Animated.View
-          style={[
-            styles.layer,
-            outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : RESTING_STYLE,
-          ]}
-        >
-          <ScreenFrame name={screen} background={tokens.bg} />
-        </Animated.View>
-        {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
-        <RestoreHost />
-        {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
-        <ExportHost />
-        <AutoBackupChip />
-        {/* §12 D1: a Pro task whose ad was watched before the app was killed. */}
-        <ProTaskResumeHost ready={libraryAfterBoot} />
-      </AppLockGate>
+    <View style={[styles.container, booting ? { backgroundColor: tokens.bg } : null]}>
+      {booting ? null : (
+        <>
+          {/* §9 O6: follows the app's theme setting, not the system's (Capture sets its own). */}
+          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+          {/* §10 M4: with the app lock on, nothing below renders until it's unlocked. */}
+          <AppLockGate>
+            {outgoing && (
+              <Animated.View
+                style={[
+                  styles.layer,
+                  transitionStyle(progress, width, 'outgoing', outgoing.navDir, reducedMotion),
+                ]}
+              >
+                <ScreenFrame name={outgoing.screen} background={tokens.bg} />
+              </Animated.View>
+            )}
+            <Animated.View
+              style={[
+                styles.layer,
+                outgoing ? transitionStyle(progress, width, 'incoming', navDir, reducedMotion) : RESTING_STYLE,
+              ]}
+            >
+              <ScreenFrame name={screen} background={tokens.bg} />
+            </Animated.View>
+            {/* §8 B4: restore / import, opened by ui/OPEN_BACKUP from anywhere. */}
+            <RestoreHost />
+            {/* §8 B5: exports asked for from a snack or Home's reminder, and the automatic backup chip. */}
+            <ExportHost />
+            <AutoBackupChip />
+            {/* §12 D1: a Pro task whose ad was watched before the app was killed. */}
+            <ProTaskResumeHost ready={libraryAfterBoot} />
+          </AppLockGate>
+        </>
+      )}
+      {/* §15 V5: the splash intro, over everything (still under App.tsx's Snackbar). It's the last
+          child in the booting tree and the booted one alike, so the switch doesn't remount it. It
+          releases the native splash itself, once its identical first frame is laid out. */}
+      <SplashIntroBoundary>
+        <SplashIntro booting={booting} appLocked={state.settings.appLock.enabled} />
+      </SplashIntroBoundary>
     </View>
   );
 }

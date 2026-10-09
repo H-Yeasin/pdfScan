@@ -6,9 +6,10 @@ import { ACCENT_IDS, ACCENTS, DEFAULT_ACCENT, spacing, useTheme, type AccentId }
 import { ProBadge } from '../pro/ProBadge';
 import { useOfferPro } from '../pro/useOfferPro';
 
-// §10 M4: Settings → Appearance's accent swatches. Teal is free; the others are Pro. Without Pro
-// a Pro swatch offers Pro instead of switching (useOfferPro). A choice made with Pro is kept and
-// comes back with Pro (ThemeProvider shows teal meanwhile).
+// §10 M4: Settings → Appearance's accent swatches. The default (id 'teal', "Forest", the logo's
+// green since §15 V3) is free; the others are Pro. Without Pro a Pro swatch offers Pro instead of
+// switching (useOfferPro). A choice made with Pro is kept and comes back with Pro (ThemeProvider
+// shows the default meanwhile).
 export function AccentPicker() {
   const { tokens, theme, accent, accentPref, setAccentPref } = useTheme();
   const { t } = useT();

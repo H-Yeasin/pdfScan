@@ -163,7 +163,29 @@ from (807.322, 0) `#155437` (top right) to (74.2486, 855.61) `#7E8693` (bottom l
 ---
 
 ## V1 · Brand sources and shared geometry *(S)*
-Status: planned.
+Status: done in code (2026-10-09). JS only; no device check.
+
+As built:
+- `assets/brand/` now holds only `pdfscan-mark.svg`, `pdfscan-tile.svg` and
+  `reference/pdfscan-applogo.png`, byte for byte the owner's files (checked with `shasum`). The 8 old
+  SVGs and `logo/` are gone. The owner's deletions of the old `logo/*.svg` were already committed in
+  e89d70b, so this commit only moves the three new files.
+- `src/theme/brand.ts`: `BRAND` gives **every** gradient `stops` and `offsets` (the tile and the
+  diagonal too, at `[0, 1]`), so V4 can hand any of them to Skia's `colors`/`positions` the same way.
+  Type `BrandGradient`. Exported from `src/theme/index.ts`.
+- `src/components/brand/markGeometry.ts`: `MARK_VIEWBOX`, `TILE_SIZE`, `TILE_GRADIENT`,
+  `MARK_GRADIENTS` (keyed `ribbon`/`diagonal`/`fold`, the same names as the `BRAND` entries),
+  `MARK_PIECES` (`fill` is typed as a `BRAND` key, so renaming one breaks the typecheck),
+  `WHITE_PIECES`/`GREEN_PIECES` (pieces, not names, filtered by `fill === 'paper'`, still in paint
+  order), `MARK_CONTENT_BOX` and `MARK_IN_TILE`. `MARK_IN_TILE` is computed from the box, so it is
+  **translate(96.8, 34.8)**; the 97.3 above was measured from the render's pixels.
+- `src/theme/__tests__/brandSync.test.ts` (30 tests) checks, beyond the plan: the pieces' exact
+  bounds equal `MARK_CONTENT_BOX` (a small M/L/H/V/C/Z parser; any other path command fails, so a
+  new export gets a look), every gradient in the file is used once, the shadow's colour matrix is
+  black at `BRAND.shadow.opacity`, and the reference PNG is 819 × 802. The security scan covers
+  every `.svg` in `assets/brand/` and also rejects `on…=` event handlers, `javascript:` and
+  `<!ENTITY`. Checked that it fails when a colour or an offset in `brand.ts` is changed.
+- `scripts/make-icons.mjs`: only its header comment changed (it still draws the old mark until V2).
 
 Goal: the owner's files live in `assets/brand/` under clean names, and the code has one typed copy of
 the logo's colours and shapes, kept in step with the SVGs by a test.
@@ -215,7 +237,45 @@ Tests (`brandSync.test.ts`, a source scan like `hardcodedStrings.test.ts`):
   rule: keep brand assets plain).
 
 ## V2 · Icon and splash images *(M; needs a new dev build)*
-Status: planned. Device checks: Verification 1–4.
+Status: done in code (2026-10-09). Open: `npx expo prebuild --clean` in the project, a new dev build,
+and Verification 1–4 on a device; the owner uploads the new 512 icon (Verification 11).
+
+As built:
+- `scripts/make-icons.mjs` is rewritten as planned. The colour images nest each file's markup
+  unchanged; `logoTile()` draws the reference (tile, mark at scale 1, both clipped to a `clipPath` of
+  the tile's own rect). The square icons stretch the tile's markup (its `rx` removed) to the square
+  with `preserveAspectRatio="none"`, 2% off, which can't be seen.
+- **Rendered at 4x and averaged down** (`SUPERSAMPLE`). At 1x resvg left a one-pixel seam where two
+  white pieces meet edge to edge (246 instead of 255 down the top of the stem: the shadow shows
+  through the antialiased boundary). At 4x it's gone. A run takes about 25 s.
+- **No sips loop any more:** the script writes its own PNGs (Paeth-filtered, `zlib.crc32`, so Node
+  22.2+): RGB with no alpha channel for the four opaque icons, RGBA for the rest. The run steps in its
+  header are now: resvg in `/tmp`, run it, look at the PNGs, prebuild.
+- **Themed icon:** a luminance `<mask>`. The pieces are drawn opaque in paint order, white or grey 115
+  (`MONO_GREEN_ALPHA` 0.45), so a later piece replaces what it covers, as in the colour logo, and the
+  grey becomes the alpha. resvg takes mask luminance straight from the sRGB values (checked: grey 115
+  gives alpha 115).
+- **Notification icon:** the silhouette fills Material's 20 dp live area (content height 20/24).
+  **The fold stays:** at 24 dp on hdpi and up (36–96 px) it reads as a page corner; only mdpi's 24 px
+  softens it to a cut corner.
+- **Tile shadow and rim** (not in the owner's files) are `TILE_SHADOW` `{ dy: 12, blur: 24, opacity:
+  0.22 }` (black) and `TILE_RIM` `{ width: 6, opacity: 0.12 }` (white, inside), in **tile units**,
+  so they scale with the tile: on the 140 dp splash tile, 2 dp down, a 4 dp σ and a 1 dp rim. They
+  are in `brand.ts`, next to `SPLASH_IMAGE_DP`, `SPLASH_TILE_FRACTION` and `SPLASH_TILE_DP` (all
+  exported from `src/theme`), for V4 and V5. The script has copies of them and of `MARK_CONTENT_BOX`.
+- `app.json`: `adaptiveIcon.backgroundColor` `#155437`; `expo-notifications` `icon`
+  `./assets/notification-icon.png`, `color` `#1e754a`. The diff has only those three values.
+- `brandSync.test.ts` (34 tests now): the splash colours equal `tokens.light.bg`/`tokens.dark.bg`,
+  `imageWidth` equals `SPLASH_IMAGE_DP`, the adaptive background equals `BRAND.tile.stops[0]`, the
+  notification colour equals `BRAND.green` (**V3 adds the check against `tokens.light.accent`**), and
+  the script's four copies equal the app's (checked that a changed copy fails).
+- Checked by eye (a contact sheet): the adaptive icon under circle, squircle and teardrop masks;
+  the themed icon tinted light and dark; the notification icon at 24–96 px; both splash images on
+  their background inside Android 12's 192 dp circle. A prebuild of a scratch copy of the project
+  made `notification_icon.png` at 5 densities, `splashscreen_logo.png` (light and night),
+  `iconBackground` `#155437` and `notification_icon_color` `#1e754a`. The real `android/` wasn't
+  touched.
+- The splash PNGs are about 160 KB each (source files; the plugin resizes them per density).
 
 Goal: every icon and the native splash show the new logo, made from the SVGs by one script.
 
@@ -274,7 +334,26 @@ Changes:
   `npx expo prebuild --clean` and a new dev build.
 
 ## V3 · Retune the default accent to the logo green *(S)*
-Status: planned. Device checks: Verification 5.
+Status: done in code (2026-10-09). Device checks open: Verification 5 (and the green course next to
+the accent, below).
+
+As built:
+- `tokens.ts` has the starting values from the table, unchanged. Checked with `contrastRatio`: light
+  accent on bg/surface/surface2 4.77/5.59/4.84, white on it 5.68, accentInk 7.49/8.77/7.60 and 7.43
+  on accentSoft; dark accent 6.67/5.92/5.30, onAccent on it 6.14 (white would be 2.8), accentInk
+  11.63/10.33/9.25 and 9.51 on accentSoft. The comments say which logo colour each one is (light
+  accent = `BRAND.green`, light accentInk = the tile's `#155437`, dark accent = the fold's `#37AE79`).
+- `en.ts`: `settings.accent.names.teal` "Forest", `settings.accent.lapsed` "… Forest for now."; the
+  id `'teal'` and the course colour's "Teal" are unchanged. AccentPicker's comment and the comment
+  on `ACCENTS` say so.
+- **Also changed** (found by the grep): `components/shared/Snackbar.tsx` hard-coded `#7fe3cd`, the old
+  dark accentInk, for its action label. The bar is dark in both themes, so it now uses
+  `tokens.dark.accentInk` and follows the default accent. Other accents still don't change it (as
+  before).
+- `brandSync.test.ts`: the notification colour check is now against `tokens.light.accent` (V2's
+  interim check was against `BRAND.green`, the same value).
+- The course colour `green` against the light accent is 1.26:1 (2.00 in dark), as predicted. Not
+  changed; look at it on the device.
 
 Goal: the app's own colour is the logo's green in both themes, with every contrast rule still met.
 
@@ -307,7 +386,45 @@ Tests: `contrast.test.ts` (unchanged, must pass), `theme/__tests__/accent.test.t
 `hardcodedStrings` stays green.
 
 ## V4 · `BrandMark` component and in-app placements *(S)*
-Status: planned. Device checks: Verification 6.
+Status: done in code (2026-10-09). Device checks open: Verification 6 (and that nothing clips the
+light shadow, below).
+
+As built:
+- `components/brand/BrandMark.tsx` exports **`BrandTile`** (Skia elements only, `{ x, y, width,
+  theme }`, to put inside a `<Canvas>`; V5 can draw its still frame with it) and **`BrandMark`**
+  (`{ size, wordmark? }`). The mark's shadow is a `Group layer={<Paint><Shadow/></Paint>}` round
+  all eight pieces, as the SVG's filter is on its `<g>` (one shadow, inside the counter too), and
+  outside the mark's scale transform so its numbers are plain canvas units. The tile clip is a plain
+  `{ rect, rx, ry }` object (native Skia takes it; no `Skia.*` call anywhere).
+- **Seams:** like resvg at 1x (V2), Skia leaves a grey line where two pieces meet edge to edge. It
+  gets worse as the logo gets smaller: 218 instead of 255 down the top of the stem at 72 dp, 208 at
+  32 dp. Each piece's fill now also gets a **hairline** in its own paint (`strokeWidth` 0: one
+  device pixel at any scale), which overlaps its neighbours by half a pixel: the seam is 254–255.
+- **Checked against the splash PNGs** with Skia's headless renderer (CanvasKit). V5 can reuse the
+  method for the handoff frame: a throwaway Jest test that `jest.mock`s `@shopify/react-native-skia`
+  to `lib/commonjs/headless` and `…/sksg/Container` to `Container.js` (jest-expo would resolve
+  `.native.js`), sets `globalThis.TextDecoder` to Node's (Expo's polyfill has no UTF-16), loads
+  `canvaskit-wasm/bin/full`, then `drawOffscreen` → `encodeToBytes()`. `BrandTile` at the splash frame
+  (896 px wide in 1024) against `splash-icon{,-dark}.png` on the theme's bg: **mean difference
+  0.4/255**, only on edge pixels (the hairlines move edges by half a pixel; before them it was 0.2).
+- **Layout:** the layout box is the tile (`size` × `size × 802/819`). The light shadow reaches
+  `TILE_SHADOW.dy + 3 × blur` tile units outside it, so the `Canvas` is that much larger on every side
+  and offset by it (`position: 'absolute'`, negative `left`/`top`). Check on the device that no
+  parent clips it (Android draws children outside their parent unless `overflow: 'hidden'`).
+- `BRAND.shadow` gained `color: '#000000'` (the SVG's colour matrix zeroes every channel;
+  `brandSync.test.ts` checks it). The tile shadow uses it and the rim uses `BRAND.paper`, with
+  `opacity` from `TILE_SHADOW`/`TILE_RIM`. Only the mark's shadow filter needs an `rgba()` string,
+  made from those values by a local helper.
+- Placements: Onboarding page 1, `BrandMark size={72} wordmark` centred above the title (the page
+  scrolls, so a large font scale pushes content down instead of cutting it). Settings → About: a row
+  of `BrandMark size={32}` and the version text (`aboutRow`, the text `flex: 1`).
+- `en.ts`: `brand.name` "PDF Scan", `brand.logoLabel` "PDF Scan logo".
+- Skia mock: `Canvas`, `Group`, `Path`, `RoundedRect`, `LinearGradient`, `Shadow`, `Blur`, `Paint` are
+  host elements (plain strings), plus `vec`. `Skia` still throws.
+- `BrandMark.test.tsx` (6 tests): the eight fills, their hairlines and the two outlines in paint
+  order; the clip's size; one shadow layer around every path (the layer is a prop, so the test reads
+  it there); the light shadow and no rim; the dark rim and no shadow; one `image` element labelled
+  from the catalog with the drawing hidden; the wordmark only when asked.
 
 Goal: the logo, drawn from the shared geometry, appears in the app where a student meets the brand.
 
@@ -347,7 +464,53 @@ Tests: `BrandMark.test.tsx` (renders in both themes, one label, the wordmark tex
 `hardcodedStrings` and `a11yLabels` stay green.
 
 ## V5 · Animated splash, "Scan & assemble" *(M)*
-Status: planned. Device checks: Verification 7–10.
+Status: done in code (2026-10-09). Open: Verification 7–10 on a device (with V2's new dev build:
+the overlay must match V2's splash images), and the numbers in `docs/qa/performance.md` → "§15 V5".
+
+As built:
+- Files: `bootstrap/splashIntro.ts` (constants, `introPlan`, `shouldExit`, `takeFirstMount`, and the
+  frame maths as worklets: `introFrame(t)`, `pieceTransform`, `foldTransform`, `sweepLine`,
+  `PAINT_RUNS`), `components/brand/IntroMark.tsx` (the drawing; **no Reanimated import**: each moving
+  part is a plain value or a shared value, and `introMarkProps(t)` gives one still frame),
+  `components/brand/SplashIntro.tsx` (the overlay, `SplashIntroBoundary`). `markGeometry.ts` gained
+  `WHITE_PIECE_CENTRES` and `FOLD_PIVOT` (430.547, 186.889), checked against the paths in
+  `brandSync.test.ts`. `rgba()` moved to `theme/brand.ts` (a worklet, so the overlay can use it too).
+- **One clock:** a shared value counts ms from the release (`withTiming`, linear, to
+  `INTRO_TOTAL_MS`). Every moving prop is `useDerivedValue` of `introFrame(clock)`. A skip cancels it
+  and sets it to the end. The clock only runs for `'play'`, so `'still'` is the rest frame. A plan
+  decided during the hold starts the clock where it would have been.
+- **Timeline as planned**, with two choices: the assemble phase is ease-out apart (first 40%), then
+  an ease-out-back return that overshoots about 5% past together (the snap); the **sweep moves at
+  a steady speed** (an eased one rushed through the diagonal: at 700 ms it had already passed it).
+  The band is `SWEEP_BAND` 220 mark units long, white at `SWEEP_PEAK` 0.45, on a clamped gradient
+  that is transparent at both ends, so it lights nothing before 400 ms or after 800 ms.
+- **The handoff:** `holdSplash` calls `setOptions({ duration: SPLASH_EXIT_MS (150), fade: true })` (in a
+  try, like `hide`). The overlay renders on AppNavigator's first render; `onLayout`, then one
+  `requestAnimationFrame`, then `releaseSplash()`. The exit waits for the hold (150 ms after the
+  release, so the native fade is over), except at the 3 s cap.
+- **Checked with headless Skia** (V4's method): the overlay's rest frame (`IntroMark` with
+  `introMarkProps(0)` inside `BrandTile`) against plain `BrandTile`: max difference 2/255, so its
+  first frame is V4's, which matches the splash PNGs to 0.4/255. A filmstrip of 12 frames at 3x
+  (0–1100 ms) looked right: the page parts and snaps back, the band runs ribbon → bowl → diagonal,
+  the fold lifts, the tile rises for the wordmark.
+- **AppNavigator:** one root `View` now. The screens (StatusBar, AppLockGate, …) are its first child
+  only once booted, and `<SplashIntroBoundary><SplashIntro booting appLocked /></SplashIntroBoundary>`
+  is always the last child, so going from booting to booted doesn't remount the overlay (with two
+  `return`s it would have). `appLocked` is `settings.appLock.enabled`. The
+  `requestAnimationFrame(releaseSplash)` effect is gone; the 3 s timers stay.
+- **Back:** the overlay's `BackHandler` listener is added once the splash is released, not at
+  mount. Child effects run before their parent's, so a listener added at mount would be **older**
+  than AppNavigator's and run after it. Back returns false once the intro is done (a slow boot
+  holding the final frame), so it backgrounds the app as usual.
+- `useExternalFileLinking.ts` exports `isFileUri`. `en.ts`: `brand.skipIntro` "Skip intro".
+- **Not handled:** the status bar icons. While booting there's no `StatusBar` element, and after boot
+  it follows the app's theme, so with the theme forced against the system's, the icons can be the
+  wrong shade over the overlay for up to about 1 s.
+- Tests: `bootstrap/__tests__/splashIntro.test.ts` (27: the `introPlan` table, `shouldExit`, the
+  phases, the frames at rest / end / peaks, the sweep line, the piece directions, the paint runs,
+  `takeFirstMount`), `splash.test.ts` (+2: `setOptions` before preventAutoHide and hide; holding
+  still works when it throws). `brandSync.test.ts` (+5). `SplashIntro` itself isn't rendered under
+  Jest (the Skia mock gained `Rect` anyway).
 
 Goal: on a cold start, the native splash hands over without a visible change to a JS overlay that
 plays a short logo animation while the app boots underneath, then fades into the start screen.

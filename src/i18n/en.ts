@@ -48,6 +48,14 @@ export const en = {
     loadingDocuments: 'Loading documents',
   },
 
+  // §15 V4: the logo's wordmark (the app's name), and what a screen reader calls the logo.
+  brand: {
+    name: 'PDF Scan',
+    logoLabel: 'PDF Scan logo',
+    // §15 V5: the splash intro's overlay is one button (a tap or Back skips to the end).
+    skipIntro: 'Skip intro',
+  },
+
   home: {
     yourCourses: 'Your courses',
     semesterA11y: 'Semester: {name}. Change',
@@ -111,9 +119,10 @@ export const en = {
     // §10 M4: theme accents (Pro).
     accent: {
       label: 'Accent colour',
-      names: { teal: 'Teal', ocean: 'Ocean', plum: 'Plum', rose: 'Rose', amber: 'Amber' },
+      // §15 V3: the default accent is the logo's green; its id stays 'teal' (stored in settings).
+      names: { teal: 'Forest', ocean: 'Ocean', plum: 'Plum', rose: 'Rose', amber: 'Amber' },
       a11y: '{name} accent',
-      lapsed: 'Your accent comes back with Pro. Teal for now.',
+      lapsed: 'Your accent comes back with Pro. Forest for now.',
     },
     // §10 M4: app lock (Pro). Lives in the Privacy section.
     appLock: {

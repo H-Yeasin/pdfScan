@@ -194,6 +194,9 @@ For day-to-day development after the native project exists:
 npm start         # expo start, connects to the dev-client build already on-device
 ```
 
+Clean builds, emulators and phones, release builds, APK and AAB: see
+[docs/build.md](docs/build.md).
+
 ## Scripts
 
 | Command | Description |
