@@ -175,10 +175,40 @@ function intlLocale(): string {
   return intlTag(getLocale());
 }
 
+// §16 G6: one Intl formatter per locale + options, kept. Building one is slow in Hermes, and a
+// library row needs three (its page count, its size, its date) on every render. The options are
+// a handful of literals, so the caches stay small. Exported for the tests.
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+function formatKey(locale: string, options: object | undefined): string {
+  return options ? `${locale}|${JSON.stringify(options)}` : locale;
+}
+
+export function numberFormat(locale: string, options?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = formatKey(locale, options);
+  let format = numberFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, options);
+    numberFormats.set(key, format);
+  }
+  return format;
+}
+
+export function dateFormat(locale: string, options?: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = formatKey(locale, options);
+  let format = dateFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    dateFormats.set(key, format);
+  }
+  return format;
+}
+
 // `locale`: the UI's by default; document text passes getDocumentLocale().
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions, locale: string = intlLocale()): string {
   try {
-    return new Intl.NumberFormat(locale, options).format(value);
+    return numberFormat(locale, options).format(value);
   } catch {
     return String(value);
   }
@@ -187,7 +217,7 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions, 
 export function formatDate(date: Date | number, options?: Intl.DateTimeFormatOptions, locale: string = intlLocale()): string {
   const d = typeof date === 'number' ? new Date(date) : date;
   try {
-    return new Intl.DateTimeFormat(locale, options).format(d);
+    return dateFormat(locale, options).format(d);
   } catch {
     return d.toDateString();
   }

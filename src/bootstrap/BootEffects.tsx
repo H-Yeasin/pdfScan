@@ -18,6 +18,7 @@ import { usePdfInfoBackfill } from '../store/usePdfInfoBackfill';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useStorageIntegrity } from '../store/useStorageIntegrity';
+import { useThumbnailBuilder } from '../store/useThumbnailBuilder';
 
 // §16 G5: the app's always-on background work, as a component that renders nothing. These hooks
 // follow whole slices (persistence diffs the library on each change, indexing and the reminders
@@ -41,6 +42,7 @@ export const BootEffects = memo(function BootEffects({ afterBoot }: { afterBoot:
   useStorageIntegrity(libraryAfterBoot);
   useAutoBackup(libraryAfterBoot);
   useCleanPdfBases(libraryLoaded, libraryAfterBoot);
+  useThumbnailBuilder(libraryAfterBoot);
 
   const settingsLoaded = useAppSelector((s) => s.settings.loaded);
   const crashReportsEnabled = useAppSelector((s) => s.settings.crashReportsEnabled);

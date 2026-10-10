@@ -15,6 +15,7 @@ import {
   type PageEdit,
 } from '../../services/persistence/pageEdits';
 import { PageGrid } from '../shared/PageGrid';
+import { thumbFor } from '../../services/library/thumbnails';
 
 type EditPagesModalProps = {
   visible: boolean;
@@ -65,7 +66,8 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
 
   const pages = useMemo(() => editedPages(doc, edit), [doc, edit]);
   const dirty = isEdited(doc, edit);
-  const gridPages = pages.map((p) => ({ id: p.id, uri: p.thumbUri || p.fileUri, rotation: p.rotation }));
+  // §16 G6: thumbnails only; a page without one shows the placeholder while it's made.
+  const gridPages = pages.map((p) => ({ id: p.id, uri: thumbFor(p), rotation: p.rotation }));
 
   const toggle = (id: string) => setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
@@ -111,7 +113,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
         <Text style={[styles.hint, { color: tokens.muted }]}>{t('reader.edit.hint')}</Text>
 
         <View style={styles.grid}>
-          <PageGrid pages={gridPages} selecting selectedIds={selected} onPress={(_, page) => toggle(page.id)} />
+          <PageGrid pages={gridPages} documentId={doc.id} selecting selectedIds={selected} onPress={(_, page) => toggle(page.id)} />
         </View>
 
         {beforeDelete ? (

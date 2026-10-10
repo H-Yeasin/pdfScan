@@ -44,4 +44,27 @@ describe('getMatchSnippet', () => {
     expect(getMatchSnippet(notes, 'week')).toBeUndefined();
     expect(getMatchSnippet(lab, 'cycle')).toBeUndefined();
   });
+
+  // §16 G6: the list asks for every row's snippet on each of its renders.
+  it('searches a document once per query, and again when the query or the document changes', () => {
+    let reads = 0;
+    const page = makePage();
+    Object.defineProperty(page, 'ocr', { get: () => (reads++, { text: 'Entropy always grows', blocks: [] }) });
+    const doc = makeDoc({ name: 'Physics', pages: [page] });
+
+    expect(getMatchSnippet(doc, 'grows')).toBe('Entropy always grows');
+    expect(getMatchSnippet(doc, 'grows')).toBe('Entropy always grows');
+    expect(getMatchSnippet(doc, ' Grows ')).toBe('Entropy always grows');
+    expect(reads).toBe(1);
+
+    expect(getMatchSnippet(doc, 'entropy')).toBe('Entropy always grows');
+    expect(reads).toBe(2);
+    // No match is remembered too.
+    expect(getMatchSnippet(doc, 'nothing')).toBeUndefined();
+    expect(getMatchSnippet(doc, 'nothing')).toBeUndefined();
+    expect(reads).toBe(3);
+
+    const renamed = { ...doc, name: 'Entropy notes' };
+    expect(getMatchSnippet(renamed, 'entropy')).toBeUndefined();
+  });
 });

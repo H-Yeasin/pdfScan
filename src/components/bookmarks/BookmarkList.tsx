@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BookmarkedPage } from '../../services/study/bookmarks';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
-import { rotationStyle } from '../../utils/rotation';
+import { PageThumb } from '../shared/PageThumb';
 import { EmptyState } from '../shared/EmptyState';
 
 // §5 T5: bookmarked pages as rows: the page's thumbnail, "<document> · p. 4", and its label.
@@ -34,7 +34,7 @@ export function BookmarkList({
             accessibilityLabel={`${item.doc.name}, page ${item.idx + 1}`}
           >
             <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-              {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={[styles.thumbImage, rotationStyle(page.rotation)]} resizeMode="cover" /> : null}
+              {page ? <PageThumb documentId={item.doc.id} page={page} style={styles.thumbImage} /> : null}
             </View>
             <View style={styles.text}>
               <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>

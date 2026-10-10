@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PageHit } from '../../services/persistence/dbService';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { useT } from '../../i18n/useT';
-import { rotationStyle } from '../../utils/rotation';
+import { PageThumb } from '../shared/PageThumb';
 
 const SHOWN_PER_DOCUMENT = 3;
 
@@ -82,7 +82,7 @@ export function PageResults({
                   accessibilityLabel={t('library.hitA11y', { doc: doc.name, page: hit.idx + 1 })}
                 >
                   <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-                    {page ? <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={[styles.thumbImage, rotationStyle(page.rotation)]} resizeMode="cover" /> : null}
+                    {page ? <PageThumb documentId={doc.id} page={page} style={styles.thumbImage} /> : null}
                   </View>
                   <View style={styles.text}>
                     <Text style={[styles.name, { color: tokens.ink }]} numberOfLines={1}>

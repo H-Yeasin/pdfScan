@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatBytes, formatRelativeDate } from '../../utils/format';
@@ -9,6 +9,8 @@ import { FileTypeIcon } from './FileTypeIcon';
 import { useT } from '../../i18n/useT';
 import { useAppSelector } from '../../store/AppStateContext';
 import { INDEX_MAX_PAGES } from '../../services/documents/importedPdfIndex';
+import { useThumb } from '../shared/PageThumb';
+import { AppImage } from '../shared/AppImage';
 import { rotationStyle } from '../../utils/rotation';
 import { useRenderCount } from '../../utils/renderCounts';
 
@@ -44,6 +46,8 @@ export const FileRow = memo(function FileRow({
   const { tokens } = useTheme();
   const { t } = useT();
   const cover = doc.pages[0];
+  // §16 G6: the 400 px thumbnail or the format's icon, never the master; a missing one is made.
+  const coverUri = useThumb(doc.id, cover);
   const indexNote = useIndexNote(doc);
 
   return (
@@ -57,8 +61,9 @@ export const FileRow = memo(function FileRow({
       ]}
     >
       <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
-        {cover?.thumbUri || cover?.fileUri ? (
-          <Image source={{ uri: cover.thumbUri || cover.fileUri }} style={[styles.coverImage, rotationStyle(cover.rotation)]} resizeMode="cover" />
+        {coverUri ? (
+          // The row is recycled (FlashList): keyed, so it never shows another document's cover.
+          <AppImage uri={coverUri} recyclingKey={doc.id} style={[styles.coverImage, rotationStyle(cover?.rotation)]} />
         ) : (
           <FileTypeIcon format={doc.format} size={18} />
         )}
@@ -125,7 +130,16 @@ export const FileRow = memo(function FileRow({
   );
 });
 
+// The space between two rows of a document list. FlashList's content style takes padding only
+// (no `gap`), so the lists pass this as their ItemSeparatorComponent (§16 G6).
+export function FileRowGap() {
+  return <View style={styles.gap} />;
+}
+
 const styles = StyleSheet.create({
+  gap: {
+    height: spacing.sm,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

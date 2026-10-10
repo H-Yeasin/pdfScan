@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SegmentedControl } from '../shared/SegmentedControl';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import { sectionIndex, type OutlineEntry } from '../../services/reader/outline';
 import type { LibraryPage } from '../../types/models';
-import { rotationStyle } from '../../utils/rotation';
+import { PageThumb } from '../shared/PageThumb';
 import { OutlineList } from './OutlineList';
 
 const THUMB_WIDTH = 72;
@@ -14,6 +14,8 @@ const THUMB_GAP = spacing.sm;
 
 type PageScrubberSheetProps = {
   visible: boolean;
+  // The pages' document: a page without a thumbnail gets one made (§16 G6).
+  documentId: string;
   pages: LibraryPage[];
   // The library page on screen, outlined and scrolled into view.
   currentIdx: number;
@@ -33,7 +35,7 @@ const CONTENTS_SHARE = 0.55;
 // PDFs); tapping one jumps there. A page without a thumbnail shows its number only.
 // §18 W11: a PDF with an outline also has a Contents tab (OutlineList). The tab last used stays
 // for as long as the document is open.
-export function PageScrubberSheet({ visible, pages, currentIdx, onPick, outline, onPickOutline, onClose }: PageScrubberSheetProps) {
+export function PageScrubberSheet({ visible, documentId, pages, currentIdx, onPick, outline, onPickOutline, onClose }: PageScrubberSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
@@ -91,14 +93,13 @@ export function PageScrubberSheet({ visible, pages, currentIdx, onPick, outline,
               getItemLayout={(_, index) => ({ length: THUMB_WIDTH + THUMB_GAP, offset: (THUMB_WIDTH + THUMB_GAP) * index, index })}
               onScrollToIndexFailed={() => {}}
               renderItem={({ item, index }) => {
-                const uri = item.thumbUri || item.fileUri;
                 return (
                   <Pressable accessibilityRole="button"
                     onPress={() => onPick(index)}
                     style={[styles.thumb, { borderColor: index === currentIdx ? tokens.accent : tokens.edge, backgroundColor: tokens.surface2 }]}
                     accessibilityLabel={t('reader.pageIndicator', { page: index + 1, count: pages.length })}
                   >
-                    {uri ? <Image source={{ uri }} style={[styles.image, rotationStyle(item.rotation)]} resizeMode="cover" /> : null}
+                    <PageThumb documentId={documentId} page={item} style={styles.image} />
                     <View style={styles.number}>
                       <Text style={styles.numberText}>{index + 1}</Text>
                     </View>

@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { EmptyState } from '../components/shared/EmptyState';
-import { FileRow } from '../components/library/FileRow';
+import { FileRow, FileRowGap } from '../components/library/FileRow';
 import { CourseList } from '../components/courses/CourseList';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
 import { CourseFilterChips } from '../components/courses/CourseFilterChips';
@@ -31,7 +32,6 @@ import { PICKER_MIME_TYPES } from '../services/documents/formatCapabilities';
 import { looksLikeZip, ZIP_MIME_TYPES } from '../services/backup/incomingZip';
 import { openIncomingZip } from '../store/backupIntake';
 import { useStableCallback } from '../utils/useStableCallback';
-import { DOC_LIST_TUNING } from '../components/library/docListTuning';
 import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../theme';
@@ -123,12 +123,27 @@ export function LibraryScreen() {
     () => (tab === 'starred' ? files.filter((f) => f.star) : files).filter((f) => f.archived).length,
     [files, tab]
   );
-  const courseColorOf = useCallback(
-    (courseId: string | undefined) => {
-      const course = courseId ? state.library.courses.find((c) => c.id === courseId) : undefined;
-      return course ? courseColorValue(course.color, tokens) : undefined;
-    },
+  const courseColors = useMemo(
+    () => new Map(state.library.courses.map((c) => [c.id, courseColorValue(c.color, tokens)])),
     [state.library.courses, tokens]
+  );
+  // §16 G6: one function for the list, and primitives for the row, so `memo(FileRow)` skips every
+  // row whose own document, selection, snippet and colour are what they were. The snippet is
+  // found once per query per document (searchService), not on each pass.
+  const renderRow = useCallback(
+    ({ item }: ListRenderItemInfo<LibraryDocument>) => (
+      <FileRow
+        doc={item}
+        selected={selection.has(item.id)}
+        selectionMode={selMode}
+        matchSnippet={getMatchSnippet(item, search)}
+        courseColor={item.courseId ? courseColors.get(item.courseId) : undefined}
+        onPress={onRowPress}
+        onLongPress={onRowLongPress}
+        onToggleStar={onRowStar}
+      />
+    ),
+    [selection, selMode, search, courseColors, onRowPress, onRowLongPress, onRowStar]
   );
 
   const visibleFiles = useMemo(() => {
@@ -282,10 +297,10 @@ export function LibraryScreen() {
               showBookmarked={bookmarkedIds.size > 0}
             />
           ) : null}
-          <FlatList
+          <FlashList
             data={visibleFiles}
-            keyExtractor={(doc) => doc.id}
-            {...DOC_LIST_TUNING}
+            keyExtractor={docKey}
+            ItemSeparatorComponent={FileRowGap}
             contentContainerStyle={styles.listContent}
             ListFooterComponent={
               searching ? (
@@ -319,18 +334,7 @@ export function LibraryScreen() {
                 </Pressable>
               ) : null
             }
-            renderItem={({ item }) => (
-              <FileRow
-                doc={item}
-                selected={selection.has(item.id)}
-                selectionMode={selMode}
-                matchSnippet={getMatchSnippet(item, search)}
-                courseColor={courseColorOf(item.courseId)}
-                onPress={onRowPress}
-                onLongPress={onRowLongPress}
-                onToggleStar={onRowStar}
-              />
-            )}
+            renderItem={renderRow}
           />
         </>
       )}
@@ -347,6 +351,8 @@ export function LibraryScreen() {
     </SafeAreaView>
   );
 }
+
+const docKey = (doc: LibraryDocument) => doc.id;
 
 const styles = StyleSheet.create({
   container: {
@@ -392,9 +398,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.heading,
     fontSize: typeScale.title.fontSize,
   },
+  // The rows' gap is FileRowGap: FlashList's content style takes padding only.
   listContent: {
     padding: spacing.lg,
-    gap: spacing.sm,
   },
   archivedToggle: {
     alignSelf: 'center',

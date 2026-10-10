@@ -112,3 +112,29 @@ describe('formatting', () => {
     expect(formatBytes(1.44 * 1024 * 1024)).toBe('1.4 MB');
   });
 });
+
+// §16 G6: a row formats its page count, size and date on every render; the formatters are built
+// once per locale + options.
+describe('Intl formatter cache', () => {
+  const { dateFormat, numberFormat } = jest.requireActual('../index') as typeof import('../index');
+
+  it('hands back the same formatter for the same locale and options', () => {
+    expect(numberFormat('en')).toBe(numberFormat('en'));
+    expect(numberFormat('en', { maximumFractionDigits: 1 })).toBe(numberFormat('en', { maximumFractionDigits: 1 }));
+    expect(dateFormat('en', { month: 'short', day: 'numeric' })).toBe(dateFormat('en', { month: 'short', day: 'numeric' }));
+  });
+
+  it('keeps locales and options apart', () => {
+    expect(numberFormat('en')).not.toBe(numberFormat('bn'));
+    expect(numberFormat('en')).not.toBe(numberFormat('en', { maximumFractionDigits: 1 }));
+    expect(dateFormat('en', { month: 'short' })).not.toBe(dateFormat('en', { month: 'long' }));
+  });
+
+  it('builds nothing new for a formatted value', () => {
+    formatDate(new Date(2026, 9, 2), { month: 'short', day: 'numeric' });
+    const built = jest.spyOn(Intl, 'DateTimeFormat');
+    expect(formatDate(new Date(2026, 9, 3), { month: 'short', day: 'numeric' })).toBe('Oct 3');
+    expect(built).not.toHaveBeenCalled();
+    built.mockRestore();
+  });
+});

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { AccessibilityInfo, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { radii, spacing, useTheme } from '../../theme';
@@ -8,6 +8,7 @@ import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
 import { rotationStyle } from '../../utils/rotation';
 import { useStableCallback } from '../../utils/useStableCallback';
+import { AppImage } from '../shared/AppImage';
 
 const THUMB_WIDTH = 60;
 const THUMB_HEIGHT = (THUMB_WIDTH * 4) / 3;
@@ -66,7 +67,7 @@ export function ThumbnailStrip({
         ]}
       >
         {cover?.mode === 'imported_image' && cover.importedUri ? (
-          <Image source={{ uri: cover.importedUri }} style={styles.thumbImage} resizeMode="cover" />
+          <AppImage uri={cover.importedUri} style={styles.thumbImage} />
         ) : (
           <Ionicons
             name={cover ? 'document-text-outline' : 'add-outline'}
@@ -184,11 +185,9 @@ const DraggableThumbnail = memo(function DraggableThumbnail({
           animatedStyle,
         ]}
       >
-        <Image
-          source={{ uri: page.thumbUri ?? page.uri }}
-          style={[styles.thumbImage, rotationStyle(page.rotation)]}
-          resizeMode="cover"
-        />
+        {/* §16 G6: a session page's thumbnail is made at ingest; until a crop or a merge has
+            written the new one it's the page itself, which expo-image decodes at this size. */}
+        <AppImage uri={page.thumbUri ?? page.uri} bare style={[styles.thumbImage, rotationStyle(page.rotation)]} />
         <View style={styles.indexBadge}>
           <Text style={styles.indexBadgeText}>{index + 1}</Text>
         </View>

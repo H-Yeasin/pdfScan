@@ -47,7 +47,7 @@ so they're saved like real documents. Do this in a dev build, then install the r
   compatibility (and re-renders on everything).
 - **Lists:** `FileRow` and Review's thumbnails are `React.memo` with stable handlers
   (`utils/useStableCallback`); a row reads only its own document's indexing progress. The
-  Library and Course lists use `DOC_LIST_TUNING` (`components/library/docListTuning.ts`). Rows vary
+  Library and Course lists used `DOC_LIST_TUNING` (`components/library/docListTuning.ts`) until §16 G6 moved them to FlashList. Rows vary
   in height, so there's no `getItemLayout`.
 - **Cold start:** the start screen is chosen behind the splash (§9 O1). The integrity check,
   imported-PDF indexing, stale reminder clean-up and Sentry init wait until 1.5 s after the first

@@ -25,11 +25,26 @@ export function searchDocuments(documents: LibraryDocument[], query: string): Li
   return documents.filter((doc) => haystackOf(doc).includes(q));
 }
 
+// §16 G6: the last snippet found for a document, with the query it was for. A row asks on every
+// render of the list (a selection, a star, a scroll), and the search lower-cases each page's text
+// until it finds the match; once per query per document is enough. Kept like the haystack: a
+// changed document is a new object.
+const snippets = new WeakMap<LibraryDocument, { q: string; snippet: string | undefined }>();
+
 // Returns a short snippet of OCR text around the first match, but only when the match is
 // NOT already visible in the filename (the row already shows the name, so repeating it adds nothing).
 export function getMatchSnippet(doc: LibraryDocument, query: string): string | undefined {
   const q = query.trim().toLowerCase();
-  if (!q || doc.name.toLowerCase().includes(q)) return undefined;
+  if (!q) return undefined;
+  const last = snippets.get(doc);
+  if (last?.q === q) return last.snippet;
+  const snippet = findSnippet(doc, q);
+  snippets.set(doc, { q, snippet });
+  return snippet;
+}
+
+function findSnippet(doc: LibraryDocument, q: string): string | undefined {
+  if (doc.name.toLowerCase().includes(q)) return undefined;
 
   for (const page of doc.pages) {
     const text = page.ocr?.text;

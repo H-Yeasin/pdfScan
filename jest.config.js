@@ -12,6 +12,8 @@ module.exports = {
     '^expo-sqlite$': '<rootDir>/src/test/mocks/expoSqlite.ts',
     '^rn-mlkit-ocr$': '<rootDir>/src/test/mocks/rnMlkitOcr.ts',
     '^expo-haptics$': '<rootDir>/src/test/mocks/expoHaptics.ts',
+    '^expo-image$': '<rootDir>/src/test/mocks/expoImage.ts',
+    '^@shopify/flash-list$': '<rootDir>/src/test/mocks/flashList.ts',
     '^expo-notifications$': '<rootDir>/src/test/mocks/expoNotifications.ts',
     '^expo-clipboard$': '<rootDir>/src/test/mocks/expoClipboard.ts',
     '^expo-secure-store$': '<rootDir>/src/test/mocks/expoSecureStore.ts',

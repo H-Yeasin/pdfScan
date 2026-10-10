@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NameField } from '../components/deliver/NameField';
 import { PagePickerModal } from '../components/study/PagePickerModal';
@@ -11,7 +11,7 @@ import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
-import { rotationStyle } from '../utils/rotation';
+import { PageThumb } from '../components/shared/PageThumb';
 import { EmptyState } from '../components/shared/EmptyState';
 
 // §5 T6: the exam-pack tray: the picked pages in order (move up/down, remove), "Add pages" from
@@ -127,7 +127,7 @@ export function ExamPackScreen() {
           {rows.map((row, i) => (
             <View key={`${row.item.documentId}:${row.item.pageId}`} style={[styles.row, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
               <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-                {row.page ? <Image source={{ uri: row.page.thumbUri ?? row.page.fileUri }} style={[styles.thumbImage, rotationStyle(row.page.rotation)]} resizeMode="cover" /> : null}
+                {row.page ? <PageThumb documentId={row.item.documentId} page={row.page} style={styles.thumbImage} /> : null}
               </View>
               <Text style={[styles.rowText, { color: row.doc ? tokens.ink : tokens.muted }]} numberOfLines={2}>
                 {row.doc && row.idx >= 0 ? t('study.pack.rowLabel', { name: row.doc.name, page: row.idx + 1 }) : t('study.pack.missing')}

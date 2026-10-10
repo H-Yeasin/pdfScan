@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { radii, spacing, useTheme, touchSlop } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import type { PackItem } from '../../store/slices/packSlice';
 import { useT } from '../../i18n/useT';
-import { rotationStyle } from '../../utils/rotation';
+import { PageThumb } from '../shared/PageThumb';
 
 // §5 T6: pick pages from documents (a course's, for the exam pack), each document's pages as a
 // row of thumbnails; tap to select. Pages already in the pack are marked and can't be picked again.
@@ -74,7 +74,9 @@ export function PagePickerModal({
                       accessibilityLabel={t('study.pageA11y', { doc: doc.name, page: i + 1 })}
                       style={[styles.page, { borderColor: on ? tokens.accent : tokens.edge, opacity: inPack ? 0.4 : 1 }]}
                     >
-                      <Image source={{ uri: page.thumbUri ?? page.fileUri }} style={[styles.thumb, rotationStyle(page.rotation)]} resizeMode="cover" />
+                      <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
+                        <PageThumb documentId={doc.id} page={page} style={styles.thumbImage} />
+                      </View>
                       <Text style={[styles.pageNo, { color: tokens.ink, backgroundColor: on ? tokens.accentSoft : tokens.surface }]}>{i + 1}</Text>
                     </Pressable>
                   );
@@ -146,6 +148,11 @@ const styles = StyleSheet.create({
   thumb: {
     width: '100%',
     height: 88,
+    overflow: 'hidden',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
   },
   pageNo: {
     textAlign: 'center',

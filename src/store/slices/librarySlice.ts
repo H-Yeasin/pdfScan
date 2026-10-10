@@ -54,6 +54,8 @@ export type LibraryAction =
   | { type: 'library/UPDATE_FILE'; id: string; patch: Partial<LibraryDocument> }
   // §16 G4: a document's word boxes, read from the database after the load (documents/pageOcr.ts).
   | { type: 'library/SET_PAGE_OCR'; id: string; pages: readonly LibraryPage[] }
+  // §16 G6: a thumbnail built for a page that had none (services/library/thumbnails.ts).
+  | { type: 'library/SET_PAGE_THUMB'; id: string; pageId: string; thumbUri: string }
   | { type: 'library/REPLACE_FILES'; ids: string[]; files: LibraryDocument[] }
   | { type: 'library/SET_COURSES'; courses: Course[] }
   // `color` defaults to the next unused palette colour; the course goes to the end of the list.
@@ -193,6 +195,18 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
           if (f.id !== action.id || !f.pages.some((p) => p.ocr?.blocksRow !== undefined && loaded.has(p.id))) return f;
           return { ...f, pages: f.pages.map((p) => (p.ocr?.blocksRow !== undefined && loaded.has(p.id) ? { ...p, ocr: loaded.get(p.id) } : p)) };
         }),
+      };
+    }
+    case 'library/SET_PAGE_THUMB': {
+      // By page id, and only for a page still without one: the document may have changed while it
+      // was built (the page removed, or its thumbnail written by the indexer).
+      const doc = state.files.find((f) => f.id === action.id);
+      if (!doc || !doc.pages.some((p) => p.id === action.pageId && !p.thumbUri)) return state;
+      return {
+        ...state,
+        files: state.files.map((f) =>
+          f === doc ? { ...f, pages: f.pages.map((p) => (p.id === action.pageId ? { ...p, thumbUri: action.thumbUri } : p)) } : f
+        ),
       };
     }
     case 'library/REPLACE_FILES':

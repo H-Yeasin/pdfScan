@@ -634,7 +634,72 @@ Tests: `appReducer` identity (a no-op action returns the same object); the `libr
 Device check: Verification 6.
 
 ## G6 · Lists and images *(M; needs a new dev build for `expo-image`)*
-Status: planned.
+Status: done in code (2026-10-10). **Needs a new dev build** (`expo-image` is native; FlashList v2 is JS
+only). Nothing here has run on a phone. Open: Verification 7.
+
+As built:
+- **Packages:** `@shopify/flash-list` 2.0.2 and `expo-image` ~57.0.5 (`npx expo install`). The `expo-image`
+  config plugin isn't added: it only sets an iOS pod property (`disableLibdav1d`), and `app.config.js` is
+  untouched.
+- **FlashList** for the Library and Course document lists and for `shared/PageGrid` (Review's "All pages",
+  the Reader's "Edit pages"). Its content style takes padding only, so the rows' gap is `FileRowGap`
+  (`ItemSeparatorComponent`, exported by `FileRow.tsx`) and the grid's gap is a margin on the tile.
+  `renderItem` is a `useCallback` and the rows get primitives: FlashList re-renders a row when
+  `renderItem` changes, and `memo(FileRow)` / `memo(PageTile)` then skip the ones that are the same.
+  `PageGrid`'s handlers are stable (`useStableCallback`) and its selection is a Set.
+  `docListTuning.ts` is deleted.
+- **Not done: the thumbnail strip.** `review/ThumbnailStrip` is still a ScrollView. Its thumbnails are
+  dragged across their neighbours to reorder; in FlashList each one sits in its own cell, so the
+  dragged one would pass *under* the cells after it on Android (z-order is per parent), and a recycled
+  cell could take a drag's shared values with it. That needs a `CellRendererComponent` that lifts the
+  cell, checked on a phone. It only got `AppImage`. `PageScrubberSheet` keeps its FlatList
+  (`getItemLayout`, `scrollToIndex`); `HomeScreen` has no document list or page image, so nothing
+  changed there.
+- **`components/shared/AppImage.tsx`:** the `expo-image` wrapper (`cachePolicy="memory-disk"`,
+  `contentFit="cover"`, no transition, the theme's `surface2` behind it; `bare` for none). In a recycled
+  row pass `recyclingKey`.
+- **`services/library/thumbnails.ts`:** `thumbFor(page)` is the thumbnail or undefined, never the master.
+  `requestThumb(documentId, pageId)` queues a build: one at a time, the newest request first, a page at
+  most once, a failed page not again until the next launch. A scan's is resized from its master
+  (`expo-image-manipulator`, `THUMB_MAX_DIM` / `THUMB_JPEG_Q`, the page's stored size, so no extra
+  decode); an imported PDF's is `pdfNative.renderPage` at 400 px. It is saved as
+  `thumb_<pageId>.jpg` in the document's folder. `components/shared/PageThumb.tsx` (`PageThumb`,
+  `useThumb`) is what a component uses: it asks in an effect, never during render.
+- **Differences from the plan:**
+  - Saved with a new action, **`library/SET_PAGE_THUMB`** (by page id, only for a page still without one),
+    not `library/UPDATE_FILE` with a page list: the document can change while a thumbnail is built, and a
+    whole-`pages` patch would undo that change.
+  - The queue reads and writes the library through a host that `store/useThumbnailBuilder.ts` sets
+    (mounted in `BootEffects`, after boot and a good load). A document deleted during a build gets nothing
+    written, and its folder isn't made again.
+  - An imported PDF's page is built only once the indexer has finished with the document (`indexState`
+    `done` or `partial`: the pages past `INDEX_MAX_PAGES`, a page that failed once), not while the Reader
+    holds the pdfium thread (`readerHold`), and not for a page turned since indexing (its PDF already
+    carries the turn; the row's `rotation` would apply it twice). Those show the placeholder.
+  - A session page (Capture's tray, the Review strip, Review's grid) keeps `thumbUri ?? uri`: it has no
+    library row to save a thumbnail on, its thumbnail exists from ingest, and `expo-image` decodes at the
+    size shown.
+- **Every fallback site** now uses `PageThumb` / `useThumb`: `FileRow`, `PageResults`, `EditPagesModal`,
+  `PagePickerModal`, `BookmarkList`, `SortUnsortedSheet`, `ExamPackScreen`, and `PageScrubberSheet` (not on
+  the plan's list, same fallback; it takes a `documentId` now). Guard test
+  `src/__tests__/noMasterThumbs.test.ts` fails on `thumbUri ?? …fileUri` in a component.
+- **Snippets:** `getMatchSnippet` remembers its last answer per document object and query (a WeakMap, like
+  the haystack; a changed document is a new object, which is what "updatedAt" was for). It is still called
+  from the row renderer, for the rows on screen only: computing it for all 500 documents up front on each
+  keystroke would cost more than it saves.
+- **Intl:** `i18n/index.ts` `numberFormat(locale, options)` / `dateFormat(locale, options)` keep one
+  formatter per locale + options; `formatNumber` and `formatDate` use them. `utils/format.ts` already goes
+  through those two. Nothing in the app uses `Intl.RelativeTimeFormat`.
+- **Left for G7:** `PagePeekCarousel`'s neighbouring masters and `previewImageCache` (the Review preview).
+  Other RN `Image`s that aren't thumbnails (signatures, the crop overlay, the profile logo, the cover
+  preview's logo, the page surface) are unchanged.
+- **Tests:** `services/library/__tests__/thumbnails.test.ts`, the Intl cache in `i18n.test.ts`, the snippet
+  memo in `searchService.test.ts`, `noMasterThumbs`. Jest stand-ins: `src/test/mocks/expoImage.ts` (a View)
+  and `src/test/mocks/flashList.ts` (a FlatList: the real list measures over several frames and never
+  settles under Node), mapped in `jest.config.js`.
+- **`npm run typecheck` fails on HEAD, before this step:** `tsconfig.json` got `"jsx": "react"` in commit
+  cec8ca3, which overrides Expo's `react-jsx` and gives 2,272 "React refers to a UMD global" errors.
+  Not changed here. `npx tsc --noEmit --jsx react-jsx` is clean.
 
 Goal: long lists scroll at 60 fps on a mid-range phone, and no row ever decodes a 2400 px image.
 

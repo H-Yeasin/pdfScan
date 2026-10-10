@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRef } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { adjacentCaptureMode } from '../../services/capture/captureModes';
 import { CaptureModePicker } from './CaptureModePicker';
@@ -9,6 +9,7 @@ import { radii, spacing } from '../../theme';
 import { useCaptureChrome } from '../../theme/captureChrome';
 import type { CaptureMode, SessionPage } from '../../types/models';
 import { rotationStyle } from '../../utils/rotation';
+import { AppImage } from '../shared/AppImage';
 
 const SIDE_BUTTON_SIZE = 48;
 const SCAN_BUTTON_SIZE = 76;
@@ -111,11 +112,7 @@ export function CaptureControls({
             accessibilityLabel={t('capture.tray', { count: pageCount })}
           >
             {lastPage ? (
-              <Image
-                source={{ uri: lastPage.thumbUri ?? lastPage.uri }}
-                style={[styles.thumbnailImage, rotationStyle(lastPage.rotation)]}
-                resizeMode="cover"
-              />
+              <AppImage uri={lastPage.thumbUri ?? lastPage.uri} bare style={[styles.thumbnailImage, rotationStyle(lastPage.rotation)]} />
             ) : (
               <Ionicons name="document-outline" size={20} color={chrome.textDim} />
             )}

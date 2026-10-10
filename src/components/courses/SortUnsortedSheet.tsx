@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDocType, docTypeOf } from '../../services/courses/docTypes';
 import { courseColorValue } from '../../services/courses/palette';
@@ -9,7 +9,7 @@ import { radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatRelativeDate } from '../../utils/format';
 import { useT } from '../../i18n/useT';
-import { rotationStyle } from '../../utils/rotation';
+import { PageThumb } from '../shared/PageThumb';
 
 // §3 K6: files Unsorted documents one at a time. Each shows its first page and the active
 // courses, best guess first (suggestCourses, as if it were scanned at the time it was made, so a
@@ -68,7 +68,7 @@ export function SortUnsortedSheet({ visible, docs, onClose }: { visible: boolean
             <View style={styles.docRow}>
               <View style={[styles.thumb, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
                 {doc.pages[0] ? (
-                  <Image source={{ uri: doc.pages[0].thumbUri ?? doc.pages[0].fileUri }} style={[styles.thumbImage, rotationStyle(doc.pages[0].rotation)]} resizeMode="cover" />
+                  <PageThumb documentId={doc.id} page={doc.pages[0]} style={styles.thumbImage} />
                 ) : null}
               </View>
               <View style={styles.docText}>

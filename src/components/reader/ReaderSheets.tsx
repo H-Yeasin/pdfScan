@@ -110,6 +110,7 @@ export function ReaderSheets({
       {doc ? (
         <PageScrubberSheet
           visible={open === 'pages'}
+          documentId={doc.id}
           pages={doc.pages}
           currentIdx={currentIdx}
           onPick={(idx) => {

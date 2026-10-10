@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CourseBadge } from '../components/courses/CourseBadge';
 import { CourseEditorSheet } from '../components/courses/CourseEditorSheet';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
 import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { EmptyState } from '../components/shared/EmptyState';
-import { FileRow } from '../components/library/FileRow';
+import { FileRow, FileRowGap } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { SelectAllButton } from '../components/library/SelectAllButton';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
@@ -24,7 +25,6 @@ import { useRouter } from '../navigation/router';
 import { docTypeOf } from '../services/courses/docTypes';
 import { startScan } from '../services/courses/startScan';
 import { useStableCallback } from '../utils/useStableCallback';
-import { DOC_LIST_TUNING } from '../components/library/docListTuning';
 import type { LibraryDocument } from '../types/models';
 import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
@@ -83,6 +83,20 @@ export function CourseScreen() {
   const shownDocs = useMemo(
     () => (typeFilter ? listedDocs.filter((d) => docTypeOf(d) === typeFilter) : listedDocs),
     [listedDocs, typeFilter]
+  );
+  // §16 G6: one function for the list and primitives for the row, so `memo(FileRow)` holds.
+  const renderRow = useCallback(
+    ({ item }: ListRenderItemInfo<LibraryDocument>) => (
+      <FileRow
+        doc={item}
+        selected={selection.has(item.id)}
+        selectionMode={selMode}
+        onPress={onRowPress}
+        onLongPress={onRowLongPress}
+        onToggleStar={onRowStar}
+      />
+    ),
+    [selection, selMode, onRowPress, onRowLongPress, onRowStar]
   );
   // §5 T5: bookmarked pages across this course's documents (3 shown until "Show all").
   const bookmarked = useMemo(
@@ -268,13 +282,13 @@ export function CourseScreen() {
       ) : (
         <>
           <DocTypeFilterChips docs={listedDocs} value={typeFilter} onChange={setTypeFilter} />
-          <FlatList
+          <FlashList
             data={shownDocs}
-            keyExtractor={(doc) => doc.id}
-            {...DOC_LIST_TUNING}
+            keyExtractor={docKey}
+            ItemSeparatorComponent={FileRowGap}
             // Room for the floating Scan button above the navigation bar; while selecting, the
             // SelectionBar (a BottomBar) sits below the list and clears the bar itself.
-            contentContainerStyle={[styles.listContent, { paddingBottom: selMode ? spacing.lg : 96 + insets.bottom }]}
+            contentContainerStyle={{ padding: spacing.lg, paddingBottom: selMode ? spacing.lg : 96 + insets.bottom }}
             ListFooterComponent={
               <>
                 {archivedCount > 0 ? (
@@ -299,16 +313,7 @@ export function CourseScreen() {
                 ) : null}
               </>
             }
-            renderItem={({ item }) => (
-              <FileRow
-                doc={item}
-                selected={selection.has(item.id)}
-                selectionMode={selMode}
-                onPress={onRowPress}
-                onLongPress={onRowLongPress}
-                onToggleStar={onRowStar}
-              />
-            )}
+            renderItem={renderRow}
           />
         </>
       )}
@@ -343,6 +348,8 @@ export function CourseScreen() {
   );
 }
 
+const docKey = (doc: LibraryDocument) => doc.id;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -374,10 +381,6 @@ const styles = StyleSheet.create({
   selectionTitle: {
     fontFamily: fontFamily.heading,
     fontSize: typeScale.title.fontSize,
-  },
-  listContent: {
-    padding: spacing.lg,
-    gap: spacing.sm,
   },
   scanButton: {
     position: 'absolute',
