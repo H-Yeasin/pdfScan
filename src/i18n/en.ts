@@ -737,6 +737,29 @@ export const en = {
     pageA11y: 'Page {page} of {count}. Tap to go to a page.',
     // §18 W10: the thumb on the right edge of a long document.
     fastScroll: 'Scroll through pages',
+    // §18 W11: a PDF's outline, the second tab of the Pages sheet.
+    contents: 'Contents',
+    contentsEntryA11y: '{title}, page {page}',
+    // §18 W11: a link that leaves the app. The address is the prompt's body.
+    link: {
+      title: 'Open this link?',
+      open: 'Open',
+      copy: 'Copy',
+      copied: 'Link copied',
+      cantOpen: "Can't open this link",
+    },
+    // §18 W11: what a screen reader can do on a page, and the sheet "Read page text" opens.
+    pageActions: {
+      next: 'Next page',
+      previous: 'Previous page',
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      readText: 'Read page text',
+    },
+    pageText: {
+      loading: 'Reading the page…',
+      none: 'No text on this page.',
+    },
     pageRangeA11y: 'Pages {first} and {last} of {count}. Tap to go to a page.',
     cantOpen: "Can't open this file",
     cantOpenBody: 'It may be damaged, or not really a PDF.',

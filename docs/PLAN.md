@@ -386,11 +386,11 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W4 Non-PDF quick fixes (sheet/TXT scroll, TXT cap, DOCX inset and tap) (done in code; device check open)
 - [x] W5 Position robustness (resume page, edits keep the page, roles, library page numbers) (done in code; device check open)
 - [x] W6 ReaderScreen split and the sheet state machine (done in code; device check open)
-- [x] W7 pdf-native v2 (pdfium sessions, tiles, dark, links, outline; iOS PDFKit) + `expo-screen-orientation` (done in code; iOS not built yet; new dev build + device check open)
+- [x] W7 pdf-native v2 (pdfium sessions, tiles, dark, links, outline; iOS PDFKit) + `expo-screen-orientation` (done; dev build made and checked on a phone 2026-10-10; iOS not built yet; times not recorded in `docs/qa/performance.md`)
 - [x] W8 Surface geometry (done in code; JS only, no device check)
 - [x] W9 Render queue, page cache, dark matrix
-- [x] W10 Read-only surface behind a flag (done in code; device check open)
-- [ ] W11 Links, contents, landscape, TalkBack
+- [x] W10 Read-only surface behind a flag (done; checked on a phone 2026-10-10)
+- [x] W11 Links, contents, landscape, TalkBack (done; checked on a phone 2026-10-10)
 - [ ] W12 Find on the surface ("3 of 27")
 - [ ] W13 In-page text selection
 - [ ] W14 Exports carry the marks

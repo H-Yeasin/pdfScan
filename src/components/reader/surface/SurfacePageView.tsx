@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View, type AccessibilityActionInfo } from 'react-native';
 import { mapRect, overlayMatrix } from '../../../services/reader/pageSpace';
 import type { PageFrame } from '../../../services/reader/renderPlan';
 import type { SurfacePage } from '../../../services/reader/surfacePages';
@@ -72,12 +72,17 @@ type SurfacePageViewProps = {
   edge?: string;
   // A file the page was showing is gone (the system cleared the cache).
   onLost: (page: number) => void;
+  // §18 W11 (A14): the page is one element to a screen reader, "Page 12 of 300", with the
+  // surface's actions on it (PAGE_ACTIONS in PageSurface).
+  label: string;
+  actions: readonly AccessibilityActionInfo[];
+  onAction: (page: number, action: string) => void;
 };
 
 // §18 W10 (A4): one page of the surface, bottom to top: the paper, the stored thumbnail (by day;
 // it is light), the small placeholder render, the page's own render, and from a deep zoom the
 // tiles of the part on screen. It re-renders alone when one of its images arrives.
-export const SurfacePageView = memo(function SurfacePageView({ page, x, y, width, height, images, live, night, paper, edge, onLost }: SurfacePageViewProps) {
+export const SurfacePageView = memo(function SurfacePageView({ page, x, y, width, height, images, live, night, paper, edge, onLost, label, actions, onAction }: SurfacePageViewProps) {
   const held = usePageImages(images, page.index);
   const lost = () => onLost(page.index);
   // The thumbnail is of the page's own picture (a master, or the page as it was indexed): it sits
@@ -86,7 +91,14 @@ export const SurfacePageView = memo(function SurfacePageView({ page, x, y, width
   const thumb = page.thumbUri && !night ? mapRect(overlayMatrix({ x: 0, y: 0, width, height }, space), { left: 0, top: 0, width: space.width, height: space.height }) : null;
 
   return (
-    <View style={[styles.page, { left: x, top: y, width, height, backgroundColor: paper }, edge ? { borderColor: edge, borderWidth: StyleSheet.hairlineWidth } : null]}>
+    <View
+      style={[styles.page, { left: x, top: y, width, height, backgroundColor: paper }, edge ? { borderColor: edge, borderWidth: StyleSheet.hairlineWidth } : null]}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={label}
+      accessibilityActions={actions}
+      onAccessibilityAction={(e) => onAction(page.index, e.nativeEvent.actionName)}
+    >
       {thumb ? (
         <Image source={{ uri: page.thumbUri }} style={[styles.image, turnedStyle(thumb, space.turn)]} fadeDuration={0} resizeMethod="scale" resizeMode="stretch" />
       ) : null}

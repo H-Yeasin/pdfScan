@@ -17,9 +17,10 @@ type FastScrollerProps = {
   visible: boolean;
   // "12 / 300", the page the view is on: the bubble's text while the thumb is held.
   label: string;
-  // 1-based, for a screen reader's value.
-  page: number;
-  pageCount: number;
+  // §18 W11: the outline section that page is in, under the number; undefined without an outline.
+  section?: string;
+  // "Page 12 of 300": a screen reader's value for the thumb.
+  value: string;
   // A screen reader's "increase" / "decrease": a page on or back.
   onStep: (by: 1 | -1) => void;
   // The thumb was taken or let go: it stays while it is held.
@@ -28,8 +29,9 @@ type FastScrollerProps = {
 
 // §18 W10 (A11): the thumb on the right edge of a long document. It rides down the visible band
 // as the document scrolls; dragging it scrolls the document the same way back, with the page
-// number beside it. The geometry is services/reader/fastScroll.
-export function FastScroller({ layout, viewport, insets, motion, visible, label, page, pageCount, onStep, onHold }: FastScrollerProps) {
+// number beside it (W11: and the outline section that page is in). A screen reader adjusts it a
+// page at a time. The geometry is services/reader/fastScroll.
+export function FastScroller({ layout, viewport, insets, motion, visible, label, section, value, onStep, onHold }: FastScrollerProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const { scale, tx, ty, moving, settled } = motion;
@@ -87,15 +89,21 @@ export function FastScroller({ layout, viewport, insets, motion, visible, label,
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={t('reader.fastScroll')}
-        accessibilityValue={{ min: 1, max: pageCount, now: page }}
+        // As text: with min / max / now TalkBack says a percentage, not the page.
+        accessibilityValue={{ text: value }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => onStep(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
       >
         {held ? (
-          <View style={[styles.bubble, { backgroundColor: tokens.ink, borderColor: tokens.muted }]}>
+          <View style={[styles.bubble, section ? styles.bubbleWide : null, { backgroundColor: tokens.ink, borderColor: tokens.muted }]}>
             <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.bubbleText, { color: tokens.bg }]} numberOfLines={1}>
               {label}
             </Text>
+            {section ? (
+              <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.bubbleSection, { color: tokens.bg }]} numberOfLines={1}>
+                {section}
+              </Text>
+            ) : null}
           </View>
         ) : null}
         <Animated.View style={[styles.grip, { backgroundColor: tokens.accent, borderColor: tokens.surface }, fade]} />
@@ -106,6 +114,8 @@ export function FastScroller({ layout, viewport, insets, motion, visible, label,
 
 const GRIP_WIDTH = 8;
 const BUBBLE_WIDTH = 132;
+// With a section's title under the number.
+const BUBBLE_WIDTH_SECTION = 196;
 
 const styles = StyleSheet.create({
   // A 48 dp target around a slim grip.
@@ -135,5 +145,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radii.chip * 2,
   },
+  bubbleWide: { width: BUBBLE_WIDTH_SECTION },
   bubbleText: { fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  bubbleSection: { fontSize: 12, opacity: 0.8 },
 });

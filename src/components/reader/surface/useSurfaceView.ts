@@ -3,12 +3,15 @@ import type { LayoutChangeEvent } from 'react-native';
 import { cancelAnimation, runOnJS, useAnimatedReaction, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import {
   anchorOf,
+  clampView,
+  clampZoom,
   currentPage,
   scrollRange,
   surfaceLayout,
   viewForAnchor,
   viewForPage,
   visiblePages,
+  zoomAbout,
   type ContentInsets,
   type Size,
   type SurfaceFit,
@@ -130,6 +133,23 @@ export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, o
     [place]
   );
 
+  // §18 W11: a zoom step without a pinch (a screen reader's "Zoom in" / "Zoom out"), about the
+  // middle of the visible band.
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const g = geometry.current;
+      if (!g) return;
+      const now = view.current;
+      const x = (g.insets.left + g.viewport.width - g.insets.right) / 2;
+      const y = (g.insets.top + g.viewport.height - g.insets.bottom) / 2;
+      const to = clampView(g.layout, zoomAbout(now, clampZoom(now.scale * factor), x, y), g.viewport, g.insets);
+      // Zoomed back out page by page: onto the page, not between two.
+      if (g.layout.slots && to.scale <= 1.01) place(viewForPage(g.layout, currentPage(g.layout, now, g.viewport.height, g.insets), to, g.viewport, g.insets));
+      else place(to);
+    },
+    [place]
+  );
+
   const settled = useCallback(() => {
     'worklet';
     moving.value = false;
@@ -177,5 +197,5 @@ export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, o
   );
 
   const motion = useMemo<SurfaceMotion>(() => ({ scale, tx, ty, moving, settled }), [scale, tx, ty, moving, settled]);
-  return { onLayout, viewport, layout, ready, motion, view, geometry, goToIndex };
+  return { onLayout, viewport, layout, ready, motion, view, geometry, goToIndex, zoomBy };
 }

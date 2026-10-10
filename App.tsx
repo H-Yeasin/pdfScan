@@ -4,6 +4,7 @@ import { Snackbar } from './src/components/shared/Snackbar';
 import { holdSplash } from './src/bootstrap/splash';
 import { warmDb } from './src/services/persistence/dbService';
 import { warmSettings } from './src/services/persistence/settingsStorage';
+import React from 'react';
 
 // §9 O1: at module scope so the native splash can't auto-hide before AppNavigator picks the start
 // screen (see src/bootstrap/splash.ts).

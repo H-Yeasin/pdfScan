@@ -833,7 +833,9 @@ Device check: every More item, hint and Back behaves as before.
 ## W7 · pdf-native v2 *(L; needs a new dev build)*
 Status: done in code (2026-10-10), (a) and (b). Android compiles against pdfiumandroid 1.0.32
 (`:pdf-native:compileDebugKotlin`); **the iOS code was only type-checked against a stub of
-ExpoModulesCore and has never been built or run.** Open: a new dev build, then the device check below.
+ExpoModulesCore and has never been built or run.** The new dev build is made and **the owner ran the
+device check below on a physical Android phone (2026-10-10): OK.** Open: the measured times are not
+written into `docs/qa/performance.md` ("§18 W7") yet, and iOS.
 
 As built:
 - **Android** (`modules/pdf-native/android/.../`):
@@ -1060,9 +1062,9 @@ As built:
   `utils/__tests__/hash.test.ts`, `components/reader/surface/__tests__/useRenderQueue.test.tsx`.
 
 ## W10 · Read-only surface behind a flag *(L)*
-Status: **done in code** (2026-10-10), (a) and (b) together. JS only (it runs on W7's dev build). A first
-pass on the emulator is done (see "On the emulator" below); the device check on a real phone is open, and
-the surface stays behind `reader_surface` (default off) until it passes.
+Status: **done** (2026-10-10), (a) and (b) together. JS only (it runs on W7's dev build). A first pass
+on the emulator is done (see "On the emulator" below), and **the owner ran the device check on a physical
+phone (2026-10-10): OK.** The surface stays behind `reader_surface` (default off) until W17 turns it on.
 
 Goal: PDFs and scans read on the new surface: sharp, fast, dark-capable, never covered, resuming in place.
 
@@ -1108,8 +1110,9 @@ As built:
     bubble was squeezed to nothing (an absolute child wider than its parent): it has a fixed width.
     The pill and the thumb did not show for a scroll that stayed on its pages: a movement now reports
     when it begins.
-  - **not checked:** a pinch (adb has no two-finger input), `[300p]`, `[2in1]`, `[pw]`, a scan, memory
-    over time, TalkBack, a real phone's speed. At night a page can show plain dark paper for a moment
+  - **not checked on the emulator** (the owner's check on a phone covered them): a pinch (adb has no
+    two-finger input), `[300p]`, `[2in1]`, `[pw]`, a scan, memory over time, TalkBack, a real phone's
+    speed. At night a page can show plain dark paper for a moment
     during a fast thumb drag (its placeholder is still in the queue).
 - **The flag:** `remoteConfig` `readerSurface` (`reader_surface`, default false), `isReaderSurfaceEnabled`
   / `useReaderSurfaceEnabled`, `setReaderSurfaceOverride` (dev). **The engine:** new
@@ -1174,7 +1177,61 @@ As built:
   the two chrome distances.
 
 ## W11 · Links, contents, landscape, accessibility *(M; a dev build only if orientation needs `app.json`)*
-Status: planned.
+Status: **done** (2026-10-10). JS only (it runs on W7's dev build; `app.json` is unchanged). **The
+owner checked it on a physical phone (2026-10-10): OK.** iOS landscape is still open (see below).
+
+As built:
+- **`services/reader/links.ts`** (pure): `tapOnPage(layout, view, x, y)` (the page under a touch and the
+  point on it, as fractions of the page), `linkAt(links, x, y, slop)` (a link under the point, else the
+  nearest within the slop; of two as near, the smaller), `LINK_SLOP` 8 screen px, `safeLinkUrl` (the
+  allow-list: `http`, `https`, `mailto`, `tel`; `www.…` becomes `https://www.…`; spaces and control
+  characters are removed first; everything else, `file:` / `content:` / `intent:` / `javascript:` and a
+  bare file name included, is null), `linkTarget(link, pageCount)` (a page of the file wins over an
+  address), `shownUrl` (240 characters at most in the prompt).
+- **`services/reader/outline.ts`** (pure): `flattenOutline(items, pageCount)` → `OutlineEntry[]`
+  (`{ key, title, page?, depth }`; 2000 entries, 8 levels: deeper levels are left out; an entry without
+  a title is left out and its children move up; a page outside the file is dropped from its entry),
+  `sectionIndex(entries, page)` / `currentSection` (the entry that starts on or nearest before the page;
+  of several on one page the last, which is the most specific).
+- **Taps** (`PageSurface`): `useSurfaceGestures` hands the single tap's place to the surface. On a PDF
+  page it looks for a link: one to a page jumps (`goToIndex`), one out of the app opens an alert with
+  the address and **Open / Copy / Cancel** (`Linking.openURL`, `expo-clipboard`), anything else is the
+  Reader's tap (the bars). A scan's pages have no links. A page's links are read once, when the page
+  comes to rest on screen; a tap that arrives first waits for them.
+- **Contents:** the surface reads the session's outline once (`hasOutline`) and reports it
+  (`onOutline`; `[]` again when it unmounts, since a rewritten file may have lost it).
+  `PageScrubberSheet` shows **Pages | Contents** (`shared/SegmentedControl`) when there are entries;
+  `components/reader/OutlineList.tsx` lists them (indented, the page on the right, the section being
+  read marked and scrolled to, an entry without a page greyed and not tappable). The sheet's body now
+  takes its own taps. `FastScroller`'s bubble has the section under the page number.
+- **Landscape** (`components/reader/useReaderOrientation.ts`): `unlockAsync()` while the surface is the
+  viewer, the Reader is the screen on top and no tool is open; `lockAsync(PORTRAIT_UP)` when that ends.
+  **Mark, Select text and Sign turn the screen upright** (they still open the portrait-only overlays;
+  W15 / W16 lift that). The Reader's own Back (`leave`) locks, waits for the window to be upright
+  (500 ms at most) and only then pops. **The hardware Back does not wait:** it goes through
+  `AppNavigator`'s `resolveBack`, so the lock is put back as the Reader stops being active; if Library
+  shows a sideways frame there, that is where to fix it. The re-anchor on a rotation was already W10's
+  (`anchorOf` / `viewForAnchor`). The other viewers (pdf-jsi, DOCX, sheets, TXT) stay portrait.
+- **`app.json` is unchanged** (`"orientation": "portrait"`). Android's runtime unlock overrides the
+  manifest; the plan's fallback (`"default"` + a lock at boot) was not needed (the device check
+  passed without it). **iOS still needs it** (its supported orientations come from `app.json`): not done.
+- **Accessibility:** every page on the surface is an element, "Page 12 of 300" (`a11y.pageOf`), with
+  the actions **Next page, Previous page, Zoom in, Zoom out, Read page text**. They are named actions
+  with labels (TalkBack's actions menu), not `scrollForward` / `scrollBackward`: React Native has no
+  such standard action on a plain view. Zoom steps by 1.5× about the middle of the visible band
+  (`useSurfaceView.zoomBy`). "Read page text" opens `components/reader/PageTextSheet.tsx` (sheet kind
+  `'pageText'`; the text is the scan's OCR text or the PDF page's own, through the surface's
+  `pageText(index)`). The page come to rest on is announced 600 ms after the last movement, not on
+  opening. The thumb's value is now text ("Page 12 of 300"; with min / max / now TalkBack says a
+  percentage). Jumps were never animated; the glide and the fling are Reanimated's, which already
+  follows the system's reduced-motion setting.
+- **Not done / gaps:** URLs that are only written in a page's text are not links (W7's note). There is
+  no "back to where I was" after a link's jump. A file from outside has no Pages tool, so its Contents
+  can't be opened yet (the bubble still shows its sections). No test renders these components; the
+  pure parts are tested.
+- **Tests:** `services/reader/__tests__/links.test.ts` (`linkAt` slop, nearest and smallest; the scheme
+  allow-list; `linkTarget`; `tapOnPage` under zoom and scroll), `outline.test.ts` (flattening, both
+  caps, `currentSection`).
 
 Files: new `services/reader/{links,outline}.ts`, `components/reader/OutlineList.tsx`,
 `PageScrubberSheet.tsx` ("Pages | Contents" through `shared/SegmentedControl`),

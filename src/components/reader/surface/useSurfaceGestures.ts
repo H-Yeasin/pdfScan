@@ -25,13 +25,15 @@ type Options = {
   viewport: Size | null;
   insets: ContentInsets;
   motion: SurfaceMotion;
-  onTap: () => void;
+  // A single tap, where it landed in the viewport (§18 W11: a link may be under it).
+  onTap: (x: number, y: number) => void;
 };
 
 // §18 W10 (A5, the read tool): the surface's gestures, all on the UI thread.
 //  - one or two fingers scroll, and a fling carries on (page by page: it settles on a page);
 //  - a pinch zooms about its middle, while the same fingers still scroll;
-//  - a double tap zooms in about the finger, or back out; a single tap is the Reader's (the bars).
+//  - a double tap zooms in about the finger, or back out; a single tap is the surface's to route
+//    (a link under it, else the Reader's bars).
 // W13 adds the long press, W15 the Mark tools.
 export function useSurfaceGestures({ layout, viewport, insets, motion, onTap }: Options) {
   const { scale, tx, ty, moving, settled } = motion;
@@ -155,8 +157,8 @@ export function useSurfaceGestures({ layout, viewport, insets, motion, onTap }: 
         if (layout.slots && to.scale === 1) to = viewForPage(layout, currentPage(layout, view, viewport.height, insets), to, viewport, insets);
         glide(to);
       });
-    const singleTap = Gesture.Tap().onEnd((_e, success) => {
-      if (success && !caught.value) runOnJS(onTap)();
+    const singleTap = Gesture.Tap().onEnd((e, success) => {
+      if (success && !caught.value) runOnJS(onTap)(e.x, e.y);
     });
 
     return Gesture.Race(Gesture.Simultaneous(pinch, pan), Gesture.Exclusive(doubleTap, singleTap));

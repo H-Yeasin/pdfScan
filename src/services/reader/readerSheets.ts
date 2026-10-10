@@ -7,11 +7,12 @@
 // - 'more': the More sheet; 'reading': reading settings; 'type': the document type picker;
 // - 'jump': "Go to page"; 'pages': the thumbnails strip; 'submissions': the submission history;
 // - 'bookmarks', 'notes': their lists; 'label': the bookmark label prompt;
-// - 'signCapture': drawing a signature, for library page `idx` (§18 W1).
+// - 'signCapture': drawing a signature, for library page `idx` (§18 W1);
+// - 'pageText': the text of library page `idx`, for a screen reader (§18 W11).
 // W23 adds 'rename' and 'move'.
 export type ReaderSheet =
   | { kind: 'more' | 'reading' | 'type' | 'jump' | 'pages' | 'submissions' | 'bookmarks' | 'notes' | 'label' }
-  | { kind: 'signCapture'; idx: number };
+  | { kind: 'signCapture' | 'pageText'; idx: number };
 
 export type ReaderSheetKind = ReaderSheet['kind'];
 

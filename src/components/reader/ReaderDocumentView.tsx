@@ -16,6 +16,7 @@ import { NIGHT_OVERLAY_ALPHA, pdfViewOptions } from '../../services/documents/re
 import { pdfNativeVersion } from '../../services/pdf/pdfNative';
 import { useIsPro } from '../../services/pro/entitlement';
 import { readerEngine } from '../../services/reader/readerEngine';
+import type { OutlineEntry } from '../../services/reader/outline';
 import { chromeLocked, readerBackTarget } from '../../services/reader/readerSheets';
 import type { ContentInsets } from '../../services/reader/surfaceGeometry';
 import { useReaderSurfaceEnabled } from '../../services/remote/remoteConfig';
@@ -48,6 +49,7 @@ import { usePageOcr } from './usePageOcr';
 import { useReaderChrome } from './useReaderChrome';
 import { useReaderDocument, type ReaderOpenSubject } from './useReaderDocument';
 import { useReaderFind } from './useReaderFind';
+import { useReaderOrientation } from './useReaderOrientation';
 import { useReaderOverflowActions } from './useReaderOverflowActions';
 import { useReaderSheets } from './useReaderSheets';
 import { useReaderSigning } from './useReaderSigning';
@@ -63,7 +65,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   const { tokens } = useTheme();
   const { t } = useT();
   // Back returns to wherever the document was opened from: Home, Library or a course page.
-  const { back } = useRouter();
+  const { back: pop } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'reader', 'settings');
   const reading = state.settings.reading;
@@ -104,6 +106,9 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   );
   // The library page the surface is on (it shows a 2-in-1 document as single pages).
   const [surfaceIdx, setSurfaceIdx] = useState<number | null>(null);
+  // §18 W11: the PDF's contents, as the surface read them, and a page's text for a screen reader.
+  const [outline, setOutline] = useState<OutlineEntry[]>([]);
+  const pageText = useCallback((idx: number) => surfaceRef.current?.pageText(idx) ?? Promise.resolve(''), []);
   const {
     format,
     isPageRaster,
@@ -141,6 +146,10 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   const onScreen = useScreenRole() === 'active';
   // §18 W10: the bars stay while Find, a sheet or a tool needs them.
   const chrome = useReaderChrome(reading.keepAwake && onScreen, find.open || chromeLocked(sheets.state));
+  // §18 W11 (A13): the surface may be read sideways. Not the tools that still open the old
+  // overlays (Mark, Select text, Sign until W15 / W16): the screen turns upright for those.
+  const leave = useReaderOrientation(onSurface && onScreen && !tool);
+  const back = useCallback(() => leave(pop), [leave, pop]);
   const { onPage: onChromePage, toggle: toggleChrome, show: showChrome } = chrome;
   // §18 W2: a tap on the page hides the bars, but not while Find is open: its field is in the top
   // bar, and the tap is usually aimed at a match. A search result can open Find on a Reader kept
@@ -394,6 +403,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
           onLoad={onSurfaceLoad}
           onPage={onSurfacePage}
           onTap={onViewerTap}
+          onOutline={setOutline}
+          onReadText={(idx) => openSheet({ kind: 'pageText', idx })}
           onError={handlePdfError}
         />
       ) : isPageRaster ? (
@@ -506,6 +517,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         goToPage={goToPage}
         goToIdx={goToIdx}
         nightPages={onSurface}
+        outline={onSurface ? outline : NO_OUTLINE}
+        pageText={pageText}
         flashMark={markFlash.flash}
         moreItems={moreItems}
         onSelectMore={onSelectMore}
@@ -552,6 +565,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     </View>
   );
 }
+
+const NO_OUTLINE: OutlineEntry[] = [];
 
 const styles = StyleSheet.create({
   // The top bar's buttons are 44 pt with a 6 pt gap and an 8 pt edge; the bookmark button is the

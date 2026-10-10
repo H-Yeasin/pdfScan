@@ -12,6 +12,7 @@ import { pdfPageFor } from '../../services/documents/pageMap';
 import { parseJumpInput, type PageLabel } from '../../services/documents/readerPosition';
 import type { ReaderMoreItemId } from '../../services/documents/readerTools';
 import type { ReadingSettings } from '../../services/documents/readingSettings';
+import type { OutlineEntry } from '../../services/reader/outline';
 import { shareAs, shareFileName } from '../../services/sharing/shareService';
 import { documentBookmarks } from '../../services/study/bookmarks';
 import { writeExportText } from '../../services/study/textExport';
@@ -21,6 +22,7 @@ import type { Bookmark, LibraryDocument, Submission } from '../../types/models';
 import { NotesSheet } from './NotesSheet';
 import { OverflowSheet } from './OverflowSheet';
 import { PageScrubberSheet } from './PageScrubberSheet';
+import { PageTextSheet } from './PageTextSheet';
 import { ReadingSettingsSheet } from './ReadingSettingsSheet';
 import type { ReaderSheets as Sheets } from './useReaderSheets';
 
@@ -38,6 +40,10 @@ type Props = {
   goToIdx: (idx: number) => void;
   // The page surface is the viewer: night redraws the pages (ReadingSettingsSheet).
   nightPages: boolean;
+  // §18 W11: the PDF's contents, read by the page surface ([] elsewhere), and a library page's
+  // text for the "Read page text" sheet.
+  outline: OutlineEntry[];
+  pageText: (idx: number) => Promise<string>;
   flashMark: (page: number, query: string) => void;
   moreItems: ReaderMoreItemId[];
   onSelectMore: (id: ReaderMoreItemId) => void;
@@ -57,6 +63,8 @@ export function ReaderSheets({
   goToPage,
   goToIdx,
   nightPages,
+  outline,
+  pageText,
   flashMark,
   moreItems,
   onSelectMore,
@@ -71,6 +79,7 @@ export function ReaderSheets({
   const shareSubmission = useShareSubmission();
   const { close } = sheets;
   const open = sheets.sheet?.kind;
+  const textIdx = sheets.sheet?.kind === 'pageText' ? sheets.sheet.idx : null;
 
   // §5 T5: bookmarks of this document. §12 D4: the notes panel: marks, notes and bookmarks by page.
   const docBookmarks = useMemo(() => (doc ? documentBookmarks(state.library.bookmarks, doc) : []), [doc, state.library.bookmarks]);
@@ -110,9 +119,22 @@ export function ReaderSheets({
             close('pages');
             goToIdx(idx);
           }}
+          outline={outline}
+          // The surface's pages are the file's own wherever there is an outline.
+          onPickOutline={(page) => {
+            close('pages');
+            goToIdx(page);
+          }}
           onClose={() => close('pages')}
         />
       ) : null}
+
+      <PageTextSheet
+        visible={textIdx !== null}
+        title={textIdx !== null ? t('a11y.pageOf', { n: textIdx + 1, total: shownPage.count }) : ''}
+        load={() => (textIdx !== null ? pageText(textIdx) : Promise.resolve(''))}
+        onClose={() => close('pageText')}
+      />
 
       <ReadingSettingsSheet
         visible={open === 'reading'}
