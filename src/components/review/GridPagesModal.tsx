@@ -22,7 +22,7 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
   const { tokens } = useTheme();
   const { t } = useT();
   // Component-local, not store state - this selection is transient to the modal itself (same
-  // reasoning as why review.sel is a plain number rather than Library's selMode/selection array).
+  // reasoning as why review.sel is a plain number rather than Library's selMode/selection, state.libraryUi).
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 

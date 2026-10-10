@@ -9,6 +9,7 @@ import { useCaptureChrome } from '../../theme/captureChrome';
 import { useT } from '../../i18n/useT';
 import type { TKey } from '../../i18n';
 import { useReportBottomBar } from './bottomBarHeight';
+import { useRenderCount } from '../../utils/renderCounts';
 
 const LABELS: Record<TabId, TKey> = {
   home: 'shared.tabs.home',
@@ -19,6 +20,7 @@ const LABELS: Record<TabId, TKey> = {
 // §16 G2: rendered once, by the shell in navigation/ScreenStack, under the tab roots - it no
 // longer slides with each tab's screen. Over Capture it takes Capture's dark chrome.
 export function TabBar() {
+  useRenderCount('TabBar');
   const insets = useSafeAreaInsets();
   const onLayout = useReportBottomBar();
   const { t } = useT();

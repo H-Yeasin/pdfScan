@@ -171,8 +171,8 @@ describe('submissions in the library state', () => {
   });
 });
 
-// §14 Q5: bulk delete and Select all.
-describe('librarySlice selection and bulk delete', () => {
+// §14 Q5: bulk delete. The selection itself is in libraryUiSlice (§16 G5).
+describe('librarySlice bulk delete', () => {
   const docs = ['a', 'b', 'c'].map((id) => makeDoc({ id }));
   const loaded = (): LibraryState => {
     const base = run({ type: 'library/SET_FILES', files: docs });
@@ -192,29 +192,9 @@ describe('librarySlice selection and bulk delete', () => {
     };
   };
 
-  it('SELECT_ALL selects exactly the given ids and turns selection mode on', () => {
-    const state = libraryReducer(libraryReducer(loaded(), { type: 'library/TOGGLE_SELECTION', id: 'c' }), {
-      type: 'library/SELECT_ALL',
-      ids: ['a', 'b'],
-    });
-    expect(state.selection).toEqual(['a', 'b']);
-    expect(state.selMode).toBe(true);
-  });
-
-  it('SELECT_ALL with no ids selects none but keeps selecting', () => {
-    const state = libraryReducer(libraryReducer(loaded(), { type: 'library/SELECT_ALL', ids: ['a', 'b'] }), {
-      type: 'library/SELECT_ALL',
-      ids: [],
-    });
-    expect(state.selection).toEqual([]);
-    expect(state.selMode).toBe(true);
-  });
-
-  it('REMOVE_FILES with several ids drops them from the selection and cascades', () => {
-    const selected = libraryReducer(loaded(), { type: 'library/SELECT_ALL', ids: ['a', 'b', 'c'] });
-    const state = libraryReducer(selected, { type: 'library/REMOVE_FILES', ids: ['a', 'c'] });
+  it('REMOVE_FILES with several ids cascades to their annotations and bookmarks', () => {
+    const state = libraryReducer(loaded(), { type: 'library/REMOVE_FILES', ids: ['a', 'c'] });
     expect(state.files.map((f) => f.id)).toEqual(['b']);
-    expect(state.selection).toEqual(['b']);
     expect(state.annotations.map((a) => a.documentId)).toEqual(['b']);
     expect(state.bookmarks.map((b) => b.documentId)).toEqual(['b']);
   });

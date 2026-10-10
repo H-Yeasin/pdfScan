@@ -106,6 +106,32 @@ On a phone (the "Cold start" row above, before and after G3, same release build 
   those screens' modules (pdf-jsi and the WebView; pdf-lib) now load then. If the first open
   stutters, preload after `useDeferredBoot` (see `docs/plan/16-speed.md` G3).
 
+## §16 G4: the boot waterfall
+
+Needs a new dev build first (`npx expo prebuild`, then rebuild): the fonts are embedded on Android.
+After it, check that every screen still shows Caprasimo (headings) and Figtree (everything else),
+in a cold start with no Metro connection too.
+
+Measured in Node, not on a phone yet (the sqlite test mock; 500 documents × 4 pages × 250 words,
+median of 7 loads):
+
+| Library | `ocr_json` | Load before G4 | `loadAll` now |
+|---|---|---|---|
+| Text only (no word boxes) | 0 MB | 4 ms | 5 ms |
+| With word boxes | 52.6 MB | 132 ms | 6 ms |
+
+On a phone (§16 Verification 4–5):
+- cold start to the first usable screen, against the baseline (30% faster, with G3);
+- **boot doesn't grow with OCR size:** Settings → Filter Lab → "Seed library", cold start three
+  times and note the median; delete the seeded documents, then "Seed with word boxes" and do the
+  same. The two medians should match within the run-to-run spread;
+- with the word-box library: search still finds words; open a seeded document, **Select text**
+  picks single words and Mark mode's highlighter snaps to them (the boxes loaded when the Reader
+  opened); merge two seeded documents, reopen the app, and Select text still picks words in the
+  result (boxes that were never loaded survive a save);
+- share a merged or compressed document as a PDF and search inside it in another app (its text
+  layer comes from boxes loaded during the build).
+
 ## §15 V5: the splash intro
 
 The native splash now goes as soon as the intro's overlay has drawn its first frame (an identical
@@ -125,3 +151,45 @@ played (about 1.1 s from the release) or been skipped. Measure on the same phone
 | Date | Phone | Build | First usable screen, before V5 | Intro skipped | Intro played | Handoff clean (light / dark) |
 |---|---|---|---|---|---|---|
 | | | | | | | |
+
+## §16 G5: render counts
+
+Dev build. Settings → Developer → **Render counts** shows a small overlay with how often each
+counted component rendered since it was turned on (AppNavigator, BootEffects, ScreenStack, TabBar,
+Home, Library, Course, SearchBar, FileRow); a name whose count just moved is in the accent colour.
+Tap the overlay to set the counts back to zero, do one gesture, and read it.
+
+Expected (§16 Verification 6), on the 500-document seeded library:
+
+| Gesture | May move | Must not move |
+|---|---|---|
+| Type one letter in Library search | SearchBar, Library, FileRow (the rows whose snippet or place changed) | AppNavigator, BootEffects, ScreenStack, TabBar, Home |
+| Long-press a row, then tap a second one | Library, FileRow (2 per tap at most), ScreenStack (once, the tab bar gives way) | AppNavigator, BootEffects, Home |
+| An imported PDF being indexed (progress ticks) | FileRow (that one row); BootEffects, Library and Home only when pages are saved (every few pages) | AppNavigator, ScreenStack, TabBar |
+| Scan progress during ingest | none of the counted ones except on page added | AppNavigator |
+
+| Date | Phone | Build | One letter typed | One selection tap | Notes |
+|---|---|---|---|---|---|
+| | | | | | |
+
+## §18 W7: pdf-native version 2
+
+Settings → Developer → **Reader Lab**, on the dev build made after W7 (the first line must say
+"pdf-native version 2"). Use a release-like build for the numbers if you can; a dev build's are upper
+bounds. Pick `[300p]`, tap **Open**, set a page, tap **Time page + tile**: each measure runs three
+times; write down the middle one.
+
+- **Text page / image page:** pick a page that is mostly text, then one that is mostly a picture.
+- **Open:** tap Open again for a second and third number (the lab closes the document first).
+- Expected from the plan's risk notes: about 50–150 ms for a text page, 200–500 ms for an image-heavy
+  one; `openDocument` on 300 pages ≤ 150 ms (the lab shows it in red above that).
+
+| Date | Phone | Build | Open `[300p]` | Text page, 1080 px | Text page, 4× tile | Image page, 1080 px | Image page, 4× tile | Session text | Old `renderPage` |
+|---|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | | |
+
+Checks (yes / no, with a note):
+
+| Date | Phone | Annotations: pdfium draws the highlight, old `renderPage` doesn't | Turned PDF: size and tile the right way up | `[pw]` opens; wrong password → `PdfWrongPasswordError`; none → `PdfEncryptedError` | Links and outline listed | Colour matrix (inverted image) | Image decode + region | Works again after 60 s idle | Rotation unlock under `"portrait"` |
+|---|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | | |

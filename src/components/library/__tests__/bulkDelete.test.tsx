@@ -75,7 +75,7 @@ describe('confirmDelete', () => {
     expect((deleteDocumentFiles as jest.Mock).mock.calls).toEqual([['pdf'], ['docx'], ['locked']]);
     // The rows go before the files.
     expect(dispatch.mock.invocationCallOrder[0]).toBeLessThan((deleteDocumentFiles as jest.Mock).mock.invocationCallOrder[0]);
-    expect(dispatch).toHaveBeenCalledWith({ type: 'library/CLEAR_SELECTION' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'libraryUi/CLEAR_SELECTION' });
     expect(dispatch).toHaveBeenCalledWith({ type: 'ui/SHOW_SNACK', msg: 'Deleted 3 documents' });
   });
 
@@ -133,17 +133,17 @@ describe('Select all', () => {
       app.dispatch({ type: 'library/ADD_FILE', file: makeDoc({ id: 'old', archived: true }) });
       app.dispatch({ type: 'library/ADD_FILE', file: makeDoc({ id: 'd1' }) });
       app.dispatch({ type: 'library/ADD_FILE', file: makeDoc({ id: 'd2' }) });
-      app.dispatch({ type: 'library/SET_SEL_MODE', on: true });
-      app.dispatch({ type: 'library/TOGGLE_SELECTION', id: 'd1' });
+      app.dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true });
+      app.dispatch({ type: 'libraryUi/TOGGLE_SELECTION', id: 'd1' });
     });
     const button = () => root.root.find((n) => n.props.testID === 'select-all' && typeof n.type !== 'string');
 
     act(() => button().props.onPress());
-    expect([...app.state.library.selection].sort()).toEqual(['d1', 'd2']);
+    expect([...app.state.libraryUi.selection].sort()).toEqual(['d1', 'd2']);
 
     act(() => button().props.onPress());
-    expect(app.state.library.selection).toEqual([]);
-    expect(app.state.library.selMode).toBe(true);
+    expect([...app.state.libraryUi.selection]).toEqual([]);
+    expect(app.state.libraryUi.selMode).toBe(true);
     act(() => root.unmount());
   });
 });

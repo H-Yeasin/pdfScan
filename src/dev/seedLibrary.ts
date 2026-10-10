@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import { PDFDocument } from 'pdf-lib';
 import type { Dispatch } from 'react';
 import type { AppAction } from '../store/appReducer';
-import type { Bookmark, LibraryDocument, LibraryPage, Submission } from '../types/models';
+import type { Bookmark, LibraryDocument, LibraryPage, OcrLine, PageOcr, Submission } from '../types/models';
 import { getDocumentDir } from '../services/persistence/libraryFiles';
 import { createId } from '../utils/id';
 
@@ -23,13 +23,37 @@ function ocrText(i: number): string {
   return Array.from({ length: 60 }, (_, k) => WORDS[(i * 7 + k * 3) % WORDS.length]).join(' ');
 }
 
+// §16 G4: the same text as OCR stores it, in lines of six words with a box per word, for the
+// "boot doesn't grow with OCR size" check (docs/qa/performance.md): seed once without and once
+// with, and compare the cold start.
+const WORDS_PER_LINE = 6;
+
+function ocrWithBoxes(text: string): PageOcr {
+  const words = text.split(' ');
+  const lines: OcrLine[] = [];
+  for (let start = 0; start < words.length; start += WORDS_PER_LINE) {
+    const row = words.slice(start, start + WORDS_PER_LINE);
+    const top = 60 + lines.length * 40;
+    lines.push({
+      text: row.join(' '),
+      bounding: { left: 40, top, width: 510, height: 28 },
+      words: row.map((word, w) => ({ text: word, bounding: { left: 40 + w * 85, top, width: 78, height: 28 } })),
+    });
+  }
+  return { text, blocks: [{ text, lines, bounding: { left: 40, top: 60, width: 510, height: lines.length * 40 } }] };
+}
+
 async function onePagePdf(): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.addPage([595, 842]);
   return pdf.save();
 }
 
-export async function seedLibrary(dispatch: Dispatch<AppAction>, onProgress?: (done: number) => void): Promise<void> {
+export async function seedLibrary(
+  dispatch: Dispatch<AppAction>,
+  onProgress?: (done: number) => void,
+  options: { wordBoxes?: boolean } = {}
+): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const asset = await Asset.fromModule(require('../../assets/splash-icon.png')).downloadAsync();
   const image = new File(asset.localUri ?? asset.uri);
@@ -59,7 +83,7 @@ export async function seedLibrary(dispatch: Dispatch<AppAction>, onProgress?: (d
       thumbUri: thumb.uri,
       width: 595,
       height: 842,
-      ocr: { text, blocks: [] },
+      ocr: options.wordBoxes ? ocrWithBoxes(text) : { text, blocks: [] },
     };
     // Every 9th document is Unsorted.
     const courseId = i % 9 === 8 ? undefined : courseIds[i % courseIds.length];

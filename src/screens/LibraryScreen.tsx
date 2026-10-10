@@ -37,15 +37,18 @@ import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateCont
 import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import { useT } from '../i18n/useT';
 import { SkeletonRows } from '../components/library/SkeletonRows';
+import { useRenderCount } from '../utils/renderCounts';
 
 export function LibraryScreen() {
+  useRenderCount('Library');
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
   const dispatch = useAppDispatch();
-  const state = useAppSlices('library');
+  const state = useAppSlices('library', 'libraryUi');
   const store = useAppStore();
-  const { loadStatus, files, selection, selMode, tab, search, searchOpen, searchResultIds } = state.library;
+  const { loadStatus, files } = state.library;
+  const { selection, selMode, tab, search, searchOpen, searchResultIds } = state.libraryUi;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   // Stable, so the memo'd FileRows only re-render when their own data changes (§9 O5).
   const onRowPress = useStableCallback(handlePressRow);
@@ -97,10 +100,10 @@ export function LibraryScreen() {
     if (!query) return;
     const timer = setTimeout(() => {
       searchDocumentsByText(query)
-        .then((ids) => dispatch({ type: 'library/SET_SEARCH_RESULT_IDS', ids }))
+        .then((ids) => dispatch({ type: 'libraryUi/SET_SEARCH_RESULT_IDS', ids }))
         .catch((e) => {
           console.warn('dbService.searchDocumentsByText failed', e);
-          dispatch({ type: 'library/SET_SEARCH_RESULT_IDS', ids: null });
+          dispatch({ type: 'libraryUi/SET_SEARCH_RESULT_IDS', ids: null });
         });
     }, 200);
     return () => clearTimeout(timer);
@@ -188,7 +191,7 @@ export function LibraryScreen() {
             </Pressable>
             <Pressable hitSlop={touchSlop(44)}
               style={styles.iconButton}
-              onPress={() => dispatch({ type: 'library/TOGGLE_SEARCH_OPEN' })}
+              onPress={() => dispatch({ type: 'libraryUi/TOGGLE_SEARCH_OPEN' })}
               accessibilityRole="button"
               accessibilityLabel={t('library.search')}
             >
@@ -203,22 +206,22 @@ export function LibraryScreen() {
         <View style={styles.selectionHeader}>
           <Pressable
             style={[styles.clearButton, { backgroundColor: tokens.surface2 }]}
-            onPress={() => dispatch({ type: 'library/CLEAR_SELECTION' })}
+            onPress={() => dispatch({ type: 'libraryUi/CLEAR_SELECTION' })}
             accessibilityRole="button"
             accessibilityLabel={t('library.clearSelection')}
           >
             <Ionicons name="close" size={20} color={tokens.ink} />
           </Pressable>
-          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.length })}</Text>
+          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.size })}</Text>
           <SelectAllButton visibleIds={tab === 'courses' ? [] : visibleFiles.map((f) => f.id)} selection={selection} />
         </View>
       )}
 
       {searchOpen && (
-        <SearchBar value={search} onChange={(value) => dispatch({ type: 'library/SET_SEARCH', search: value })} />
+        <SearchBar value={search} onChange={(value) => dispatch({ type: 'libraryUi/SET_SEARCH', search: value })} />
       )}
 
-      <LibraryTabs value={tab} onChange={(value) => dispatch({ type: 'library/SET_TAB', tab: value })} />
+      <LibraryTabs value={tab} onChange={(value) => dispatch({ type: 'libraryUi/SET_TAB', tab: value })} />
 
       {loadStatus === 'loading' ? (
         <SkeletonRows />
@@ -234,7 +237,7 @@ export function LibraryScreen() {
             counts={courseCounts}
             unsortedCount={unsortedCount}
             onOpenCourse={(id) => {
-              dispatch({ type: 'library/SET_ACTIVE_COURSE', id });
+              dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id });
               go('course');
             }}
           />
@@ -319,7 +322,7 @@ export function LibraryScreen() {
             renderItem={({ item }) => (
               <FileRow
                 doc={item}
-                selected={selection.includes(item.id)}
+                selected={selection.has(item.id)}
                 selectionMode={selMode}
                 matchSnippet={getMatchSnippet(item, search)}
                 courseColor={courseColorOf(item.courseId)}

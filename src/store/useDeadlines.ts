@@ -12,7 +12,7 @@ import { createId } from '../utils/id';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // Reminders show while the app is open too (a banner, not silently in the tray). Called once by
-// AppNavigator's deferred boot (§16 G3), not at module scope, so importing this file does no work.
+// BootEffects' deferred boot (§16 G3), not at module scope, so importing this file does no work.
 // Until then the default handler shows nothing in the foreground: a reminder due in the first
 // seconds of a cold start isn't shown while the app is open.
 let notificationsConfigured = false;
@@ -24,7 +24,7 @@ export function configureNotifications(): void {
   });
 }
 
-// Always mounted (AppNavigator). Keeps scheduled reminders in step with the deadlines - a deleted
+// Always mounted (BootEffects). Keeps scheduled reminders in step with the deadlines - a deleted
 // deadline, one deleted with its course, or one marked done loses its reminders - and opens the
 // course page, with the deadline highlighted, when a reminder is tapped (also from a cold start).
 // `cleanupReady` (§9 O5): the stale-reminder clean-up waits until after boot; opening a tapped
@@ -49,8 +49,8 @@ export function useDeadlineReminders(libraryLoaded: boolean, cleanupReady = libr
     handled.current = key;
     const data = response.notification.request.content.data as Partial<DeadlineNotificationData> | undefined;
     if (!data?.courseId || !courses.some((c) => c.id === data.courseId)) return;
-    dispatch({ type: 'library/SET_ACTIVE_COURSE', id: data.courseId });
-    dispatch({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: data.deadlineId ?? null });
+    dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id: data.courseId });
+    dispatch({ type: 'libraryUi/SET_HIGHLIGHT_DEADLINE', id: data.deadlineId ?? null });
     go('course');
   }, [libraryLoaded, response, courses, dispatch, go]);
 }

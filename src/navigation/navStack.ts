@@ -70,7 +70,7 @@ function withStack(state: NavState, tab: TabId, stack: Entry[]): NavState {
 // Opens `screen` on the active tab. Already on top: nothing changes (the Reader showing a new
 // "Open with" file re-renders in place, as before). Further down the stack: that entry and
 // everything above it go, and a fresh one is pushed. Screens like the Reader and a course page
-// show whatever the store says is open (reader.readerId, library.activeCourseId), so a second,
+// show whatever the store says is open (reader.readerId, libraryUi.activeCourseId), so a second,
 // hidden copy lower down would show the new document too.
 export function push(state: NavState, screen: ScreenName, key: string): NavState {
   const stack = activeStack(state);

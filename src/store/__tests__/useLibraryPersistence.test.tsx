@@ -4,6 +4,7 @@ import { resetStorage } from '../../test/db';
 import { makeDoc } from '../../test/fixtures';
 import { getDb } from '../../services/persistence/dbService';
 import { LEGACY_INDEX_KEY } from '../../services/persistence/legacyLibrary';
+import * as libraryRepo from '../../services/persistence/libraryRepo';
 import { loadAll } from '../../services/persistence/libraryRepo';
 import { AppStateProvider, useAppState } from '../AppStateContext';
 import { useLibraryPersistence } from '../useLibraryPersistence';
@@ -74,6 +75,38 @@ describe('useLibraryPersistence', () => {
       ['new', false],
       ['old', true],
     ]);
+  });
+
+  // §16 G5: search, selection, the open tab and indexing progress aren't library data.
+  it('writes nothing for UI-only actions', async () => {
+    const ctx = await mountPersistence();
+    await act(async () => ctx.current().dispatch({ type: 'library/ADD_FILE', file: makeDoc({ id: 'a' }) }));
+    await flush();
+    const library = ctx.current().state.library;
+    const sync = jest.spyOn(libraryRepo, 'syncLibrary');
+    try {
+      await act(async () => {
+        const { dispatch } = ctx.current();
+        dispatch({ type: 'libraryUi/TOGGLE_SEARCH_OPEN' });
+        dispatch({ type: 'libraryUi/SET_SEARCH', search: 'alg' });
+        dispatch({ type: 'libraryUi/SET_SEARCH_RESULT_IDS', ids: ['a'] });
+        dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true });
+        dispatch({ type: 'libraryUi/TOGGLE_SELECTION', id: 'a' });
+        dispatch({ type: 'libraryUi/SET_TAB', tab: 'starred' });
+        dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id: 'c1' });
+        dispatch({ type: 'libraryUi/SET_INDEXING', progress: { documentId: 'a', done: 1, total: 9 } });
+      });
+      await flush();
+      expect(ctx.current().state.library).toBe(library);
+      expect(sync).not.toHaveBeenCalled();
+
+      // The spy does see a real change.
+      await act(async () => ctx.current().dispatch({ type: 'library/TOGGLE_STAR', id: 'a' }));
+      await flush();
+      expect(sync).toHaveBeenCalledTimes(1);
+    } finally {
+      sync.mockRestore();
+    }
   });
 
   it('courses and semesters survive a restart, including an archived semester and a reorder', async () => {

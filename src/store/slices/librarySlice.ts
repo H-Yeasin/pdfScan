@@ -1,12 +1,13 @@
 import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, LibraryPage, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 
-export type LibraryTab = 'starred' | 'recent' | 'courses';
-
 // 'failed' means the stored library couldn't be read. Nothing is written back to disk until a
 // load succeeds, so a read error can never overwrite the real library with an empty one.
 export type LibraryLoadStatus = 'loading' | 'ready' | 'failed';
 
+// What the library holds; all of it is saved (useLibraryPersistence), apart from the load status.
+// What the screens show of it (search, selection, the open tab and course, indexing progress)
+// lives in libraryUiSlice.ts (§16 G5).
 export type LibraryState = {
   loadStatus: LibraryLoadStatus;
   // Bumped by RETRY_LOAD; useLibraryPersistence reloads whenever it changes.
@@ -23,29 +24,11 @@ export type LibraryState = {
   submissions: Submission[];
   // §4 S8: course deadlines, by due date. Done ones stay (they record the submission).
   deadlines: Deadline[];
-  // UI-only: the deadline a tapped reminder points at, highlighted on its course page.
-  highlightDeadlineId: string | null;
   // §5 T4: highlights, ink and notes on library pages, oldest first.
   annotations: Annotation[];
   // §5 T5: bookmarked pages, oldest first.
   bookmarks: Bookmark[];
-  // Home's semester switcher. null = follow the current semester by date (homeSelectors). UI-only.
-  homeSemesterId: string | null;
-  // UI-only drill-in state for the Courses tab: null = showing the course list,
-  // a course id = showing that course's contents. Not persisted, same category as `tab`.
-  activeCourseId: string | null;
-  selection: string[];
-  selMode: boolean;
-  tab: LibraryTab;
-  search: string;
-  searchOpen: boolean;
-  // null = no active DB-backed search result; fall back to the in-memory haystack filter.
-  searchResultIds: string[] | null;
-  // §7 R1: the imported PDF being indexed in the background, and how far it is. UI-only.
-  indexing: IndexingProgress | null;
 };
-
-export type IndexingProgress = { documentId: string; done: number; total: number };
 
 export const initialLibraryState: LibraryState = {
   loadStatus: 'loading',
@@ -56,18 +39,8 @@ export const initialLibraryState: LibraryState = {
   timetable: [],
   submissions: [],
   deadlines: [],
-  highlightDeadlineId: null,
   annotations: [],
   bookmarks: [],
-  homeSemesterId: null,
-  activeCourseId: null,
-  selection: [],
-  selMode: false,
-  tab: 'recent',
-  search: '',
-  searchOpen: false,
-  searchResultIds: null,
-  indexing: null,
 };
 
 export type LibraryAction =
@@ -81,15 +54,6 @@ export type LibraryAction =
   // §16 G4: a document's word boxes, read from the database after the load (documents/pageOcr.ts).
   | { type: 'library/SET_PAGE_OCR'; id: string; pages: readonly LibraryPage[] }
   | { type: 'library/REPLACE_FILES'; ids: string[]; files: LibraryDocument[] }
-  | { type: 'library/TOGGLE_SELECTION'; id: string }
-  | { type: 'library/SET_SEL_MODE'; on: boolean }
-  | { type: 'library/CLEAR_SELECTION' }
-  // §14 Q5: selects exactly `ids` (the visible list); an empty array selects none but stays selecting.
-  | { type: 'library/SELECT_ALL'; ids: string[] }
-  | { type: 'library/SET_TAB'; tab: LibraryTab }
-  | { type: 'library/SET_SEARCH'; search: string }
-  | { type: 'library/TOGGLE_SEARCH_OPEN' }
-  | { type: 'library/SET_SEARCH_RESULT_IDS'; ids: string[] | null }
   | { type: 'library/SET_COURSES'; courses: Course[] }
   // `color` defaults to the next unused palette colour; the course goes to the end of the list.
   | { type: 'library/CREATE_COURSE'; id: string; name: string; fields?: Partial<Omit<CourseFields, 'name'>> }
@@ -101,7 +65,6 @@ export type LibraryAction =
   | { type: 'library/UPDATE_SEMESTER'; id: string; patch: Partial<Omit<Semester, 'id' | 'createdAt'>> }
   | { type: 'library/ARCHIVE_SEMESTER'; id: string }
   | { type: 'library/DELETE_SEMESTER'; id: string }
-  | { type: 'library/SET_HOME_SEMESTER'; id: string | null }
   | { type: 'library/SET_TIMETABLE'; timetable: TimetableSlot[] }
   | { type: 'library/SET_SUBMISSIONS'; submissions: Submission[] }
   | { type: 'library/ADD_SUBMISSION'; submission: Submission }
@@ -110,7 +73,6 @@ export type LibraryAction =
   | { type: 'library/ADD_DEADLINE'; deadline: Deadline }
   | { type: 'library/UPDATE_DEADLINE'; id: string; patch: Partial<Omit<Deadline, 'id'>> }
   | { type: 'library/DELETE_DEADLINE'; id: string }
-  | { type: 'library/SET_HIGHLIGHT_DEADLINE'; id: string | null }
   | { type: 'library/SET_ANNOTATIONS'; annotations: Annotation[] }
   | { type: 'library/ADD_ANNOTATION'; annotation: Annotation }
   | { type: 'library/DELETE_ANNOTATIONS'; ids: string[] }
@@ -124,8 +86,6 @@ export type LibraryAction =
   | { type: 'library/REMOVE_SLOT'; id: string }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_DOC_TYPE'; ids: string[]; docType: DocType }
-  | { type: 'library/SET_ACTIVE_COURSE'; id: string | null }
-  | { type: 'library/SET_INDEXING'; progress: IndexingProgress | null }
   | { type: 'library/SET_LAST_PAGE'; id: string; page: number };
 
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
@@ -175,8 +135,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         ...state,
         files: state.files.map((f) => (f.id === action.id && f.lastPage !== action.page ? { ...f, lastPage: action.page } : f)),
       };
-    case 'library/SET_INDEXING':
-      return { ...state, indexing: action.progress };
     case 'library/SET_LOAD_STATUS':
       return { ...state, loadStatus: action.status };
     case 'library/RETRY_LOAD':
@@ -189,7 +147,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return {
         ...state,
         files: state.files.filter((f) => !action.ids.includes(f.id)),
-        selection: state.selection.filter((id) => !action.ids.includes(id)),
         // Their submissions go too (ON DELETE CASCADE on disk; the files are in the document folder).
         submissions: state.submissions.filter((s) => !action.ids.includes(s.documentId)),
         annotations: state.annotations.filter((a) => !action.ids.includes(a.documentId)),
@@ -233,7 +190,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return {
         ...state,
         files: [...action.files, ...state.files.filter((f) => !action.ids.includes(f.id))],
-        selection: state.selection.filter((id) => !action.ids.includes(id)),
         // A document replaced by others (merge, split) takes its submissions with it.
         submissions: state.submissions.filter(
           (s) => !action.ids.includes(s.documentId) || action.files.some((f) => f.id === s.documentId)
@@ -243,34 +199,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         annotations: followPages(state.annotations, action.ids, action.files),
         bookmarks: followPages(state.bookmarks, action.ids, action.files),
       };
-    case 'library/TOGGLE_SELECTION': {
-      const selected = state.selection.includes(action.id);
-      return {
-        ...state,
-        selection: selected
-          ? state.selection.filter((id) => id !== action.id)
-          : [...state.selection, action.id],
-      };
-    }
-    case 'library/SET_SEL_MODE':
-      return { ...state, selMode: action.on, selection: action.on ? state.selection : [] };
-    case 'library/CLEAR_SELECTION':
-      return { ...state, selection: [], selMode: false };
-    case 'library/SELECT_ALL':
-      return { ...state, selection: [...action.ids], selMode: true };
-    case 'library/SET_TAB':
-      return { ...state, tab: action.tab, activeCourseId: null };
-    case 'library/SET_SEARCH':
-      return { ...state, search: action.search, searchResultIds: action.search.trim() ? state.searchResultIds : null };
-    case 'library/TOGGLE_SEARCH_OPEN':
-      return {
-        ...state,
-        searchOpen: !state.searchOpen,
-        search: state.searchOpen ? state.search : '',
-        searchResultIds: state.searchOpen ? state.searchResultIds : null,
-      };
-    case 'library/SET_SEARCH_RESULT_IDS':
-      return { ...state, searchResultIds: action.ids };
     case 'library/SET_COURSES':
       return { ...state, courses: bySortOrder(action.courses) };
     case 'library/CREATE_COURSE': {
@@ -304,7 +232,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         submissions: state.submissions.map((s) => (s.courseId === action.id ? { ...s, courseId: undefined } : s)),
         // Its deadlines go with it (ON DELETE CASCADE); useDeadlineReminders cancels their reminders.
         deadlines: state.deadlines.filter((d) => d.courseId !== action.id),
-        activeCourseId: state.activeCourseId === action.id ? null : state.activeCourseId,
       };
     case 'library/ASSIGN_COURSE':
       return {
@@ -359,11 +286,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/UPDATE_DEADLINE':
       return { ...state, deadlines: byDueAt(state.deadlines.map((d) => (d.id === action.id ? { ...d, ...action.patch } : d))) };
     case 'library/DELETE_DEADLINE':
-      return {
-        ...state,
-        deadlines: state.deadlines.filter((d) => d.id !== action.id),
-        highlightDeadlineId: state.highlightDeadlineId === action.id ? null : state.highlightDeadlineId,
-      };
+      return { ...state, deadlines: state.deadlines.filter((d) => d.id !== action.id) };
     case 'library/SET_ANNOTATIONS':
       return { ...state, annotations: action.annotations };
     case 'library/ADD_ANNOTATION':
@@ -383,8 +306,6 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return { ...state, annotations: state.annotations.map((a) => (a.id === action.id ? { ...a, ...action.patch } : a)) };
     case 'library/DELETE_ANNOTATIONS':
       return { ...state, annotations: state.annotations.filter((a) => !action.ids.includes(a.id)) };
-    case 'library/SET_HIGHLIGHT_DEADLINE':
-      return { ...state, highlightDeadlineId: action.id };
     case 'library/ADD_SLOT':
       return { ...state, timetable: sortSlots([...state.timetable, action.slot]) };
     case 'library/UPDATE_SLOT':
@@ -394,15 +315,11 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       };
     case 'library/REMOVE_SLOT':
       return { ...state, timetable: state.timetable.filter((s) => s.id !== action.id) };
-    case 'library/SET_HOME_SEMESTER':
-      return { ...state, homeSemesterId: action.id };
     case 'library/SET_DOC_TYPE':
       return {
         ...state,
         files: state.files.map((f) => (action.ids.includes(f.id) && f.docType !== action.docType ? { ...f, docType: action.docType } : f)),
       };
-    case 'library/SET_ACTIVE_COURSE':
-      return { ...state, activeCourseId: action.id };
     default:
       return state;
   }

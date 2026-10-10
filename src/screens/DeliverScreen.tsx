@@ -392,7 +392,7 @@ export function DeliverScreen() {
         dispatch({ type: 'deliver/RESET' });
         // Land where the new document is: its course page, or the Library for an unsorted one.
         if (doc.courseId) {
-          dispatch({ type: 'library/SET_ACTIVE_COURSE', id: doc.courseId });
+          dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id: doc.courseId });
           go('course');
         } else {
           go('library');

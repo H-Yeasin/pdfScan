@@ -67,11 +67,25 @@ describe('selector store', () => {
     // The compatibility hook still sees everything.
     expect(renders.whole).toBe(before.whole + 1);
 
-    dispatch({ type: 'library/SET_SEL_MODE', on: true });
+    dispatch({ type: 'library/RETRY_LOAD' });
     expect(renders.snack).toBe(before.snack + 1);
     // `files` didn't change, so the files selector stays put; the library slice did.
     expect(renders.library).toBe(before.library);
     expect(renders.slices).toBe(before.slices + 1);
+
+    // §16 G5: selection, search and the like are another slice; `library` readers don't see them.
+    dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true });
+    dispatch({ type: 'libraryUi/SET_SEARCH', search: 'a' });
+    expect(renders.slices).toBe(before.slices + 1);
+    expect(renders.whole).toBe(before.whole + 4);
+  });
+
+  it('tells nobody about an action that changes nothing', () => {
+    const { renders, dispatch } = mount();
+    const before = { ...renders };
+    dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
+    dispatch({ type: 'ui/CLEAR_SNACK' });
+    expect(renders).toEqual(before);
   });
 });
 

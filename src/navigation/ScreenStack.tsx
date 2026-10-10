@@ -7,6 +7,7 @@ import { captureChromeStatic } from '../theme/captureChrome';
 import { useReducedMotion } from '../theme/useReducedMotion';
 import type { ScreenName } from '../types/navigation';
 import { activeStack, isRootEntry, isTabRoot, rootEntry, TABS, topEntry, type TabId } from './navStack';
+import { useRenderCount } from '../utils/renderCounts';
 import { useRouter } from './router';
 import { ScreenRoleContext, type ScreenRole } from './screenRole';
 import { FADE_DURATION_MS, RESTING_STYLE, runSlide, SLIDE_DURATION_MS, transitionStyle } from './transitions';
@@ -62,12 +63,13 @@ const ScreenLayer = memo(function ScreenLayer({ Screen, fullBleed, role, style, 
 });
 
 export function ScreenStack({ screens }: { screens: ScreenMap }) {
+  useRenderCount('ScreenStack');
   const { nav, transition, navTick } = useRouter();
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   // Library's selection bar takes the tab bar's place.
-  const selecting = useAppSelector((s) => s.library.selMode);
+  const selecting = useAppSelector((s) => s.libraryUi.selMode);
 
   // 0 at rest, so a transition's first frame already draws both layers where they start.
   const progress = useRef(new Animated.Value(0)).current;

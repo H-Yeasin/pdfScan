@@ -439,7 +439,7 @@ describe('deleting rows', () => {
     await syncLibrary(db, saved, { ...empty, documents: [docs[0]] });
 
     const deletes = runs.mock.calls.filter(([sql]) => sql.startsWith('DELETE FROM documents'));
-    expect(deletes.map(([, params]) => (params as string[]).length)).toEqual([500, 500, 200]);
+    expect(deletes.map(([, params]) => (params as unknown as string[]).length)).toEqual([500, 500, 200]);
     runs.mockRestore();
     expect(await db.getAllAsync('SELECT id FROM documents')).toEqual([{ id: 'd0' }]);
     expect(await db.getAllAsync('SELECT id FROM pages')).toEqual([{ id: 'p0' }]);

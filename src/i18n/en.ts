@@ -185,6 +185,12 @@ export const en = {
       section: 'Developer',
       filterLab: 'Filter Lab',
       filterLabSubtitle: 'Compare every filter and tune its constants',
+      readerLab: 'Reader Lab',
+      readerLabSubtitle: 'Time PDF pages and tiles, check passwords, links and rotation',
+      // §16 G5: the render-count overlay (src/utils/renderCounts.ts).
+      renderCounts: 'Render counts',
+      renderCountsOn: 'Showing. Tap a count to reset; tap here to hide.',
+      renderCountsOff: 'Show how often each screen renders',
       // §10 M3: test Pro features before the rewarded ad (M6) exists.
       proPass: 'Grant a Pro pass',
       proPassActive: 'Pro until {time}. Tap to end it now.',

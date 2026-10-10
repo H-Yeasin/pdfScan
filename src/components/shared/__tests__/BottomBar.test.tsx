@@ -54,8 +54,8 @@ describe('bottom insets', () => {
     act(() => {
       app.dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' });
       app.dispatch({ type: 'library/ADD_FILE', file: makeDoc({ id: 'd1' }) });
-      app.dispatch({ type: 'library/SET_SEL_MODE', on: true });
-      app.dispatch({ type: 'library/TOGGLE_SELECTION', id: 'd1' });
+      app.dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true });
+      app.dispatch({ type: 'libraryUi/TOGGLE_SELECTION', id: 'd1' });
     });
 
     expect(paddingBottomOf(root, 'selection-bar')).toBe(NAV_BAR);

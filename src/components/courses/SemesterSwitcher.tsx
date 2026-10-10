@@ -27,7 +27,7 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
 
   const pick = (semester: Semester) => {
     // Picking the current one goes back to following the date.
-    dispatch({ type: 'library/SET_HOME_SEMESTER', id: semester.id === current?.id ? null : semester.id });
+    dispatch({ type: 'libraryUi/SET_HOME_SEMESTER', id: semester.id === current?.id ? null : semester.id });
     onClose();
   };
 
@@ -43,7 +43,7 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
           style: 'destructive',
           onPress: () => {
             dispatch({ type: 'library/ARCHIVE_SEMESTER', id: semester.id });
-            dispatch({ type: 'library/SET_HOME_SEMESTER', id: null });
+            dispatch({ type: 'libraryUi/SET_HOME_SEMESTER', id: null });
             // §8 B5: the end of term is the moment to keep a copy; a quiet nudge with the action.
             const courseIds = state.library.courses.filter((c) => c.semesterId === semester.id).map((c) => c.id);
             const hasDocuments = state.library.files.some((f) => f.courseId !== undefined && courseIds.includes(f.courseId));

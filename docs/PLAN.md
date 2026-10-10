@@ -337,8 +337,8 @@ reports respect the opt-in.
 - [x] G1 Privacy hotfix: one opt-in Sentry path (remove the wizard's init with session replay), untrack build output (done in code; the DSN rotation and Verification 1 are open)
 - [x] G2 Router v2: a back stack, kept tab roots, keyed layers, a persistent tab bar, `useScreenRole` (done in code; Verification 2–3 on a device are open)
 - [x] G3 Boot diet: lazy screens; pdf-lib, xlsx, mammoth and the filter registry off the boot path (done in code; Verification 4 on a device is open)
-- [ ] G4 Boot waterfall: embedded fonts, early DB and settings, a lighter `loadAll`, WAL (new dev build)
-- [ ] G5 Re-render hygiene: memo'd layers, `BootEffects`, UI fields out of `library`, reducer identity
+- [x] G4 Boot waterfall: embedded fonts, early DB and settings, `loadAll` without word boxes (loaded on demand), WAL, native layout backfill (done in code; schema v17; needs a new dev build; Verification 4–5 on a device are open)
+- [x] G5 Re-render hygiene: memo'd layers, `BootEffects`, UI fields out of `library` (the `libraryUi` slice), reducer identity (done in code; Verification 6 on a device is open)
 - [ ] G6 FlashList + `expo-image`, thumbnails never fall back to masters (new dev build)
 - [ ] G7 Heavy work off the hot path (Review sliders, progressive ingest, OCR reuse, indexing writes)
 - [ ] G8 Release build: R8 + resource shrinking, React Compiler trial (new dev build)
@@ -385,9 +385,9 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W3 Atomic writes, preview preparation, native page count for outside PDFs (done in code; device check open)
 - [x] W4 Non-PDF quick fixes (sheet/TXT scroll, TXT cap, DOCX inset and tap) (done in code; device check open)
 - [x] W5 Position robustness (resume page, edits keep the page, roles, library page numbers) (done in code; device check open)
-- [ ] W6 ReaderScreen split and the sheet state machine
-- [ ] W7 pdf-native v2 (pdfium sessions, tiles, dark, links, outline; iOS PDFKit) + `expo-screen-orientation` (new dev build)
-- [ ] W8 Surface geometry
+- [x] W6 ReaderScreen split and the sheet state machine (done in code; device check open)
+- [x] W7 pdf-native v2 (pdfium sessions, tiles, dark, links, outline; iOS PDFKit) + `expo-screen-orientation` (done in code; iOS not built yet; new dev build + device check open)
+- [x] W8 Surface geometry (done in code; JS only, no device check)
 - [ ] W9 Render queue, page cache, dark matrix
 - [ ] W10 Read-only surface behind a flag
 - [ ] W11 Links, contents, landscape, TalkBack
@@ -448,4 +448,4 @@ Rule: don't start a phase until the "done when" checks of the previous phase pas
 
 ## 8. Next step
 
-§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. §14 is planned in `docs/plan/14-prelaunch-fixes.md` (done in code; device checks open). §15 is planned in `docs/plan/15-brand-refresh.md`. §16–§18 are planned in `docs/plan/16-speed.md`, `docs/plan/17-design-flow.md` and `docs/plan/18-reader.md`. §16 G1 (privacy hotfix) is done in code (the owner rotates the Sentry DSN). §16 G2 (router v2) is done in code (its device checks are open). §16 G3 (boot diet) is done in code (its device check is open). §18 W1 (sign on the right page) is done in code (its device check is open). §18 W2 (Find and chrome hygiene) is done in code (its device check is open). Next: §18 W3–W4, then §16–§18 in the order in `docs/plan/README.md`; alongside, §15's device checks (V1–V5 are done in code; V2 needs `npx expo prebuild --clean` and a new dev build) and run §14's device checks, then plan §11 Launch and growth (`docs/plan/11-launch.md`).
+§0 is planned in `docs/plan/00-foundation.md`. §1 is planned in `docs/plan/01-capture.md`. §2 is planned in `docs/plan/02-review-enhance.md`. §3 is planned in `docs/plan/03-courses.md`. §4 is planned in `docs/plan/04-submit.md`. §5 is planned in `docs/plan/05-study.md`. §6 is planned in `docs/plan/06-languages.md`. §7 is planned in `docs/plan/07-reader-tools.md`. §8 is planned in `docs/plan/08-backup.md`. §9 is planned in `docs/plan/09-onboarding.md`. §10 is planned in `docs/plan/10-monetization.md`. §14 is planned in `docs/plan/14-prelaunch-fixes.md` (done in code; device checks open). §15 is planned in `docs/plan/15-brand-refresh.md`. §16–§18 are planned in `docs/plan/16-speed.md`, `docs/plan/17-design-flow.md` and `docs/plan/18-reader.md`. §16 G1 (privacy hotfix) is done in code (the owner rotates the Sentry DSN). §16 G2 (router v2) is done in code (its device checks are open). §16 G3 (boot diet) is done in code (its device check is open). §16 G4 (boot waterfall) is done in code (it needs a new dev build for the embedded fonts; its device checks are open). §16 G5 (re-render hygiene) is done in code (its device check is open). §18 W1 (sign on the right page) is done in code (its device check is open). §18 W2 (Find and chrome hygiene) is done in code (its device check is open). Next: §18 W3–W4, then §16–§18 in the order in `docs/plan/README.md`; alongside, §15's device checks (V1–V5 are done in code; V2 needs `npx expo prebuild --clean` and a new dev build) and run §14's device checks, then plan §11 Launch and growth (`docs/plan/11-launch.md`).

@@ -41,7 +41,7 @@ export function useImportedPdfIndexing(libraryLoaded: boolean): void {
     indexImportedPdf(doc, {
       script,
       signal: controller.signal,
-      onProgress: ({ done, total }) => dispatch({ type: 'library/SET_INDEXING', progress: { documentId: doc.id, done, total } }),
+      onProgress: ({ done, total }) => dispatch({ type: 'libraryUi/SET_INDEXING', progress: { documentId: doc.id, done, total } }),
       onCommit: commit,
     })
       .then((result) => {
@@ -59,7 +59,7 @@ export function useImportedPdfIndexing(libraryLoaded: boolean): void {
         // Deleted while it ran: thumbnails written after the delete would be orphaned.
         if (controller.signal.reason === REMOVED) deleteDocumentFiles(doc.id);
         running.current = null;
-        dispatch({ type: 'library/SET_INDEXING', progress: null });
+        dispatch({ type: 'libraryUi/SET_INDEXING', progress: null });
         setFinishedRuns((n) => n + 1);
       });
     // `courses`/`settings` only pick the OCR script when a run starts; they don't restart one.

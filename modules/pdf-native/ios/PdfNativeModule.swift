@@ -21,9 +21,61 @@ final class PdfReadException: GenericException<String>, @unchecked Sendable {
 // §7 R1: the few PDF jobs JavaScript can't do well, on PDFKit. Pages are 0-based; sizes are PDF
 // points with the page's /Rotate applied (what a reader shows), and text boxes are in that same
 // rotated space with a top-left origin, matching the Android module.
+//
+// §18 W7 (version 2) adds sessions for the Reader's page surface (PdfSessions.swift).
 public class PdfNativeModule: Module {
+  private let sessions = PdfSessionStore()
+
   public func definition() -> ModuleDefinition {
     Name("PdfNative")
+
+    OnCreate {
+      self.sessions.start()
+    }
+
+    OnDestroy {
+      self.sessions.stop()
+    }
+
+    // JavaScript checks this before it uses the session functions (a build made before W7 has none).
+    Function("nativeVersion") { () -> Int in
+      return 2
+    }
+
+    AsyncFunction("openDocument") { (uri: URL, password: String?) -> [String: Any] in
+      return try self.sessions.openDocument(uri, password)
+    }.runOnQueue(sessions.queue)
+
+    AsyncFunction("closeDocument") { (id: String) in
+      self.sessions.closeDocument(id)
+    }.runOnQueue(sessions.queue)
+
+    AsyncFunction("renderPageImage") { (id: String, page: Int, options: PageImageOptions) -> [String: Any] in
+      return try renderPageImage(try self.sessions.page(id, page), options)
+    }.runOnQueue(sessions.queue)
+
+    // Not a session call: it runs on the module's own queue, beside the PDF work.
+    AsyncFunction("decodeImage") { (uri: URL, options: DecodeOptions) -> [String: Any] in
+      return try decodeImage(uri, options)
+    }
+
+    AsyncFunction("getSessionPageText") { (id: String, page: Int) -> [String: Any] in
+      return try pageText(try self.sessions.page(id, page))
+    }.runOnQueue(sessions.queue)
+
+    AsyncFunction("getPageLinks") { (id: String, page: Int) -> [[String: Any]] in
+      let doc = try self.sessions.document(id)
+      return pageLinks(try self.sessions.page(id, page), doc)
+    }.runOnQueue(sessions.queue)
+
+    AsyncFunction("getOutline") { (id: String) -> [[String: Any]] in
+      let doc = try self.sessions.document(id)
+      guard let root = doc.outlineRoot else {
+        return []
+      }
+      var total = 0
+      return outlineItems(root, doc, 0, &total)
+    }.runOnQueue(sessions.queue)
 
     AsyncFunction("getPageCount") { (uri: URL) -> Int in
       return try openDocument(uri).pageCount
@@ -78,14 +130,14 @@ fileprivate func openPage(_ uri: URL, _ index: Int) throws -> PDFPage {
   return page
 }
 
-fileprivate func displaySize(_ page: PDFPage) -> CGSize {
+func displaySize(_ page: PDFPage) -> CGSize {
   let box = page.bounds(for: .mediaBox)
   return page.rotation % 180 == 0 ? box.size : CGSize(width: box.height, height: box.width)
 }
 
 // Unrotated page space (origin bottom-left of the media box) to the displayed page (origin
 // top-left, rotated clockwise by /Rotate).
-fileprivate func toDisplay(_ r: CGRect, _ page: PDFPage) -> CGRect {
+func toDisplay(_ r: CGRect, _ page: PDFPage) -> CGRect {
   let box = page.bounds(for: .mediaBox)
   let x0 = r.minX - box.minX, x1 = r.maxX - box.minX
   let y0 = r.minY - box.minY, y1 = r.maxY - box.minY
@@ -102,7 +154,7 @@ fileprivate func toDisplay(_ r: CGRect, _ page: PDFPage) -> CGRect {
   }
 }
 
-fileprivate func pageText(_ page: PDFPage) throws -> [String: Any] {
+func pageText(_ page: PDFPage) throws -> [String: Any] {
   let size = displaySize(page)
   let text = page.string ?? ""
   var words: [[String: Any]] = []

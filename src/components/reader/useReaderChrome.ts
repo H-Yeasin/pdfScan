@@ -6,7 +6,8 @@ const KEEP_AWAKE_TAG = 'reader';
 
 // §12 D2: the Reader's top and bottom bars. Tapping the page hides or shows them (immersive
 // reading); going back a page (scrolling up) brings them back, the way a browser does.
-// `visible` drives both bars' slide and fade.
+// `visible` drives both bars' slide and fade. A new document starts with the bars shown and no
+// page history (§18 W6: one instance per file).
 export function useReaderChrome(keepAwake: boolean) {
   const visible = useRef(new Animated.Value(1)).current;
   const [shown, setShown] = useState(true);
@@ -25,12 +26,6 @@ export function useReaderChrome(keepAwake: boolean) {
     lastPage.current = page;
   }, []);
 
-  // A new document starts with the bars shown and no page history.
-  const reset = useCallback(() => {
-    lastPage.current = null;
-    setShown(true);
-  }, []);
-
   // Reading settings: keep the screen on while the Reader is open. Best-effort: a phone that
   // refuses just sleeps as usual.
   useEffect(() => {
@@ -41,5 +36,5 @@ export function useReaderChrome(keepAwake: boolean) {
     };
   }, [keepAwake]);
 
-  return { visible, shown, toggle, show, onPage, reset };
+  return { visible, shown, toggle, show, onPage };
 }

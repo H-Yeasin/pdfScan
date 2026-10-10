@@ -10,6 +10,7 @@ import { useT } from '../../i18n/useT';
 import { useAppSelector } from '../../store/AppStateContext';
 import { INDEX_MAX_PAGES } from '../../services/documents/importedPdfIndex';
 import { rotationStyle } from '../../utils/rotation';
+import { useRenderCount } from '../../utils/renderCounts';
 
 
 const LONG_PRESS_MS = 400;
@@ -39,6 +40,7 @@ export const FileRow = memo(function FileRow({
   onLongPress,
   onToggleStar,
 }: FileRowProps) {
+  useRenderCount('FileRow');
   const { tokens } = useTheme();
   const { t } = useT();
   const cover = doc.pages[0];
@@ -185,7 +187,7 @@ const styles = StyleSheet.create({
 // read in full. Nothing for a fully indexed PDF or any other document.
 function useIndexNote(doc: LibraryDocument): string | null {
   // Only this document's progress: other documents' ticks don't re-render this row.
-  const progress = useAppSelector((s) => (s.library.indexing?.documentId === doc.id ? s.library.indexing : null));
+  const progress = useAppSelector((s) => (s.libraryUi.indexing?.documentId === doc.id ? s.libraryUi.indexing : null));
   const { t } = useT();
   if (doc.sourceKind !== 'imported_pdf') return null;
   if (progress) return t('library.index.reading', { done: progress.done, total: progress.total });

@@ -4,6 +4,7 @@ import { initialCaptureState } from './slices/captureSlice';
 import { initialReviewState } from './slices/reviewSlice';
 import { initialDeliverState } from './slices/deliverSlice';
 import { initialLibraryState } from './slices/librarySlice';
+import { initialLibraryUiState } from './slices/libraryUiSlice';
 import { initialReaderState } from './slices/readerSlice';
 import { initialSettingsState } from './slices/settingsSlice';
 import { initialSignatureState } from './slices/signatureSlice';
@@ -14,6 +15,7 @@ export const initialAppState: AppState = {
   review: initialReviewState,
   deliver: initialDeliverState,
   library: initialLibraryState,
+  libraryUi: initialLibraryUiState,
   reader: initialReaderState,
   settings: initialSettingsState,
   signature: initialSignatureState,

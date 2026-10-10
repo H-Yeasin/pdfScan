@@ -136,18 +136,22 @@ export function FilterLabScreen() {
   const [timing, setTiming] = useState(false);
   // §9 O5: the dev menu's "Seed library" for the performance budget (docs/qa/performance.md).
   const [seeded, setSeeded] = useState<number | null>(null);
-  const handleSeed = useCallback(async () => {
-    setSeeded(0);
-    try {
-      await seedLibrary(dispatch, setSeeded);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: `Seeded ${SEED_DOCUMENTS} documents` });
-    } catch (e) {
-      console.warn('seedLibrary failed', e);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: 'Seeding failed' });
-    } finally {
-      setSeeded(null);
-    }
-  }, [dispatch]);
+  // §16 G4: `wordBoxes` seeds the same documents with a box per word, to compare cold starts.
+  const handleSeed = useCallback(
+    async (wordBoxes: boolean) => {
+      setSeeded(0);
+      try {
+        await seedLibrary(dispatch, setSeeded, { wordBoxes });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: `Seeded ${SEED_DOCUMENTS} documents${wordBoxes ? ' with word boxes' : ''}` });
+      } catch (e) {
+        console.warn('seedLibrary failed', e);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: 'Seeding failed' });
+      } finally {
+        setSeeded(null);
+      }
+    },
+    [dispatch]
+  );
   const [timings, setTimings] = useState<Timing[] | null>(null);
   const [selected, setSelected] = useState<EnhanceMode>('auto');
   const [overrides, setOverrides] = useState<OverridesByFilter>({});
@@ -220,13 +224,21 @@ export function FilterLabScreen() {
         <View style={styles.actions}>
           <Pressable
             style={[styles.button, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
-            onPress={handleSeed}
+            onPress={() => handleSeed(false)}
             disabled={seeded !== null}
           >
             <Ionicons name="library-outline" size={16} color={tokens.ink} />
             <Text style={[styles.buttonLabel, { color: tokens.ink }]}>
               {seeded === null ? `Seed library (${SEED_DOCUMENTS} docs)` : `Seeding ${seeded}/${SEED_DOCUMENTS}…`}
             </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.button, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}
+            onPress={() => handleSeed(true)}
+            disabled={seeded !== null}
+          >
+            <Ionicons name="scan-outline" size={16} color={tokens.ink} />
+            <Text style={[styles.buttonLabel, { color: tokens.ink }]}>Seed with word boxes</Text>
           </Pressable>
           <Pressable style={[styles.button, { backgroundColor: tokens.accent }]} onPress={handlePick}>
             <Ionicons name="image-outline" size={16} color={tokens.surface} />

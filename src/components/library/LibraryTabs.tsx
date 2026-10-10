@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
-import type { LibraryTab } from '../../store/slices/librarySlice';
+import type { LibraryTab } from '../../store/slices/libraryUiSlice';
 import { useT } from '../../i18n/useT';
 
 const TABS: LibraryTab[] = ['starred', 'recent', 'courses'];

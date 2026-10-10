@@ -1,6 +1,7 @@
 import { StyleSheet, TextInput } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { useRenderCount } from '../../utils/renderCounts';
 
 type SearchBarProps = {
   value: string;
@@ -8,6 +9,7 @@ type SearchBarProps = {
 };
 
 export function SearchBar({ value, onChange }: SearchBarProps) {
+  useRenderCount('SearchBar');
   const { tokens } = useTheme();
   const { t } = useT();
 

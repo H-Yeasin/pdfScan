@@ -2,6 +2,7 @@ import { captureReducer, CaptureAction, CaptureState } from './slices/captureSli
 import { reviewReducer, ReviewAction, ReviewState } from './slices/reviewSlice';
 import { deliverReducer, DeliverAction, DeliverState } from './slices/deliverSlice';
 import { libraryReducer, LibraryAction, LibraryState } from './slices/librarySlice';
+import { libraryUiReducer, LibraryUiAction, LibraryUiState } from './slices/libraryUiSlice';
 import { readerReducer, ReaderAction, ReaderState } from './slices/readerSlice';
 import { settingsReducer, SettingsAction, SettingsState } from './slices/settingsSlice';
 import { signatureReducer, SignatureAction, SignatureState } from './slices/signatureSlice';
@@ -14,6 +15,7 @@ export type AppState = {
   review: ReviewState;
   deliver: DeliverState;
   library: LibraryState;
+  libraryUi: LibraryUiState;
   reader: ReaderState;
   settings: SettingsState;
   signature: SignatureState;
@@ -26,6 +28,7 @@ export type AppAction =
   | ReviewAction
   | DeliverAction
   | LibraryAction
+  | LibraryUiAction
   | ReaderAction
   | SettingsAction
   | SignatureAction
@@ -52,16 +55,20 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   return { ...next, review: { ...next.review, history: pushEntry(next.review.history, entry) } };
 }
 
+// §16 G5: the same root object when no slice changed (an action no reducer handles, or one that
+// changes nothing), so the store's `next === state` check stops there and no selector runs.
 function slicesReducer(state: AppState, action: AppAction): AppState {
-  return {
+  const next: AppState = {
     capture: captureReducer(state.capture, action as CaptureAction),
     review: reviewReducer(state.review, action as ReviewAction),
     deliver: deliverReducer(state.deliver, action as DeliverAction),
     library: libraryReducer(state.library, action as LibraryAction),
+    libraryUi: libraryUiReducer(state.libraryUi, action as LibraryUiAction | LibraryAction),
     reader: readerReducer(state.reader, action as ReaderAction),
     settings: settingsReducer(state.settings, action as SettingsAction),
     signature: signatureReducer(state.signature, action as SignatureAction),
     ui: uiReducer(state.ui, action as UiAction),
     pack: packReducer(state.pack, action as PackAction),
   };
+  return (Object.keys(next) as (keyof AppState)[]).every((key) => next[key] === state[key]) ? state : next;
 }

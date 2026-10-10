@@ -1,5 +1,6 @@
 import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
+import { BootEffects } from './BootEffects';
 import { Alert, BackHandler, StyleSheet, View } from 'react-native';
 import { useRouter } from '../navigation/router';
 import { resolveBack, type BackContext } from '../navigation/backHandling';
@@ -8,10 +9,7 @@ import { ScreenStack, type ScreenMap } from '../navigation/ScreenStack';
 import { SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
-import { loadRemoteConfig, useRemoteConfig } from '../services/remote/remoteConfig';
-import { loadEntitlement, useIsPro } from '../services/pro/entitlement';
-import { startAds } from '../services/ads/adsSdk';
-import { MIN_SESSIONS_FOR_ADS } from '../services/ads/adPolicy';
+import { useRenderCount, useRenderCountsShown } from '../utils/renderCounts';
 import { lazyScreens } from '../navigation/lazyScreens';
 import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
@@ -20,18 +18,7 @@ import { SplashIntro, SplashIntroBoundary } from '../components/brand/SplashIntr
 import { ExportHost } from '../components/backup/ExportHost';
 import { ProTaskResumeHost } from '../components/pro/ProTaskResumeHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
-import { useAutoBackup } from '../store/useAutoBackup';
-import { useLibraryPersistence } from '../store/useLibraryPersistence';
-import { useSettingsPersistence } from '../store/useSettingsPersistence';
-import { useSignaturePersistence } from '../store/useSignaturePersistence';
-import { useExternalFileLinking } from '../store/useExternalFileLinking';
-import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
-import { usePdfInfoBackfill } from '../store/usePdfInfoBackfill';
-import { configureNotifications, useDeadlineReminders } from '../store/useDeadlines';
-import { useStorageIntegrity } from '../store/useStorageIntegrity';
-import { useAppDispatch, useAppSelector, useAppSlices } from '../store/AppStateContext';
-import { initCrashReporting } from '../services/telemetry/crash';
-import { logUsage, setUsageCollection } from '../services/telemetry/usage';
+import { useAppDispatch, useAppSelector, useAppStore } from '../store/AppStateContext';
 import { useAppFonts, useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
 
@@ -58,81 +45,48 @@ const SCREENS: ScreenMap = lazyScreens({
   // Dev only (Settings shows the way in under __DEV__). Metro folds __DEV__ before it collects a
   // release bundle's requires, so the Filter Lab isn't in one.
   filterLab: __DEV__ ? () => (require('../dev/FilterLabScreen') as typeof import('../dev/FilterLabScreen')).FilterLabScreen : () => NoScreen,
+  readerLab: __DEV__ ? () => (require('../dev/ReaderLabScreen') as typeof import('../dev/ReaderLabScreen')).ReaderLabScreen : () => NoScreen,
 });
 
 function NoScreen() {
   return null;
 }
 
+// §16 G5, dev only (Settings → Developer → Render counts). Required inside the component, so the
+// overlay isn't loaded at boot, and not in a release bundle, like the Filter Lab above.
+function DevRenderCounts() {
+  const shown = useRenderCountsShown();
+  if (!__DEV__ || !shown) return null;
+  const { RenderCountOverlay } = require('../dev/RenderCountOverlay') as typeof import('../dev/RenderCountOverlay');
+  return <RenderCountOverlay />;
+}
+
+// §16 G5: reads single fields, never a whole slice, so a search keystroke, a selection tap, a scan
+// progress tick or an indexed page doesn't re-render the navigator (and, under it, the layers and
+// hosts). The hooks that do follow whole slices (persistence, integrity, indexing, reminders) are
+// in <BootEffects/>, which renders nothing. What Back and the start screen need of the rest is
+// read from the store at that moment.
 export function AppNavigator() {
-  const libraryLoaded = useLibraryPersistence();
+  useRenderCount('AppNavigator');
   const [booting, setBooting] = useState(true);
   // §9 O5: true a moment after the start screen is up; work the first screen doesn't need waits.
   const afterBoot = useDeferredBoot(!booting);
-  const libraryAfterBoot = afterBoot && libraryLoaded;
-  useSettingsPersistence();
-  useSignaturePersistence();
-  useExternalFileLinking(libraryLoaded);
-  useDeadlineReminders(libraryLoaded, libraryAfterBoot);
-  useImportedPdfIndexing(libraryAfterBoot);
-  usePdfInfoBackfill(libraryAfterBoot);
-  useStorageIntegrity(libraryAfterBoot);
-  useAutoBackup(libraryAfterBoot);
   const { screen, nav, navTick, go, back, replace } = useRouter();
   const { tokens, theme } = useTheme();
   // §16 G4: fonts gate the first screen here, with the data, instead of in a gate above the store
-  // (AppProviders' old FontGate): the boot hooks above start on the first render either way. Ready
+  // (AppProviders' old FontGate): the boot hooks (BootEffects) start on the first render either way. Ready
   // at once in a build with the fonts embedded (app.json's expo-font plugin); a runtime load in
   // Expo Go, on the web and in a dev build made before that.
   const { fontsReady } = useAppFonts();
 
   const dispatch = useAppDispatch();
-  const state = useAppSlices('capture', 'library', 'settings');
-  // §14 Q7: only this field of `deliver` (the rest changes with every keystroke in Deliver).
-  const coverTarget = useAppSelector((s) => s.deliver.coverTarget);
-  const { crashReportsEnabled } = state.settings;
-  // Deferred too (§9 O5): Sentry's init isn't free, and a crash before it still reaches the
-  // ErrorBoundary.
-  useEffect(() => {
-    if (afterBoot) initCrashReporting(crashReportsEnabled);
-  }, [afterBoot, crashReportsEnabled]);
-  // §10 M8: usage counts follow "Help improve PDF Scan", after the first frame like Sentry. One
-  // app_open per run, sent once collection is on.
-  const { usageStatsEnabled } = state.settings;
-  const openLogged = useRef(false);
-  useEffect(() => {
-    if (!afterBoot || !state.settings.loaded) return;
-    void setUsageCollection(usageStatsEnabled).then(() => {
-      if (usageStatsEnabled && !openLogged.current) {
-        openLogged.current = true;
-        logUsage('app_open');
-      }
-    });
-  }, [afterBoot, state.settings.loaded, usageStatsEnabled]);
-  // §10 M3: one small secure-store read, not deferred, so Pro features and the banner policy
-  // (M5) see the pass as soon as they render.
-  useEffect(() => {
-    void loadEntitlement();
-  }, []);
-  // §10 M2: the console's settings (ads switch, pass length, support contact); bundled defaults
-  // until then and whenever Firebase isn't there.
-  useEffect(() => {
-    if (afterBoot) void loadRemoteConfig();
-  }, [afterBoot]);
-  // Reminders as banners while the app is open (§16 G3: deferred, not at import).
-  useEffect(() => {
-    if (afterBoot) configureNotifications();
-  }, [afterBoot]);
-  // §10 M5: the ads SDK (and its consent form, where the law needs one) only once a banner could
-  // show: ads switched on in the console, the introduction done, from the third start, no Pro.
-  // Before that the SDK is never loaded.
-  const { adsEnabled } = useRemoteConfig();
-  const isPro = useIsPro();
-  const adsCould = afterBoot && adsEnabled && !isPro && state.settings.onboardingDone && state.settings.appSessions >= MIN_SESSIONS_FOR_ADS;
-  useEffect(() => {
-    if (adsCould) void startAds();
-  }, [adsCould]);
-  const { processingStatus, errorMessage } = state.capture;
+  const store = useAppStore();
+  const libraryStatus = useAppSelector((s) => s.library.loadStatus);
+  const settingsLoaded = useAppSelector((s) => s.settings.loaded);
+  const appLocked = useAppSelector((s) => s.settings.appLock.enabled);
+  const hasActiveCourse = useAppSelector((s) => s.library.courses.some((c) => !c.archived));
+  const processingStatus = useAppSelector((s) => s.capture.processingStatus);
+  const errorMessage = useAppSelector((s) => s.capture.errorMessage);
   const prevProcessingStatus = useRef(processingStatus);
 
   // Start screen (§9 O1, `chooseStartScreen`): picked once settings, the library index and the
@@ -142,19 +96,18 @@ export function AppNavigator() {
   // If loading takes longer than SPLASH_TIMEOUT_MS the app shows anyway, and the start screen is
   // still corrected once loading finishes, as long as the user hasn't navigated yet.
   const startChosen = useRef(false);
-  const libraryStatus = state.library.loadStatus;
-  const hasActiveCourse = state.library.courses.some((c) => !c.archived);
-  const bootReady = libraryStatus !== 'loading' && state.settings.loaded && fontsReady;
+  const bootReady = libraryStatus !== 'loading' && settingsLoaded && fontsReady;
   useEffect(() => {
     if (startChosen.current || !bootReady) return;
     startChosen.current = true;
     // §9 O2: the introduction for a brand-new user; someone updating with a library already in
     // place is marked done without seeing it.
+    const { settings, library } = store.getState();
     const onboarding = onboardingDecision({
-      onboardingDone: state.settings.onboardingDone,
+      onboardingDone: settings.onboardingDone,
       libraryLoaded: libraryStatus === 'ready',
-      documentCount: state.library.files.length,
-      courseCount: state.library.courses.length,
+      documentCount: library.files.length,
+      courseCount: library.courses.length,
     });
     if (onboarding === 'markDone') dispatch({ type: 'settings/SET_ONBOARDING_DONE', done: true });
     if (screen === 'capture' && navTick === 0) {
@@ -173,24 +126,27 @@ export function AppNavigator() {
 
   // §9 O1: Android back. Open RN Modals and inline overlays (`useBackHandler`) get the press first;
   // this handles the rest by `resolveBack`'s order. Registered once, at boot, so every overlay's
-  // listener is newer and runs first; it reads the latest state through a ref.
-  const backCtx = useRef<BackContext | null>(null);
-  backCtx.current = {
-    screen,
-    tab: nav.tab,
-    canPop: activeStack(nav).length > 1,
-    hasCourses: hasActiveCourse,
-    selMode: state.library.selMode,
-    searchOpen: state.library.searchOpen,
-    sessionPageCount: state.capture.pages.length,
-    retakeTargetId: state.capture.retakeTargetId,
-    highlightDeadlineId: state.library.highlightDeadlineId,
-    coverTarget,
-  };
+  // listener is newer and runs first; it reads where the router is through a ref, and the rest
+  // from the store when Back is pressed (§16 G5), so none of it re-renders the navigator.
+  const where = useRef({ screen, nav });
+  where.current = { screen, nav };
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!backCtx.current) return false;
-      const step = resolveBack(backCtx.current);
+      const { capture, library, libraryUi, deliver } = store.getState();
+      const ctx: BackContext = {
+        screen: where.current.screen,
+        tab: where.current.nav.tab,
+        canPop: activeStack(where.current.nav).length > 1,
+        hasCourses: library.courses.some((c) => !c.archived),
+        selMode: libraryUi.selMode,
+        searchOpen: libraryUi.searchOpen,
+        sessionPageCount: capture.pages.length,
+        retakeTargetId: capture.retakeTargetId,
+        highlightDeadlineId: libraryUi.highlightDeadlineId,
+        // §14 Q7.
+        coverTarget: deliver.coverTarget,
+      };
+      const step = resolveBack(ctx);
       switch (step.kind) {
         case 'dispatch':
           step.actions.forEach(dispatch);
@@ -222,7 +178,7 @@ export function AppNavigator() {
       }
     });
     return () => sub.remove();
-  }, [dispatch, go, back]);
+  }, [dispatch, store, go, back]);
 
   // Lives here (always mounted) rather than on CaptureScreen/ReviewScreen: neither is always on
   // screen (and before §16 G2 both unmounted as the user moved between tabs). Navigating to
@@ -247,6 +203,9 @@ export function AppNavigator() {
 
   return (
     <View style={[styles.container, booting ? { backgroundColor: tokens.bg } : null]}>
+      {/* §16 G5: persistence, indexing, reminders and the other boot work. Renders nothing; here
+          from the first render, above the lock, like the hooks it took over from this component. */}
+      <BootEffects afterBoot={afterBoot} />
       {booting ? null : (
         <>
           {/* §9 O6: follows the app's theme setting, not the system's (Capture sets its own). */}
@@ -261,7 +220,7 @@ export function AppNavigator() {
             <ExportHost />
             <AutoBackupChip />
             {/* §12 D1: a Pro task whose ad was watched before the app was killed. */}
-            <ProTaskResumeHost ready={libraryAfterBoot} />
+            <ProTaskResumeHost ready={afterBoot && libraryStatus === 'ready'} />
           </AppLockGate>
         </>
       )}
@@ -269,8 +228,9 @@ export function AppNavigator() {
           child in the booting tree and the booted one alike, so the switch doesn't remount it. It
           releases the native splash itself, once its identical first frame is laid out. */}
       <SplashIntroBoundary>
-        <SplashIntro booting={booting} appLocked={state.settings.appLock.enabled} />
+        <SplashIntro booting={booting} appLocked={appLocked} />
       </SplashIntroBoundary>
+      <DevRenderCounts />
     </View>
   );
 }

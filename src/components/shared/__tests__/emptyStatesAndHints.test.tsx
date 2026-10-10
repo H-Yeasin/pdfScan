@@ -16,6 +16,13 @@ jest.mock('../../../components/shared/SignaturePlacementOverlay', () => ({ Signa
 
 type Ctx = { app: ReturnType<typeof useAppState>; router: ReturnType<typeof useRouter> };
 
+// Unmounted after each test: Home keeps a timer to the next midnight (utils/useDayClock), and a
+// tree left mounted would keep Jest waiting for it.
+const mounted: ReturnType<typeof create>[] = [];
+afterEach(() => {
+  act(() => mounted.splice(0).forEach((root) => root.unmount()));
+});
+
 function mount() {
   let ctx: Ctx | null = null;
   function Screens() {
@@ -38,6 +45,7 @@ function mount() {
       </SafeAreaProvider>
     );
   });
+  mounted.push(root);
   return { root, ctx: () => ctx! };
 }
 
@@ -84,7 +92,7 @@ describe('empty states', () => {
     const { root, ctx } = mount();
     act(() => {
       ctx().app.dispatch({ type: 'library/CREATE_COURSE', id: 'c1', name: 'Programming', fields: { code: 'CSE 101' } });
-      ctx().app.dispatch({ type: 'library/SET_ACTIVE_COURSE', id: 'c1' });
+      ctx().app.dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id: 'c1' });
     });
     act(() => ctx().router.go('course'));
     expect(texts(root)).toEqual(expect.arrayContaining([en.courses.page.emptyBody.replace('{course}', 'CSE 101')]));

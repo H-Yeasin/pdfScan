@@ -30,19 +30,22 @@ import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateCont
 import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
 import type { DocType } from '../types/models';
 import { useT } from '../i18n/useT';
+import { useRenderCount } from '../utils/renderCounts';
 
 // One course's page: its header and its documents, newest first. Opened from Home's course grid
-// and Library's Courses tab (state.library.activeCourseId says which). Scanning from here files
+// and Library's Courses tab (state.libraryUi.activeCourseId says which). Scanning from here files
 // the scan into this course (startScan preselects it in Deliver). Type chips filter the list (K4).
 export function CourseScreen() {
+  useRenderCount('Course');
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
   const { go, back } = useRouter();
   const dispatch = useAppDispatch();
-  const state = useAppSlices('library', 'pack', 'settings');
+  const state = useAppSlices('library', 'libraryUi', 'pack', 'settings');
   const store = useAppStore();
-  const { files, courses, activeCourseId, selection, selMode } = state.library;
+  const { files, courses } = state.library;
+  const { activeCourseId, selection, selMode, highlightDeadlineId } = state.libraryUi;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   // §8 B3: "Export course…" (Unsorted: its documents).
   const { exportScope, overlay: exportOverlay } = useBackupExport();
@@ -66,7 +69,6 @@ export function CourseScreen() {
   );
   const shareSubmission = useShareSubmission();
   // §4 S8: this course's open deadlines; a tapped reminder highlights one.
-  const { highlightDeadlineId } = state.library;
   const deadlines = useMemo(
     () => (course ? state.library.deadlines.filter((d) => d.courseId === course.id && !d.doneSubmissionId) : []),
     [course, state.library.deadlines]
@@ -113,8 +115,8 @@ export function CourseScreen() {
   };
 
   const goBack = () => {
-    dispatch({ type: 'library/CLEAR_SELECTION' });
-    if (highlightDeadlineId) dispatch({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null });
+    dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
+    if (highlightDeadlineId) dispatch({ type: 'libraryUi/SET_HIGHLIGHT_DEADLINE', id: null });
     back();
   };
 
@@ -133,12 +135,12 @@ export function CourseScreen() {
         <View style={styles.header}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button"
             style={[styles.iconButton, { backgroundColor: tokens.surface2, borderRadius: 22 }]}
-            onPress={() => dispatch({ type: 'library/CLEAR_SELECTION' })}
+            onPress={() => dispatch({ type: 'libraryUi/CLEAR_SELECTION' })}
             accessibilityLabel={t('library.clearSelection')}
           >
             <Ionicons name="close" size={20} color={tokens.ink} />
           </Pressable>
-          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.length })}</Text>
+          <Text style={[styles.selectionTitle, { color: tokens.ink }]}>{t('library.selected', { count: selection.size })}</Text>
           <SelectAllButton visibleIds={shownDocs.map((d) => d.id)} selection={selection} />
         </View>
       ) : (
@@ -300,7 +302,7 @@ export function CourseScreen() {
             renderItem={({ item }) => (
               <FileRow
                 doc={item}
-                selected={selection.includes(item.id)}
+                selected={selection.has(item.id)}
                 selectionMode={selMode}
                 onPress={onRowPress}
                 onLongPress={onRowLongPress}

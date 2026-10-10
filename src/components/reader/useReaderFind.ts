@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { searchTextDirect, type PDFSearchResultItem } from 'react-native-pdf-jsi';
-import { useBackHandler } from '../../navigation/useBackHandler';
 import { createFindRunner } from '../../services/reader/findRunner';
 
 const SEARCH_DEBOUNCE_MS = 200;
@@ -16,14 +15,14 @@ type Options = {
   pdfUri: string | undefined;
   pdfId: string;
   pageCount: number;
-  // Resets everything when another document opens.
-  contentKey: string | undefined;
   goToPage: (page: number) => void;
 };
 
 // The Reader's Find: the query, the PDF engine's hits (highlighted in the viewer), and the
-// match count shown in the top bar.
-export function useReaderFind({ pdfUri, pdfId, pageCount, contentKey, goToPage }: Options) {
+// match count shown in the top bar. §18 W6: one instance per file (ReaderDocumentView is keyed on
+// it), so another document starts with Find closed. Android Back closing Find is the caller's
+// (readerSheets.readerBackTarget: a sheet or a tool comes first).
+export function useReaderFind({ pdfUri, pdfId, pageCount, goToPage }: Options) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PDFSearchResultItem[]>(NO_RESULTS);
@@ -49,15 +48,12 @@ export function useReaderFind({ pdfUri, pdfId, pageCount, contentKey, goToPage }
     setLocalMatchCount(0);
     setTargetPage(null);
   }, [runner]);
-  // §9 O1: Android back closes the find bar before leaving the Reader.
-  useBackHandler(close, open);
 
   const toggle = useCallback(() => {
     if (open) close();
     else setOpen(true);
   }, [open, close]);
 
-  useEffect(() => close(), [contentKey, close]);
   // A search that outlives the Reader must not scroll a viewer that is gone.
   useEffect(() => () => runner.close(), [runner]);
 

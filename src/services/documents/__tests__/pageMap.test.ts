@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import MlkitOcr from 'rn-mlkit-ocr';
 import { makePng } from '../../../test/png';
 import { runOcr } from '../../ocr/ocrService';
-import { buildPdfFromPages, type PageSizeId } from '../../pdf/pdfService';
+import { buildPdfFromPages, inspectPdf, type PageSizeId } from '../../pdf/pdfService';
 import type { LibraryDocument, LibraryPage, PageLayout, PageRotation } from '../../../types/models';
 import { libraryIdxFor, pdfPageCount, pdfPageFor, pdfRectFor } from '../pageMap';
 import { backfillPdfInfo } from '../pdfInfoBackfill';
@@ -168,6 +168,8 @@ describe('word-level OCR', () => {
   });
 });
 
+// The pdf-lib reader, which a build without modules/pdf-native still uses (§16 G4), on PDFs the
+// app really builds. The native reader has its own test (pdfInfoBackfill.test.ts).
 describe('backfillPdfInfo', () => {
   it('reads the layout and paper from the PDF, and skips what it should', async () => {
     const image = new File(Paths.cache, 'bf.png');
@@ -175,14 +177,17 @@ describe('backfillPdfInfo', () => {
     const src = [0, 1, 2].map(() => ({ uri: image.uri, width: 1000, height: 1400 }));
     const twoUp = await buildPdfFromPages('bf_two', src, 'as-is', undefined, '2_in_1', 'Letter');
     const std = await buildPdfFromPages('bf_std', src.slice(0, 1), 'as-is', undefined, 'standard', 'A4');
-    const patches = await backfillPdfInfo([
-      doc({ id: 'two', pdfUri: twoUp.uri }),
-      doc({ id: 'std', pdfUri: std.uri }),
-      doc({ id: 'known', pdfUri: std.uri, pdfLayout: 'standard' }),
-      doc({ id: 'imported', pdfUri: std.uri, sourceKind: 'imported_pdf' }),
-      doc({ id: 'missing', pdfUri: 'file:///nope.pdf' }),
-      doc({ id: 'docx', format: 'DOCX', pdfUri: std.uri }),
-    ]);
+    const patches = await backfillPdfInfo(
+      [
+        doc({ id: 'two', pdfUri: twoUp.uri }),
+        doc({ id: 'std', pdfUri: std.uri }),
+        doc({ id: 'known', pdfUri: std.uri, pdfLayout: 'standard' }),
+        doc({ id: 'imported', pdfUri: std.uri, sourceKind: 'imported_pdf' }),
+        doc({ id: 'missing', pdfUri: 'file:///nope.pdf' }),
+        doc({ id: 'docx', format: 'DOCX', pdfUri: std.uri }),
+      ],
+      inspectPdf
+    );
     expect(patches).toEqual([
       { id: 'two', patch: { pdfLayout: '2_in_1', pdfPageSize: 'Letter' } },
       { id: 'std', patch: { pdfLayout: 'standard', pdfPageSize: 'A4' } },

@@ -422,7 +422,98 @@ count. The allow-list is empty, so a new static import breaks the test. Existing
 Device check: Verification 4 (cold start, against the `docs/qa/performance.md` baseline).
 
 ## G4 · Boot waterfall: data before fonts, less work in `loadAll` *(M; needs a new dev build)*
-Status: planned.
+Status: done in code (2026-10-10). **Needs a new dev build** (`npx expo prebuild`, then rebuild) for the
+embedded fonts; the JS works in the current dev build (it loads the fonts at run time, as before). Schema
+is now **v17**. Open: Verification 4–5 on a device, and the font check after the new build.
+
+As built:
+- **Fonts.** `app.json`: the `expo-font` plugin gets `android.fonts` with the five files from
+  `node_modules/@expo-google-fonts/{caprasimo,figtree}/…` (SDK 57 docs and the plugin source: on
+  Android the file name is the family name, and the files are named exactly like `fontFamily`'s
+  values). `useAppFonts` didn't change: `useFonts` starts out `loaded` when every family is already
+  registered natively, so an Android build with the fonts has them on the first render; Expo Go, the
+  web and an older dev build load them at run time as before. **Android only:** on iOS an embedded
+  font is named by the font file's own name ("Figtree-Regular"), not ours, so embedding there would
+  only add dead files; iOS keeps the runtime load. `theme/__tests__/embeddedFonts.test.ts` fails if
+  `fontFamily` and app.json's list drift (on a phone that would only be a silent fallback to the
+  runtime load). `npx expo config` shows the plugin options are in the resolved config.
+- **FontGate is gone, not moved.** Moving it below the providers (the plan) wouldn't have helped: the
+  boot hooks live in `AppNavigator`, which would still have been its child. `AppNavigator` calls
+  `useAppFonts()` itself and waits for the fonts in `bootReady`, next to the settings and the library,
+  so the hooks start on the first render and no screen draws text before the fonts are in. (G5's
+  `BootEffects` can take the hooks from there.) The 3 s `SPLASH_TIMEOUT_MS` still shows the app if
+  anything hangs.
+- **Module scope.** `App.tsx` calls `warmDb()` (`dbService`: starts `getDb()`'s memoised open) and
+  `warmSettings()` (`settingsStorage`: one read that the boot's first `loadSettings()` takes; later
+  calls, such as a backup's, read again). The library load itself still starts in
+  `useLibraryPersistence`'s effect, on the promise that is already running.
+- **Legacy import.** Migration **v17** adds a `meta` key/value table (`persistence/meta.ts`,
+  `getMeta`/`setMeta`). `importLegacyLibraryIfPresent` returns at once when `legacyImportDone` is set,
+  and sets it last, after an import or after finding nothing; a failed import leaves it unset and is
+  tried again. `meta` isn't in backups (it describes this phone's file).
+- **`loadAll` without `ocr_json`.** The pages query names its columns and selects
+  `ocr_json IS NOT NULL AS has_boxes` instead of the JSON. A page with stored boxes loads as
+  `{ text, blocks: [], blocksRow: <its page id> }` (new optional `PageOcr.blocksRow`: "the boxes are
+  still in the database, in this row").
+  - **Reading them:** `libraryRepo.loadPageOcr(db, pages)` (it takes the pages, not a document id, so
+    it also works for a copy whose own row isn't written yet) and `documents/pageOcr.ts`
+    `withPageBlocks(pages)`, which reads between library writes (`withWriteLock`). Called in **one
+    place per consumer kind** instead of at every entry point: `pdfService.buildPdfFromPages` and
+    `rasterPdf.buildRasterPdf` load the boxes of the pages they're given (so merge, split, compress,
+    sign, submit, add cover, exam pack and Edit pages need nothing; `toSourcePage` now passes the
+    page id), `toDocx.readPagesText` does for Convert to Word, and the Reader's
+    `components/reader/usePageOcr.ts` dispatches `library/SET_PAGE_OCR` for Select text and Mark
+    mode's snap-to-word. `SET_PAGE_OCR` only fills pages that are still waiting.
+  - **Writing (the part the plan didn't spell out):** every page save deletes and re-inserts the
+    document's page rows, so a page whose boxes were never loaded would have been written back
+    without them. `syncLibrary` (and `upsertDocuments`, `insertIfMissing`) first reads the stored
+    JSON of such pages, **before any delete**, and writes it back unchanged. It looks in the page's
+    own row first, then in the row `blocksRow` names: `copyPageInto` gives a copy a new id while its
+    boxes are still in the original's row, and the original may be deleted later.
+  - **Loading boxes is not a change.** `SET_PAGE_OCR` makes a new `pages` array; without care the
+    sync would rewrite every page of every document the Reader opens and move `updated_at` (which
+    backups compare). `libraryRepo` remembers the OCR objects it loaded (a `WeakSet`), and a document
+    that differs from the stored one only by them is skipped; `documentEdited` ignores it too.
+  - Not converted, on purpose: anything that only reads `ocr.text` (search snippets, Copy text,
+    titles) - the text is still loaded.
+- **`searchHaystack` is removed from `LibraryDocument`.** Not every search goes through FTS: the
+  Library filters in memory while the FTS query is on its way (and if it fails). `searchService`
+  now builds that text on the first search, per document object, in a `WeakMap`. The ~20 places that
+  built it by hand (Deliver, merge/split, page edits, add cover, exam pack, text edit, the reducer's
+  `UPDATE_FILE`) no longer do. `getMatchSnippet` didn't change (it reads `ocr.text`).
+- **PRAGMAs.** `journal_mode = WAL` and `synchronous = NORMAL` with `foreign_keys` in the one `execAsync`
+  after the open. Nothing copies `pdfscan.db`: backups read rows through the same connection
+  (`backup/format.ts`), restores write under `withWriteLock`, and Android's backup takes the whole
+  `SQLite/` folder, log file included (`plugins/withBackupRules.js`). So there is no checkpoint call.
+- **Backfill.** `store/usePdfInfoBackfill.ts` runs it from `AppNavigator` with `libraryAfterBoot`,
+  once per library load; `useLibraryPersistence` no longer does. `pdfInfoBackfill` reads the page
+  count and the last page's size with `pdfNative` (pdf-lib only in a build without the module). An
+  unreadable PDF gets `pdfInfoFailed` (new column `documents.pdf_info_failed`, v17; not an edit; reset
+  in a backup's export) and isn't opened again. **A missing file is skipped, not marked**, so it is
+  read when it comes back (a restore). pdfium's sizes have `/Rotate` applied and pdf-lib's don't; that
+  can't matter here, because a document without `pdfLayout` was built before pages could be turned.
+- **External open:** §18 W3 landed it first (`getPageCount`, `undefined` on any failure). Checked.
+- **Deletes:** `deleteRows` runs `DELETE … WHERE id IN (…)` per 500 ids.
+- **Dev seeder:** the Filter Lab has "Seed with word boxes" (`seedLibrary(…, { wordBoxes: true })`)
+  for Verification 5: seed once without and once with, and compare cold starts.
+- **Measured in Node, not on a phone** (the sqlite test mock; 500 documents × 4 pages × 250 words,
+  median of 7): with word boxes the library holds 52.6 MB of `ocr_json` and 3.6 MB of text. The old
+  load (every column, each page parsed, the search text joined) took **132 ms**; `loadAll` now takes
+  **6 ms**, the same as for the library without boxes (5 ms). A phone is several times slower and
+  also copies those strings across JSI, so the old figure there is seconds; Verification 5 is the
+  real test.
+- **Left for G7:** imported-PDF indexing still saves the whole page list every 10 pages. For a
+  document resumed after a restart, each of those saves now also reads back the boxes of the pages
+  indexed earlier. G7's incremental writes remove both.
+- **Tests:** `libraryRepo.test.ts` (the load's SQL has no `ocr_json`; `loadPageOcr`; boxes survive a
+  reorder, a copy under a new id whose original is then deleted, and a merge; loading boxes opens no
+  transaction and keeps `updated_at`; batched deletes; the failed mark), `documents/__tests__/
+  pageOcr.test.ts` (a PDF built from a just-loaded document still has its text layer: it fails
+  without the call in `buildPdfFromPages`; Convert to Word), `pdfInfoBackfill.test.ts` (native
+  reader; `pdfService` is mocked to throw on load), `legacyImport.test.ts` (one AsyncStorage read per
+  database; a failed import isn't marked), `settingsWarm.test.ts`, `search/__tests__/
+  searchService.test.ts`, `librarySlice.test.ts` (`SET_PAGE_OCR`), `embeddedFonts.test.ts`.
+  `bootImports.test.ts` passes unchanged.
 
 Goal: the database and settings start loading in the first millisecond, the library load doesn't grow
 with OCR data, and nothing PDF-heavy runs before the first screen.
@@ -467,7 +558,48 @@ Device check: Verification 4–5. After `npx expo prebuild --clean` and the new 
 screen still shows Caprasimo and Figtree.
 
 ## G5 · Re-render hygiene *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: Verification 6 on a device (the render counts).
+
+As built:
+- **`libraryUi` slice** (`store/slices/libraryUiSlice.ts`): `selection`, `selMode`, `tab`, `search`,
+  `searchOpen`, `searchResultIds`, `indexing`, and the three other UI-only fields of `library`,
+  `activeCourseId`, `homeSemesterId` and `highlightDeadlineId` (otherwise `SET_TAB`, opening a
+  course and a tapped reminder would still change `library`). Their actions are now `libraryUi/…`
+  (`TOGGLE_SELECTION`, `SET_SEL_MODE`, `CLEAR_SELECTION`, `SELECT_ALL`, `SET_TAB`, `SET_SEARCH`,
+  `TOGGLE_SEARCH_OPEN`, `SET_SEARCH_RESULT_IDS`, `SET_INDEXING`, `SET_ACTIVE_COURSE`,
+  `SET_HOME_SEMESTER`, `SET_HIGHLIGHT_DEADLINE`). The slice also follows `library/REMOVE_FILES`,
+  `REPLACE_FILES`, `DELETE_COURSE` and `DELETE_DEADLINE` (a deleted document leaves the selection,
+  and so on). Every case returns the same state when nothing changes. `library` is now only what
+  is saved, plus the load status.
+- **Selection is a `ReadonlySet<string>`** (insertion order kept): `.has(id)` in the rows and
+  `SelectAllButton`, `.size` in the headers, `[...selection]` for `REPLACE_FILES`.
+- **`appReducer`** returns `state` when every slice reducer returned its own state, so the store's
+  `next === state` check stops there.
+- **`bootstrap/BootEffects.tsx`** (memo'd, renders `null`, mounted by AppNavigator from the first
+  render, above the lock) hosts the persistence, signature, external-file, reminder, indexing,
+  backfill, integrity and auto-backup hooks, and the crash / usage / entitlement / remote config /
+  notifications / ads effects. The hooks themselves still read the whole `library` slice; they
+  re-render only this component.
+- **AppNavigator** reads single fields (`loadStatus`, `settings.loaded`, the app lock switch, "has
+  an active course", `processingStatus`, `errorMessage`). The Android Back handler and the start
+  screen's choice read the rest from the store at that moment (`useAppStore().getState()`), not
+  from a subscription.
+- `ScreenLayer` and `ScreenFrame` were already memo'd with stable props (G2); nothing to change.
+- **Home:** `utils/useDayClock.ts` (`now`, `today`): changes at midnight (a timer), when the app
+  comes back to the foreground, and when Home is shown again after a minute or more. Not only
+  `today`, because the deadline list's "overdue" needs the time. A test that mounts Home has to
+  unmount it (the midnight timer keeps Jest waiting otherwise).
+- **Render counts (dev only):** `utils/renderCounts.ts` `useRenderCount(name)` (not in `src/dev`:
+  the screens import it, and `bootImports.test.ts` keeps `src/dev` out of AppNavigator's static
+  imports) and `src/dev/RenderCountOverlay.tsx`, turned on in Settings → Developer → Render counts.
+  It counts only while shown. Counted: AppNavigator, BootEffects, ScreenStack, TabBar, Home, Library,
+  Course, SearchBar, FileRow. Tap the overlay to reset.
+- **Not done here:** LibraryScreen itself still re-renders on a keystroke (it filters the list with
+  the query); FileRow is memo'd, so rows whose data didn't change don't. Verification 6 will show
+  "Library" moving with "SearchBar". Splitting the screen is G6's list work if the counts say so.
+- Tests: `store/__tests__/{appReducer,libraryUiSlice}.test.ts`, `selectorStore.test.tsx` (a UI
+  action doesn't reach a `library` reader; a no-op tells nobody), `useLibraryPersistence.test.tsx`
+  (no `syncLibrary` for UI-only actions), `utils/__tests__/{useDayClock,renderCounts}.test.ts(x)`.
 
 Goal: a keystroke, a selection tap or a progress tick re-renders only the components that show it.
 

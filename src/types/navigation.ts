@@ -19,6 +19,8 @@ export type ScreenName =
   // §9 O2: the three-page introduction for new users.
   | 'onboarding'
   // Dev-only (__DEV__): see src/dev/FilterLabScreen.tsx.
-  | 'filterLab';
+  | 'filterLab'
+  // Dev-only (__DEV__): see src/dev/ReaderLabScreen.tsx (§18 W7).
+  | 'readerLab';
 export type NavDir = 'fwd' | 'back';
 // The tabs and the back stacks are in navigation/navStack.ts (§16 G2).

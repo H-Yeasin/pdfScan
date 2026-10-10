@@ -63,10 +63,10 @@ function fixedBackTarget(ctx: BackContext): ScreenName | null {
 
 export function resolveBack(ctx: BackContext): BackStep {
   if (ctx.selMode && SELECTION_SCREENS.has(ctx.screen)) {
-    return { kind: 'dispatch', actions: [{ type: 'library/CLEAR_SELECTION' }] };
+    return { kind: 'dispatch', actions: [{ type: 'libraryUi/CLEAR_SELECTION' }] };
   }
   if (ctx.searchOpen && ctx.screen === 'library') {
-    return { kind: 'dispatch', actions: [{ type: 'library/TOGGLE_SEARCH_OPEN' }] };
+    return { kind: 'dispatch', actions: [{ type: 'libraryUi/TOGGLE_SEARCH_OPEN' }] };
   }
 
   // §9 O2: Onboarding's own pages step back with useBackHandler. On its first page: opened again
@@ -77,7 +77,7 @@ export function resolveBack(ctx: BackContext): BackStep {
   const actions: AppAction[] = [];
   if (ctx.screen === 'review' && ctx.retakeTargetId) actions.push({ type: 'capture/SET_RETAKE_TARGET', id: null });
   if (ctx.screen === 'course' && ctx.highlightDeadlineId) {
-    actions.push({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null });
+    actions.push({ type: 'libraryUi/SET_HIGHLIGHT_DEADLINE', id: null });
   }
   if (ctx.screen === 'academicOptions' && ctx.coverTarget) actions.push({ type: 'deliver/SET_COVER_TARGET', target: null });
 

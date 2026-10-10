@@ -19,6 +19,13 @@ jest.mock('../../components/shared/SignaturePlacementOverlay', () => ({ Signatur
 type Ctx = { app: ReturnType<typeof useAppState>; router: ReturnType<typeof useRouter> };
 
 // Home and the course page, switched by the router like AppNavigator does (without transitions).
+// Unmounted after each test: Home keeps a timer to the next midnight (utils/useDayClock), and a
+// tree left mounted would keep Jest waiting for it.
+const mounted: ReturnType<typeof create>[] = [];
+afterEach(() => {
+  act(() => mounted.splice(0).forEach((root) => root.unmount()));
+});
+
 function mount() {
   let ctx: Ctx | null = null;
   function Screens() {
@@ -41,6 +48,7 @@ function mount() {
       </SafeAreaProvider>
     );
   });
+  mounted.push(root);
   return { root, ctx: () => ctx! };
 }
 
@@ -78,7 +86,7 @@ describe('Home course hub', () => {
 
     press(root, 'Physics');
     expect(ctx().router.screen).toBe('course');
-    expect(ctx().app.state.library.activeCourseId).toBe('physics');
+    expect(ctx().app.state.libraryUi.activeCourseId).toBe('physics');
     expect(texts(root)).toContain('Nothing in Physics yet');
 
     press(root, 'Scan into this course');

@@ -25,6 +25,7 @@ import { APP_VERSION } from '../config/appInfo';
 import { useRemoteConfig, useRemoteConfigSource } from '../services/remote/remoteConfig';
 import { useAdsSdk } from '../services/ads/adsSdk';
 import { isCrashReportingActive, reportCrash } from '../services/telemetry/crash';
+import { setRenderCountsShown, useRenderCountsShown } from '../utils/renderCounts';
 import { deviceInfo, supportContacts, type SupportContact } from '../services/support/supportLinks';
 
 export function SettingsScreen() {
@@ -37,6 +38,7 @@ export function SettingsScreen() {
   ];
   const [timetableOpen, setTimetableOpen] = useState(false);
   const { go, back } = useRouter();
+  const renderCountsOn = useRenderCountsShown();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const entitlement = useEntitlement();
@@ -241,6 +243,17 @@ export function SettingsScreen() {
               subtitle={t('settings.developer.filterLabSubtitle')}
               chevron
               onPress={() => go('filterLab')}
+            />
+            <SettingRow
+              title={t('settings.developer.readerLab')}
+              subtitle={t('settings.developer.readerLabSubtitle')}
+              chevron
+              onPress={() => go('readerLab')}
+            />
+            <SettingRow
+              title={t('settings.developer.renderCounts')}
+              subtitle={t(renderCountsOn ? 'settings.developer.renderCountsOn' : 'settings.developer.renderCountsOff')}
+              onPress={() => setRenderCountsShown(!renderCountsOn)}
             />
             <SettingRow
               title={t('settings.developer.proPass')}

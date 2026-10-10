@@ -24,7 +24,7 @@ export function useOpenCoverOptions() {
         dispatch({ type: 'ui/SHOW_SNACK', msg });
         return;
       }
-      dispatch({ type: 'library/CLEAR_SELECTION' });
+      dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
       dispatch({ type: 'deliver/SET_COVER_TARGET', target: { docId: doc.id, from: screen } });
       go('academicOptions');
     },

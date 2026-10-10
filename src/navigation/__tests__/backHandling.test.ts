@@ -35,7 +35,7 @@ describe('resolveBack order', () => {
   it('leaves selection before anything else', () => {
     expect(resolveBack(ctx({ screen: 'course', tab: 'library', canPop: true, selMode: true }))).toEqual({
       kind: 'dispatch',
-      actions: [{ type: 'library/CLEAR_SELECTION' }],
+      actions: [{ type: 'libraryUi/CLEAR_SELECTION' }],
     });
     // Even on the root tab: selection first, exit only on the next press.
     expect(resolveBack(ctx({ screen: 'home', selMode: true })).kind).toBe('dispatch');
@@ -44,7 +44,7 @@ describe('resolveBack order', () => {
   it('closes Library search, then goes back to the start tab', () => {
     expect(resolveBack(ctx({ screen: 'library', tab: 'library', searchOpen: true }))).toEqual({
       kind: 'dispatch',
-      actions: [{ type: 'library/TOGGLE_SEARCH_OPEN' }],
+      actions: [{ type: 'libraryUi/TOGGLE_SEARCH_OPEN' }],
     });
     expect(resolveBack(ctx({ screen: 'library', tab: 'library' }))).toEqual({ kind: 'go', to: 'home', actions: [] });
   });
@@ -99,7 +99,7 @@ describe('resolveBack order', () => {
     });
     expect(resolveBack(ctx({ screen: 'course', canPop: true, highlightDeadlineId: 'd1' }))).toEqual({
       kind: 'pop',
-      actions: [{ type: 'library/SET_HIGHLIGHT_DEADLINE', id: null }],
+      actions: [{ type: 'libraryUi/SET_HIGHLIGHT_DEADLINE', id: null }],
     });
   });
 

@@ -14,6 +14,7 @@ import { dueSoon } from '../services/submit/deadlines';
 import { BannerSlot } from '../components/ads/BannerSlot';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
+import { useScreenRole } from '../navigation/screenRole';
 import {
   continueDocument,
   courseActivity,
@@ -25,27 +26,30 @@ import {
 } from '../services/courses/homeSelectors';
 import { courseColorValue } from '../services/courses/palette';
 import { startScan } from '../services/courses/startScan';
-import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
+import { useAppDispatch, useAppSelector, useAppSlices, useAppStore } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
 import type { Course } from '../types/models';
-import { toLocalDateString } from '../utils/localDate';
+import { useDayClock } from '../utils/useDayClock';
 import { formatShortDate } from '../utils/format';
 import { useBackupReminder } from '../store/useBackupReminder';
 import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/shared/Hint';
 import { useHint } from '../components/shared/useHint';
+import { useRenderCount } from '../utils/renderCounts';
 
 // The course hub (docs/PLAN.md §3): the shown semester with a switcher, "Continue" for the last
 // opened or saved document, a grid of the semester's courses, Unsorted, and a big Scan button.
 // All derived data comes from homeSelectors.ts.
 export function HomeScreen() {
+  useRenderCount('Home');
   const { tokens } = useTheme();
   const { t } = useT();
   const { go } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
+  const homeSemesterId = useAppSelector((s) => s.libraryUi.homeSemesterId);
   const store = useAppStore();
-  const { files, courses, semesters, homeSemesterId } = state.library;
+  const { files, courses, semesters } = state.library;
   const openDocument = useOpenDocument();
   // §8 B5: "Last backup: never. Back up now?"
   const reminder = useBackupReminder();
@@ -57,8 +61,9 @@ export function HomeScreen() {
   // §9 O3: points at Scan once (after onboarding, or on Capture if that comes first).
   const scanHint = useHint('scan', !switcherOpen && !quickSetup && editing === null && !addingDeadline);
 
-  const now = Date.now();
-  const today = toLocalDateString(now);
+  // §16 G5: a clock that changes at midnight and when Home is shown again, not on every render,
+  // so the memos below hold.
+  const { now, today } = useDayClock(useScreenRole() === 'active');
   const current = useMemo(() => currentSemester(semesters, today), [semesters, today]);
   const shown = useMemo(() => homeSemester(semesters, homeSemesterId, today), [semesters, homeSemesterId, today]);
   const gridCourses = useMemo(() => homeCourses(courses, shown), [courses, shown]);
@@ -69,7 +74,7 @@ export function HomeScreen() {
   const soon = useMemo(() => dueSoon(state.library.deadlines, now), [state.library.deadlines, now]);
 
   const openCourse = (id: string) => {
-    dispatch({ type: 'library/SET_ACTIVE_COURSE', id });
+    dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id });
     go('course');
   };
 
@@ -182,7 +187,7 @@ export function HomeScreen() {
                   return c?.code || c?.name;
                 }}
                 onPress={(d) => {
-                  dispatch({ type: 'library/SET_HIGHLIGHT_DEADLINE', id: d.id });
+                  dispatch({ type: 'libraryUi/SET_HIGHLIGHT_DEADLINE', id: d.id });
                   openCourse(d.courseId);
                 }}
               />

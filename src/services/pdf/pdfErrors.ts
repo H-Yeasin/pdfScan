@@ -7,3 +7,13 @@ export class PdfEncryptedError extends Error {
     this.name = 'PdfEncryptedError';
   }
 }
+
+// §18 W7: a password was given and it doesn't open the PDF. It is still an encrypted PDF, so code
+// that only asks "does this need a password?" keeps working.
+export class PdfWrongPasswordError extends PdfEncryptedError {
+  constructor() {
+    super();
+    this.message = "That password doesn't open the PDF";
+    this.name = 'PdfWrongPasswordError';
+  }
+}

@@ -97,7 +97,7 @@ export function confirmDelete(docs: readonly LibraryDocument[], dispatch: Dispat
               console.warn('confirmDelete: could not delete the files of', id, error);
             }
           }
-          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.deleted', { count }) });
         },
       },
@@ -107,12 +107,13 @@ export function confirmDelete(docs: readonly LibraryDocument[], dispatch: Dispat
 
 // What a document list does with its rows, shared by the Library and Course screens: tap opens
 // (or toggles, in selection mode), long-press starts selecting, and the SelectionBar's tools
-// (merge, split, compress, sign, set type). Selection lives in state.library, so it's one selection
+// (merge, split, compress, sign, set type). Selection lives in state.libraryUi, so it's one selection
 // app-wide. Render `overlays` once in the screen: it holds the signing overlays and the type and course pickers.
 export function useDocumentListActions() {
   const dispatch = useAppDispatch();
-  const state = useAppSlices('library', 'signature');
-  const { files, selection, selMode } = state.library;
+  const state = useAppSlices('library', 'libraryUi', 'signature');
+  const { files } = state.library;
+  const { selection, selMode } = state.libraryUi;
   const openDocument = useOpenDocument();
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
@@ -123,12 +124,12 @@ export function useDocumentListActions() {
   const { exportScope, overlay: backupOverlay } = useBackupExport();
   const openCoverOptions = useOpenCoverOptions();
 
-  const selectedDocs = useMemo(() => files.filter((f) => selection.includes(f.id)), [files, selection]);
+  const selectedDocs = useMemo(() => files.filter((f) => selection.has(f.id)), [files, selection]);
 
   const handlePressRow = useCallback(
     (doc: LibraryDocument) => {
       if (selMode) {
-        dispatch({ type: 'library/TOGGLE_SELECTION', id: doc.id });
+        dispatch({ type: 'libraryUi/TOGGLE_SELECTION', id: doc.id });
         return;
       }
       openDocument(doc);
@@ -139,8 +140,8 @@ export function useDocumentListActions() {
   const handleLongPress = useCallback(
     (doc: LibraryDocument) => {
       if (!selMode) hapticSelection();
-      dispatch({ type: 'library/SET_SEL_MODE', on: true });
-      dispatch({ type: 'library/TOGGLE_SELECTION', id: doc.id });
+      dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true });
+      dispatch({ type: 'libraryUi/TOGGLE_SELECTION', id: doc.id });
     },
     [dispatch, selMode]
   );
@@ -157,7 +158,7 @@ export function useDocumentListActions() {
       // §8 B3: Everything or PDFs only, then share or save the zip.
       if (id === 'export') {
         exportScope({ kind: 'documents', documentIds: selectedDocs.map((d) => d.id) });
-        dispatch({ type: 'library/CLEAR_SELECTION' });
+        dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
         return;
       }
 
@@ -183,7 +184,7 @@ export function useDocumentListActions() {
         const ids = selectedDocs.map((d) => d.id);
         const archived = !selectedDocs.every((d) => d.archived);
         dispatch({ type: 'library/SET_ARCHIVED', ids, archived });
-        dispatch({ type: 'library/CLEAR_SELECTION' });
+        dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
         dispatch({
           type: 'ui/SHOW_SNACK',
           msg: archived ? t('library.archivedSnack', { count: ids.length }) : t('library.unarchivedSnack', { count: ids.length }),
@@ -194,7 +195,7 @@ export function useDocumentListActions() {
       }
 
       if (id === 'submit' && selectedDocs.length === 1) {
-        dispatch({ type: 'library/CLEAR_SELECTION' });
+        dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
         await submit(selectedDocs[0]);
         return;
       }
@@ -218,19 +219,19 @@ export function useDocumentListActions() {
         if (tool === 'merge' && selectedDocs.length >= 2) {
           const merged = await libraryOps().mergeDocuments(selectedDocs, annotationsOf(selectedDocs));
           selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
-          dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
-          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'library/REPLACE_FILES', ids: [...selection], files: [merged] });
+          dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.merged', { count: selectedDocs.length }) });
         } else if (tool === 'split' && selectedDocs.length === 1) {
           const [doc] = selectedDocs;
           const split = await libraryOps().splitDocument(doc, annotationsOf([doc]));
           deleteDocumentFiles(doc.id);
           dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
-          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.splitInto', { count: split.length }) });
         } else if (tool === 'compress') {
           const msg = await compressDocuments(selectedDocs, state.library.annotations, dispatch);
-          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg });
         }
       }
@@ -261,7 +262,7 @@ export function useDocumentListActions() {
         state.library.annotations.filter((a) => a.documentId === signTarget.id)
       );
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
-      dispatch({ type: 'library/CLEAR_SELECTION' });
+      dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: 1 }) });
     },
@@ -296,7 +297,7 @@ export function useDocumentListActions() {
       // 2-in-1 sheet. The saved signature is only read, so it is there for the next document.
       const updated = await libraryOps().applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement, signPage);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
-      dispatch({ type: 'library/CLEAR_SELECTION' });
+      dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
       setSignStep(null);
       setCapturedSignature(null);
       setSignTarget(null);
@@ -322,7 +323,7 @@ export function useDocumentListActions() {
         value={sharedType}
         onSelect={(docType) => {
           dispatch({ type: 'library/SET_DOC_TYPE', ids: selectedDocs.map((d) => d.id), docType });
-          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
         }}
         onClose={() => setTypePickerOpen(false)}
       />
@@ -336,7 +337,7 @@ export function useDocumentListActions() {
         onSelect={(courseId) => {
           const ids = selectedDocs.map((d) => d.id);
           dispatch({ type: 'library/ASSIGN_COURSE', ids, courseId });
-          dispatch({ type: 'library/CLEAR_SELECTION' });
+          dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           const name = courseId ? state.library.courses.find((c) => c.id === courseId)?.name : t('common.unsorted');
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.moved', { count: ids.length, name: name ?? t('library.movedFallback') }) });
         }}

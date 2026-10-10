@@ -8,7 +8,7 @@ const FLASH_MS = 1600;
 // imported PDF), so rather than map it here the PDF's own text is searched for the mark's words on
 // that page: a scan's invisible OCR layer or an imported PDF's text. Best effort: no text, no
 // flash.
-export function useMarkFlash(pdfId: string, contentKey: string | undefined) {
+export function useMarkFlash(pdfId: string) {
   const [rects, setRects] = useState<Array<{ page: number; rect: string }> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const run = useRef(0);
@@ -19,7 +19,8 @@ export function useMarkFlash(pdfId: string, contentKey: string | undefined) {
     timer.current = null;
     setRects(null);
   }, []);
-  useEffect(() => clear, [contentKey, clear]);
+  // Leaving the document ends the flash (and its timer).
+  useEffect(() => clear, [clear]);
 
   const flash = useCallback(
     async (page: number, query: string) => {

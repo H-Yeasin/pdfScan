@@ -782,7 +782,41 @@ Add to library keeps the page. The password field stays above the keyboard. On `
 scrubber agree.
 
 ## W6 · ReaderScreen split and the sheet state machine *(M)*
-Status: planned. JS only. **No UI change.**
+Status: done in code (2026-10-10). JS only. **No UI change.** Open: the device check below.
+
+As built:
+- **`services/reader/readerSheets.ts`** (pure): `{ sheet, tool }`. `sheet` is one of `more`, `reading`,
+  `type`, `jump`, `pages`, `submissions`, `bookmarks`, `notes`, `label`, `signCapture` (with the page
+  `idx`). `tool` is one of `mark`, `selectText`, `signPlace`, `signFlatten`, each with its library page
+  `idx`. `rename` and `move` are not in the type yet: W23 adds them with their sheets.
+  - `openSheet` replaces the open sheet. `closeSheet` names a kind and closes only that one (More closes
+    itself, then the item picked opens another sheet). `openTool` closes the sheet it started from.
+  - `readerBackTarget(state, findOpen)` gives the Back order: sheet → tool → Find → leave.
+  - `chromeLocked(state)` replaces the twelve OR'd booleans (the bookmark hint waits on it).
+- **`ReaderScreen`** (30 lines, not 150): `useReaderSubject()` (role, held subject, `viewKey`), the inert
+  view, "not found", and `<ReaderDocumentView key={viewKey}/>`. `viewKey` is the file's uri, or the
+  document's id while it has no file yet (the preview being prepared).
+- **`ReaderDocumentView`** (479 lines) holds the viewers, both bars and the wiring. It is still the
+  largest file: the Pro task starters (convert, edit, fill form) stayed in it.
+- **`useReaderDocument({ doc, external })`** and **`useReaderFind`** lost their reset effects, and
+  `reloaded` no longer carries a `contentKey`. `useMarkFlash` and `useReaderChrome` lost theirs too
+  (`contentKey` argument, `reset()`).
+- **`useReaderOverflowActions`**: `readerOverflowActions(ctx)` is a `Record<ReaderMoreItemId, handler>`;
+  the hook returns a stable `onSelect` that runs the item against the Reader as it is then.
+- **`useReaderSigning`**: `start()` (asks which page on a 2-in-1 sheet) and `overlays`. The page being
+  signed is the `idx` in the sheet or tool, not a separate state.
+- **`ReaderSheets`**: every sheet's JSX and what its answer does. **`ReaderLoadProblem`**: the damaged
+  and password cards, plus `ReaderNotice` for the full-screen states.
+- **Back:** the sheets are RN Modals and Mark mode has its own listener, so they still take the press
+  themselves. Find's handler moved from `useReaderFind` to `ReaderDocumentView`, on only while
+  `readerBackTarget` says `find`.
+- **One behaviour change, from the key:** opening another file in the same Reader (the "Open" on a
+  converted copy's snack, a saved edited copy or filled form, Add to library) now also closes any sheet
+  or tool and drops the Pro task hooks' state. Before, only the position, password, Find and bars reset.
+- Tests: `services/reader/__tests__/readerSheets.test.ts` (the reducer, Back order, chrome lock);
+  `components/reader/__tests__/readerOverflowActions.test.ts` (a handler for every id, checked against a
+  `Record<ReaderMoreItemId, true>` so a new id fails to compile; the sheets opened; Add to library;
+  Delete). No test renders `ReaderDocumentView`.
 
 Goal: the Reader is small files with one state machine, so W10–W17 each change a small file once.
 
@@ -797,7 +831,66 @@ handler table covers every `ReaderMoreItemId` (exhaustive at the type level).
 Device check: every More item, hint and Back behaves as before.
 
 ## W7 · pdf-native v2 *(L; needs a new dev build)*
-Status: planned. Split point: (a) Android + the lab screen; (b) iOS (PDFKit).
+Status: done in code (2026-10-10), (a) and (b). Android compiles against pdfiumandroid 1.0.32
+(`:pdf-native:compileDebugKotlin`); **the iOS code was only type-checked against a stub of
+ExpoModulesCore and has never been built or run.** Open: a new dev build, then the device check below.
+
+As built:
+- **Android** (`modules/pdf-native/android/.../`):
+  - `PdfSessions.kt`: the open documents and the one thread for every pdfium call. At most 2 open (a third
+    closes the least recently used), closed after 60 s without a call, all closed on `onTrimMemory`
+    (background or running-critical) and `onLowMemory`.
+  - `PageRenderer.kt`: `renderPageImage`. The pdfium thread only draws; the colour matrix, the JPEG and
+    the write (`out.tmp` → rename) run on an encode thread, with at most 2 bitmaps in flight. `BitmapPool`
+    (4 bitmaps, 48 MB) and `JpegOutput` are in the same file.
+  - `ImageDecoding.kt`: `decodeImage` on its own thread (`inSampleSize`, then an exact scale;
+    `BitmapRegionDecoder` for a region).
+  - `PdfNativeModule.kt`: the functions, the error codes, `getPageLinks`, the shared page-text reader.
+    v1's `getPageText` now also runs on the pdfium thread; `getPageCount/getPageSize/renderPage` are as
+    they were (PdfRenderer, under their lock).
+- **A session can close under JavaScript** (the three reasons above). The call then rejects with
+  `SESSION_CLOSED`, and `pdfSession.ts` opens again once and repeats it. So native memory is bounded
+  whatever JavaScript does, and no caller sees the error.
+- **Page sizes** come from `FPDF_GetPageSizeByIndex` (no content parsing). The library only offers it on
+  a loaded page, so `PdfSessions.pageSize` asks through a `PdfPage` object that was never loaded (it uses
+  only the document and the index), at 7200 dpi, which gives hundredths of a point. If that ever fails it
+  loads the page. Sizes are fractional (595.28, not 595); v1's `getPageText` still reports whole points.
+- **The matrix is scale + translate only.** pdfiumandroid passes only those four values to
+  `FPDF_RenderPageBitmapWithMatrix` (read from its bytecode), so `[a, b, c, d, e, f]` with `b` or `c` not 0
+  is refused with `OUT_OF_RANGE`, on iOS too. It maps shown points (top-left, `/Rotate` applied) to image
+  pixels; a region of a page needs nothing more. Without a matrix the page is fitted to width × height.
+- **Limits:** an image side is 1..4096 px (`OUT_OF_RANGE`); `out` must be a file uri inside the cache
+  directory.
+- **Links** are link annotations only: `uri`, `page` (0-based), or both. URLs that are only written in the
+  page's text (`loadWebLink`) are not listed; W11 can add them if it wants them.
+- **Outline:** `{ title, page?, children }`; `page` is missing when the entry points nowhere in the file.
+  Capped at 12 levels and 5000 entries. It is read once at open (`hasOutline` needs it) and kept.
+- **iOS** (`ios/PdfSessions.swift`, PDFKit): the same functions and codes on one serial queue.
+  Annotations are hidden for a draw with `shouldDisplay`; the colour matrix is `CIColorMatrix` without a
+  working colour space; `decodeImage` uses ImageIO's downsampling. Render and encode don't overlap there.
+  Sizes use the media box, like the iOS v1 functions.
+- **JS:** `modules/pdf-native/index.ts` (types), `services/pdf/pdfNative.ts` (`pdfNativeVersion()`:
+  0 no module, 1 before W7, 2 sessions; `hasPdfSessions()`; `openDocument`, `closeDocument`,
+  `renderPageImage`, `decodeImage`, `getSessionPageText`, `getPageLinks`, `getOutline`; the session calls
+  throw `PdfNativeUnavailableError` on an older build), `services/pdf/pdfErrors.ts`
+  (`PdfWrongPasswordError`, which extends `PdfEncryptedError`), `PdfSessionClosedError`,
+  `PdfOutOfRangeError`.
+- **`services/pdf/pdfSession.ts`:** `acquirePdfSession(uri, password?)` → `{ pageCount, pages, hasOutline,
+  renderPage, pageText, pageLinks, outline, release }`. One native open per uri + password; the last
+  `release()` closes. A failed open is not kept. The password stays in memory while the session is held
+  (a reopen needs it).
+- **`expo-screen-orientation` ~57.0.2** is installed and autolinked. `app.json` is unchanged: no plugin
+  entry (its only option is iOS's `initialOrientation`), `"orientation": "portrait"` stays. On iOS,
+  landscape will need `app.json` changes; that is W11's.
+- **The lab:** Settings → Developer → **Reader Lab** (`src/dev/ReaderLabScreen.tsx`, route `readerLab`).
+  Its tile matrix and inverted colour matrix are stand-ins for W9's `renderPlan` and `darkMatrix`.
+- Tests: `services/pdf/__tests__/pdfSession.test.ts` (error mapping, version detection, one native open
+  for two users, the close on the last release, the reopen after `SESSION_CLOSED`, failed opens). The mock
+  (`src/test/mocks/pdfNative.ts`) has the version 2 functions.
+- §16 G4's embedded fonts are already in `app.json`, so this dev build carries them. G6's `expo-image`
+  was not ready and is not in it.
+
+Split point: (a) Android + the lab screen; (b) iOS (PDFKit).
 
 Goal: the native API the surface needs (A3), measured on a real phone before the surface is built.
 
@@ -822,17 +915,21 @@ Changes:
 Tests: wrapper error mapping, `nativeVersion` detection, session ref counting (opened twice → one native
 open; closed on the last release).
 
-Device check (lab screen):
-- record the render times in `docs/qa/performance.md`;
+Device check (lab screen, after `npm run android` has made the new dev build):
+- record the render times in `docs/qa/performance.md` ("§18 W7");
 - `openDocument` on 300 pages takes ≤ 150 ms;
 - a PDF with a highlight annotation: pdfium with annotations draws it, the old `renderPage` doesn't
   (confirms A0 §5);
 - on a rotated PDF, sizes and tile orientation are right;
 - `[pw]` opens with the right password; a wrong one gives `PASSWORD_WRONG`;
-- the orientation unlock works with `app.json` `"portrait"`.
+- the orientation unlock works with `app.json` `"portrait"`;
+- "Decode an image" on a scan's master: the whole image and the region tile look right;
+- leave the lab open for over a minute, then "Time page + tile" again: it still works (the session was
+  closed for being idle and opened again);
+- iOS, when there is a Mac build: the same list (this code has not run yet).
 
 ## W8 · Surface geometry *(M)*
-Status: planned. JS only; no device check.
+Status: **done in code** (2026-10-10). JS only; no device check.
 
 Files: new `services/reader/{surfaceGeometry,pageSpace,surfacePages,fastScroll}.ts`;
 `annotations/markMode.ts` re-exports `columnLayout`, `clampView`, `zoomAbout`, `pageAtY`, `currentPage`,
@@ -846,6 +943,46 @@ Tests:
 - `overlayMatrix` for 0/90/180/270 and for a placement;
 - `surfacePagesFor`: `[2in1]` with a cover → single pages in library numbering; a PDF-level document with
   a merged scan page; external.
+
+As built:
+- **Insets are not content.** A layout starts at content (0, 0); `scrollRange(layout, scale, viewport,
+  insets)` is what keeps the first page below the top bar and the last above the bottom one, and
+  `clampView`, `viewForPage`, `currentPage`, `anchorOf`, `revealRect` and `pagedSnap` take the insets as a
+  last, optional argument (Mark mode passes none, so its calls are unchanged). Zooming never zooms the
+  padding, and a bar that slides never moves a page. Side insets narrow `layout.width`.
+- `surfaceLayout(pages, { viewport, insets, fit, gap, paged })` returns a `ColumnLayout` plus `lefts` and
+  `widths` (a fit-page box narrower than the screen is centred) and, when paged, `slots`: page i's own
+  stretch from `slots[i]` to `slots[i + 1]`, at least as high as the band, with the page centred in it.
+  `pageBox(layout, i)` reads either kind of layout.
+- `pageAtY` is a binary search now (the same answers). `visiblePages` → `{ first, last }`.
+- **The anchor is index-based:** `{ page, fx, fy, dy? }`. The surface turns `page` into a page id for
+  storage (W10/W19). `dy` is new: a point in the gap around a page is kept as the nearest edge plus content
+  pixels, because a fraction past the edge lands on the next page once the pages are bigger (landscape).
+  It may be dropped when stored.
+- `pagedSnap(layout, view, viewport, velocityY, from, insets)` → `{ page, ty } | null`. `from` is the page
+  the gesture began on, so one swipe turns one page; null while the page's stretch still covers the band
+  (a tall or zoomed page). Forward lands on the next page's start, back on the previous page's end.
+  `PAGE_FLING` 600 px/s, `PAGE_TURN_SHARE` 0.5: tune both on a device in W10.
+- `revealRect` takes a rectangle in **content** coordinates (map a page-space box with
+  `mapRect(overlayMatrix(pageBox, space), box)`) and returns the same `view` object when nothing has to
+  move. Constants: `MAX_ZOOM` 6, `DOUBLE_TAP_ZOOM` 2.5, `REVEAL_MARGIN` 24.
+- `pageSpace.ts`: `PageSpace = { unit: 'master' | 'indexed' | 'points', width, height, turn, placement? }`;
+  the order is space → `placement` (fractions of the unturned page) → `turn` → the shown page → the box.
+  `overlayMatrix(box, space)`, `boxToSpace`, `spaceScale` (stroke widths), `mapPoint`, `mapRect`,
+  `matrix3` (row-major, for Skia). The matrix type is `pdf/rotation`'s `Matrix`, imported as a type, so
+  nothing here loads pdf-lib.
+- `surfacePages.ts`:
+  - a PDF-level or outside document has **no pages until the session is passed in**;
+  - an imported page that isn't indexed (no thumbnail: past page 300, a password file, indexing still
+    running) reads like an outside page: space = shown points, `words: 'live'`, `canMark: false`;
+  - a session page with no library row gets the id `ext:<index>`;
+  - a merged scan page's placement assumes `page.rotation` equals the PDF page's `/Rotate`, which the
+    builder (`pdfService` `setRotation`) and Edit pages (`pdfOps` `turnBy`) keep true;
+  - it imports `pdfService` (`imagePlacement`), so it must stay off the boot path: only the surface loads it.
+- `fastScroll.ts`: `showsFastScroll`, `thumbTrack`, `scrollProgress`, `thumbTop`, `progressAtThumb`,
+  `viewAtProgress`, `pageAtProgress` (worklets); `FAST_SCROLL_MIN_PAGES` 8, `FAST_SCROLL_HIDE_MS` 1200.
+- `markMode.ts` also re-exports the `ColumnLayout` and `ColumnView` types. Its tests pass unchanged.
+- Tests: `services/reader/__tests__/{surfaceGeometry,surfacePages}.test.ts`.
 
 ## W9 · Render queue, page cache, dark matrix *(M)*
 Status: planned. JS only; no device check.
