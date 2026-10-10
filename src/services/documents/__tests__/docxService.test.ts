@@ -1,6 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 import JSZip from 'jszip';
-import { DOCX_TAP_SCRIPT, docxPageHtml, docxToHtml, extractDocxText, isDocxTapMessage } from '../docxService';
+import { docxPageHtml, docxToHtml, extractDocxText } from '../docxService';
 import { promoteExternalToLibrary } from '../../persistence/libraryOperations';
 import { searchDocuments } from '../../search/searchService';
 
@@ -63,14 +63,34 @@ describe('DOCX preview', () => {
     expect(docxPageHtml('<p>Hi</p>', colors, { padTop: -40 })).toContain('padding: 20px 18px 48px;');
   });
 
-  it("acts on exactly the tap script's message (§18 W4)", () => {
-    expect(isDocxTapMessage('tap')).toBe(true);
-    for (const other of ['Tap', ' tap', 'tap ', '"tap"', '{"type":"tap"}', 'https://example.com', '', undefined, null, 1, { tap: true }]) {
-      expect(isDocxTapMessage(other)).toBe(false);
-    }
-    expect(DOCX_TAP_SCRIPT).toContain("postMessage('tap')");
-    // Fixed text: nothing from a document is ever put into it.
-    expect(DOCX_TAP_SCRIPT).not.toContain('${');
+  it('leaves room for all four bars and edges (§18 W22)', () => {
+    const colors = { bg: '#fff', ink: '#000', muted: '#666', edge: '#ccc', accent: '#07f' };
+    expect(docxPageHtml('<p>Hi</p>', colors, { pad: { top: 60, bottom: 52 } })).toContain('padding: 80px 18px 100px;');
+    expect(docxPageHtml('<p>Hi</p>', colors, { pad: { top: 60, bottom: 52, left: 30, right: 0 } })).toContain('padding: 80px 18px 100px 48px;');
+    const odd = docxPageHtml('<p>Hi</p>', colors, { pad: { bottom: '1px; } body { display: none' as unknown as number } });
+    expect(odd).toContain('padding: 20px 18px 48px;');
+  });
+
+  it('carries the night palette, switched by the body class (§18 W22)', () => {
+    const day = { bg: '#fff', ink: '#000', muted: '#666', edge: '#ccc', accent: '#07f' };
+    const dark = { bg: '#111', ink: '#eee', muted: '#999', edge: '#333', accent: '#4c8' };
+    const find = { fill: '#efe', current: '#0a0', onCurrent: '#fff' };
+    const nightFind = { fill: '#242', current: '#4c8', onCurrent: '#000' };
+    const plain = docxPageHtml('<p>x</p>', day);
+    expect(plain).not.toContain('body.night');
+    expect(plain).not.toContain('mark.pdfscan-find');
+
+    const page = docxPageHtml('<p>x</p>', day, { find, night: { on: false, colors: dark, find: nightFind } });
+    expect(page).toContain('body { background: #fff; color: #000;');
+    expect(page).toContain('body.night { background: #111; color: #eee; }');
+    expect(page).toContain('body.night a { color: #4c8; }');
+    expect(page).toContain('mark.pdfscan-current { background: #0a0; color: #fff; }');
+    expect(page).toContain('body.night mark.pdfscan-current { background: #4c8; color: #000; }');
+    expect(page).toContain('<body><p>x</p></body>');
+    // Still no scripts of the document's own.
+    expect(page).toContain("default-src 'none'");
+
+    expect(docxPageHtml('<p>x</p>', day, { night: { on: true, colors: dark } })).toContain('<body class="night"><p>x</p></body>');
   });
 
   it('puts the text into the page text when a DOCX joins the library', async () => {

@@ -309,6 +309,16 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v18 (§18 W19): where reading stopped, for every format, as JSON (types/models ReaderPosition;
+    // read back only through readerPosition.decodePosition). A page position names the page by its
+    // id, so it survives what `last_page` (a PDF page number, kept as the fallback) doesn't: a
+    // reorder, a cover added, the two pages of a 2-in-1 sheet. NULL: not read since.
+    version: 18,
+    up: async (db) => {
+      await db.execAsync('ALTER TABLE documents ADD COLUMN last_position TEXT;');
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

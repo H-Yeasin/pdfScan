@@ -117,6 +117,7 @@ export function asImportedPdfs(json: LibraryJson, manifest: Pick<Manifest, 'read
         pdf_page_size: null,
         cover_kind: null,
         last_page: null,
+        last_position: null,
       };
     });
   tables.pages = [];

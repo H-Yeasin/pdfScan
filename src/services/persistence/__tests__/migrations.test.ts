@@ -135,4 +135,15 @@ describe('v3: semesters and course fields', () => {
     await runMigrations(db);
     expect(await getSchemaVersion(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
   });
+
+  it('adds documents.last_position to a v17 library, empty (§18 W19)', async () => {
+    const db = await SQLite.openDatabaseAsync('t.db');
+    await runMigrations(db, MIGRATIONS.filter((m) => m.version <= 17));
+    await db.runAsync("INSERT INTO documents (id, name, format, mode, size_bytes, created_at, updated_at, last_page) VALUES ('d1', 'Notes', 'PDF', 'document', 1, 1, 1, 7)");
+    await runMigrations(db);
+    expect(await getSchemaVersion(db)).toBeGreaterThanOrEqual(18);
+    expect(await db.getAllAsync('SELECT id, last_page, last_position FROM documents')).toEqual([{ id: 'd1', last_page: 7, last_position: null }]);
+    await db.runAsync("UPDATE documents SET last_position = ? WHERE id = 'd1'", ['{"kind":"docx","fraction":0.5}']);
+    expect(await db.getFirstAsync('SELECT last_position FROM documents')).toEqual({ last_position: '{"kind":"docx","fraction":0.5}' });
+  });
 });

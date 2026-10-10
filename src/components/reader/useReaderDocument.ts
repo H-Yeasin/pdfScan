@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { File } from 'expo-file-system';
 import { useScreenRole } from '../../navigation/screenRole';
-import { classifyNativePdfError, heldSubject, openingPage, type NativePdfErrorCode } from '../../services/documents/readerPosition';
+import { externalPositionKey, loadExternalPosition, saveExternalPosition } from '../../services/documents/externalPositions';
+import { classifyNativePdfError, heldSubject, openingPage, resumeSpot, viewerPositionFor, type NativePdfErrorCode } from '../../services/documents/readerPosition';
 import { isPageRasterFormat, isPdfLevel } from '../../services/documents/formatCapabilities';
 import { pdfPageFor } from '../../services/documents/pageMap';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
-import type { ExternalFileDocument, LibraryDocument } from '../../types/models';
+import type { ExternalFileDocument, LibraryDocument, ReaderPosition } from '../../types/models';
 
 // §7 R4: how long the page must stay on screen before it's saved as "where I left off".
 const LAST_PAGE_SAVE_MS = 800;
@@ -64,7 +65,35 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
   // (PageSurface keeps its first `initialIndex`), so it may change freely afterwards.
   const target = live && doc && !external ? state.reader.target : null;
   const targetIdx = target && doc ? doc.pages.findIndex((p) => p.id === target.pageId) : -1;
-  const firstPage = openingPage(doc && !external ? doc.lastPage : undefined, doc && targetIdx >= 0 ? pdfPageFor(doc, targetIdx).page : null);
+
+  // §18 W19 (A12): the exact position this file was left at, as it was when the Reader opened it
+  // (the saved one changes while reading). A library document's is in its row; an outside file's
+  // is in the list of the last ones read (documents/externalPositions), which has to be read
+  // first: until then `positionReady` is false and no viewer is mounted. null: not read yet.
+  const externalKey = external ? externalPositionKey(external) : null;
+  const [opened, setOpened] = useState<{ position: ReaderPosition | undefined } | null>(() => (external ? null : { position: doc?.lastPosition }));
+  useEffect(() => {
+    if (!externalKey) return;
+    let cancelled = false;
+    void loadExternalPosition(externalKey).then((position) => {
+      if (!cancelled) setOpened({ position });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [externalKey]);
+  // The page surface's: a library page (0-based) and how far down it. A search hit or bookmark
+  // being opened wins over it.
+  const spot = isPageRaster && targetIdx < 0 ? resumeSpot(external ? undefined : doc, opened?.position) : undefined;
+  const spotPage = !spot
+    ? undefined
+    : doc && !external && !isPdfLevel(doc) && doc.pages.length > 0
+      ? pdfPageFor(doc, Math.min(spot.index, doc.pages.length - 1)).page
+      : spot.index + 1;
+  const firstPage =
+    spotPage !== undefined
+      ? openingPage(spotPage)
+      : openingPage(doc && !external ? doc.lastPage : undefined, doc && targetIdx >= 0 ? pdfPageFor(doc, targetIdx).page : null);
 
   const [pageCount, setPageCount] = useState(0);
   const [activeIndex, setActiveIndex] = useState((firstPage ?? 1) - 1);
@@ -130,6 +159,41 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
     };
   }, [live, docId, dispatch]);
 
+  // §18 W19: the exact position, for every format: the viewer says where reading is as it moves,
+  // and it is saved once it has rested there, and at once when the Reader leaves the screen. Only
+  // the Reader on screen saves (as above). A library document's goes into its row, an outside
+  // file's into the list.
+  const pendingPosition = useRef<ReaderPosition | null>(null);
+  const latestPosition = useRef<ReaderPosition | undefined>(undefined);
+  const positionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveNow = useRef(live);
+  liveNow.current = live;
+  const flushPosition = useCallback(() => {
+    if (positionTimer.current) clearTimeout(positionTimer.current);
+    positionTimer.current = null;
+    const position = pendingPosition.current;
+    pendingPosition.current = null;
+    if (!position) return;
+    if (docId) dispatch({ type: 'library/SET_LAST_POSITION', id: docId, position });
+    else if (externalKey) void saveExternalPosition(externalKey, position);
+  }, [docId, externalKey, dispatch]);
+  const savePosition = useCallback(
+    (position: ReaderPosition) => {
+      if (!liveNow.current) return;
+      latestPosition.current = position;
+      pendingPosition.current = position;
+      if (positionTimer.current) clearTimeout(positionTimer.current);
+      positionTimer.current = setTimeout(flushPosition, LAST_PAGE_SAVE_MS);
+    },
+    [flushPosition]
+  );
+  useEffect(() => {
+    if (!live) return;
+    return flushPosition;
+  }, [live, flushPosition]);
+  // Where reading is now, as last heard (Add to library carries it over).
+  const currentPosition = useCallback(() => latestPosition.current ?? opened?.position, [opened]);
+
   const handleLoad = useCallback((count: number) => {
     restored.current = true;
     setPageCount(count);
@@ -184,6 +248,12 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
     loadProblem,
     reloadKey,
     initialPage,
+    // §18 W19: where a viewer mounting for the first time opens (a reload names its own page).
+    positionReady: opened !== null,
+    initialSpot: reloaded ? undefined : spot,
+    initialViewerPosition: viewerPositionFor(format, opened?.position),
+    savePosition,
+    currentPosition,
     reload,
     handleLoad,
     handlePageChanged,

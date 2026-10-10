@@ -1,7 +1,22 @@
 import { createElement } from 'react';
 import { act, create } from 'react-test-renderer';
 import { ScreenRoleContext, useScreenRole, type ScreenRole } from '../../../navigation/screenRole';
-import { classifyNativePdfError, heldSubject, openingPage, pageLabel, parseJumpInput, pdfPageAfterEdit } from '../readerPosition';
+import {
+  classifyNativePdfError,
+  decodePosition,
+  encodePosition,
+  heldSubject,
+  normalizePosition,
+  openingPage,
+  pageLabel,
+  pagePosition,
+  parseJumpInput,
+  pdfPageAfterEdit,
+  remapPositionPage,
+  resumeSpot,
+  samePosition,
+  viewerPositionFor,
+} from '../readerPosition';
 import { initialLibraryState, libraryReducer } from '../../../store/slices/librarySlice';
 import { makeDoc, makePage } from '../../../test/fixtures';
 import { resetStorage } from '../../../test/db';
@@ -144,5 +159,155 @@ describe('library/SET_LAST_PAGE', () => {
     expect(loaded.lastPage).toBe(12);
     // The page rows were left alone, not rewritten.
     expect(loaded.pages.map((p) => p.id)).toEqual(doc.pages.map((p) => p.id));
+  });
+});
+
+// §18 W19: the exact position, for every format.
+describe('encodePosition / decodePosition', () => {
+  const positions = [
+    { kind: 'page', pageId: 'p7', index: 6, fy: 0.25 },
+    { kind: 'page', index: 2, fy: 0 },
+    { kind: 'txt', chunk: 41, fy: 0.5 },
+    { kind: 'sheet', sheet: 1, row: 320, col: 12 },
+    { kind: 'docx', fraction: 0.75 },
+  ] as const;
+
+  it('round-trips every kind', () => {
+    for (const position of positions) expect(decodePosition(encodePosition(position))).toEqual(position);
+  });
+
+  it('stores nothing for no position', () => {
+    expect(encodePosition(undefined)).toBeNull();
+    expect(decodePosition(null)).toBeUndefined();
+    expect(decodePosition('')).toBeUndefined();
+  });
+
+  it('normalises what is out of range', () => {
+    expect(normalizePosition({ kind: 'page', pageId: 'p1', index: 3.9, fy: 7 })).toEqual({ kind: 'page', pageId: 'p1', index: 3, fy: 1 });
+    expect(normalizePosition({ kind: 'page', pageId: '', index: -4, fy: -1 })).toEqual({ kind: 'page', index: 0, fy: 0 });
+    expect(normalizePosition({ kind: 'page', pageId: 12, index: 1, fy: 0.5 })).toEqual({ kind: 'page', index: 1, fy: 0.5 });
+    expect(normalizePosition({ kind: 'docx', fraction: 1.5, extra: 'x' })).toEqual({ kind: 'docx', fraction: 1 });
+    expect(normalizePosition({ kind: 'sheet', sheet: 0, row: 2.5, col: 1e12 })).toEqual({ kind: 'sheet', sheet: 0, row: 2, col: 10_000_000 });
+  });
+
+  it('gives up on damaged JSON', () => {
+    const damaged = [
+      '{',
+      'null',
+      '12',
+      '"page"',
+      '[]',
+      '{}',
+      '{"kind":"comic","index":1}',
+      '{"kind":"page","index":"3","fy":0}',
+      '{"kind":"page","index":3}',
+      '{"kind":"page","index":null,"fy":0}',
+      '{"kind":"txt","chunk":1,"fy":"NaN"}',
+      '{"kind":"sheet","sheet":0,"row":1}',
+      '{"kind":"docx"}',
+      `{"kind":"docx","fraction":0.5,"pad":"${'x'.repeat(2000)}"}`,
+    ];
+    for (const json of damaged) expect(decodePosition(json)).toBeUndefined();
+    expect(decodePosition(12)).toBeUndefined();
+    expect(decodePosition({ kind: 'docx', fraction: 0.5 })).toBeUndefined();
+  });
+
+  it('compares by value', () => {
+    expect(samePosition({ kind: 'docx', fraction: 0.5 }, { kind: 'docx', fraction: 0.5 })).toBe(true);
+    expect(samePosition({ kind: 'docx', fraction: 0.5 }, { kind: 'docx', fraction: 0.6 })).toBe(false);
+    expect(samePosition(undefined, undefined)).toBe(true);
+    expect(samePosition(undefined, { kind: 'docx', fraction: 0 })).toBe(false);
+  });
+});
+
+describe('resumeSpot', () => {
+  const doc = makeDoc({ pages: pagesOf('a', 'b', 'c', 'd') });
+
+  it('finds the page by its id, wherever it is now', () => {
+    expect(resumeSpot(doc, { kind: 'page', pageId: 'c', index: 0, fy: 0.4 })).toEqual({ index: 2, fy: 0.4 });
+    // The same page after a cover was added in front, or the pages were reordered.
+    const moved = makeDoc({ pages: pagesOf('cover', 'c', 'a', 'b', 'd') });
+    expect(resumeSpot(moved, { kind: 'page', pageId: 'c', index: 2, fy: 0.4 })).toEqual({ index: 1, fy: 0.4 });
+  });
+
+  it('falls back on the index: no id, or a page deleted since', () => {
+    expect(resumeSpot(undefined, { kind: 'page', index: 7, fy: 0.2 })).toEqual({ index: 7, fy: 0.2 });
+    expect(resumeSpot(doc, { kind: 'page', index: 3, fy: 0.2 })).toEqual({ index: 3, fy: 0.2 });
+    // Another page is at that index now: its top, not part-way down it.
+    expect(resumeSpot(doc, { kind: 'page', pageId: 'gone', index: 1, fy: 0.9 })).toEqual({ index: 1, fy: 0 });
+  });
+
+  it('has nothing to say without a page position', () => {
+    expect(resumeSpot(doc, undefined)).toBeUndefined();
+    expect(resumeSpot(doc, { kind: 'docx', fraction: 0.5 })).toBeUndefined();
+  });
+
+  it('builds the position the surface saves', () => {
+    expect(pagePosition(doc, 2, 0.5)).toEqual({ kind: 'page', pageId: 'c', index: 2, fy: 0.5 });
+    expect(pagePosition(undefined, 2, 1.4)).toEqual({ kind: 'page', index: 2, fy: 1 });
+    expect(pagePosition(doc, 9, 0)).toEqual({ kind: 'page', index: 9, fy: 0 });
+  });
+});
+
+describe('viewerPositionFor', () => {
+  it('gives each viewer only its own kind of position', () => {
+    const sheet = { kind: 'sheet', sheet: 1, row: 3, col: 0 } as const;
+    expect(viewerPositionFor('XLSX', sheet)).toBe(sheet);
+    expect(viewerPositionFor('CSV', sheet)).toBe(sheet);
+    expect(viewerPositionFor('TXT', sheet)).toBeUndefined();
+    expect(viewerPositionFor('DOCX', { kind: 'docx', fraction: 0.3 })).toEqual({ kind: 'docx', fraction: 0.3 });
+    expect(viewerPositionFor('TXT', { kind: 'txt', chunk: 2, fy: 0 })).toEqual({ kind: 'txt', chunk: 2, fy: 0 });
+    expect(viewerPositionFor('PDF', { kind: 'page', index: 1, fy: 0 })).toBeUndefined();
+    expect(viewerPositionFor(undefined, sheet)).toBeUndefined();
+    expect(viewerPositionFor('DOCX', undefined)).toBeUndefined();
+  });
+});
+
+describe('remapPositionPage', () => {
+  const ids = new Map([['p1', 'new1']]);
+  it('follows the page to its new id', () => {
+    expect(decodePosition(remapPositionPage('{"kind":"page","pageId":"p1","index":0,"fy":0.5}', ids))).toEqual({ kind: 'page', pageId: 'new1', index: 0, fy: 0.5 });
+  });
+  it('keeps the index when the page did not come along', () => {
+    expect(decodePosition(remapPositionPage('{"kind":"page","pageId":"p9","index":4,"fy":0.5}', ids))).toEqual({ kind: 'page', index: 4, fy: 0.5 });
+  });
+  it('leaves the other kinds alone and drops junk', () => {
+    expect(decodePosition(remapPositionPage('{"kind":"docx","fraction":0.5}', ids))).toEqual({ kind: 'docx', fraction: 0.5 });
+    expect(remapPositionPage('junk', ids)).toBeNull();
+    expect(remapPositionPage(null, ids)).toBeNull();
+  });
+});
+
+describe('library/SET_LAST_POSITION', () => {
+  beforeEach(resetStorage);
+
+  it('saves the position without touching the pages, and it survives a restart', async () => {
+    const doc = makeDoc({ id: 'd1' });
+    const before = { ...initialLibraryState, files: [doc] };
+    const position = { kind: 'sheet', sheet: 2, row: 140, col: 6 } as const;
+    const after = libraryReducer(before, { type: 'library/SET_LAST_POSITION', id: 'd1', position });
+    expect(after.files[0].lastPosition).toEqual(position);
+    expect(after.files[0].pages).toBe(doc.pages);
+    // The same position again changes nothing (no write); nor does one for a document not here.
+    expect(libraryReducer(after, { type: 'library/SET_LAST_POSITION', id: 'd1', position: { ...position } })).toBe(after);
+    expect(libraryReducer(after, { type: 'library/SET_LAST_POSITION', id: 'nope', position })).toBe(after);
+
+    const db = await getDb();
+    const empty = { documents: [], courses: [], semesters: [], timetable: [] };
+    await syncLibrary(db, empty, { ...empty, documents: [doc] });
+    await db.runAsync("UPDATE documents SET updated_at = 1000 WHERE id = 'd1'");
+    await syncLibrary(db, { ...empty, documents: [doc] }, { ...empty, documents: after.files });
+    expect((await loadAll(db)).documents[0].lastPosition).toEqual(position);
+    // Reading isn't editing: backups compare updated_at.
+    expect(await db.getFirstAsync("SELECT updated_at FROM documents WHERE id = 'd1'")).toEqual({ updated_at: 1000 });
+  });
+
+  it('reads a damaged row as "never read"', async () => {
+    const doc = makeDoc({ id: 'd1' });
+    const db = await getDb();
+    const empty = { documents: [], courses: [], semesters: [], timetable: [] };
+    await syncLibrary(db, empty, { ...empty, documents: [doc] });
+    await db.runAsync("UPDATE documents SET last_position = '{\"kind\":\"page\",\"index\":' WHERE id = 'd1'");
+    expect((await loadAll(db)).documents[0].lastPosition).toBeUndefined();
   });
 });

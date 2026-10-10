@@ -204,6 +204,9 @@ export type LibraryDocument = {
   // §7 R4: the PDF page (1-based) the Reader was last on, so reopening resumes there. Undefined:
   // never read (opens at page 1).
   lastPage?: number;
+  // §18 W19: where exactly reading stopped, for every format (ReaderPosition). It wins over
+  // `lastPage` when it still fits the document; undefined: never read since W19.
+  lastPosition?: ReaderPosition;
   // §8 B1: the start-up integrity check (storage/integrity.ts) found its PDF, source file or a
   // page master missing (deleted by hand, or a partial Android restore). The library says so and
   // the Reader shows a message instead of failing. Cleared when the files are back. Undefined:
@@ -215,6 +218,21 @@ export type LibraryDocument = {
 // never persisted to AsyncStorage/SQLite. `uri` is always a stable local copy under
 // Paths.document/external-open/<id>/, never the original incoming URI (see externalFileService.ts
 // for why: content:// / security-scoped grants from the source app aren't reliably durable).
+// §18 W19 (A12, A15): where reading stopped in a document.
+// - 'page': the page surface (PDFs and scans). `pageId` is the library page at the top of the
+//   visible band, which survives a reorder, a deleted page and an added cover; `index` (0-based,
+//   as the surface counts) stands in when there is no such page (an outside file, an imported PDF
+//   not indexed yet, a page since deleted). `fy`: how far down that page, 0..1.
+// - 'txt': the chunk at the top of the list and how far down it.
+// - 'sheet': the tab, and the cell at the top-left of the grid.
+// - 'docx': how far down the document, 0..1 of its scroll range.
+export type PagePosition = { kind: 'page'; pageId?: string; index: number; fy: number };
+export type ViewerPosition =
+  | { kind: 'txt'; chunk: number; fy: number }
+  | { kind: 'sheet'; sheet: number; row: number; col: number }
+  | { kind: 'docx'; fraction: number };
+export type ReaderPosition = PagePosition | ViewerPosition;
+
 export type ExternalFileDocument = {
   uri: string;
   name: string;

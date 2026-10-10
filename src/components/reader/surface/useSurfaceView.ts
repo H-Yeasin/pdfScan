@@ -45,8 +45,10 @@ type Options = {
   gap: number;
   paged: boolean;
   insets: ContentInsets;
-  // The page to open on. Read once, when the first layout exists.
+  // The page to open on, and how far down it (0..1; §18 W19). Read once, when the first layout
+  // exists.
   initialIndex: number;
+  initialFy?: number;
   onView: (view: SurfaceView, settled: boolean) => void;
   // Worklet (useReaderChrome's `scrolled`): the finger scrolled by `dy` screen pixels.
   onScroll: (dy: number, atStart: boolean, atEnd: boolean) => void;
@@ -58,7 +60,7 @@ function pagesKey(first: number, last: number, current: number): number {
   return (first * 131072 + last) * 131072 + current;
 }
 
-export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, onView, onScroll }: Options) {
+export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, initialFy = 0, onView, onScroll }: Options) {
   const [viewport, setViewport] = useState<Size | null>(null);
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -111,7 +113,9 @@ export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, o
     const prev = geometry.current;
     geometry.current = { layout, viewport, insets };
     if (!prev) {
-      place(viewForPage(layout, initialIndex, { scale: 1, tx: insets.left, ty: insets.top }, viewport, insets));
+      // Page by page a page is shown whole; in a scroll the saved point of it goes to the top.
+      if (initialFy > 0 && !layout.slots) place(viewForAnchor(layout, { page: initialIndex, fx: 0, fy: initialFy }, 1, viewport, insets));
+      else place(viewForPage(layout, initialIndex, { scale: 1, tx: insets.left, ty: insets.top }, viewport, insets));
       setReady(true);
       return;
     }

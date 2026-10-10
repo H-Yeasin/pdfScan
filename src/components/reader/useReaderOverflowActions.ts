@@ -11,7 +11,7 @@ import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, sha
 import { writeDocumentText } from '../../services/study/textExport';
 import { extractDocumentText } from '../../services/study/textSelection';
 import type { AppAction } from '../../store/appReducer';
-import type { Annotation, ExternalFileDocument, LibraryDocument } from '../../types/models';
+import type { Annotation, ExternalFileDocument, LibraryDocument, ReaderPosition } from '../../types/models';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import type { t as translate } from '../../i18n';
 
@@ -28,6 +28,8 @@ export type ReaderOverflowContext = {
   pageCount: number;
   // The PDF page on screen (1-based).
   pdfPage: number;
+  // §18 W19: where reading is, exactly (useReaderDocument.currentPosition).
+  position?: () => ReaderPosition | undefined;
   dispatch: (action: AppAction) => void;
   t: typeof translate;
   back: () => void;
@@ -83,6 +85,8 @@ export function readerOverflowActions(ctx: ReaderOverflowContext): ReaderOverflo
       const promoted = await promoteExternalToLibrary(external);
       // §18 W5: the library copy opens on the page being read, not on page 1.
       if (ctx.isPageRaster && ctx.pageCount > 0) promoted.lastPage = ctx.pdfPage;
+      // §18 W19: and at the same place in it, whatever the format.
+      promoted.lastPosition = ctx.position?.();
       dispatch({ type: 'library/ADD_FILE', file: promoted });
       dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.addedToLibrary') });

@@ -1,8 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Keyboard, Linking, PixelRatio, StyleSheet, View, type AccessibilityActionInfo } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import { AccessibilityInfo, Keyboard, PixelRatio, StyleSheet, View, type AccessibilityActionInfo } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
+import { useAskLink } from '../useAskLink';
 import { useT } from '../../../i18n/useT';
 import { useBackHandler } from '../../../navigation/useBackHandler';
 import { useScreenRole } from '../../../navigation/screenRole';
@@ -14,7 +14,7 @@ import type { PdfLink } from '../../../services/pdf/pdfNative';
 import { DAY_PAPER, nightColor, skiaNightMatrix } from '../../../services/reader/darkMatrix';
 import { FAST_SCROLL_HIDE_MS, showsFastScroll } from '../../../services/reader/fastScroll';
 import { hasReadingTaps, panMode, type SurfaceTool } from '../../../services/reader/gestureArbiter';
-import { LINK_SLOP, linkAt, linkTarget, shownUrl, tapOnPage } from '../../../services/reader/links';
+import { LINK_SLOP, linkAt, linkTarget, tapOnPage } from '../../../services/reader/links';
 import { currentSection, flattenOutline, type OutlineEntry } from '../../../services/reader/outline';
 import { openPageCache, prunePageCache } from '../../../services/reader/pageCache';
 import { boxToSpace, mapRect, spaceScale, spaceToShown, type UnitRect } from '../../../services/reader/pageSpace';
@@ -94,8 +94,12 @@ type PageSurfaceProps = {
   // useReaderChrome: the bars' progress (1 shown), and its scroll rule (a worklet).
   chrome: SharedValue<number>;
   onScroll: (dy: number, atStart: boolean, atEnd: boolean) => void;
-  // The library page to open on (0-based). Read once.
+  // The library page to open on (0-based), and how far down it. Read once.
   initialIndex: number;
+  initialFy?: number;
+  // §18 W19 (A12): where reading has come to rest: the page at the top of the visible band and
+  // how far down it (the Reader saves it as the position to come back to).
+  onPosition?: (index: number, fy: number) => void;
   // The pages are known and the first view is in place.
   onLoad: (pageCount: number) => void;
   onPage: (index: number) => void;
@@ -164,6 +168,8 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     chrome,
     onScroll,
     initialIndex,
+    initialFy,
+    onPosition,
     onLoad,
     onPage,
     onTap,
@@ -232,6 +238,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     paged: reading.layout === 'paged',
     insets,
     initialIndex,
+    initialFy,
     onView,
     onScroll,
   });
@@ -255,8 +262,8 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     []
   );
 
-  const handlers = useRef({ onLoad, onPage, onTap, onOutline, onReadText });
-  handlers.current = { onLoad, onPage, onTap, onOutline, onReadText };
+  const handlers = useRef({ onLoad, onPage, onTap, onOutline, onReadText, onPosition });
+  handlers.current = { onLoad, onPage, onTap, onOutline, onReadText, onPosition };
 
   // §18 W11: the outline, read once the session is open.
   const [outline, setOutline] = useState<OutlineEntry[]>([]);
@@ -330,6 +337,8 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     sayTimer.current = null;
     if (settled) {
       for (let i = visible.first; i <= Math.min(visible.last, count - 1); i += 1) void linksOf(i);
+      const anchor = anchorOf(g.layout, view, g.insets);
+      handlers.current.onPosition?.(Math.min(anchor.page, count - 1), anchor.fy);
       // A14: the page come to rest on is announced (not the one the document opens on: the top
       // bar has it). Waiting a moment keeps a run of short scrolls to one announcement.
       if (said.current === null) said.current = onPageNow;
@@ -457,33 +466,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
   useImperativeHandle(ref, () => ({ goToIndex, pageText, findStep, flash }), [goToIndex, pageText, findStep, flash]);
 
   // §18 W11: a link out of the app is never followed on the tap: the address is shown first.
-  const askLink = useCallback(
-    (url: string) => {
-      Alert.alert(
-        t('reader.link.title'),
-        shownUrl(url),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('reader.link.copy'),
-            onPress: () => {
-              Clipboard.setStringAsync(url)
-                .then(() => dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.link.copied') }))
-                .catch(() => undefined);
-            },
-          },
-          {
-            text: t('reader.link.open'),
-            onPress: () => {
-              Linking.openURL(url).catch(() => dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.link.cantOpen') }));
-            },
-          },
-        ],
-        { cancelable: true }
-      );
-    },
-    [t, dispatch]
-  );
+  const askLink = useAskLink();
 
   // §18 W13 (A8): the selection, and what its menu does (useSelectionActions).
   const selection = useSurfaceSelection({ pages, docPages, session, layout, geometry: surface.geometry, view: surface.view, selecting, current });

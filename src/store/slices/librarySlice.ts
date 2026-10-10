@@ -1,5 +1,6 @@
-import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, LibraryPage, Semester, Submission, TimetableSlot } from '../../types/models';
+import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, LibraryPage, ReaderPosition, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
+import { samePosition } from '../../services/documents/positionCodec';
 
 // 'failed' means the stored library couldn't be read. Nothing is written back to disk until a
 // load succeeds, so a read error can never overwrite the real library with an empty one.
@@ -86,7 +87,8 @@ export type LibraryAction =
   | { type: 'library/REMOVE_SLOT'; id: string }
   | { type: 'library/ASSIGN_COURSE'; ids: string[]; courseId: string | null }
   | { type: 'library/SET_DOC_TYPE'; ids: string[]; docType: DocType }
-  | { type: 'library/SET_LAST_PAGE'; id: string; page: number };
+  | { type: 'library/SET_LAST_PAGE'; id: string; page: number }
+  | { type: 'library/SET_LAST_POSITION'; id: string; position: ReaderPosition };
 
 // The editable part of a course: everything but its identity, position (REORDER_COURSES) and
 // creation time.
@@ -135,6 +137,13 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         ...state,
         files: state.files.map((f) => (f.id === action.id && f.lastPage !== action.page ? { ...f, lastPage: action.page } : f)),
       };
+    // §18 W19: the same for every format, and exact (ReaderPosition). A position equal to the saved
+    // one keeps the state, so a Reader coming to rest where it was writes nothing.
+    case 'library/SET_LAST_POSITION': {
+      const at = state.files.find((f) => f.id === action.id);
+      if (!at || samePosition(at.lastPosition, action.position)) return state;
+      return { ...state, files: state.files.map((f) => (f === at ? { ...f, lastPosition: action.position } : f)) };
+    }
     case 'library/SET_LOAD_STATUS':
       return { ...state, loadStatus: action.status };
     case 'library/RETRY_LOAD':

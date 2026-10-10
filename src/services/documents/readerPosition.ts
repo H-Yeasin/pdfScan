@@ -1,7 +1,7 @@
 // §7 R4: where the Reader opens a document, and the "go to page" box. Pages are PDF pages,
 // 1-based, as the Reader counts them.
 import type { ScreenRole } from '../../navigation/screenRole';
-import type { LibraryDocument } from '../../types/models';
+import type { DocFormat, LibraryDocument, PagePosition, ReaderPosition, ViewerPosition } from '../../types/models';
 import { libraryIdxFor, pdfPageCount, pdfPageFor } from './pageMap';
 
 type PositionDoc = Pick<LibraryDocument, 'pages' | 'coverKind' | 'pdfLayout'>;
@@ -71,4 +71,37 @@ export type PdfLoadProblem = 'password' | 'damaged';
 
 export function classifyNativePdfError(code: NativePdfErrorCode | undefined): PdfLoadProblem {
   return code === 'password' ? 'password' : 'damaged';
+}
+
+// §18 W19: the saved position's reading and writing (JSON, checked) is in positionCodec.ts, which
+// the library's load and the store import at boot; this file pulls in the page map (and with it
+// the PDF builder), so it stays off the boot path. Re-exported here for the Reader's code.
+export { decodePosition, encodePosition, normalizePosition, remapPositionPage, samePosition } from './positionCodec';
+
+// Where the page surface opens a document that was read before: the library page (0-based) and how
+// far down it. The page is found by its id, so a reorder, a deleted page or a cover added since
+// doesn't move the student; without one (or when that page is gone) the index stands in, kept
+// inside the document. undefined: no saved page position (the caller falls back on `lastPage`).
+export function resumeSpot(doc: Pick<LibraryDocument, 'pages'> | undefined, position: ReaderPosition | undefined): { index: number; fy: number } | undefined {
+  if (position?.kind !== 'page') return undefined;
+  const byId = position.pageId && doc ? doc.pages.findIndex((p) => p.id === position.pageId) : -1;
+  if (byId >= 0) return { index: byId, fy: position.fy };
+  // An index past the end is left to the surface, which opens on its last page.
+  return { index: position.index, fy: position.pageId ? 0 : position.fy };
+}
+
+// What the surface reports, as the position to save.
+export function pagePosition(doc: Pick<LibraryDocument, 'pages'> | undefined, index: number, fy: number): PagePosition {
+  const pageId = doc?.pages[index]?.id;
+  const at = { index: Math.max(0, Math.floor(index)), fy: Math.min(1, Math.max(0, fy)) };
+  return pageId ? { kind: 'page', pageId, ...at } : { kind: 'page', ...at };
+}
+
+// The saved position as the format's own viewer takes it: only one of that viewer's kind (a file
+// whose format changed under the same row, or a position from the surface, starts at the top).
+const VIEWER_KIND: Partial<Record<DocFormat, ViewerPosition['kind']>> = { TXT: 'txt', CSV: 'sheet', XLSX: 'sheet', XLS: 'sheet', DOCX: 'docx' };
+
+export function viewerPositionFor(format: DocFormat | undefined, position: ReaderPosition | undefined): ViewerPosition | undefined {
+  if (!format || !position || position.kind === 'page') return undefined;
+  return VIEWER_KIND[format] === position.kind ? position : undefined;
 }

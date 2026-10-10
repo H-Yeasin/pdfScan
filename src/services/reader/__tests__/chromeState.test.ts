@@ -1,4 +1,4 @@
-import { CHROME_HIDE_AFTER, CHROME_SHOW_AFTER, CHROME_SHOWN, chromeAfterScroll, chromeAfterTap, type ChromeScroll } from '../chromeState';
+import { CHROME_HIDE_AFTER, CHROME_SHOW_AFTER, CHROME_SHOWN, chromeAfterScroll, chromeAfterTap, scrollSaid, type ChromeScroll, type ScrollDirection } from '../chromeState';
 
 const MID = { atStart: false, atEnd: false };
 
@@ -49,5 +49,37 @@ describe('chromeAfterTap', () => {
     expect(chromeAfterTap(false, false)).toBe(true);
     expect(chromeAfterTap(true, true)).toBe(true);
     expect(chromeAfterTap(false, true)).toBe(true);
+  });
+});
+
+// §18 W19: the viewers that scroll by themselves say which way reading goes.
+describe('scrollSaid', () => {
+  function run(steps: number[], edge = MID): (ScrollDirection | null)[] {
+    let travel = 0;
+    return steps.map((dy) => {
+      const next = scrollSaid(travel, dy, edge);
+      travel = next.travel;
+      return next.say;
+    });
+  }
+
+  it('says forward once reading has gone on far enough, and again further on', () => {
+    expect(run([10, 10, 10])).toEqual([null, null, 'forward']);
+    expect(run([CHROME_HIDE_AFTER, 10, 10, 10])).toEqual(['forward', null, null, 'forward']);
+  });
+
+  it('says back sooner than forward', () => {
+    expect(run([-4, -4])).toEqual([null, 'back']);
+    expect(run([-CHROME_SHOW_AFTER])).toEqual(['back']);
+  });
+
+  it('starts the count again on a turn, so a wobble says nothing', () => {
+    expect(run([20, -4, 20, -4, 20])).toEqual([null, null, null, null, null]);
+  });
+
+  it('says back at either end, and nothing while still', () => {
+    expect(run([30], { atStart: true, atEnd: false })).toEqual(['back']);
+    expect(run([30], { atStart: false, atEnd: true })).toEqual(['back']);
+    expect(run([0, 0])).toEqual([null, null]);
   });
 });

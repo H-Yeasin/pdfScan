@@ -1672,7 +1672,56 @@ Device check: `npx expo prebuild --clean`; APK size before and after; pdfium `.s
 reader regression; the iOS build compiles.
 
 ## W19 · Viewer contract, parse cache, positions *(M)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only, no new dev build (schema v18). **Device check open** (below):
+none of W19–W22 has run on a phone.
+
+What was built, and where it differs from the plan:
+- **The contract:** `components/reader/viewers/types.ts` (`ViewerProps`, `ViewerFind`, `ViewerFindResult`;
+  A15 as written). TXT, sheets and DOCX take exactly it; `SheetView` adds `format` and `chrome`.
+  `viewers/useViewerFind.ts` (`steppedIndex`, `viewerFindCount`): a new query asks for match **-1**, "your
+  first match from where reading is"; the viewer answers with the one it chose and next / previous step
+  from that. The top bar's `FindBar` now reads "3 of 27" with its step buttons for every viewer
+  (`useReaderFind` lost `matchCount` / `setLocalMatchCount`).
+- **Positions.** `types/models`: `ReaderPosition` = `PagePosition | ViewerPosition`,
+  `LibraryDocument.lastPosition`.
+  - **Not as planned:** a page position is `{ kind: 'page', pageId?, index, fy }`, not `{ pageId, fy }`. An
+    outside file and an imported PDF that isn't indexed yet have no page ids, and a page can be deleted:
+    `index` stands in (`readerPosition.resumeSpot`).
+  - `services/documents/positionCodec.ts`: `normalizePosition`, `encodePosition`, `decodePosition`,
+    `samePosition`, `remapPositionPage`. **A file of its own, not in `readerPosition.ts` as planned:**
+    `libraryRepo`, the library slice and the backup format are on the boot path, and `readerPosition`
+    imports the page map and with it pdf-lib (`bootImports.test.ts` caught it). `readerPosition`
+    re-exports them and has `resumeSpot`, `pagePosition`, `viewerPositionFor`.
+  - Schema **v18**: `documents.last_position TEXT`. `libraryRepo` reads and writes it; it is in `NOT_EDITS`
+    (reading isn't editing: `updated_at` stays). `library/SET_LAST_POSITION` returns the same state for an
+    equal position. `last_page` is still written, as the fallback.
+  - **Backup:** `SELECT *` carries the column; `importPlan` moves a page position to the page's new id (Add
+    and "keep both"); a "PDFs only" restore clears it.
+  - `services/documents/externalPositions.ts`: the AsyncStorage list (50, most recent first) for outside
+    files, keyed by `sourceUri|size`. `useReaderDocument` reads it before a viewer mounts
+    (`positionReady`), so an outside file never opens at the top and then jumps.
+  - `useReaderDocument`: `savePosition` (debounced 800 ms, flushed when the Reader leaves the screen; only
+    the active Reader saves), `initialSpot`, `initialViewerPosition`, `currentPosition` (Add to library
+    carries it over).
+  - **The surface:** `PageSurface` `initialFy` + `onPosition(index, fy)` (the anchor at rest). A 2-in-1
+    document now reopens on the page it was left on, not its sheet's left page.
+- **Parse cache:** `services/documents/parseCache.ts`: `createParseCache(max)` (LRU, one load shared by
+  callers asking at once, a failed load not kept), `parseKey` (the file's uri, size and modified time, from
+  `pageCache.fileStamp`), `cachedDocxHtml` (memory 2, then `<cache>/docx-html/<stamp>.html`, newest 4,
+  none over 12 MB of text). `sheetService.cachedSheetPreview` keeps 3 sheets (W21 parses one sheet at a
+  time, so "2 workbooks" became 3 sheets). **Beyond the plan:** `deleteDocumentFiles` drops a deleted
+  document's cached HTML (`dropCachedHtml`): it is the document's text.
+- **Insets, taps, auto-hide:** every viewer gets the measured insets and pads its first and last lines.
+  `chromeState.scrollSaid` + `viewers/useScrollDirection.ts`: a viewer says "forward" or "back" (the same
+  24 px / 8 px rule; said again every further 24 px, so bars shown by a tap hide again on reading on) and
+  `useReaderChrome.directed` shows or hides the bars.
+- **Landscape:** `useReaderOrientation` is on for TXT, sheets and DOCX too, off while the file editor
+  (`useEditFile().open`) is up.
+- `components/reader/useAskLink.ts`: W11's Open / Copy / Cancel prompt, moved out of `PageSurface` so the
+  DOCX viewer asks the same way.
+- Tests: `readerPosition.test.ts` (round trips, damaged JSON, `resumeSpot`, the reducer, the row),
+  `migrations.test.ts` (v17 → v18), `parseCache.test.ts`, `externalPositions.test.ts`,
+  `chromeState.test.ts` (`scrollSaid`), `components/reader/__tests__/viewerFind.test.ts`.
 
 Files: `components/reader/viewers/{types.ts,useViewerFind.ts}`, `services/documents/parseCache.ts`,
 `persistence/migrations.ts` + `libraryRepo.ts` (`last_position TEXT`), `librarySlice` (`SET_LAST_POSITION`),
@@ -1684,11 +1733,27 @@ Changes: A15. Landscape and auto-hide in every viewer.
 
 Tests: cache LRU and mtime invalidation; position round-trips and normalising damaged JSON; the migration.
 
-Device check: reopening an XLSX is instant; each format restores its position; landscape and auto-hide work
-in every viewer.
+Device check: reopening an XLSX is instant; each format restores its position (a scan, `[2in1]` on its
+right-hand page, an imported PDF, an outside PDF opened twice from the same app, TXT, a sheet's tab and
+cell, DOCX); landscape and auto-hide work in every viewer; the file editor opens upright; deleting a DOCX
+leaves nothing in `<cache>/docx-html`.
 
 ## W20 · TXT *(S)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only. **Device check open** (below).
+
+What was built:
+- **`services/documents/txtIndex.ts`:** `buildTxtIndex` (chunks of about 3,000 characters ending on a line
+  break, their offsets, the text lower-cased once; `lowerSameLength` keeps every character's place, so an
+  offset in the lower-cased text is an offset in the text), `findAll` (ranges of the whole text, capped at
+  10,000 with `partial`), `chunkSegments` / `chunkHasMatch` (a match across two chunks is drawn in both),
+  `chunkOf`, `firstMatchAfter`, and the heights: `averageHeight`, `chunkTop`, `chunkAt`, `fractionInChunk`.
+- **`TxtView.tsx`:** the viewer contract. Matches are `Text` spans (the current one in the accent colour);
+  Find starts from where reading is and steps; the query is searched 120 ms after the last keystroke.
+  A jump (a match, the saved position) goes through `scrollToIndex` with a `viewOffset` worked out from the
+  chunk's measured height, and looks again once the chunk has been drawn (5 tries, as W4's retry).
+  The position is `{ chunk, fy }` from the measured heights. The "not UTF-8" and "first 4 MB" notes are the
+  list's header now (they sat under the top bar). Colours from the theme (`themes.dark` at night).
+- **Not done:** selecting text in a TXT file (not in this step's list).
 
 Files: new `services/documents/txtIndex.ts` (`buildTxtIndex`: lower-cased once, with chunk offsets;
 `findAll` capped at 10,000; `chunkSegments`), `TxtView.tsx` (highlight spans, the current match, scrolling
@@ -1696,11 +1761,46 @@ from measured heights, the position, theme tokens instead of hex).
 
 Tests: case folding; matches across chunks; the cap; segments.
 
-Device check: `[txt3]` "the": next/prev with highlights; typing stays smooth.
+Device check: `[txt3]` "the": next/prev with highlights; typing stays smooth; a match deep in the file
+lands in view (the jump settles within a moment); reopen restores the place.
 
 ## W21 · Sheets *(L)*
-Status: planned. JS only. Split point: (a) the capped parse + column window + letters; (b) focal zoom +
-the cell sheet + Find.
+Status: **done in code (2026-10-10)**, (a) and (b) together. JS only. **Device check open** (below): the
+pinch and the frozen rows in particular have never run on a phone.
+
+What was built, and where it differs from the plan:
+- **`services/documents/sheetWindow.ts`:** `columnOffsets`, `columnAt`, `columnWindow` (overscan 3, in steps
+  of 2 columns), `focalScroll`, `focalColumnScroll` (**added:** the columns are rounded one by one, so the
+  grid doesn't grow by one ratio), `scrollIntoView`, `rowHeight`, `gutterWidth`, `columnLetter`,
+  `cellAddress`, `cellMatches` (capped at 10,000), `firstCellFrom`, `matchedColumns`. `computeColumnWidths`,
+  `MAX_COLUMNS` and `sheetZoom` moved here from `SheetView` (`CsvGrid` imports them from here).
+- **`sheetService.ts`:** `loadSheetPreview(uri, format, index)` → `{ names, index, rows, truncated,
+  totalRows }`: SheetJS `sheets: index`, `sheetRows: 5000`, `dense: true`; `!fullref` gives the row count;
+  Papa `preview` for CSV. A sheet index past the end reads the last sheet. `usedRange` reads a dense sheet.
+  **`loadSheets` (every sheet, the 50,000-cell cap) stays** for Office → PDF; `readWorkbook` is unchanged.
+  The viewer no longer has a cell cap: 5,000 rows by 200 columns at most.
+- **`SheetView.tsx`:**
+  - a header block over the grid: tabs, the "first 5,000 of N rows" / "first 200 columns" notes, the column
+    letters, the frozen first row. It follows the horizontal scroll on the native driver, as each row's
+    number does. **Not in the contract:** `chrome` (the bars' progress), so the block rides up with the top
+    bar instead of leaving a gap or shifting the rows;
+  - only the columns of the window are drawn, after a spacer;
+  - a pinch is a transform about the fingers; at its end the grid is laid out once at the nearest 0.1 and
+    the scroll put where `focalScroll` / `focalColumnScroll` say;
+  - a tap on a cell with text → `components/reader/CellDetailSheet.tsx` (address, the whole text, Copy);
+    a tap on an empty cell, a row number or a letter toggles the bars. One handler per row: the column
+    comes from where the tap was;
+  - Find counts cells, starts from the row at the top, tints the matches and scrolls both axes to the
+    current one (150 ms after the last keystroke);
+  - the position is `{ sheet, row, col }`; a tab is loaded when it is opened.
+- New strings: `reader.firstRows`, `reader.firstRowsOf`, `reader.cell.*`.
+
+Not as planned, or left open:
+- A CSV's row count isn't known when it is cut off (the note says "first 5,000 rows" without a total), and
+  the whole CSV is still read into memory (10 MB cap) before Papa stops.
+- Find reads every cell of the sheet per query (up to 1,000,000). If `[xlsx5]` stutters while typing, keep
+  a lower-cased copy per sheet.
+- Find searches the open tab only.
 
 Files:
 - new `services/documents/sheetWindow.ts`: `columnOffsets`, `columnWindow`, `focalScroll`, `rowHeight`,
@@ -1718,11 +1818,40 @@ Files:
 Tests: the window functions; the capped parse with a fixture workbook; `cellMatches`.
 
 Device check: `[xlsx5]` opens in under 3 s with the "first 5,000 rows" note; smooth across 150 columns;
-pinch keeps the cell under the fingers; tapping a cell shows its text; Find "total" → "2 of 14" scrolls
-sideways. `[csv50k]` too.
+pinch keeps the cell under the fingers (no jump when the fingers lift); tapping a cell shows its text; Find
+"total" → "2 of 14" scrolls sideways. `[csv50k]` too. The letters and row numbers stay put in both
+directions; the header rides up with the top bar; landscape; a second tab opens, and reopening the file
+returns to it.
 
 ## W22 · DOCX *(M)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only. **Device check open** (below).
+
+What was built, and where it differs from the plan:
+- **`services/documents/docxBridge.ts`:**
+  - `DOCX_BRIDGE_SCRIPT`, one constant (ES5): `window.__pdfscan` = `find(query, seq)`, `findGo(index, seq)`,
+    `setNight`, `setInsets`, `scrollToFraction`; a click listener (a tap; a link out is posted, never
+    followed; a `#` link scrolls there, clear of the top bar); the scroll position at most every 100 ms;
+    `ready`. Find walks the text nodes, wraps each match in `<mark class="pdfscan-find">` (2,000 at most,
+    then `partial`), takes the old marks out first, starts from the first match below the top inset, and
+    scrolls a table sideways to a match in it;
+  - `callScript(name, args)`: a name from a fixed list and the arguments as JSON, with `<`, `>`, U+2028 and
+    U+2029 escaped (`scriptJson`);
+  - `parseDocxMessage`: a string of at most 4,096 characters, JSON, a known `t`, exactly that message's
+    fields, every number a whole number in range. Anything else is null.
+- **`docxService.docxPageHtml`:** `night: { on, colors, find }` adds the `body.night` rules; `pad` (all four
+  sides) beside `padTop`; `DOCX_BODY_PAD`. `DOCX_TAP_SCRIPT` and `isDocxTapMessage` are gone (the bridge).
+- **`DocxView.tsx`:** the viewer contract. The page is built once (the first night state and insets are
+  read through a ref); night, insets, Find and the position all go through the bridge. HTML from
+  `parseCache.cachedDocxHtml`. A link is checked by `links.safeLinkUrl` and asked about (`useAskLink`).
+  The WebView's locks are as before; its security comment is rewritten.
+- **`docxFind.ts` and its test are deleted.**
+- Tests: `docxBridge.test.ts` (the schema, the escaping, the script run against a fake page, and **its Find
+  run in jsdom**, which `jest-expo` brings in), `docxService.test.ts` (the night CSS, the padding).
+
+Not as planned, or left open:
+- A match split by formatting ("bo**ld**") still isn't found (one text node at a time), as before.
+- jsdom has no layout, so where Find scrolls to and the saved position are only checked on a phone.
+- The page is built again if the app's theme changes while it is open (the day palette is in the HTML).
 
 Files:
 - new `services/documents/docxBridge.ts`:
@@ -1737,8 +1866,10 @@ Files:
 
 Tests: `parseDocxMessage` rejects junk; escaping (quotes, `</script>`, U+2028); the night CSS is present.
 
-Device check: `[docx]` Find with no flicker or reload; night is instant; a tap toggles the bars; a link asks
-first; reopen restores the scroll position.
+Device check: `[docx]` Find with no flicker or reload, "3 of 27" and next / previous; night is instant; a
+tap toggles the bars; a link asks first (and a `javascript:` or `file:` link does nothing); a link to a
+heading in the document scrolls to it; reopen restores the scroll position; the second open is quick
+(`parseCache`).
 
 ## W23 · Grouped More sheet + Rename, Move, Star and page tools *(M)*
 Status: planned. JS only. Needs §17 U3's `Menu`; shares §17 U7's `useDocumentActions` (Rename, Move, Star)

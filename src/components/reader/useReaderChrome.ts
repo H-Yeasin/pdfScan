@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { runOnJS, useSharedValue, withTiming } from 'react-native-reanimated';
-import { CHROME_SHOWN, chromeAfterScroll, chromeAfterTap, type ChromeScroll } from '../../services/reader/chromeState';
+import { CHROME_SHOWN, chromeAfterScroll, chromeAfterTap, type ChromeScroll, type ScrollDirection } from '../../services/reader/chromeState';
 
 const KEEP_AWAKE_TAG = 'reader';
 const SLIDE_MS = 180;
@@ -49,6 +49,16 @@ export function useReaderChrome(keepAwake: boolean, locked = false) {
     [scroll, lockedOn]
   );
 
+  // §18 W19: the viewers that scroll by themselves (TXT, sheets, DOCX) say which way reading goes
+  // (chromeState.scrollSaid); the rule is the same, the bars just aren't moved frame by frame.
+  const directed = useCallback(
+    (direction: ScrollDirection) => {
+      if (direction === 'back') setShown(true);
+      else if (!locked) setShown(false);
+    },
+    [locked]
+  );
+
   const [bars, setBars] = useState({ top: 0, bottom: 0 });
   const onTopHeight = useCallback((top: number) => setBars((b) => (b.top === top ? b : { ...b, top })), []);
   const onBottomHeight = useCallback((bottom: number) => setBars((b) => (b.bottom === bottom ? b : { ...b, bottom })), []);
@@ -63,5 +73,5 @@ export function useReaderChrome(keepAwake: boolean, locked = false) {
     };
   }, [keepAwake]);
 
-  return { progress, shown, toggle, show, scrolled, bars, onTopHeight, onBottomHeight };
+  return { progress, shown, toggle, show, scrolled, directed, bars, onTopHeight, onBottomHeight };
 }

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { columnCount, deleteRow, insertRow, setCell } from '../../services/edit/textEdit';
 import { useT } from '../../i18n/useT';
 import { MIN_TOUCH, radii, spacing, useTheme } from '../../theme';
-import { computeColumnWidths, MAX_COLUMNS } from './SheetView';
+import { computeColumnWidths, MAX_COLUMNS } from '../../services/documents/sheetWindow';
 
 const ROW_NUMBER_WIDTH = 48;
 

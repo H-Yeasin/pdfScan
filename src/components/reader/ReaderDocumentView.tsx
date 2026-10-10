@@ -12,7 +12,7 @@ import { useScreenRole } from '../../navigation/screenRole';
 import { useBackHandler } from '../../navigation/useBackHandler';
 import { canFindInDoc, canSign, isPageRasterFormat, isPdfLevel } from '../../services/documents/formatCapabilities';
 import { libraryIdxFor, pdfPageCount, pdfPageFor } from '../../services/documents/pageMap';
-import { pageLabel, pdfPageAfterEdit } from '../../services/documents/readerPosition';
+import { pageLabel, pagePosition, pdfPageAfterEdit } from '../../services/documents/readerPosition';
 import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../../services/documents/readerTools';
 import { useIsPro } from '../../services/pro/entitlement';
 import type { OutlineEntry } from '../../services/reader/outline';
@@ -48,6 +48,7 @@ import { useReaderOrientation } from './useReaderOrientation';
 import { useReaderOverflowActions } from './useReaderOverflowActions';
 import { useReaderSheets } from './useReaderSheets';
 import { useReaderSigning } from './useReaderSigning';
+import { useViewerFind } from './viewers/useViewerFind';
 
 // §12 D2: the Reader on one file, laid out for studying. Top: Back, title, page "12 / 40", Find,
 // Bookmark, More. Bottom: the study tool bar (readerTools). Tap the page to hide both bars.
@@ -107,6 +108,11 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     loadProblem,
     reloadKey,
     initialPage,
+    positionReady,
+    initialSpot,
+    initialViewerPosition,
+    savePosition,
+    currentPosition,
     reload,
     handleLoad,
     handlePageChanged,
@@ -116,15 +122,25 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   usePageOcr(doc);
   // The page surface shows this file (a PDF or a scan); else the format's own view does.
   const onSurface = isPageRaster;
+  // The format's own view shows it (TXT, a sheet, DOCX), through the viewer contract (viewers/types).
+  const onViewer = format === 'TXT' || format === 'CSV' || format === 'XLSX' || format === 'XLS' || format === 'DOCX';
   // §18 W12: the page surface searches the query itself (PageSurface's useSurfaceFind) and says
-  // what it found; the other viewers count their own matches.
+  // what it found. §18 W19: so does each of the other viewers, with a current match to step from.
   const find = useReaderFind();
   const [surfaceFind, setSurfaceFind] = useState<SurfaceFindStatus | null>(null);
+  const viewerFind = useViewerFind(find.query, find.open && onViewer);
   const findCount = useMemo(
-    () => (onSurface ? { current: surfaceFind?.current ?? 0, total: surfaceFind?.total ?? 0, scanning: surfaceFind?.scanning ?? false } : { total: find.matchCount }),
-    [onSurface, surfaceFind, find.matchCount]
+    () => (onSurface ? { current: surfaceFind?.current ?? 0, total: surfaceFind?.total ?? 0, scanning: surfaceFind?.scanning ?? false } : viewerFind.count),
+    [onSurface, surfaceFind, viewerFind.count]
   );
-  const findStep = useCallback((by: 1 | -1) => surfaceRef.current?.findStep(by), []);
+  const stepViewer = viewerFind.step;
+  const findStep = useCallback((by: 1 | -1) => (onSurface ? surfaceRef.current?.findStep(by) : stepViewer(by)), [onSurface, stepViewer]);
+  const subject = useMemo<ReaderSubject | null>(() => (doc ? { doc } : external ? { external } : null), [doc, external]);
+  const proTasks = useMemo(() => (subject ? readerProTasks(subject) : []), [subject]);
+  // §12 D7–D9: edit a TXT, CSV, XLSX, XLS or Word file (one ad unlocks the document for a while). Preloading is
+  // shared with the conversion gate's (rewarded.preloadRewarded keeps one ad).
+  const edit = useEditFile({ preload: proTasks.includes('editFiles') });
+  const editorOpen = edit.open;
   const sheets = useReaderSheets();
   const { open: openSheet, openTool, closeTool, tool } = sheets;
   // §9 O1: Android back closes the find bar before leaving the Reader, once no sheet or tool is
@@ -140,7 +156,10 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   const surfaceSelecting = onSurface && tool?.kind === 'selectText';
   const surfaceMarking = onSurface && tool?.kind === 'mark';
   const surfaceSigning = onSurface && tool?.kind === 'signPlace';
-  const leave = useReaderOrientation(onSurface && onScreen && (!tool || surfaceSelecting));
+  // §18 W19: the other viewers too (each lays itself out again for the new width); the file
+  // editor over them is for an upright phone.
+  const turnable = onSurface ? !tool || surfaceSelecting : onViewer && !editorOpen;
+  const leave = useReaderOrientation(turnable && onScreen);
   // The surface's tools are not Modals: Back leaves them (a sheet over one goes first).
   const backIsTools = readerBackTarget(sheets.state, find.open) === 'tool';
   useBackHandler(closeTool, (surfaceSelecting || surfaceMarking) && backIsTools);
@@ -163,8 +182,6 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     [doc, state.library.submissions]
   );
   const night = reading.night;
-  const subject = useMemo<ReaderSubject | null>(() => (doc ? { doc } : external ? { external } : null), [doc, external]);
-  const proTasks = useMemo(() => (subject ? readerProTasks(subject) : []), [subject]);
   const tools = useMemo(() => (subject ? readerTools(subject, { proTasks, isPro }) : []), [subject, proTasks, isPro]);
   const moreItems = useMemo(() => (subject ? readerMoreItems(subject, { proTasks }) : []), [subject, proTasks]);
   // §12 D5/D6: Office → PDF and scan/PDF → Word, each through D1's gate; an ad is loaded ahead
@@ -186,9 +203,6 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     if (external) startWord({ uri: external.uri, name: external.name, title: external.name, grantId: external.uri });
     else if (doc) startWord({ docId: doc.id, title: doc.name, grantId: doc.id });
   }, [doc, external, startWord]);
-  // §12 D7–D9: edit a TXT, CSV, XLSX, XLS or Word file (one ad unlocks the document for a while). Preloading is
-  // shared with the conversion gate's (rewarded.preloadRewarded keeps one ad).
-  const edit = useEditFile({ preload: proTasks.includes('editFiles') });
   const { start: startEdit } = edit;
   const editFile = useCallback(() => {
     if (external) startEdit({ external });
@@ -332,6 +346,22 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     [topInset, bottomInset, insets.left, insets.right]
   );
 
+  // §18 W19: the surface's position, by the page's id where it has one.
+  const positionDoc = useRef(doc);
+  positionDoc.current = doc;
+  const onSurfacePosition = useCallback((idx: number, fy: number) => savePosition(pagePosition(positionDoc.current, idx, fy)), [savePosition]);
+  // §18 W19 (A15): what every other viewer gets (viewers/types).
+  const viewerProps = {
+    night,
+    insets: surfaceInsets,
+    onTap: onViewerTap,
+    find: viewerFind.find,
+    onFindResult: viewerFind.onFindResult,
+    initialPosition: initialViewerPosition,
+    onPosition: savePosition,
+    onScrollDirection: chrome.directed,
+  };
+
   const handleTool = useCallback(
     (id: ReaderToolId) => {
       // A file's Pro tasks: one conversion (Office → PDF, D5, or scan/PDF → Word, D6), editing a
@@ -366,6 +396,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     isPageRaster,
     pageCount,
     pdfPage: activeIndex + 1,
+    position: currentPosition,
     dispatch,
     t,
     back,
@@ -394,7 +425,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
-      {onSurface ? (
+      {!positionReady ? null : onSurface ? (
         <PageSurface
           // Mounted again for each reload (useReaderDocument): a rewritten file, a password to try.
           key={`${pdfUri ?? pdfId}:${reloadKey}`}
@@ -409,7 +440,11 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
           safeBottom={insets.bottom}
           chrome={chrome.progress}
           onScroll={chrome.scrolled}
-          initialIndex={mapped ? libraryIdxFor(doc, initialPage ?? 1) : (initialPage ?? 1) - 1}
+          // §18 W19: the saved place on the page it was left on; else the page a reload, a search
+          // hit or the old saved page number names.
+          initialIndex={initialSpot ? initialSpot.index : mapped ? libraryIdxFor(doc, initialPage ?? 1) : (initialPage ?? 1) - 1}
+          initialFy={initialSpot?.fy}
+          onPosition={onSurfacePosition}
           onLoad={onSurfaceLoad}
           onPage={onSurfacePage}
           onTap={onViewerTap}
@@ -431,34 +466,11 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
           onError={handlePdfError}
         />
       ) : format === 'CSV' || format === 'XLSX' || format === 'XLS' ? (
-        <SheetView
-          key={nativeUri}
-          uri={nativeUri!}
-          format={format}
-          night={night}
-          findQuery={find.query}
-          onMatchCount={find.setLocalMatchCount}
-          onTap={onViewerTap}
-        />
+        <SheetView key={nativeUri} uri={nativeUri!} format={format} chrome={chrome.progress} {...viewerProps} />
       ) : format === 'TXT' ? (
-        <TxtView
-          key={nativeUri}
-          uri={nativeUri!}
-          night={night}
-          findQuery={find.query}
-          onMatchCount={find.setLocalMatchCount}
-          onTap={onViewerTap}
-        />
+        <TxtView key={nativeUri} uri={nativeUri!} {...viewerProps} />
       ) : format === 'DOCX' ? (
-        <DocxView
-          key={nativeUri}
-          uri={nativeUri!}
-          night={night}
-          findQuery={find.query}
-          onMatchCount={find.setLocalMatchCount}
-          padTop={insets.top + TOP_BAR_ROW_HEIGHT}
-          onTap={onViewerTap}
-        />
+        <DocxView key={nativeUri} uri={nativeUri!} {...viewerProps} />
       ) : format === 'DOC' ? (
         // Only on documents added before R5 dropped .doc; there's no viewer for it.
         <View style={styles.unsupported}>
@@ -490,7 +502,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
           findQuery={find.query}
           onChangeFindQuery={find.changeQuery}
           findCount={findCount}
-          onFindStep={onSurface ? findStep : undefined}
+          onFindStep={findStep}
           subtitle={submittedSummary(docSubmissions, formatShortDate)}
           onSubtitlePress={() => openSheet({ kind: 'submissions' })}
           bookmarked={canBookmark ? !!currentBookmark : undefined}

@@ -398,10 +398,10 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W16 Signatures as rows on the surface (done in code 2026-10-10; device check open)
 - [x] W17 The surface becomes the reader (bake-ins removed) (done in code 2026-10-10; device check open)
 - [x] W18 Remove react-native-pdf-jsi (done in code 2026-10-10; **needs `npx expo prebuild --clean` and a new dev build**; device check open)
-- [ ] W19 Viewer contract, parse cache, positions
-- [ ] W20 TXT
-- [ ] W21 Sheets
-- [ ] W22 DOCX
+- [x] W19 Viewer contract, parse cache, positions (done in code 2026-10-10; schema v18; device check open)
+- [x] W20 TXT (done in code 2026-10-10; device check open)
+- [x] W21 Sheets (done in code 2026-10-10; device check open)
+- [x] W22 DOCX (done in code 2026-10-10; device check open)
 - [ ] W23 Grouped More sheet + Rename, Move, Star (needs §17 U3)
 
 **Done when:** on a mid-range phone a 300-page textbook opens sharp in ≤ 1.2 s cold, flings with ≤ 5%

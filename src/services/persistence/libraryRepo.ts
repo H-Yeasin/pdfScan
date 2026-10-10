@@ -17,6 +17,7 @@ import type {
   TimetableSlot,
 } from '../../types/models';
 import { COURSE_COLORS, isCourseColor } from '../courses/palette';
+import { decodePosition, encodePosition } from '../documents/positionCodec';
 import { parseOcrScript } from '../scripts/registry';
 import { parseSubmitPreset, serializeSubmitPreset } from '../submit/preset';
 import { fromStoredPath, toStoredPath } from './libraryFiles';
@@ -46,6 +47,7 @@ type DocumentRow = {
   indexed_at: number | null;
   index_state: string | null;
   last_page: number | null;
+  last_position: string | null;
   missing_files: number;
   disk_bytes: number | null;
   pdf_info_failed: number;
@@ -279,6 +281,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       indexedAt: row.indexed_at ?? undefined,
       indexState: INDEX_STATES.includes(row.index_state as IndexState) ? (row.index_state as IndexState) : undefined,
       lastPage: row.last_page && row.last_page > 0 ? row.last_page : undefined,
+      lastPosition: decodePosition(row.last_position),
       missingFiles: row.missing_files ? true : undefined,
       pdfInfoFailed: row.pdf_info_failed ? true : undefined,
     };
@@ -571,13 +574,14 @@ async function writeDocument(
     doc.indexedAt ?? null,
     doc.indexState ?? null,
     doc.lastPage ?? null,
+    encodePosition(doc.lastPosition),
     doc.missingFiles ? 1 : 0,
     doc.pdfInfoFailed && !doc.pdfLayout ? 1 : 0,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
        updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size,
-       indexed_at, index_state, last_page, missing_files, pdf_info_failed)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       indexed_at, index_state, last_page, last_position, missing_files, pdf_info_failed)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -590,6 +594,7 @@ async function writeDocument(
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
          archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size,
          indexed_at = excluded.indexed_at, index_state = excluded.index_state, last_page = excluded.last_page,
+         last_position = excluded.last_position,
          missing_files = excluded.missing_files, pdf_info_failed = excluded.pdf_info_failed,
          disk_bytes = CASE WHEN ${pagesUnchanged ? 1 : 0} AND documents.size_bytes = excluded.size_bytes
            AND documents.pdf_path IS excluded.pdf_path THEN documents.disk_bytes ELSE NULL END`,
@@ -803,7 +808,7 @@ export async function archiveSemester(db: SQLiteDatabase, id: string): Promise<v
 // vs "changed since") and which says when the library last changed (B5's reminder and automatic
 // backups) - so reading a document doesn't count as changing it. Nor does loading its word boxes
 // (§16 G4, blocksLoadedOnly).
-const NOT_EDITS: readonly (keyof LibraryDocument)[] = ['lastPage', 'missingFiles', 'pdfInfoFailed'];
+const NOT_EDITS: readonly (keyof LibraryDocument)[] = ['lastPage', 'lastPosition', 'missingFiles', 'pdfInfoFailed'];
 
 export function documentEdited(before: LibraryDocument, after: LibraryDocument): boolean {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)] as (keyof LibraryDocument)[]);

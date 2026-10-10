@@ -87,5 +87,6 @@ export function useEditFile(opts: { preload: boolean }) {
     </>
   );
 
-  return { start, element, busy: gate.loadingAd };
+  // `open`: the editor is on screen (it is laid out for an upright phone; §18 W19).
+  return { start, element, busy: gate.loadingAd, open: editing !== null };
 }

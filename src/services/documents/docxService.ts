@@ -53,65 +53,72 @@ export const PRINT_PAGE_CSS = `
   table { display: table; width: auto; max-width: 100%; }
   tr, img { break-inside: avoid; page-break-inside: avoid; }`;
 
-const BODY_PAD_TOP = 20;
+// The page's own padding, in CSS px; the Reader's bars add to it (docxBridge's setInsets uses the
+// same numbers, so the padding it sets later agrees with what the page was built with).
+export const DOCX_BODY_PAD = { top: 20, side: 18, bottom: 48 } as const;
 
-// §18 W4: a tap on the page hides or shows the Reader's bars, as in every other viewer. The page
-// can't run scripts (its CSP), so DocxView injects this one, fixed line; the document's content
-// never becomes part of it. It says exactly one thing, DOCX_TAP_MESSAGE, and not when the tap was
-// on a link or ended a text selection.
-export const DOCX_TAP_MESSAGE = 'tap';
-export const DOCX_TAP_SCRIPT = `(function () {
-  if (window.__pdfscanTap) return;
-  window.__pdfscanTap = true;
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    if (t && t.closest && t.closest('a')) return;
-    var s = window.getSelection ? String(window.getSelection()) : '';
-    if (s.length > 0) return;
-    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('${DOCX_TAP_MESSAGE}');
-  }, true);
-})(); true;`;
+export type DocxColors = { bg: string; ink: string; muted: string; edge: string; accent: string };
+// Find's marks (services/documents/docxBridge): every match, and the one Find is on.
+export type DocxFindColors = { fill: string; current: string; onCurrent: string };
+export type DocxPad = { top?: number; bottom?: number; left?: number; right?: number };
 
-// The only message the app acts on. The bridge exists for the script above, but a message is
-// untrusted input all the same: anything that isn't exactly the tap is dropped, never parsed.
-export function isDocxTapMessage(data: unknown): boolean {
-  return data === DOCX_TAP_MESSAGE;
+// A number only, so nothing but a length can reach the style sheet.
+function px(base: number, extra: unknown): number {
+  return base + Math.max(0, Math.round(Number(extra) || 0));
 }
 
 // A complete page around docxToHtml's body. The CSP is the second lock after the WebView's own
-// settings (navigation blocked, a bridge that accepts one fixed word): no scripts of the document's own (inline, linked or a
-// javascript: link), no network, images only as data: URIs. The app's own injected script (§12
-// D11's scroll to a find mark) runs outside the CSP.
-// `padTop` (§18 W4): extra space above the first line, in CSS px - the Reader's top bar lies over
-// the page, and without it the document's first lines sat hidden under the bar.
+// settings (navigation blocked, a bridge whose messages are checked against a strict schema): no
+// scripts of the document's own (inline, linked or a javascript: link), no network, images only as
+// data: URIs. The app's own injected script (docxBridge.DOCX_BRIDGE_SCRIPT) runs outside the CSP.
+// `padTop` (§18 W4) / `pad` (§18 W22): room for the Reader's bars around the text, in CSS px -
+// they lie over the page, and without it the document's first lines sat hidden under the top bar.
 // `print`: for expo-print (D5), which renders it the same locked-down way. `find`: the colours of
-// §12 D11's find marks (services/documents/docxFind), the first match stronger than the rest.
+// Find's marks. `night` (§18 W22): the second palette, as `body.night` rules, and whether the page
+// starts in it - the viewer switches by setting the body's class, with no reload.
 export function docxPageHtml(
   body: string,
-  colors: { bg: string; ink: string; muted: string; edge: string; accent: string },
-  opts: { print?: boolean; find?: { fill: string; current: string; onCurrent: string }; padTop?: number } = {}
+  colors: DocxColors,
+  opts: { print?: boolean; find?: DocxFindColors; padTop?: number; pad?: DocxPad; night?: { on: boolean; colors: DocxColors; find?: DocxFindColors } } = {}
 ): string {
   const findCss = opts.find
     ? `
   mark.pdfscan-find { background: ${opts.find.fill}; color: inherit; border-radius: 2px; }
   mark.pdfscan-current { background: ${opts.find.current}; color: ${opts.find.onCurrent}; }`
     : '';
-  // A number only, so nothing but a length can reach the style sheet.
-  const padTop = BODY_PAD_TOP + Math.max(0, Math.round(Number(opts.padTop) || 0));
+  const night = opts.night;
+  const nightCss = night
+    ? `
+  body.night { background: ${night.colors.bg}; color: ${night.colors.ink}; }
+  body.night td, body.night th { border-color: ${night.colors.edge}; }
+  body.night a { color: ${night.colors.accent}; }
+  body.night blockquote { border-left-color: ${night.colors.edge}; color: ${night.colors.muted}; }${
+    night.find
+      ? `
+  body.night mark.pdfscan-find { background: ${night.find.fill}; }
+  body.night mark.pdfscan-current { background: ${night.find.current}; color: ${night.find.onCurrent}; }`
+      : ''
+  }`
+    : '';
+  const top = px(DOCX_BODY_PAD.top, opts.pad?.top ?? opts.padTop);
+  const right = px(DOCX_BODY_PAD.side, opts.pad?.right);
+  const bottom = px(DOCX_BODY_PAD.bottom, opts.pad?.bottom);
+  const left = px(DOCX_BODY_PAD.side, opts.pad?.left);
+  const padding = left === right ? `${top}px ${right}px ${bottom}px` : `${top}px ${right}px ${bottom}px ${left}px`;
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body { background: ${colors.bg}; color: ${colors.ink}; font: 16px/1.55 -apple-system, Roboto, sans-serif; margin: 0; padding: ${padTop}px 18px 48px; overflow-wrap: break-word; }
+  body { background: ${colors.bg}; color: ${colors.ink}; font: 16px/1.55 -apple-system, Roboto, sans-serif; margin: 0; padding: ${padding}; overflow-wrap: break-word; }
   h1, h2, h3, h4 { line-height: 1.25; margin: 1.2em 0 0.5em; }
   p { margin: 0 0 0.8em; }
   img { max-width: 100%; height: auto; }
   table { border-collapse: collapse; display: block; overflow-x: auto; margin: 0 0 1em; }
   td, th { border: 1px solid ${colors.edge}; padding: 4px 8px; vertical-align: top; }
   a { color: ${colors.accent}; }
-  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }${opts.print ? PRINT_PAGE_CSS : ''}${findCss}
+  blockquote { border-left: 3px solid ${colors.edge}; color: ${colors.muted}; margin: 0 0 1em; padding-left: 12px; }${opts.print ? PRINT_PAGE_CSS : ''}${findCss}${nightCss}
 </style>
-</head><body>${body}</body></html>`;
+</head><body${night?.on ? ' class="night"' : ''}>${body}</body></html>`;
 }

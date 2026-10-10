@@ -1,4 +1,4 @@
-import { SHEET_ZOOM_MAX, SHEET_ZOOM_MIN, sheetLineHeight, sheetRowHeight, sheetZoom } from '../SheetView';
+import { rowHeight as sheetRowHeight, SHEET_ZOOM_MAX, SHEET_ZOOM_MIN, sheetLineHeight, sheetZoom } from '../../../services/documents/sheetWindow';
 
 describe('sheet pinch zoom (§12 D11)', () => {
   it('scales from where the pinch started, in steps of 0.1, within the limits', () => {

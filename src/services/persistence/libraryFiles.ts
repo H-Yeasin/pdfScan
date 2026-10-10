@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { sanitizeFolderSegment } from '../../utils/sanitize';
+import { dropCachedHtml } from '../documents/parseCache';
 import { dropPageCache } from '../reader/pageCache';
 
 const LIBRARY_SEGMENT = 'library';
@@ -14,7 +15,18 @@ export function getDocumentDir(documentId: string): Directory {
 
 export function deleteDocumentFiles(documentId: string): void {
   const dir = new Directory(Paths.document, LIBRARY_SEGMENT, documentId);
-  if (dir.exists) dir.delete();
+  if (dir.exists) {
+    // §18 W19: the DOCX viewer's parsed copy of it, in the cache (named by the file as it is, so
+    // before the file goes).
+    try {
+      for (const entry of dir.list()) {
+        if (entry instanceof File && entry.name.toLowerCase().endsWith('.docx')) dropCachedHtml(entry.uri);
+      }
+    } catch {
+      // A folder that can't be listed: the cache keeps a few files at most and ages them out.
+    }
+    dir.delete();
+  }
   // §18 W9: the Reader's rendered pages of it, in the cache.
   dropPageCache(documentId);
 }

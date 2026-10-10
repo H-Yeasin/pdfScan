@@ -1,15 +1,13 @@
 import { useCallback, useState } from 'react';
 
-// The Reader's Find: whether it is open, the query, and the match count shown in the top bar for
-// the viewers that find in their own text (TXT, sheets, DOCX report it through
-// setLocalMatchCount). §18 W12: the page surface searches the query itself and reports what it
-// found (surface/useSurfaceFind). §18 W6: one instance per file (ReaderDocumentView is keyed on
+// The Reader's Find: whether it is open, and the query. §18 W12: the page surface searches the
+// query itself and reports what it found (surface/useSurfaceFind). §18 W19: so do the other
+// viewers, through the viewer contract (viewers/useViewerFind keeps their current match). §18 W6: one instance per file (ReaderDocumentView is keyed on
 // it), so another document starts with Find closed. Android Back closing Find is the caller's
 // (readerSheets.readerBackTarget: a sheet or a tool comes first).
 export function useReaderFind() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [localMatchCount, setLocalMatchCount] = useState(0);
   // §5 T2, §18 W12: the library page (0-based) a page search result opened Find on. The surface
   // starts from it; the whole document is searched either way. Typing a new query starts from
   // where reading is again.
@@ -20,7 +18,6 @@ export function useReaderFind() {
   const close = useCallback(() => {
     setOpen(false);
     setQuery('');
-    setLocalMatchCount(0);
     setTargetPage(null);
   }, []);
 
@@ -43,5 +40,5 @@ export function useReaderFind() {
     }
   }, []);
 
-  return { open, toggle, close, query, changeQuery, openOnPage, targetPage, matchCount: localMatchCount, setLocalMatchCount };
+  return { open, toggle, close, query, changeQuery, openOnPage, targetPage };
 }

@@ -32,3 +32,20 @@ export function chromeAfterScroll(state: ChromeScroll, dy: number, edge: ChromeE
 export function chromeAfterTap(shown: boolean, locked: boolean): boolean {
   return locked ? true : !shown;
 }
+
+// §18 W19 (A15): the same rule for the viewers that scroll by themselves (a list, a web page).
+// They can't run the rule a frame at a time on the UI thread; they say which way reading is
+// going, and the Reader shows or hides the bars (useReaderChrome.directed).
+export type ScrollDirection = 'forward' | 'back';
+
+// `travel` as in ChromeScroll. After something is said the count starts again, so the same
+// direction is said again a little further on: the Reader may have shown the bars in between (a
+// tap, Find closing), and reading on should hide them again without a turn first.
+export function scrollSaid(travel: number, dy: number, edge: ChromeEdge): { travel: number; say: ScrollDirection | null } {
+  if (edge.atStart || edge.atEnd) return { travel: 0, say: 'back' };
+  if (dy === 0) return { travel, say: null };
+  const next = dy > 0 === travel > 0 ? travel + dy : dy;
+  if (next >= CHROME_HIDE_AFTER) return { travel: 0, say: 'forward' };
+  if (next <= -CHROME_SHOW_AFTER) return { travel: 0, say: 'back' };
+  return { travel: next, say: null };
+}

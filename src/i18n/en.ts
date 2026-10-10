@@ -717,6 +717,15 @@ export const en = {
     openFailed: "Couldn't open this file.",
     loading: 'Loading…',
     firstColumns: 'Showing the first {count} columns.',
+    // §18 W21: the sheet preview stops at 5,000 rows; `total` when the file says how many it has.
+    firstRows: 'Showing the first {count} rows.',
+    firstRowsOf: 'Showing the first {count} of {total} rows.',
+    // §18 W21: a tapped cell's whole text ("C12").
+    cell: {
+      title: 'Cell {address}',
+      copy: 'Copy',
+      copied: 'Cell copied',
+    },
     // §18 W4: a text file over the preview cap ({size} is e.g. "4 MB").
     firstBytes: 'Showing the first {size}.',
     tooLargeToPreview: 'File too large to preview',

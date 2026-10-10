@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { tDoc } from '../../i18n';
 import { createId } from '../../utils/id';
 import { sanitizeFileName } from '../../utils/sanitize';
+import { remapPositionPage } from '../documents/positionCodec';
 import { fromStoredPath } from '../persistence/libraryFiles';
 
 // §8 B2: what goes into a backup zip and how it comes back out.
@@ -531,6 +532,11 @@ export function importPlan(
     const page: Row = { ...row, id: claim('pages', String(row.id), keepIds(decision)), document_id: decision.targetId };
     for (const column of PATH_COLUMNS.pages!) page[column] = storedPathFor(row[column], decision.sourceId, decision.targetId, readable);
     out.pages.push(page);
+  }
+
+  // §18 W19: a saved page position names its page by id, so it follows the page to its new one.
+  for (const doc of out.documents) {
+    if (doc.last_position != null) doc.last_position = remapPositionPage(doc.last_position, maps.pages);
   }
 
   // Submissions are the student's own history: restored, never added from someone else.
