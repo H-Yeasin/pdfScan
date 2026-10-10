@@ -1,5 +1,6 @@
 import { tDoc } from '../../i18n';
-import type { Annotation, Bookmark, LibraryDocument } from '../../types/models';
+import type { Annotation, Bookmark, LibraryDocument, OcrBounding } from '../../types/models';
+import { NOTE_ICON } from './hitTest';
 import { HIGHLIGHT_COLORS, PEN_COLORS } from './palette';
 import { isRectMark } from './marks';
 
@@ -103,6 +104,25 @@ export function flashQuery(entry: Pick<NoteEntry, 'kind' | 'text'>): string | nu
   if (!isMarkEntry(entry.kind)) return null;
   const words = entry.text.split(/\s+/).filter(Boolean);
   return words.length ? words.slice(0, FLASH_WORDS).join(' ') : null;
+}
+
+// §18 W12: where a mark is on its page, for the flash on the page surface: the mark's own boxes
+// (the space marks are stored in), so it needs no text to search for and a note or a mark on a
+// page without words flashes too. Pen strokes aren't listed in the panel; they give their bounds.
+export function flashRects(annotation: Pick<Annotation, 'data'>): OcrBounding[] {
+  const data = annotation.data;
+  if ('rects' in data) return data.rects;
+  if ('box' in data) return [data.box];
+  if ('strokes' in data) {
+    const points = data.strokes.flat();
+    if (!points.length) return [];
+    const xs = points.map(([x]) => x);
+    const ys = points.map(([, y]) => y);
+    const left = Math.min(...xs) - data.width / 2;
+    const top = Math.min(...ys) - data.width / 2;
+    return [{ left, top, width: Math.max(...xs) + data.width / 2 - left, height: Math.max(...ys) + data.width / 2 - top }];
+  }
+  return [{ left: data.x - NOTE_ICON / 2, top: data.y - NOTE_ICON / 2, width: NOTE_ICON, height: NOTE_ICON }];
 }
 
 // The text of an export, in the document language: the caller passes tDoc-backed labels so this

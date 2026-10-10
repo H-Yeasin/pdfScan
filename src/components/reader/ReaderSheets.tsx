@@ -6,9 +6,8 @@ import { useHint } from '../shared/useHint';
 import { SubmissionsSheet } from '../submit/SubmissionsSheet';
 import { tDoc } from '../../i18n';
 import { useT } from '../../i18n/useT';
-import { documentNotes, flashQuery, formatNotesExport, notesExportLabels, type NoteEntry } from '../../services/annotations/notesPanel';
+import { documentNotes, formatNotesExport, notesExportLabels, type NoteEntry } from '../../services/annotations/notesPanel';
 import { docTypeOf, getDocType } from '../../services/courses/docTypes';
-import { pdfPageFor } from '../../services/documents/pageMap';
 import { parseJumpInput, type PageLabel } from '../../services/documents/readerPosition';
 import type { ReaderMoreItemId } from '../../services/documents/readerTools';
 import type { ReadingSettings } from '../../services/documents/readingSettings';
@@ -44,7 +43,8 @@ type Props = {
   // text for the "Read page text" sheet.
   outline: OutlineEntry[];
   pageText: (idx: number) => Promise<string>;
-  flashMark: (page: number, query: string) => void;
+  // A mark picked in the Notes panel lights up on its page, once the Reader has gone there.
+  flashNote: (entry: NoteEntry) => void;
   moreItems: ReaderMoreItemId[];
   onSelectMore: (id: ReaderMoreItemId) => void;
   submissions: Submission[];
@@ -65,7 +65,7 @@ export function ReaderSheets({
   nightPages,
   outline,
   pageText,
-  flashMark,
+  flashNote,
   moreItems,
   onSelectMore,
   submissions,
@@ -193,10 +193,8 @@ export function ReaderSheets({
         onOpen={(entry: NoteEntry) => {
           close('notes');
           if (!doc) return;
-          const { page } = pdfPageFor(doc, entry.pageIdx);
           goToIdx(entry.pageIdx);
-          const query = flashQuery(entry);
-          if (query) flashMark(page, query);
+          flashNote(entry);
         }}
         onExport={(shown) => {
           if (!doc) return;

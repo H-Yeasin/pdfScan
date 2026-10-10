@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, TextInput, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fontFamily, spacing, useTheme, touchSlop, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { PageLabel } from '../../services/documents/readerPosition';
+import { FindBar, type FindCount } from './FindBar';
 
 type ReaderTopChromeProps = {
   // useReaderChrome's `progress`: 1 shown, 0 slid away.
@@ -25,7 +26,9 @@ type ReaderTopChromeProps = {
   findOpen: boolean;
   findQuery: string;
   onChangeFindQuery: (value: string) => void;
-  matchCount: number;
+  // §18 W12: what Find found, and (the page surface) its next / previous match.
+  findCount: FindCount;
+  onFindStep?: (by: 1 | -1) => void;
   // A line under the name (e.g. "Submitted 2× · last on 3 Oct"); tappable when onSubtitlePress.
   subtitle?: string | null;
   onSubtitlePress?: () => void;
@@ -48,7 +51,8 @@ export function ReaderTopChrome({
   findOpen,
   findQuery,
   onChangeFindQuery,
-  matchCount,
+  findCount,
+  onFindStep,
   subtitle,
   onSubtitlePress,
   bookmarked,
@@ -87,20 +91,16 @@ export function ReaderTopChrome({
       pointerEvents="box-none"
       onLayout={onLayout}
     >
-      <View style={styles.row}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>
-          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-        </Pressable>
-        {findOpen ? (
-          <TextInput
-            value={findQuery}
-            onChangeText={onChangeFindQuery}
-            placeholder={t('reader.findPlaceholder')}
-            placeholderTextColor={tokens.muted}
-            autoFocus
-            style={[styles.findInput, { color: tokens.ink }]}
-          />
-        ) : (
+      {findOpen && onFind ? (
+        // §18 W12: Find takes the whole row (FindBar); its close button and Android Back end it.
+        <View style={styles.row}>
+          <FindBar query={findQuery} onChangeQuery={onChangeFindQuery} count={findCount} onStep={onFindStep} onClose={onFind} />
+        </View>
+      ) : (
+        <View style={styles.row}>
+          <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>
+            <Ionicons name="chevron-back" size={20} color={tokens.ink} />
+          </Pressable>
           <View style={styles.titleWrap}>
             <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
               {name}
@@ -113,58 +113,48 @@ export function ReaderTopChrome({
               </Pressable>
             ) : null}
           </View>
-        )}
-        {findOpen ? (
-          <>
-            <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.matchCount, { color: tokens.muted }]}>{matchCount}</Text>
-            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-              <Ionicons name="close" size={20} color={tokens.ink} />
+          {page.count > 0 ? (
+            <Pressable
+              style={styles.indicator}
+              onPress={onJump}
+              disabled={!onJump}
+              accessibilityRole="button"
+              accessibilityLabel={
+                page.last > page.first
+                  ? t('reader.pageRangeA11y', { first: page.first, last: page.last, count: page.count })
+                  : t('reader.pageA11y', { page: page.first, count: page.count })
+              }
+            >
+              <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.indicatorText, { color: tokens.ink }]} numberOfLines={1}>
+                {page.last > page.first
+                  ? t('reader.pageRange', { first: page.first, last: page.last, count: page.count })
+                  : t('reader.pageIndicator', { page: page.first, count: page.count })}
+              </Text>
             </Pressable>
-          </>
-        ) : (
-          <>
-            {page.count > 0 ? (
-              <Pressable
-                style={styles.indicator}
-                onPress={onJump}
-                disabled={!onJump}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  page.last > page.first
-                    ? t('reader.pageRangeA11y', { first: page.first, last: page.last, count: page.count })
-                    : t('reader.pageA11y', { page: page.first, count: page.count })
-                }
-              >
-                <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.indicatorText, { color: tokens.ink }]} numberOfLines={1}>
-                  {page.last > page.first
-                    ? t('reader.pageRange', { first: page.first, last: page.last, count: page.count })
-                    : t('reader.pageIndicator', { page: page.first, count: page.count })}
-                </Text>
-              </Pressable>
-            ) : null}
-            {onFind ? (
-              <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} accessibilityRole="button" accessibilityLabel={t('reader.find')}>
-                <Ionicons name="search" size={19} color={tokens.ink} />
-              </Pressable>
-            ) : null}
-            {bookmarked !== undefined && onBookmark ? (
-              <Pressable hitSlop={touchSlop(44)}
-                style={styles.iconButton}
-                onPress={onBookmark}
-                onLongPress={onBookmarkLongPress}
-                accessibilityRole="button"
-                accessibilityLabel={bookmarked ? t('reader.removeBookmark') : t('reader.bookmarkPage')}
-                accessibilityHint={t('reader.bookmarkHint')}
-              >
-                <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={19} color={bookmarked ? tokens.accentInk : tokens.ink} />
-              </Pressable>
-            ) : null}
-            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onOverflow} accessibilityRole="button" accessibilityLabel={t('a11y.moreActions')}>
-              <Ionicons name="ellipsis-vertical" size={18} color={tokens.ink} />
+          ) : null}
+          {onFind ? (
+            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} accessibilityRole="button" accessibilityLabel={t('reader.find')}>
+              <Ionicons name="search" size={19} color={tokens.ink} />
             </Pressable>
-          </>
-        )}
-      </View>
+          ) : null}
+          {bookmarked !== undefined && onBookmark ? (
+            <Pressable
+              hitSlop={touchSlop(44)}
+              style={styles.iconButton}
+              onPress={onBookmark}
+              onLongPress={onBookmarkLongPress}
+              accessibilityRole="button"
+              accessibilityLabel={bookmarked ? t('reader.removeBookmark') : t('reader.bookmarkPage')}
+              accessibilityHint={t('reader.bookmarkHint')}
+            >
+              <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={19} color={bookmarked ? tokens.accentInk : tokens.ink} />
+            </Pressable>
+          ) : null}
+          <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onOverflow} accessibilityRole="button" accessibilityLabel={t('a11y.moreActions')}>
+            <Ionicons name="ellipsis-vertical" size={18} color={tokens.ink} />
+          </Pressable>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -203,14 +193,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontFamily: fontFamily.bodySemiBold,
-  },
-  findInput: {
-    flex: 1,
-    fontSize: 15,
-  },
-  matchCount: {
-    fontSize: 13,
-    paddingHorizontal: spacing.sm,
   },
   indicator: {
     height: 44,

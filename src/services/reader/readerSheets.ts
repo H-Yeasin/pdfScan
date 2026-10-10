@@ -17,7 +17,8 @@ export type ReaderSheet =
 export type ReaderSheetKind = ReaderSheet['kind'];
 
 // A tool: a mode that takes over the page until it is left, each on library page `idx`.
-// 'mark': Mark mode (§12 D3); 'selectText': Select text (§5 T3); 'signPlace': placing the
+// 'mark': Mark mode (§12 D3); 'selectText': Select text (§5 T3; on the page surface a mode of the
+// surface itself, §18 W13, not a sheet over it); 'signPlace': placing the
 // signature on a PDF page; 'signFlatten': signing a JPG-format document's page master.
 export type ReaderOpenTool = { kind: 'mark' | 'selectText' | 'signPlace' | 'signFlatten'; idx: number };
 

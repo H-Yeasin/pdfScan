@@ -716,6 +716,12 @@ export const en = {
     save: 'Save',
     find: 'Find',
     findPlaceholder: 'Find in document',
+    // §18 W12: the match Find is on among the ones found ({total} ends in "+" while pages are
+    // still being searched), and its two step buttons.
+    findCount: '{n} of {total}',
+    findNone: 'No matches',
+    findNext: 'Next match',
+    findPrevious: 'Previous match',
     bookmarkPage: 'Bookmark this page',
     removeBookmark: 'Remove bookmark',
     bookmarkHint: 'Long-press to add a label',
@@ -802,6 +808,11 @@ export const en = {
       highlighted: 'Highlighted',
       underlined: 'Underlined',
       stillNoText: 'Still no text found on this page',
+      // §18 W13: selecting on the page itself (the page surface).
+      surfaceHint: 'Touch and hold a word, or tap it. Drag the handles to select more.',
+      none: 'No text found on this page',
+      done: 'Done',
+      menu: 'Selection actions',
     },
     // §12 D3: Mark mode (replaced T4's Annotate sheet).
     mark: {

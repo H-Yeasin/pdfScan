@@ -391,8 +391,8 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W9 Render queue, page cache, dark matrix
 - [x] W10 Read-only surface behind a flag (done; checked on a phone 2026-10-10)
 - [x] W11 Links, contents, landscape, TalkBack (done; checked on a phone 2026-10-10)
-- [ ] W12 Find on the surface ("3 of 27")
-- [ ] W13 In-page text selection
+- [x] W12 Find on the surface ("3 of 27") (done in code 2026-10-10; device check open)
+- [x] W13 In-page text selection (done in code 2026-10-10; device check open)
 - [ ] W14 Exports carry the marks
 - [ ] W15 Mark mode on the surface
 - [ ] W16 Signatures as rows on the surface

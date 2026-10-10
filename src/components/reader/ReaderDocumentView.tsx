@@ -5,6 +5,7 @@ import { useOpenCoverOptions } from '../library/useCoverTarget';
 import { Hint } from '../shared/Hint';
 import { useHint } from '../shared/useHint';
 import { useT } from '../../i18n/useT';
+import { flashQuery, flashRects, type NoteEntry } from '../../services/annotations/notesPanel';
 import { useRouter } from '../../navigation/router';
 import { useScreenRole } from '../../navigation/screenRole';
 import { useBackHandler } from '../../navigation/useBackHandler';
@@ -24,7 +25,7 @@ import { submittedSummary } from '../../services/submit/history';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { spacing, useTheme } from '../../theme';
-import type { LibraryDocument } from '../../types/models';
+import type { Annotation, LibraryDocument } from '../../types/models';
 import { formatShortDate } from '../../utils/format';
 import { createId } from '../../utils/id';
 import { DocxView } from './DocxView';
@@ -37,6 +38,7 @@ import { ReaderTopChrome, ROW_HEIGHT as TOP_BAR_ROW_HEIGHT } from './ReaderTopCh
 import { SelectTextSheet } from './SelectTextSheet';
 import { SheetView } from './SheetView';
 import { PageSurface, type PageSurfaceHandle } from './surface/PageSurface';
+import type { SurfaceFindStatus } from './surface/useSurfaceFind';
 import { TxtView } from './TxtView';
 import { useAnnotationPdfSync } from './useAnnotationPdfSync';
 import { useConvertToPdf } from './useConvertToPdf';
@@ -53,6 +55,7 @@ import { useReaderOrientation } from './useReaderOrientation';
 import { useReaderOverflowActions } from './useReaderOverflowActions';
 import { useReaderSheets } from './useReaderSheets';
 import { useReaderSigning } from './useReaderSigning';
+import React from 'react';
 
 // §12 D2: the Reader on one file, laid out for studying. Top: Back, title, page "12 / 40", Find,
 // Bookmark, More. Bottom: the study tool bar (readerTools). Tap the page to hide both bars.
@@ -136,7 +139,15 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     submitPassword,
   } = useReaderDocument({ doc: openDoc, external });
   usePageOcr(doc);
-  const find = useReaderFind({ pdfUri, pdfId, pageCount, goToPage });
+  // §18 W12: the page surface searches the query itself (PageSurface's useSurfaceFind) and says
+  // what it found; pdf-jsi's search is the other engine's.
+  const find = useReaderFind({ pdfUri: onSurface ? undefined : pdfUri, pdfId, pageCount, goToPage });
+  const [surfaceFind, setSurfaceFind] = useState<SurfaceFindStatus | null>(null);
+  const findCount = useMemo(
+    () => (onSurface ? { current: surfaceFind?.current ?? 0, total: surfaceFind?.total ?? 0, scanning: surfaceFind?.scanning ?? false } : { total: find.matchCount }),
+    [onSurface, surfaceFind, find.matchCount]
+  );
+  const findStep = useCallback((by: 1 | -1) => surfaceRef.current?.findStep(by), []);
   const sheets = useReaderSheets();
   const { open: openSheet, openTool, closeTool, tool } = sheets;
   // §9 O1: Android back closes the find bar before leaving the Reader, once no sheet or tool is
@@ -147,8 +158,12 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   // §18 W10: the bars stay while Find, a sheet or a tool needs them.
   const chrome = useReaderChrome(reading.keepAwake && onScreen, find.open || chromeLocked(sheets.state));
   // §18 W11 (A13): the surface may be read sideways. Not the tools that still open the old
-  // overlays (Mark, Select text, Sign until W15 / W16): the screen turns upright for those.
-  const leave = useReaderOrientation(onSurface && onScreen && !tool);
+  // overlays (Mark, Sign until W15 / W16): the screen turns upright for those. §18 W13: Select
+  // text is on the surface itself.
+  const surfaceSelecting = onSurface && tool?.kind === 'selectText';
+  const leave = useReaderOrientation(onSurface && onScreen && (!tool || surfaceSelecting));
+  // The surface's Select tool is not a Modal: Back leaves it (a sheet over it goes first).
+  useBackHandler(closeTool, surfaceSelecting && readerBackTarget(sheets.state, find.open) === 'tool');
   const back = useCallback(() => leave(pop), [leave, pop]);
   const { onPage: onChromePage, toggle: toggleChrome, show: showChrome } = chrome;
   // §18 W2: a tap on the page hides the bars, but not while Find is open: its field is in the top
@@ -221,7 +236,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
 
   // §12 D3: the library page Mark mode opened on, or null; §5 T3: the one open in "Select text".
   const markIdx = tool?.kind === 'mark' ? tool.idx : null;
-  const selectTextIdx = tool?.kind === 'selectText' ? tool.idx : null;
+  // §18 W13: on the page surface, selecting happens on the pages; the sheet is the other engine's.
+  const selectTextIdx = !onSurface && tool?.kind === 'selectText' ? tool.idx : null;
   // §12 D10: whether Mark mode's Text tool is open on this document (checked without asking when
   // Mark mode opens, so a remembered Text tool comes back; else unlocked through the gate).
   const [textUnlocked, setTextUnlocked] = useState(false);
@@ -242,8 +258,14 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     };
   }, [markOpen, doc, isTextUnlocked]);
   // §12 D3: marks reach document.pdf in the background; the viewer then reloads on the page being
-  // read.
-  const syncAnnotations = useAnnotationPdfSync(useCallback(() => reload(), [reload]));
+  // read. §18 W13: not the surface on a scan, which shows the page images and never opened the
+  // PDF: there is nothing to load again.
+  const keepView = onSurface && mapped;
+  const syncAnnotations = useAnnotationPdfSync(
+    useCallback(() => {
+      if (!keepView) reload();
+    }, [reload, keepView])
+  );
   // The library page on screen (on a 2-up sheet, its left page).
   const sheetIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
   const currentIdx = onSurface && mapped && surfaceIdx !== null ? Math.min(surfaceIdx, Math.max(0, doc.pages.length - 1)) : sheetIdx;
@@ -254,6 +276,28 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     return onSurface && mapped && label.library ? { ...label, first: currentIdx + 1, last: currentIdx + 1 } : label;
   }, [doc, activeIndex, pageCount, onSurface, mapped, currentIdx]);
   const markFlash = useMarkFlash(pdfId);
+  // §12 D4: a mark picked in the Notes panel flashes on its page. §18 W12: the surface draws the
+  // mark's own geometry; pdf-jsi can only be asked to find the mark's first words in the PDF.
+  const annotations = state.library.annotations;
+  const docId = doc?.id;
+  const docMarks = useMemo(() => (docId ? annotations.filter((a) => a.documentId === docId) : NO_MARKS), [annotations, docId]);
+  const onMarked = useCallback(() => {
+    if (docId) syncAnnotations(docId);
+  }, [docId, syncAnnotations]);
+  const { flash: flashByText } = markFlash;
+  const flashNote = useCallback(
+    (entry: NoteEntry) => {
+      if (!doc) return;
+      if (onSurface) {
+        const mark = annotations.find((a) => a.id === entry.id);
+        if (mark) surfaceRef.current?.flash(entry.pageIdx, flashRects(mark));
+        return;
+      }
+      const query = flashQuery(entry);
+      if (query) void flashByText(pdfPageFor(doc, entry.pageIdx).page, query);
+    },
+    [doc, onSurface, annotations, flashByText]
+  );
   // §5 T5: the bookmark on the page on screen.
   const currentBookmark = doc ? state.library.bookmarks.find((b) => b.documentId === doc.id && b.pageId === doc.pages[currentIdx]?.id) : undefined;
   // §9 O3: one-time hint. It waits until nothing covers the top bar.
@@ -271,6 +315,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   // A page search result: once the PDF has loaded, jump to that library page's PDF page and
   // highlight the query there. (The viewer already opened on it, useReaderDocument's first page;
   // the jump is for a Reader that was open.) §18 W5: only the Reader on screen takes the target.
+  // §18 W12: the surface starts Find from that library page (a 2-in-1 sheet's PDF page can't
+  // name it) and searches on through the document.
   const target = onScreen ? state.reader.target : null;
   const { openOnPage } = find;
   useEffect(() => {
@@ -278,8 +324,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     dispatch({ type: 'reader/SET_TARGET', target: null });
     const idx = doc.pages.findIndex((p) => p.id === target.pageId);
     if (idx < 0) return;
-    // §18 W10: Find comes to the surface in W12; until then a search hit only opens its page.
-    if (!onSurface) openOnPage(pdfPageFor(doc, idx).page, target.query);
+    openOnPage(onSurface ? idx : pdfPageFor(doc, idx).page, target.query);
     goToIdx(idx);
   }, [target, doc, pageCount, dispatch, openOnPage, goToIdx, onSurface]);
 
@@ -333,10 +378,12 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         return;
       }
       if (!doc) return;
-      if (id === 'mark' || id === 'selectText') openTool({ kind: id, idx: currentIdx });
+      // §18 W13: on the surface the Select tool is a mode of the page, and its button also leaves it.
+      if (id === 'selectText' && surfaceSelecting) closeTool();
+      else if (id === 'mark' || id === 'selectText') openTool({ kind: id, idx: currentIdx });
       else openSheet({ kind: id });
     },
-    [doc, currentIdx, proTasks, toWord, convertToPdf, convertToWord, editFile, fillForm, openTool, openSheet, t]
+    [doc, currentIdx, proTasks, toWord, convertToPdf, convertToWord, editFile, fillForm, openTool, closeTool, surfaceSelecting, openSheet, t]
   );
 
   const onSelectMore = useReaderOverflowActions({
@@ -405,6 +452,13 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
           onTap={onViewerTap}
           onOutline={setOutline}
           onReadText={(idx) => openSheet({ kind: 'pageText', idx })}
+          findQuery={find.open ? find.query : ''}
+          findFrom={find.targetPage}
+          onFindStatus={setSurfaceFind}
+          selecting={surfaceSelecting}
+          onSelectDone={closeTool}
+          marks={docMarks}
+          onMarked={onMarked}
           onError={handlePdfError}
         />
       ) : isPageRaster ? (
@@ -479,12 +533,12 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         onOverflow={() => openSheet({ kind: 'more' })}
         page={shownPage}
         onJump={isPageRaster ? () => openSheet({ kind: 'jump' }) : undefined}
-        // §18 W10: Find is hidden on the surface until W12 brings it there.
-        onFind={format && canFindInDoc(format) && !onSurface ? find.toggle : undefined}
+        onFind={format && canFindInDoc(format) ? find.toggle : undefined}
         findOpen={find.open}
         findQuery={find.query}
         onChangeFindQuery={find.changeQuery}
-        matchCount={find.matchCount}
+        findCount={findCount}
+        onFindStep={onSurface ? findStep : undefined}
         subtitle={submittedSummary(docSubmissions, formatShortDate)}
         onSubtitlePress={() => openSheet({ kind: 'submissions' })}
         bookmarked={canBookmark ? !!currentBookmark : undefined}
@@ -519,7 +573,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         nightPages={onSurface}
         outline={onSurface ? outline : NO_OUTLINE}
         pageText={pageText}
-        flashMark={markFlash.flash}
+        flashNote={flashNote}
         moreItems={moreItems}
         onSelectMore={onSelectMore}
         submissions={docSubmissions}
@@ -567,6 +621,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
 }
 
 const NO_OUTLINE: OutlineEntry[] = [];
+const NO_MARKS: Annotation[] = [];
 
 const styles = StyleSheet.create({
   // The top bar's buttons are 44 pt with a 6 pt gap and an 8 pt edge; the bookmark button is the

@@ -1253,7 +1253,48 @@ Device check: an internal link jumps; an external one asks first. The Contents t
 TalkBack: "Page 12 of 300", scroll actions, the adjustable thumb.
 
 ## W12 · Find on the surface *(M)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only, no new dev build. **Device check open** (below).
+
+What was built, and where it differs from the plan:
+- **`services/reader/findIndex.ts`** (pure): `normalizeFindText` (NFKC, soft hyphens out, lower case,
+  white space collapsed), `buildPageIndex(tokens)` (one string per page with a span per word),
+  `findInPage(index, query)` (non-overlapping matches, one box per line, a share of the box for part of a
+  word).
+- **`services/reader/findCursor.ts`** (pure): `scanOrder` (position → end → start), `firstFrom` (the
+  first match at or after the reading position; wraps only once the pages before it are being read),
+  `stepCursor` (next / previous around the ends), `totalHits`, `ordinalOf`, `scanFind` (one page at a
+  time; a stale search stops between pages; an unreadable page has no matches).
+- **`components/reader/surface/useSurfaceFind.ts`**: 150 ms debounce, a generation per query, results in
+  fractions of the shown page. Words: a page's stored OCR (loading its deferred boxes itself if
+  `usePageOcr` hasn't yet), else the PDF page's own text from the session through `pdfTextToOcr`
+  (un-indexed pages, pages past 300, outside and password PDFs). Every page's normalised text is kept
+  for the session, so a later query skips pages without it; word boxes are kept for 48 pages only
+  (memory on a long book). Results are published at once for the first match, then every 200 ms.
+- **`components/reader/surface/SurfaceOverlay.tsx`**: the Skia canvas, mounted only while there is a
+  match or a flash; one `Group` under the layer's transform (the same shared values), a `Rect` per box.
+  Colours in `services/reader/overlayPalette.ts`. **Not a `screen` / `multiply` blend:** the canvas is a
+  layer of its own above the page images, so a blend mode can't reach the page under it; the colours are
+  see-through instead, weaker on dark pages.
+- **`components/reader/FindBar.tsx`**: the query, "3 of 27" ("3 of 27+" while pages are still read, "No
+  matches" at the end), previous / next, close; the keyboard's search key is Next. **It takes the whole
+  top row while Find is open (Back is not shown;** close and Android Back end Find): with Back there was
+  no room for the field on a 360 dp phone. The other viewers (pdf-jsi, TXT, sheets, DOCX) use the same
+  bar with a bare count and no step buttons.
+- **`PageSurface`**: props `findQuery`, `findFrom`, `onFindStatus`; handle `findStep(by)` and
+  `flash(index, rects)`. `useSurfaceView.reveal(rect, bottomCover)` (through `revealRect`); the keyboard's
+  top is watched so a match is not revealed under it.
+- **`ReaderDocumentView`**: on the surface `useReaderFind` gets no `pdfUri` (pdf-jsi's search is not
+  run); a search result's target opens Find from its library page (`find.targetPage`). **The Notes
+  panel's flash** draws the mark's own boxes (`notesPanel.flashRects`: rect marks, a text box, a note's
+  icon, a drawing's bounds) for 1.6 s; `ReaderSheets` takes `flashNote(entry)`.
+- **Gaps:** a word hyphenated over a line break is two words (only soft hyphens are joined). The share
+  of a box for part of a word assumes equally wide letters, left to right. Session text reads are not
+  queued behind renders (`RENDER_PRIORITY.text` is unused): they go straight to the session. The count
+  before the match number can grow during the wrap ("1 of 12+" → "4 of 30"). A scan's marks are still
+  not drawn on the surface (W15), so the flash lights the place, not the mark. No test renders the hook,
+  the overlay or the bar.
+- **Tests:** `services/reader/__tests__/findIndex.test.ts`, `findCursor.test.ts`,
+  `components/reader/__tests__/findBar.test.ts` (`findCountLabel`), `notesPanel.test.ts` (`flashRects`).
 
 Files: new `services/reader/{findIndex,findCursor}.ts`, `components/reader/surface/useSurfaceFind.ts`,
 `components/reader/FindBar.tsx`, SurfaceOverlay (matches), ReaderDocumentView (the target; the notes flash
@@ -1270,7 +1311,42 @@ current one stronger; never under the bars. `[ext300]` finds progressively; `[pw
 result opens with the match highlighted. The Notes panel flash works.
 
 ## W13 · In-page text selection *(M)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only, no new dev build. **Device check open** (below).
+
+What was built, and where it differs from the plan:
+- **`services/reader/selection.ts`** (pure): `wordNear` (a long press takes the word under it or within
+  12 px, nothing on empty paper), `dragHandle` (an end moves; past the other end the two swap),
+  `selectAll`, `tokensIn`, `handlePoints` / `handleAt` (a worklet: the knob hangs under its tip),
+  `menuPosition` (a worklet: above the selection, else under it, always inside the band),
+  `selectionMenuItems`.
+- **`components/reader/surface/useSurfaceSelection.ts`** (not in the plan's list): the selection's state.
+  One page per selection, kept as the page's tokens and turned into content rectangles only to draw.
+- **`components/reader/surface/pageWords.ts`** (`loadPageWords`): a page's words and their space, shared
+  with Find (`useSurfaceFind` reads through it now).
+- **`useSelectionActions.ts`**: Copy, Share, Highlight / Underline, Run OCR. `SelectTextSheet` (the other
+  engine's) uses it too. It reads the store when an action runs and subscribes to nothing.
+- **`SelectionMenu.tsx`**: the menu (it wraps on a narrow screen; the measured size is what is clamped),
+  and `SelectBar`, the Select tool's bar above the bottom bar (how to select, or "No text found on this
+  page" + Run OCR, and Done).
+- **Gestures:** there is no `gestureArbiter.ts` yet (W15 makes it). `useSurfaceGestures` got the long
+  press (400 ms) and the handle drag: a pan that begins on a handle moves the handle and scrolls nothing.
+- **The Select tool:** the bottom bar's "Select text" turns the mode on and off (tool kind `'selectText'`,
+  as before); in it a tap selects a word. A long press selects with or without it. Back closes a
+  selection, then the tool. Landscape stays allowed while selecting.
+- **`SurfaceOverlay`:** the selection, its two handles (drawn outside the zooming group, so they keep their
+  size), and highlights and underlines.
+
+Not as planned, or left open:
+- **Marks on the surface, in part.** So that a highlight shows at once, the overlay draws highlights and
+  underlines only: all of a scan's, and on a PDF page the ones made from a selection since the surface was
+  mounted. Ink, notes, strikes and text boxes still wait for W15.
+- **An imported PDF still reloads once.** The new mark shows at once, but the file is still rewritten in
+  the background (`useAnnotationPdfSync`) and the viewer then opens it again, on the same page. A scan
+  doesn't reload any more (the surface never opened its PDF). W15 removes the write on the flag path.
+- **No auto-scroll** while a handle is dragged to the edge of the screen: scroll, then drag again.
+- **A long press doesn't carry on into a drag:** it selects the word; the handles do the rest.
+- **Select all** is left out for a file from outside (A8: "Copy and Share only").
+- **Run OCR** is offered where the page has an image (`fileUri`): a scan's page, also one merged into a PDF.
 
 Files: new `services/reader/selection.ts`, `components/reader/surface/SelectionMenu.tsx`,
 `useSelectionActions.ts` (from `SelectTextSheet.markSelection`/`rerunOcr`), the arbiter (long press,

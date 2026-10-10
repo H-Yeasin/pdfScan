@@ -11,7 +11,10 @@ export const PAGE_RASTER_FORMATS: DocFormat[] = ['PDF', 'JPG'];
 // Formats with Find in the Reader: PDF and JPG through react-native-pdf-jsi's searchTextDirect, the
 // others through their viewer's own scan of the text or rows it already holds (TxtView, SheetView,
 // and since §12 D11 DocxView over mammoth's HTML). A JPG-format scan is read from its document.pdf
-// like any other scan, and that PDF carries the invisible OCR text layer (§18 W2).
+// like any other scan, and that PDF carries the invisible OCR text layer (§18 W2). §18 W12: on the
+// page surface PDF and JPG are searched in the words the app holds (a scan's OCR, an indexed
+// page's, a PDF page's own text from the open session: services/reader/findIndex), so a
+// password-protected or outside PDF and the pages past the index's first 300 are found in too.
 export const IN_READER_FIND_FORMATS: DocFormat[] = ['PDF', 'JPG', 'CSV', 'TXT', 'XLSX', 'XLS', 'DOCX'];
 
 // §7 R5: the formats a file from outside the app can be opened as - exactly the ones the Reader

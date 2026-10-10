@@ -6,6 +6,7 @@ import {
   clampView,
   clampZoom,
   currentPage,
+  revealRect,
   scrollRange,
   surfaceLayout,
   viewForAnchor,
@@ -13,6 +14,7 @@ import {
   visiblePages,
   zoomAbout,
   type ContentInsets,
+  type ContentRect,
   type Size,
   type SurfaceFit,
   type SurfaceLayout,
@@ -133,6 +135,20 @@ export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, o
     [place]
   );
 
+  // §18 W12: brings a content rectangle (a Find match, a flashed mark) into the visible band,
+  // moving as little as it can and not at all when it is there. `bottomCover` is what covers the
+  // bottom beyond the bar (the keyboard while Find is typed in).
+  const reveal = useCallback(
+    (rect: ContentRect, bottomCover = 0) => {
+      const g = geometry.current;
+      if (!g) return;
+      const insets = bottomCover > g.insets.bottom ? { ...g.insets, bottom: bottomCover } : g.insets;
+      const to = revealRect(g.layout, view.current, rect, g.viewport, insets);
+      if (to !== view.current) place(to);
+    },
+    [place]
+  );
+
   // §18 W11: a zoom step without a pinch (a screen reader's "Zoom in" / "Zoom out"), about the
   // middle of the visible band.
   const zoomBy = useCallback(
@@ -197,5 +213,5 @@ export function useSurfaceView({ pages, fit, gap, paged, insets, initialIndex, o
   );
 
   const motion = useMemo<SurfaceMotion>(() => ({ scale, tx, ty, moving, settled }), [scale, tx, ty, moving, settled]);
-  return { onLayout, viewport, layout, ready, motion, view, geometry, goToIndex, zoomBy };
+  return { onLayout, viewport, layout, ready, motion, view, geometry, goToIndex, reveal, zoomBy };
 }

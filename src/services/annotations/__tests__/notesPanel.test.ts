@@ -5,6 +5,7 @@ import {
   documentNotes,
   filterNotes,
   flashQuery,
+  flashRects,
   formatNotesExport,
   groupNotesByPage,
   notesExportLabels,
@@ -68,6 +69,29 @@ describe('§12 D4 notes panel', () => {
     expect(flashQuery({ kind: 'highlight', text: '' })).toBeNull();
     expect(flashQuery({ kind: 'note', text: 'a note' })).toBeNull();
     expect(flashQuery({ kind: 'bookmark', text: 'label' })).toBeNull();
+  });
+
+  it('flashes a mark where it is: its boxes, a note\'s icon, a drawing\'s bounds', () => {
+    expect(flashRects({ data: rect(400) })).toEqual([{ left: 100, top: 400, width: 200, height: 30 }]);
+    expect(flashRects({ data: { box: { left: 10, top: 20, width: 300, height: 80 }, size: 40 } })).toEqual([{ left: 10, top: 20, width: 300, height: 80 }]);
+    // The icon is a 60 px square around its anchor.
+    expect(flashRects({ data: { x: 500, y: 300 } })).toEqual([{ left: 470, top: 270, width: 60, height: 60 }]);
+    // A stroke's bounds include half the pen's width.
+    expect(
+      flashRects({
+        data: {
+          strokes: [
+            [
+              [100, 100],
+              [200, 150],
+            ],
+            [[50, 300]],
+          ],
+          width: 10,
+        },
+      })
+    ).toEqual([{ left: 45, top: 95, width: 160, height: 210 }]);
+    expect(flashRects({ data: { strokes: [], width: 4 } })).toEqual([]);
   });
 
   it('exports plain text with page numbers', () => {

@@ -1,10 +1,13 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Linking, PixelRatio, StyleSheet, View, type AccessibilityActionInfo } from 'react-native';
+import { AccessibilityInfo, Alert, Keyboard, Linking, PixelRatio, StyleSheet, View, type AccessibilityActionInfo } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useT } from '../../../i18n/useT';
+import { useBackHandler } from '../../../navigation/useBackHandler';
 import { useScreenRole } from '../../../navigation/screenRole';
+import { isRectMark, markLine } from '../../../services/annotations/marks';
+import { annotationColor } from '../../../services/annotations/palette';
 import { isPdfLevel } from '../../../services/documents/formatCapabilities';
 import type { ReaderSubject } from '../../../services/documents/readerTools';
 import { nightPalette, READING_SPACING_PX, type ReadingSettings } from '../../../services/documents/readingSettings';
@@ -14,18 +17,26 @@ import { FAST_SCROLL_HIDE_MS, showsFastScroll } from '../../../services/reader/f
 import { LINK_SLOP, linkAt, linkTarget, shownUrl, tapOnPage } from '../../../services/reader/links';
 import { currentSection, flattenOutline, type OutlineEntry } from '../../../services/reader/outline';
 import { openPageCache, prunePageCache } from '../../../services/reader/pageCache';
+import { mapRect, overlayMatrix, spaceToShown, type UnitRect } from '../../../services/reader/pageSpace';
 import { holdReader } from '../../../services/reader/readerHold';
 import { isFastFling, memoryWindow, planRenders, type PageRange } from '../../../services/reader/renderPlan';
-import { currentPage, pageBox, visiblePages, type ContentInsets, type SurfaceView } from '../../../services/reader/surfaceGeometry';
+import { selectionMenuItems, type Band, type SelectionMenuItem } from '../../../services/reader/selection';
+import { anchorOf, currentPage, pageBox, visiblePages, type ContentInsets, type SurfaceView } from '../../../services/reader/surfaceGeometry';
 import { surfacePagesFor } from '../../../services/reader/surfacePages';
 import { useAppDispatch } from '../../../store/AppStateContext';
 import { useTheme } from '../../../theme';
+import type { Annotation, OcrBounding } from '../../../types/models';
 import { FastScroller } from './FastScroller';
 import { PagePill } from './PagePill';
+import { SelectBar, SelectionMenu } from './SelectionMenu';
+import { SurfaceOverlay, type SurfaceFlash, type SurfaceMark } from './SurfaceOverlay';
 import { SurfacePageView } from './SurfacePageView';
 import { usePdfSession } from './usePdfSession';
+import { useSelectionActions } from './useSelectionActions';
 import { useRenderQueue } from './useRenderQueue';
+import { useSurfaceFind, unionOf, type SurfaceFindStatus } from './useSurfaceFind';
 import { useSurfaceGestures } from './useSurfaceGestures';
+import { useSurfaceSelection } from './useSurfaceSelection';
 import { useSurfaceView } from './useSurfaceView';
 
 export type PageSurfaceHandle = {
@@ -33,6 +44,11 @@ export type PageSurfaceHandle = {
   goToIndex: (index: number) => void;
   // §18 W11: a library page's text ('' for none): a scan's OCR text, a PDF page's own.
   pageText: (index: number) => Promise<string>;
+  // §18 W12: Find's next (1) or previous (-1) match, around the ends.
+  findStep: (by: 1 | -1) => void;
+  // A mark on a library page, shown for a moment and scrolled into view: its boxes in the page's
+  // own space (SurfacePage.space, what marks are stored in).
+  flash: (index: number, rects: readonly OcrBounding[]) => void;
 };
 
 // §18 W11 (A14): what a screen reader offers on a page. Named actions with labels, shown in its
@@ -42,6 +58,10 @@ const PAGE_ZOOM_STEP = 1.5;
 // The page come to rest on is said after this long without another movement.
 const ANNOUNCE_AFTER_MS = 600;
 const NO_LINKS: PdfLink[] = [];
+// How long a mark picked in the Notes panel stays lit.
+const FLASH_MS = 1600;
+const NO_MARKS: readonly Annotation[] = [];
+const NO_DRAWN_MARKS: SurfaceMark[] = [];
 
 type PageSurfaceProps = {
   subject: ReaderSubject;
@@ -70,6 +90,20 @@ type PageSurfaceProps = {
   onOutline?: (entries: OutlineEntry[]) => void;
   // A screen reader's "Read page text" on a library page.
   onReadText: (index: number) => void;
+  // §18 W12: what Find looks for ('' with Find closed), the library page a search result opened
+  // it on (null: from where reading is), and what the top bar shows of it.
+  findQuery?: string;
+  findFrom?: number | null;
+  onFindStatus?: (status: SurfaceFindStatus | null) => void;
+  // §18 W13: the "Select text" tool is on (a tap selects a word, and its bar shows), and its
+  // Done. A long press selects a word with or without it.
+  selecting?: boolean;
+  onSelectDone?: () => void;
+  // The document's marks. Until W15 draws them all here, the surface shows the highlights and
+  // underlines that the page images don't carry: a scan's, and the ones just made from a
+  // selection (`onMarked` tells the Reader, which writes them into the file).
+  marks?: readonly Annotation[];
+  onMarked?: () => void;
   // The file can't be opened (usePdfSession.sessionErrorMessage's words).
   onError: (message: string) => void;
 };
@@ -84,12 +118,15 @@ function sameRange(a: PageRange, b: PageRange): boolean {
 // that zooms and scrolls on the UI thread (useSurfaceView, useSurfaceGestures); each page is
 // plain images, rendered into the page cache by pdfium or the image decoder as the view comes to
 // rest (renderPlan → useRenderQueue). Night pages are redrawn dark, not dimmed. Behind the
-// `reader_surface` switch until W17; Find, selection, marks and signatures arrive in W12–W16.
+// `reader_surface` switch until W17; selection, marks and signatures arrive in W13–W16.
 // §18 W11: a tap is routed here (a PDF link under it jumps, or asks before leaving the app; else
 // it is the Reader's), the outline is read for the Contents tab and the thumb's bubble, and each
 // page is an element a screen reader can name, turn, zoom and read.
+// §18 W12: Find (useSurfaceFind) and the Notes panel's flash, drawn on SurfaceOverlay.
+// §18 W13: selection on the page (useSurfaceSelection): a long press takes a word, two handles
+// move its ends, SelectionMenu floats by it.
 export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(function PageSurface(
-  { subject, pdfUri, owner, password, reading, insets, safeBottom, chrome, onScroll, initialIndex, onLoad, onPage, onTap, onOutline, onReadText, onError },
+  { subject, pdfUri, owner, password, reading, insets, safeBottom, chrome, onScroll, initialIndex, onLoad, onPage, onTap, onOutline, onReadText, findQuery = '', findFrom = null, onFindStatus, selecting = false, onSelectDone, marks = NO_MARKS, onMarked, onError },
   ref
 ) {
   const { tokens } = useTheme();
@@ -128,7 +165,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     onView,
     onScroll,
   });
-  const { layout, viewport, ready, motion, goToIndex, zoomBy } = surface;
+  const { layout, viewport, ready, motion, goToIndex, reveal, zoomBy } = surface;
 
   const [windows, setWindows] = useState<Windows | null>(null);
   const [current, setCurrent] = useState(initialIndex);
@@ -276,7 +313,78 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     },
     [pages, doc, session]
   );
-  useImperativeHandle(ref, () => ({ goToIndex, pageText }), [goToIndex, pageText]);
+
+  // §18 W12: a rectangle of a page (fractions of the page as shown) into the visible band. While
+  // Find is typed in, the keyboard covers more of the bottom than the bar does: whatever of this
+  // view lies under it counts as covered (nothing when the window shrinks for the keyboard).
+  const keyboardTop = useRef<number | null>(null);
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', (e) => {
+      keyboardTop.current = e.endCoordinates.screenY;
+    });
+    const hidden = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardTop.current = null;
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  const revealOnPage = useCallback(
+    (index: number, rect: UnitRect) => {
+      const g = surface.geometry.current;
+      if (!g || index < 0 || index >= g.layout.tops.length) return;
+      const box = pageBox(g.layout, index);
+      const cover = keyboardTop.current === null ? 0 : Math.max(0, g.viewport.height - keyboardTop.current);
+      reveal({ x: box.x + rect.x * box.width, y: box.y + rect.y * box.height, width: rect.width * box.width, height: rect.height * box.height }, cover);
+    },
+    [surface.geometry, reveal]
+  );
+  // Where reading is, for Find's first match: the top of the visible band.
+  const findPosition = useCallback(() => {
+    const g = surface.geometry.current;
+    if (!g) return null;
+    const anchor = anchorOf(g.layout, surface.view.current, g.insets);
+    return { page: anchor.page, fy: anchor.fy };
+  }, [surface.geometry, surface.view]);
+  const find = useSurfaceFind({
+    query: findQuery,
+    from: findFrom,
+    pages,
+    docPages,
+    session,
+    ready,
+    position: findPosition,
+    reveal: revealOnPage,
+    onStatus: onFindStatus,
+  });
+  const { step: findStep } = find;
+
+  const [flashed, setFlashed] = useState<SurfaceFlash | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    []
+  );
+  const flash = useCallback(
+    (index: number, rects: readonly OcrBounding[]) => {
+      const page = pages[index];
+      if (!page || !rects.length) return;
+      const toShown = spaceToShown(page.space);
+      const shown = rects.map((rect) => {
+        const r = mapRect(toShown, rect);
+        return { x: r.left, y: r.top, width: r.width, height: r.height };
+      });
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      setFlashed({ index, rects: shown });
+      revealOnPage(index, unionOf(shown));
+      flashTimer.current = setTimeout(() => setFlashed(null), FLASH_MS);
+    },
+    [pages, revealOnPage]
+  );
+  useImperativeHandle(ref, () => ({ goToIndex, pageText, findStep, flash }), [goToIndex, pageText, findStep, flash]);
 
   // §18 W11: a link out of the app is never followed on the tap: the address is shown first.
   const askLink = useCallback(
@@ -307,8 +415,87 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     [t, dispatch]
   );
 
-  // A5's tap routing, as far as the surface has it: a link under the finger, else the Reader's
-  // tap (the bars). W13 puts an open selection first.
+  // §18 W13 (A8): the selection, and what its menu does (useSelectionActions).
+  const selection = useSurfaceSelection({ pages, docPages, session, layout, geometry: surface.geometry, view: surface.view, selecting, current });
+  const { selection: selected, tokens: selectedWords, drawn, empty, clear: clearSelection, tap: selectionTap, selectAll } = selection;
+  const actions = useSelectionActions(doc);
+  // Leaving the tool closes what it selected; Back closes a selection before anything else.
+  useEffect(() => {
+    if (!selecting) clearSelection();
+  }, [selecting, clearSelection]);
+  useBackHandler(clearSelection, !!selected || !!empty);
+  // The marks made here since this surface was mounted: a PDF page shows them only once the file
+  // has been rewritten and opened again (which mounts the surface anew, with this empty).
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  const onMenuPick = useCallback(
+    (item: SelectionMenuItem) => {
+      switch (item) {
+        case 'copy':
+          void actions.copy(selectedWords).catch(() => undefined);
+          return clearSelection();
+        case 'share':
+          return actions.share(selectedWords);
+        case 'highlight':
+        case 'underline': {
+          const id = selected ? actions.mark(item, selected.pageId, selectedWords) : null;
+          if (!id) return;
+          setFresh((prev) => new Set(prev).add(id));
+          clearSelection();
+          return onMarked?.();
+        }
+        case 'selectAll':
+          return selectAll();
+        case 'runOcr': {
+          const at = empty;
+          if (at) void actions.rerunOcr(at.page).then(clearSelection, clearSelection);
+          return;
+        }
+      }
+    },
+    [actions, selected, selectedWords, empty, clearSelection, selectAll, onMarked]
+  );
+  const external = !doc;
+  const menuPage = selected ? pages[selected.page] : empty ? pages[empty.page] : undefined;
+  const menuOwn = selected ? docPages?.[selected.page] : empty ? docPages?.[empty.page] : undefined;
+  const menuItems = useMemo(
+    () => (menuPage ? selectionMenuItems({ selected: !!selected, canMark: menuPage.canMark, external, canOcr: !!menuOwn?.fileUri }) : []),
+    [menuPage, menuOwn, selected, external]
+  );
+  const menuAnchor = useMemo(() => (drawn ? drawn.bounds : empty ? { x: empty.x, y: empty.y, width: 0, height: 0 } : null), [drawn, empty]);
+  // A long press on a page with no text and no image to read it from: say so, there is no menu.
+  useEffect(() => {
+    if (!empty || menuItems.length) return;
+    dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.select.none') });
+    clearSelection();
+  }, [empty, menuItems, dispatch, t, clearSelection]);
+  const band = useMemo<Band | null>(
+    () => (viewport ? { left: insets.left, top: insets.top, right: viewport.width - insets.right, bottom: viewport.height - insets.bottom } : null),
+    [viewport, insets]
+  );
+
+  // The highlights and underlines to draw (see `marks`), as content rectangles.
+  const drawnMarks = useMemo<SurfaceMark[]>(() => {
+    if (!layout || !marks.length) return NO_DRAWN_MARKS;
+    const indexOf = new Map(pages.map((page, index) => [page.id, index]));
+    const out: SurfaceMark[] = [];
+    for (const mark of marks) {
+      const index = indexOf.get(mark.pageId);
+      const kind = mark.kind;
+      if (index === undefined || index >= layout.tops.length || (kind !== 'highlight' && kind !== 'underline') || !isRectMark(kind) || !('rects' in mark.data)) continue;
+      const page = pages[index];
+      if (page.source.kind !== 'image' && !fresh.has(mark.id)) continue;
+      const toBox = overlayMatrix(pageBox(layout, index), page.space);
+      const rects = mark.data.rects.map((rect) => {
+        const r = mapRect(toBox, kind === 'highlight' ? rect : markLine(kind, rect));
+        return { x: r.left, y: r.top, width: r.width, height: r.height };
+      });
+      out.push({ id: mark.id, index, kind, color: annotationColor(mark.color), rects });
+    }
+    return out.length ? out : NO_DRAWN_MARKS;
+  }, [marks, pages, layout, fresh]);
+
+  // A5's tap routing: an open selection first (the tap closes it, or in the Select tool picks a
+  // word), then a link under the finger, else the Reader's tap (the bars).
   const alive = useRef(true);
   useEffect(
     () => () => {
@@ -318,6 +505,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
   );
   const onSurfaceTap = useCallback(
     (x: number, y: number) => {
+      if (selectionTap(x, y)) return;
       const g = surface.geometry.current;
       const hit = g ? tapOnPage(g.layout, surface.view.current, x, y) : null;
       const page = hit ? pages[hit.index] : undefined;
@@ -342,7 +530,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
         });
       }
     },
-    [surface.geometry, surface.view, pages, linksOf, goToIndex, askLink]
+    [selectionTap, surface.geometry, surface.view, pages, linksOf, goToIndex, askLink]
   );
 
   const step = useCallback((index: number) => goToIndex(Math.max(0, Math.min(pages.length - 1, index))), [goToIndex, pages.length]);
@@ -380,7 +568,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     []
   );
 
-  const gesture = useSurfaceGestures({ layout, viewport, insets, motion, onTap: onSurfaceTap });
+  const gesture = useSurfaceGestures({ layout, viewport, insets, motion, onTap: onSurfaceTap, onLongPress: selection.longPress, handles: selection.handles, onHandle: selection.onHandle });
   const { scale, tx, ty } = motion;
   const layerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
@@ -395,6 +583,12 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     for (let i = windows.thumbs.first; i <= Math.min(windows.thumbs.last, pageCount - 1, layout.tops.length - 1); i += 1) mounted.push(i);
   }
   const onStep = useCallback((by: 1 | -1) => step(current + by), [step, current]);
+  // Only the mounted pages' marks are drawn.
+  const shownMarks = useMemo(() => {
+    if (!windows || drawnMarks === NO_DRAWN_MARKS) return NO_DRAWN_MARKS;
+    const near = drawnMarks.filter((mark) => mark.index >= windows.thumbs.first && mark.index <= windows.thumbs.last);
+    return near.length ? near : NO_DRAWN_MARKS;
+  }, [drawnMarks, windows]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette ? palette.paper : tokens.surface2 }]} onLayout={surface.onLayout}>
@@ -430,6 +624,36 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
           ) : null}
         </View>
       </GestureDetector>
+
+      {/* Mounted only while there is something to draw: an empty canvas still costs a layer. */}
+      {layout && ready && (find.hits.size > 0 || flashed || shownMarks.length > 0 || drawn) ? (
+        <SurfaceOverlay
+          layout={layout}
+          motion={motion}
+          pages={mounted}
+          hits={find.hits}
+          cursor={find.cursor}
+          flash={flashed}
+          marks={shownMarks}
+          selected={drawn}
+          night={!!palette}
+        />
+      ) : null}
+
+      {/* Away while a handle is dragged: the words under it are what is being looked at. */}
+      {ready && band && menuAnchor && menuItems.length > 0 && !selection.dragging ? (
+        <SelectionMenu items={menuItems} anchor={menuAnchor} motion={motion} band={band} busy={actions.rerunning ? 'runOcr' : null} onPick={onMenuPick} />
+      ) : null}
+      {ready && selecting ? (
+        <SelectBar
+          hasText={selection.currentHasText}
+          canOcr={!!docPages?.[current]?.fileUri}
+          rerunning={actions.rerunning}
+          bottom={insets.bottom}
+          onRunOcr={() => void actions.rerunOcr(current).catch(() => undefined)}
+          onDone={() => onSelectDone?.()}
+        />
+      ) : null}
 
       {ready && pageCount ? (
         <PagePill label={label} visible={aids && !thumbHeld} barHeight={insets.bottom} safeBottom={safeBottom} chrome={chrome} />

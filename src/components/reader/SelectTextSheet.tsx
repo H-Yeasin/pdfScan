@@ -1,20 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { runOcr } from '../../services/ocr/ocrService';
-import { resolveOcrScript } from '../../services/scripts/registry';
 import { masterToLayer } from '../../services/study/canvasMath';
 import { readingOrderTokens, selectBetween, selectionText, tokenAt, type TextToken } from '../../services/study/textSelection';
-import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { radii, spacing, useTheme, touchSlop } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { PageCanvas } from './PageCanvas';
 import { usePageImage } from '../shared/usePageImage';
-import { wordRects } from '../../services/annotations/snap';
-import { createId } from '../../utils/id';
+import { useSelectionActions } from './surface/useSelectionActions';
 import { useT } from '../../i18n/useT';
 
 type SelectTextSheetProps = {
@@ -33,13 +28,12 @@ type SelectTextSheetProps = {
 export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSheetProps) {
   const { tokens: theme } = useTheme();
   const { t } = useT();
-  const dispatch = useAppDispatch();
-  const state = useAppSlices('library', 'settings');
+  const actions = useSelectionActions(doc);
+  const { rerunning } = actions;
   const page = doc.pages[pageIdx];
   const tokens = useMemo(() => readingOrderTokens(page?.ocr), [page?.ocr]);
   const [anchor, setAnchor] = useState<TextToken | null>(null);
   const [focus, setFocus] = useState<TextToken | null>(null);
-  const [rerunning, setRerunning] = useState(false);
   const marked = useRef(false);
   const close = () => onClose(marked.current);
   // An imported page has no master: its PDF page, rendered now (null while rendering).
@@ -78,51 +72,15 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
     setFocus(token);
   };
 
-  // §12 D3: the selection as a mark, in the colour Mark mode last used for that kind.
+  // §18 W13: what is done with the words lives in useSelectionActions, shared with the surface.
   const markSelection = (kind: 'highlight' | 'underline') => {
-    if (!page || selected.length === 0) return;
-    const { rects, text: words } = wordRects(selected);
-    const prefs = state.settings.reading.mark;
-    const now = Date.now();
-    dispatch({
-      type: 'library/ADD_ANNOTATION',
-      annotation: {
-        id: createId('annot'),
-        documentId: doc.id,
-        pageId: page.id,
-        kind,
-        color: kind === 'highlight' ? prefs.highlightColor : prefs.lineColor,
-        data: { rects },
-        text: words,
-        createdAt: now,
-        updatedAt: now,
-      },
-    });
+    if (!page || !actions.mark(kind, page.id, selected)) return;
     marked.current = true;
     setAnchor(null);
     setFocus(null);
-    dispatch({ type: 'ui/SHOW_SNACK', msg: kind === 'highlight' ? t('reader.select.highlighted') : t('reader.select.underlined') });
   };
-
-  const copy = async () => {
-    await Clipboard.setStringAsync(text);
-    dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.select.copiedWords', { count: selected.length }) });
-  };
-
-  const rerunOcr = async () => {
-    if (!page) return;
-    setRerunning(true);
-    try {
-      // §6 L1: the document's course decides the script, like it did when the page was scanned.
-      const course = state.library.courses.find((c) => c.id === doc.courseId);
-      const ocr = await runOcr(page.fileUri, resolveOcrScript({ course, settings: state.settings }));
-      const pages = doc.pages.map((p, i) => (i === pageIdx ? { ...p, ocr, ocrFailed: ocr === undefined || undefined } : p));
-      dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: { pages } });
-      if (!ocr?.text.trim()) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.select.stillNoText') });
-    } finally {
-      setRerunning(false);
-    }
-  };
+  const copy = () => actions.copy(selected);
+  const rerunOcr = () => actions.rerunOcr(pageIdx);
 
   const noText = tokens.length === 0;
 
@@ -205,7 +163,7 @@ export function SelectTextSheet({ visible, doc, pageIdx, onClose }: SelectTextSh
                   <Pressable style={styles.ghost} onPress={() => markSelection('underline')} disabled={!text} accessibilityRole="button">
                     <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>{t('reader.select.underline')}</Text>
                   </Pressable>
-                  <Pressable style={styles.ghost} onPress={() => text && Share.share({ message: text })} disabled={!text} accessibilityRole="button">
+                  <Pressable style={styles.ghost} onPress={() => actions.share(selected)} disabled={!text} accessibilityRole="button">
                     <Text style={[styles.ghostLabel, { color: text ? theme.accentInk : theme.muted }]}>{t('reader.select.share')}</Text>
                   </Pressable>
                   <Pressable

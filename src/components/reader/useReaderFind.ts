@@ -11,7 +11,8 @@ type PdfSearch = { pdfId: string; query: string; from: number; to: number };
 
 type Options = {
   // The PDF being searched (pdf-jsi's searchTextDirect), or undefined: the viewer finds in its own
-  // text and reports the count through setLocalMatchCount.
+  // text and reports the count through setLocalMatchCount (TXT, sheets, DOCX), or, on the page
+  // surface, searches the query itself (§18 W12, surface/useSurfaceFind).
   pdfUri: string | undefined;
   pdfId: string;
   pageCount: number;
@@ -28,7 +29,9 @@ export function useReaderFind({ pdfUri, pdfId, pageCount, goToPage }: Options) {
   const [searchResults, setSearchResults] = useState<PDFSearchResultItem[]>(NO_RESULTS);
   const [localMatchCount, setLocalMatchCount] = useState(0);
   // §5 T2: the PDF page a page search result opened on. While set, Find searches only that page
-  // (fast) and stays there; typing a new query searches the whole document again.
+  // (fast) and stays there; typing a new query searches the whole document again. §18 W12: on
+  // the page surface it is the library page (0-based) Find starts from; the whole document is
+  // searched either way.
   const [targetPage, setTargetPage] = useState<number | null>(null);
   // §18 W2: only the newest search's answer is used (services/reader/findRunner).
   const runner = useMemo(
@@ -111,6 +114,7 @@ export function useReaderFind({ pdfUri, pdfId, pageCount, goToPage }: Options) {
     query,
     changeQuery,
     openOnPage,
+    targetPage,
     highlightRects,
     matchCount: pdfUri ? searchResults.length : localMatchCount,
     setLocalMatchCount,
