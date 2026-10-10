@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { sanitizeFolderSegment } from '../../utils/sanitize';
+import { dropPageCache } from '../reader/pageCache';
 
 const LIBRARY_SEGMENT = 'library';
 
@@ -14,6 +15,8 @@ export function getDocumentDir(documentId: string): Directory {
 export function deleteDocumentFiles(documentId: string): void {
   const dir = new Directory(Paths.document, LIBRARY_SEGMENT, documentId);
   if (dir.exists) dir.delete();
+  // §18 W9: the Reader's rendered pages of it, in the cache.
+  dropPageCache(documentId);
 }
 
 // Where a document filed under the old free-text "courseFolder" lived before every document moved

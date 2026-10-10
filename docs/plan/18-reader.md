@@ -883,7 +883,7 @@ As built:
   entry (its only option is iOS's `initialOrientation`), `"orientation": "portrait"` stays. On iOS,
   landscape will need `app.json` changes; that is W11's.
 - **The lab:** Settings → Developer → **Reader Lab** (`src/dev/ReaderLabScreen.tsx`, route `readerLab`).
-  Its tile matrix and inverted colour matrix are stand-ins for W9's `renderPlan` and `darkMatrix`.
+  Since W9 its tile matrix and night matrix are `renderPlan.regionMatrix` and `darkMatrix.nightMatrix`.
 - Tests: `services/pdf/__tests__/pdfSession.test.ts` (error mapping, version detection, one native open
   for two users, the close on the last release, the reopen after `SESSION_CLOSED`, failed opens). The mock
   (`src/test/mocks/pdfNative.ts`) has the version 2 functions.
@@ -985,7 +985,7 @@ As built:
 - Tests: `services/reader/__tests__/{surfaceGeometry,surfacePages}.test.ts`.
 
 ## W9 · Render queue, page cache, dark matrix *(M)*
-Status: planned. JS only; no device check.
+Status: **done in code** (2026-10-10). JS only; no device check. Nothing calls it yet: W10 does.
 
 Files: new `services/reader/{renderPlan,renderQueue,pageCache,darkMatrix}.ts`, `utils/hash.ts` (FNV-1a),
 `components/reader/surface/useRenderQueue.ts`; `persistence/libraryFiles.deleteDocumentFiles` drops the
@@ -998,6 +998,66 @@ Tests:
 - the dark matrix: white → paper, black → ink, red and blue keep their hue within tolerance;
 - tiles cover the region without gaps at 3×/5×; `regionMatrix` maps the region's corners to the output's
   corners.
+
+As built:
+- **`renderPlan.ts`** (pure). `planRenders({ pages, layout, view, viewport, insets?, pixelRatio,
+  direction?, fast?, night? })` → `RenderSpec[]`, most urgent first: the visible bases (the page being
+  read first), the placeholders, the tiles, then the prefetch. A spec is a queue job plus what to draw:
+  `kind` (`low` | `base` | `tile`), the output `width` × `height`, `source` (a pdf page + `matrix?`, or an
+  image uri + `region?`), `frame` (where it goes on the shown page, in fractions), `turn`, `tile?`.
+  - Sizes: `baseSize` (box × pixel ratio, ×2 from `SHARP_SCALE` 1.5, long side ≤ `BASE_MAX_SIDE` 2400,
+    never more than an image has), `placeholderSize` (`PLACEHOLDER_WIDTH` 320), `tileBucket` (0 below
+    `TILE_MIN_SCALE` 2.5, then the next whole step, 3–6), `fullSize`, `tileGrid` / `tileRect` / `tilesIn`
+    (`TILE_SIZE` 512, the middle of the visible part first), `visibleFrame`, `frameOf`.
+  - `regionMatrix(points, full, rect)` for pdfium; `imageRegion(source, full, rect)` for `decodeImage`.
+  - `memoryWindow(visible, count, scale)` → `{ images, thumbs }`; `prefetchPages`; `isFastFling`
+    (`FAST_FLING` 2500); `SETTLE_MS` 150; `RENDER_QUALITY` 0.85; `RENDER_PRIORITY` (`text: 5` is W12's).
+  - **A placeholder (`low`) is wanted for a page with no thumbnail, and for every page at night** (the
+    stored thumbnails are light). So there is no separate "dark thumbnail" job: by day the view shows
+    `thumbUri`, at night the `low` image.
+  - **A scan's image comes out unturned** (`decodeImage` doesn't turn): the spec's `width` × `height` are
+    the file's orientation and the view turns the image by `spec.turn`. PDF pages come out as shown.
+  - **A scan gets tiles only when it has more pixels than the sharp base shows.** A normal master (2400 px)
+    is shown whole from 1.5×, so scans have no tiles in practice; a bigger image is cut from its own
+    pixels, never upscaled.
+  - Prefetched pages are rendered at the plain size, also while zoomed.
+- **Cache keys** (`renderKey`): `p<page>-w<px>[-t<col>_<row>_<bucket>][-n<palette>]` for a PDF page;
+  a scan's page is `i<hash(file uri)>[r<turn>]-w<px>…`, because its pages can be reordered and re-cropped
+  (into new files) and the file comes out unturned. `w` is the shown width (a tile's: its base's).
+- **`renderQueue.ts`** (pure): `createRenderQueue({ run, onDone, onError?, skip?, lanes? })` →
+  `{ want, clear, dispose, stats }`. `want(jobs)` replaces the set. A running job is never stopped; its
+  result is reported only if its key is still (or again) wanted. A job with `delayMs` starts once it has
+  been wanted that long without a break (a tile wanted again after a small move keeps its clock), **and
+  holds its lane for less urgent jobs meanwhile**, so the lane is free when it is due. `skip(job)` is
+  asked just before a start.
+- **`pageCache.ts`:** the folder is `Paths.cache/reader/<hash(owner)>-<stamp>/`, not the plan's single
+  hash. `owner` is the document id (an outside file: its uri), so `deleteDocumentFiles(id)` can find it;
+  `stamp` is `fileStamp(pdfUri)` (uri + size + modified time), or `pages` for a scan.
+  - `openPageCache(owner, pdfUri?)` → `{ name, uriFor(key), has(key) }`: creates the folder, writes the
+    time into `.used`, and deletes the same owner's folders for older stamps.
+  - `prunePageCache(maxBytes = 200 MB)` deletes whole folders, the least recently opened first
+    (`pruneOrder`); the newest always stays, even alone over the limit. `dropPageCache(owner)`.
+  - **Nothing calls `prunePageCache` yet.** W10 calls it when the Reader closes and from the deferred
+    boot (`BootEffects`).
+- **`darkMatrix.ts`:** `darkPageMatrix(paper, ink)`, `NIGHT_PALETTES` (by `NightStrength`; the papers are
+  the plan's, the inks `#d8d2c6`, `#d4cfc6`, `#d0d0d0`: tune on a device in W10), `nightMatrix(palette)`,
+  `paletteKey(palette)` (the colours, so a retuned palette never shows old files). Multiplied out, the
+  matrix is `out = ink + (paper − ink) × hueHalfTurn(colour) / 255`.
+- **`utils/hash.ts`:** `fnv1a` (32 bits) and `hashKey` (16 hex characters, two passes: 32 bits alone could
+  give two files one name, which here means the wrong page).
+- **`components/reader/surface/useRenderQueue.ts`:**
+  - `renderToCache(spec, { cache, session?, colorMatrix? })` draws one spec (`session.renderPage` with
+    annotations on, or `decodeImage`) unless the file is already there.
+  - `createRenderImages()`: what has arrived, by page: `{ low?, base?, tiles }`. `covers(spec)` (a base at
+    least as sharp serves a smaller one and the placeholder; a failed key isn't tried again), `trim(range)`,
+    `forget(page)`, `reset()`. Tiles keep their arrival order (draw in that order), at most 48 a page.
+  - `useRenderQueue({ cache, session, palette })` → `{ images, want, night, epoch }`. The queue is rebuilt
+    (and holds nothing) when the folder, the session or the palette changes; `epoch` then changes: plan
+    and `want` again. Pass `night` to `planRenders`. `usePageImages(images, page)` re-renders one page.
+- The Reader Lab uses `regionMatrix` and `nightMatrix(NIGHT_PALETTES.medium)` now, so W7's device check
+  shows the real night page.
+- Tests: `services/reader/__tests__/{renderQueue,renderPlan,pageCache,darkMatrix}.test.ts`,
+  `utils/__tests__/hash.test.ts`, `components/reader/surface/__tests__/useRenderQueue.test.tsx`.
 
 ## W10 · Read-only surface behind a flag *(L)*
 Status: planned. JS only. Split point: (a) layout, gestures, render, resume; (b) chrome, fast scroll,

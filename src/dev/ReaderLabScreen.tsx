@@ -10,12 +10,13 @@ import {
   getPageText,
   pdfNativeVersion,
   renderPage,
-  type PdfColorMatrix,
   type PdfLink,
   type PdfMatrix,
   type PdfOutlineItem,
 } from '../services/pdf/pdfNative';
 import { acquirePdfSession, type PdfSession } from '../services/pdf/pdfSession';
+import { NIGHT_PALETTES, nightMatrix } from '../services/reader/darkMatrix';
+import { regionMatrix } from '../services/reader/renderPlan';
 import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 
 // Dev-only (Settings → Developer when __DEV__), §18 W7: pdf-native version 2 on a real phone,
@@ -25,8 +26,8 @@ import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
 // and whether the orientation unlock works while app.json says "portrait". The numbers go in
 // docs/qa/performance.md.
 //
-// The tile matrix and the night matrix here are stand-ins: W9 owns the real ones
-// (services/reader/renderPlan.ts, darkMatrix.ts).
+// The tile matrix and the night matrix are the surface's own (§18 W9: services/reader/renderPlan.ts,
+// darkMatrix.ts), so what this screen shows is what the Reader will draw.
 
 const LAB_DIR = 'reader-lab';
 const PAGE_WIDTH = 1080; // px: a page fitted to a typical phone's width
@@ -36,8 +37,8 @@ const RUNS = 3;
 const OPEN_BUDGET_MS = 150;
 const QUALITY = 0.85;
 
-// Inverts the colours, to see that a colour matrix is applied at all.
-const INVERT: PdfColorMatrix = [-1, 0, 0, 0, 255, 0, -1, 0, 0, 255, 0, 0, -1, 0, 255, 0, 0, 0, 1, 0];
+// Night at its default strength: a white page comes out dark, a photo keeps its hues.
+const NIGHT = nightMatrix(NIGHT_PALETTES.medium);
 
 type Row = { label: string; value: string; bad?: boolean };
 type Shot = { label: string; uri: string; width: number; height: number };
@@ -61,8 +62,8 @@ async function timed<T>(run: () => Promise<T>): Promise<{ ms: number; value: T }
 
 // The middle TILE × TILE px of the page as it would be at `zoom` × fit-to-width.
 function tileMatrix(pointsW: number, pointsH: number, zoom: number): PdfMatrix {
-  const scale = (zoom * PAGE_WIDTH) / pointsW;
-  return [scale, 0, 0, scale, -(pointsW * scale - TILE) / 2, -(pointsH * scale - TILE) / 2];
+  const full = { width: zoom * PAGE_WIDTH, height: (zoom * PAGE_WIDTH * pointsH) / pointsW };
+  return regionMatrix({ width: pointsW, height: pointsH }, full, { x: (full.width - TILE) / 2, y: (full.height - TILE) / 2, width: TILE, height: TILE });
 }
 
 function describe(error: unknown): string {
@@ -213,11 +214,11 @@ export function ReaderLabScreen() {
       const base = { width, height, quality: QUALITY };
       const on = await session.renderPage(pageIndex, { ...base, annotations: true, out: labOut('annot-on') });
       const off = await session.renderPage(pageIndex, { ...base, annotations: false, out: labOut('annot-off') });
-      const night = await session.renderPage(pageIndex, { ...base, annotations: true, colorMatrix: INVERT, out: labOut('night') });
+      const night = await session.renderPage(pageIndex, { ...base, annotations: true, colorMatrix: NIGHT, out: labOut('night') });
       const taken: Shot[] = [
         { label: 'pdfium, annotations on', ...on },
         { label: 'pdfium, annotations off', ...off },
-        { label: 'pdfium, colour matrix (inverted)', ...night },
+        { label: 'pdfium, colour matrix (night)', ...night },
       ];
       try {
         taken.push({ label: 'Old renderPage', ...(await renderPage(file.uri, pageIndex, { maxDim: Math.max(width, height), quality: QUALITY })) });
