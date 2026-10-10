@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, PixelRatio, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdjustPanel } from '../components/review/AdjustPanel';
+import { useLiveAdjust } from '../components/review/useLiveAdjust';
 import { ContextBar } from '../components/review/ContextBar';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { FilteredPreview } from '../components/review/FilteredPreview';
@@ -19,6 +20,7 @@ import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { useBackHandler } from '../navigation/useBackHandler';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../services/enhance/adjust';
+import { masterGeometryKey } from '../services/capture/geometryKey';
 import { recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
 import { cancelProcessing } from '../services/capture/processingSession';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
@@ -87,15 +89,18 @@ export function ReviewScreen() {
   const currentAdjust = selectedPage?.adjust ?? DEFAULT_ADJUST;
   const adjustable = selectedPage ? getFilter(selectedPage.enhance).adjustable : true;
 
-  // Slider values while a drag is in progress. Only the preview sees them; the store gets the
-  // final values from handleAdjustCommit, which clears this.
-  const [liveAdjust, setLiveAdjust] = useState<AdjustValues | null>(null);
+  // §16 G7: the slider values under the finger, as shared values. The sliders write them and the
+  // preview draws from them on the UI thread, so this screen doesn't render while one is dragged;
+  // the store gets the final values from handleAdjustCommit.
+  const liveAdjust = useLiveAdjust(currentAdjust);
+  // While the panel is open the preview is recorded without the adjustment and applies it live.
+  const adjustLive = adjustOpen && adjustable;
   useEffect(() => {
-    setLiveAdjust(null);
     setOfferApplyAll(false);
   }, [selectedPage?.id]);
 
-  // Scanned pages arrive with stats measured at ingest; gallery imports, merged halves and pages
+  // A batch measures each page's stats after it is in (ingestBatch, §16 G7); a page shown before
+  // that, merged halves and pages
   // whose image changed (crop, rotate, sign - the reducer drops stale stats) are measured here, once,
   // the first time they're shown. SET_PAGE_STATS ignores the result if the uri moved on meanwhile.
   const statsPageId = selectedPage && !selectedPage.stats ? selectedPage.id : undefined;
@@ -128,14 +133,14 @@ export function ReviewScreen() {
   const windowSize = useWindowDimensions();
   const previewMaxDim = Math.min(1400, Math.round(Math.max(windowSize.width, windowSize.height) * PixelRatio.get()));
   const { preview, loading: mainPreviewLoading } = useFilteredPicture(selectedPage, previewMaxDim, {
-    adjust: liveAdjust ?? undefined,
+    adjustLive,
     prefetchUris: [pages[sel - 1]?.uri, pages[sel + 1]?.uri],
     overlay: stampActive ? stampOverlay : undefined,
   });
   const showCompare =
     !!preview &&
     !!selectedPage &&
-    (selectedPage.enhance !== 'original' || !isDefaultAdjust(liveAdjust ?? currentAdjust) || stampActive);
+    (selectedPage.enhance !== 'original' || !isDefaultAdjust(currentAdjust) || stampActive);
   const shownPicture = preview && (comparing ? preview.originalPicture : preview.picture);
 
   // Indeterminate ribbon for OCR and the moment before per-page progress is known; once a batch
@@ -206,7 +211,6 @@ export function ReviewScreen() {
     (adjust: AdjustValues) => {
       if (!selectedPage) return;
       dispatch({ type: 'capture/SET_PAGE_ADJUST', id: selectedPage.id, adjust });
-      setLiveAdjust(null);
       setOfferApplyAll(multiPage);
     },
     [dispatch, selectedPage, multiPage]
@@ -250,7 +254,8 @@ export function ReviewScreen() {
     dispatch({ type: 'review/SET_OCR_RUNNING', running: true });
     const ocr = await runOcr(selectedPage.uri, ocrScript);
     const err = !ocr || ocr.text.trim().length < OCR_SPARSE_THRESHOLD;
-    dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: { ocr, err } });
+    const ocrGeometry = ocr ? masterGeometryKey(selectedPage, ocrScript) : undefined;
+    dispatch({ type: 'capture/UPDATE_PAGE', id: selectedPage.id, patch: { ocr, ocrGeometry, err } });
     dispatch({ type: 'review/SET_OCR_RUNNING', running: false });
     dispatch({
       type: 'ui/SHOW_SNACK',
@@ -605,7 +610,14 @@ export function ReviewScreen() {
           sel={sel}
           currentContent={
             preview && shownPicture ? (
-              <FilteredPreview picture={shownPicture} contentWidth={preview.width} contentHeight={preview.height} />
+              // Compare shows the untouched original: no sliders, no stamp.
+              <FilteredPreview
+                picture={shownPicture}
+                contentWidth={preview.width}
+                contentHeight={preview.height}
+                liveAdjust={preview.adjustLive && !comparing ? liveAdjust : undefined}
+                overlayPicture={comparing ? undefined : preview.overlayPicture}
+              />
             ) : undefined
           }
           onCommitPrev={goPrevPage}
@@ -616,6 +628,12 @@ export function ReviewScreen() {
         {mainPreviewLoading && (
           <View style={styles.previewLoading} pointerEvents="none">
             <ActivityIndicator color={tokens.accent} />
+          </View>
+        )}
+        {/* §16 G7: the page is here before its text is; over the preview, so nothing moves when it goes. */}
+        {selectedPage.ocrPending && (
+          <View style={[styles.readingChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]} pointerEvents="none">
+            <Text style={[styles.readingLabel, { color: tokens.muted }]}>{t('review.readingText')}</Text>
           </View>
         )}
         <PreviewControls
@@ -707,7 +725,7 @@ export function ReviewScreen() {
           </View>
         )}
         {adjustOpen && adjustable && (
-          <AdjustPanel value={currentAdjust} onCommit={handleAdjustCommit} onLive={setLiveAdjust} />
+          <AdjustPanel value={currentAdjust} live={liveAdjust} onCommit={handleAdjustCommit} />
         )}
         {filterHint.visible ? (
           <Hint text={t('shared.hint.reviewFilters')} onDismiss={filterHint.dismiss} arrow="down" style={styles.filterHint} />
@@ -864,6 +882,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  readingChip: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.card,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  readingLabel: { ...typeScale.caption },
   // Room for three actions (size, swap, retake) on a narrow phone.
   chipWrap: { flexWrap: 'wrap', rowGap: spacing.xs },
   splitChip: {

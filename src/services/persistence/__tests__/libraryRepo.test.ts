@@ -3,6 +3,7 @@ import { resetStorage } from '../../../test/db';
 import { getDb, searchDocumentsByText } from '../dbService';
 import {
   archiveSemester,
+  changedPages,
   deleteSemesters,
   diffById,
   documentEdited,
@@ -11,6 +12,7 @@ import {
   loadPageOcr,
   reorderCourses,
   syncLibrary,
+  upsertPages,
   type LoadedLibrary,
 } from '../libraryRepo';
 import type { Course, PageOcr, Semester } from '../../../types/models';
@@ -454,5 +456,116 @@ describe('deleting rows', () => {
     await syncLibrary(await getDb(), saved, { ...empty, documents: [{ ...doc, pdfLayout: 'standard' }] });
     const [reloaded] = (await loadAll(await getDb())).documents;
     expect(reloaded).toMatchObject({ pdfLayout: 'standard', pdfInfoFailed: undefined });
+  });
+});
+
+describe('page rows are written one by one (§16 G7)', () => {
+  const text = (t: string): PageOcr => ({ text: t, blocks: [] });
+  const page = (id: string, t: string) => makePage({ id, ocr: text(t) });
+  const lib = (...documents: LoadedLibrary['documents']): LoadedLibrary => ({ documents, courses: [], semesters: [], timetable: [] });
+
+  // Every page row inserted or updated from here on, in order ("+id" inserted, "~id" updated,
+  // "-id" deleted).
+  async function watchWrites(): Promise<() => Promise<string[]>> {
+    const db = await getDb();
+    await db.execAsync(`
+      CREATE TEMP TABLE IF NOT EXISTS page_writes (n INTEGER PRIMARY KEY AUTOINCREMENT, what TEXT);
+      DELETE FROM page_writes;
+      CREATE TEMP TRIGGER IF NOT EXISTS watch_ai AFTER INSERT ON pages BEGIN INSERT INTO page_writes (what) VALUES ('+' || new.id); END;
+      CREATE TEMP TRIGGER IF NOT EXISTS watch_au AFTER UPDATE ON pages BEGIN INSERT INTO page_writes (what) VALUES ('~' || new.id); END;
+      CREATE TEMP TRIGGER IF NOT EXISTS watch_ad AFTER DELETE ON pages BEGIN INSERT INTO page_writes (what) VALUES ('-' || old.id); END;
+    `);
+    return async () => (await db.getAllAsync<{ what: string }>('SELECT what FROM page_writes ORDER BY n')).map((row) => row.what);
+  }
+
+  const pageIds = async (docId: string) => (await loadAll(await getDb())).documents.find((d) => d.id === docId)?.pages.map((p) => p.id);
+
+  it('changedPages names the new, replaced and moved pages, and the ones that left', () => {
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => page(id, id));
+    const b2 = { ...b, thumbUri: 'file:///thumb_b.jpg' };
+    expect(changedPages([a, b, c], [a, b, c])).toEqual({ rows: [], removedIds: [] });
+    expect(changedPages([a, b, c], [a, b2, c])).toEqual({ rows: [{ page: b2, idx: 1 }], removedIds: [] });
+    expect(changedPages([a, b, c], [a, c, d])).toEqual({ rows: [{ page: c, idx: 1 }, { page: d, idx: 2 }], removedIds: ['b'] });
+    expect(changedPages([a, b], [b, a]).rows.map((row) => row.page.id)).toEqual(['b', 'a']);
+  });
+
+  it('a sync writes only the pages that changed, and search follows them', async () => {
+    const pages = Array.from({ length: 6 }, (_, i) => page(`p${i}`, i === 3 ? 'mitochondria' : `filler${i}`));
+    const prev = await seed(lib(makeDoc({ id: 'a', pages })));
+    const writes = await watchWrites();
+
+    const nextPages = pages.map((p, i) => (i === 3 ? { ...p, ocr: text('ribosome') } : p));
+    const next = lib({ ...prev.documents[0], pages: nextPages });
+    await syncLibrary(await getDb(), prev, next);
+
+    expect(await writes()).toEqual(['~p3']);
+    expect(await searchDocumentsByText('mito')).toEqual([]);
+    expect(await searchDocumentsByText('ribo')).toEqual(['a']);
+    expect(await searchDocumentsByText('filler5')).toEqual(['a']);
+    expect(await pageIds('a')).toEqual(pages.map((p) => p.id));
+  });
+
+  it('indexing progress (stub pages filled in ten at a time) never rewrites the finished pages', async () => {
+    const stubs = Array.from({ length: 40 }, (_, i) => makePage({ id: `s${i}`, fileUri: '' }));
+    let prev = await seed(lib(makeDoc({ id: 'pdf', pages: stubs })));
+    const writes = await watchWrites();
+
+    let pages = stubs;
+    for (let from = 0; from < 40; from += 10) {
+      pages = pages.map((p, i) => (i >= from && i < from + 10 ? { ...p, ocr: text(`word${i}`) } : p));
+      const next = lib({ ...prev.documents[0], pages });
+      await syncLibrary(await getDb(), prev, next);
+      prev = next;
+    }
+
+    // 40 row writes for 40 pages, not 10 + 20 + 30 + 40 with as many deletes.
+    expect(await writes()).toEqual(stubs.map((p) => `~${p.id}`));
+    expect(await searchDocumentsByText('word37')).toEqual(['pdf']);
+  });
+
+  it('applies a reorder and a removal in place', async () => {
+    const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => page(id, `text${id}`));
+    const prev = await seed(lib(makeDoc({ id: 'doc', pages: [a, b, c, d] })));
+    const writes = await watchWrites();
+
+    await syncLibrary(await getDb(), prev, lib({ ...prev.documents[0], pages: [a, d, c] }));
+
+    expect(await pageIds('doc')).toEqual(['a', 'd', 'c']);
+    expect(await writes()).toEqual(['-b', '~d']);
+    expect(await searchDocumentsByText('textb')).toEqual([]);
+    expect(await searchDocumentsByText('textd')).toEqual(['doc']);
+  });
+
+  it.each([
+    ['the giving document first', ['from', 'to']],
+    ['the taking document first', ['to', 'from']],
+  ])('moves a page between two saved documents (%s)', async (_name, order) => {
+    const [a, b, c] = ['a', 'b', 'c'].map((id) => page(id, `text${id}`));
+    const docs = { from: makeDoc({ id: 'from', pages: [a, b] }), to: makeDoc({ id: 'to', pages: [c] }) };
+    const prev = await seed(lib(...order.map((id) => docs[id as 'from' | 'to'])));
+
+    const moved = { from: { ...docs.from, pages: [a] }, to: { ...docs.to, pages: [c, b] } };
+    await syncLibrary(await getDb(), prev, lib(...order.map((id) => moved[id as 'from' | 'to'])));
+
+    expect(await pageIds('from')).toEqual(['a']);
+    expect(await pageIds('to')).toEqual(['c', 'b']);
+    expect(await searchDocumentsByText('textb')).toEqual(['to']);
+  });
+
+  it('upsertPages writes the given rows and no others, keeping boxes that were never loaded', async () => {
+    const boxes: PageOcr = { text: 'boxed', blocks: [{ text: 'boxed', lines: [], bounding: { left: 0, top: 0, width: 1, height: 1 } }] };
+    await seed(lib(makeDoc({ id: 'doc', pages: [page('a', 'one'), makePage({ id: 'b', ocr: boxes }), page('c', 'three')] })));
+    const db = await getDb();
+    // As the app holds them after a launch: text only, the boxes still in their row.
+    const loaded = (await loadAll(db)).documents[0].pages;
+    expect(loaded[1].ocr?.blocksRow).toBe('b');
+    const writes = await watchWrites();
+
+    await upsertPages(db, 'doc', [{ page: { ...loaded[1], thumbUri: undefined, width: 123 }, idx: 1 }, { page: page('n', 'new'), idx: 3 }]);
+
+    expect(await writes()).toEqual(['~b', '+n']);
+    const after = (await loadAll(db)).documents[0].pages;
+    expect(after.map((p) => [p.id, p.width])).toEqual([['a', loaded[0].width], ['b', 123], ['c', loaded[2].width], ['n', expect.any(Number)]]);
+    expect((await loadPageOcr(db, after))[1].ocr?.blocks).toEqual(boxes.blocks);
   });
 });

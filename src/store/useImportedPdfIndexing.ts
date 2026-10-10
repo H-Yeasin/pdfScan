@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { indexImportedPdf, needsIndexing } from '../services/documents/importedPdfIndex';
+import { indexImportedPdf, needsIndexing, throttleProgress } from '../services/documents/importedPdfIndex';
 import { isPdfNativeAvailable } from '../services/pdf/pdfNative';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { useReaderHeld } from '../services/reader/readerHold';
@@ -16,7 +16,7 @@ const PAUSED = 'paused';
 // document at a time, never blocking the UI. The same loop serves a fresh import (it arrives with
 // indexedAt unset) and the backfill of PDFs imported before R1 (stored with indexed_at NULL).
 // Progress is saved every few pages, so a run cut short by the app closing resumes next launch
-// after the pages it finished.
+// after the pages it finished. Each save writes those few page rows only (§16 G7).
 export function useImportedPdfIndexing(libraryLoaded: boolean): void {
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
@@ -46,7 +46,8 @@ export function useImportedPdfIndexing(libraryLoaded: boolean): void {
     indexImportedPdf(doc, {
       script,
       signal: controller.signal,
-      onProgress: ({ done, total }) => dispatch({ type: 'libraryUi/SET_INDEXING', progress: { documentId: doc.id, done, total } }),
+      // §16 G7: at most twice a second, however fast the pages go by.
+      onProgress: throttleProgress(({ done, total }) => dispatch({ type: 'libraryUi/SET_INDEXING', progress: { documentId: doc.id, done, total } })),
       onCommit: commit,
     })
       .then((result) => {

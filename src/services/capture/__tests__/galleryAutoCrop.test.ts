@@ -12,7 +12,6 @@ jest.mock('../../enhance/perspectiveCrop', () => ({
   warpPerspectiveCrop: jest.fn(async (uri: string) => ({ uri: `${uri}.cropped`, width: 1700, height: 2200 })),
 }));
 jest.mock('../../enhance/splitSpread', () => ({ splitSpread: jest.fn(async () => null) }));
-jest.mock('../../ocr/ocrService', () => ({ runOcr: jest.fn(async () => ({ text: 'ocr', blocks: [] })) }));
 jest.mock('../ingest', () => {
   const page = (uri: string, w: number, h: number, enhance?: string) => ({
     id: `p_${uri}`,
@@ -28,6 +27,7 @@ jest.mock('../ingest', () => {
     pageFromMaster: jest.fn(async (m: { uri: string; width: number; height: number }, _s: string, o: { enhance?: string }) =>
       page(m.uri, m.width, m.height, o.enhance)
     ),
+    readPage: jest.fn(async () => ({})),
   };
 });
 
@@ -42,11 +42,11 @@ const gallery = { script: 'latin' as const, spec: getCaptureModeSpec('doc'), own
 beforeEach(() => jest.clearAllMocks());
 
 describe('gallery auto-crop', () => {
-  it('warps a confidently detected page and OCRs the cropped master', async () => {
+  it('warps a confidently detected page into a new master', async () => {
     jest.mocked(detectDocumentQuad).mockResolvedValue({ quad, confidence: 'high' });
     const [page] = await ingestOne('IMG_1.jpg', gallery);
     expect(warpPerspectiveCrop).toHaveBeenCalledWith('IMG_1.jpg.master', quad);
-    expect(page).toMatchObject({ uri: 'IMG_1.jpg.master.cropped', width: 1700, height: 2200, ocr: { text: 'ocr' } });
+    expect(page).toMatchObject({ uri: 'IMG_1.jpg.master.cropped', width: 1700, height: 2200 });
     expect(page.needsCropReview).toBeUndefined();
   });
 
@@ -91,8 +91,7 @@ describe('gallery auto-crop', () => {
     await ingestGalleryBatch(dispatch, ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'], 'latin', getCaptureModeSpec('doc'));
     expect(maxRunning).toBe(1);
     expect(detectDocumentQuad).toHaveBeenCalledTimes(4);
-    const added = dispatch.mock.calls.find(([a]) => a.type === 'capture/BULK_ADD_PAGES')?.[0];
-    expect(added.pages).toHaveLength(4);
+    expect(dispatch.mock.calls.filter(([a]) => a.type === 'capture/ADD_PAGE')).toHaveLength(4);
   });
 });
 

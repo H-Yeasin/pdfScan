@@ -4,15 +4,18 @@ import type { SkCanvas, SkImage, SkPicture } from '@shopify/react-native-skia';
 import { drawFiltered, drawRotated, rotatedSize } from './filters/drawFiltered';
 import type { FilterPage } from './filters/drawFiltered';
 import { loadPreviewImage, prefetchPreviewImage } from './previewImageCache';
-import type { AdjustValues, SessionPage } from '../../types/models';
+import { DEFAULT_ADJUST } from './adjust';
+import type { SessionPage } from '../../types/models';
 
 // Draws extra content (e.g. the academic border/header/footer) on top of the filtered page, in the
 // preview's own (already rotated) pixel space. Must be memoized by the caller: a new function re-records.
 export type PictureOverlay = (canvas: SkCanvas, width: number, height: number) => void;
 
 type FilteredPictureOptions = {
-  // Live slider values while dragging; they override page.adjust without touching the store.
-  adjust?: AdjustValues;
+  // §16 G7: record the page without its slider adjustment (and without the overlay, returned as
+  // `overlayPicture`): the caller applies the sliders as it draws, from shared values, so a drag
+  // re-records nothing (components/review/FilteredPreview). Only for a filter that takes them.
+  adjustLive?: boolean;
   // Neighbouring pages' uris, decoded ahead of time so swiping lands on a ready preview.
   prefetchUris?: (string | undefined)[];
   overlay?: PictureOverlay;
@@ -22,6 +25,10 @@ export type FilteredPicture = {
   picture: SkPicture;
   // The unfiltered page from the same decoded image, for press-and-hold Compare.
   originalPicture: SkPicture;
+  // With `adjustLive`: what goes over the adjusted page, when there is an overlay.
+  overlayPicture?: SkPicture;
+  // True when `picture` still needs the sliders applied by whoever draws it.
+  adjustLive: boolean;
   width: number;
   height: number;
 };
@@ -33,14 +40,14 @@ function recordPicture(width: number, height: number, draw: (canvas: SkCanvas) =
 }
 
 // Live Review preview with no temporary files. The page is decoded once into a preview-sized
-// SkImage (previewImageCache), and every filter, option or slider change only re-records
+// SkImage (previewImageCache), and every filter or option change only re-records
 // drawFiltered - the exact call the export makes - into an SkPicture, which is cheap (it records
 // draw commands; the GPU does the pixel work when the <Canvas> renders it). The preview differs
-// from the export only in resolution.
+// from the export only in resolution. A slider drag doesn't even re-record (`adjustLive`).
 export function useFilteredPicture(
   page: (FilterPage & { uri: string; rotation?: SessionPage['rotation'] }) | undefined,
   previewMaxDim: number,
-  { adjust, prefetchUris, overlay }: FilteredPictureOptions = {}
+  { adjustLive = false, prefetchUris, overlay }: FilteredPictureOptions = {}
 ) {
   const uri = page?.uri;
   const [loaded, setLoaded] = useState<{ uri: string; maxDim: number; image: SkImage } | null>(null);
@@ -73,12 +80,12 @@ export function useFilteredPicture(
   // the previous page, and drawing the new page's filter over the old pixels would flash wrong.
   const image = loaded && loaded.uri === uri && loaded.maxDim === previewMaxDim ? loaded.image : null;
   const enhance = page?.enhance;
-  const effectiveAdjust = adjust ?? page?.adjust;
+  const effectiveAdjust = adjustLive ? DEFAULT_ADJUST : page?.adjust;
   const stats = page?.stats;
   const filterOptions = page?.filterOptions;
   const rotation = page?.rotation ?? 0;
 
-  // Recorded once per decoded image; slider drags re-record only the filtered picture below.
+  // Recorded once per decoded image.
   const originalPicture = useMemo(() => {
     if (!image) return null;
     const out = { ...rotatedSize(image.width(), image.height(), rotation), scale: 1 };
@@ -97,10 +104,13 @@ export function useFilteredPicture(
       drawRotated(canvas, image.width(), image.height(), rotation, out, (rect) =>
         drawFiltered(canvas, image, filterPage, rect)
       );
-      overlay?.(canvas, out.width, out.height);
+      if (!adjustLive) overlay?.(canvas, out.width, out.height);
     });
-    return { picture, originalPicture, width: out.width, height: out.height };
-  }, [image, originalPicture, rotation, enhance, effectiveAdjust, stats, filterOptions, overlay]);
+    // Apart from the page, so the sliders' paint doesn't tint the border and the header.
+    const overlayPicture =
+      adjustLive && overlay ? recordPicture(out.width, out.height, (canvas) => overlay(canvas, out.width, out.height)) : undefined;
+    return { picture, originalPicture, overlayPicture, adjustLive, width: out.width, height: out.height };
+  }, [image, originalPicture, rotation, enhance, effectiveAdjust, adjustLive, stats, filterOptions, overlay]);
 
   return {
     preview: result,

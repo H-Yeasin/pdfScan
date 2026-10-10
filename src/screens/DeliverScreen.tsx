@@ -20,7 +20,9 @@ import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
 import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { renderPage } from '../services/enhance/skiaEnhance';
+import { ocrFitsPage } from '../services/capture/geometryKey';
 import { MASTER_PRESET } from '../services/capture/imageSpec';
+import { stopReadingText } from '../services/capture/ingestBatch';
 import { runOcr } from '../services/ocr/ocrService';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../services/pdf/pdfService';
@@ -182,6 +184,8 @@ export function DeliverScreen() {
       const layout = appendTarget ? 'standard' : layoutMode;
       const shareAfter = mode === 'share';
       setSaving(true);
+      // §16 G7: pages a scan is still reading are read here instead, one job at a time.
+      stopReadingText();
       try {
         const documentId = createId('doc');
         // Submit fits the separate submission file to the limit, so the library copy is built at
@@ -195,9 +199,10 @@ export function DeliverScreen() {
 
         // One page at a time (never Promise.all): each page is rendered from its session master in
         // a single Skia pass (rotation + filter + resize + one JPEG encode) - once at master spec
-        // for the library, and once more at the export preset only if that differs. OCR then runs
-        // on the final master pixels, so the PDF's text layer always lines up with what was saved,
-        // whatever was rotated or cropped in Review.
+        // for the library, and once more at the export preset only if that differs. The text is
+        // the one read at scan time when it still fits the page, else OCR of the final master, so
+        // the PDF's text layer always lines up with what was saved, whatever was rotated or
+        // cropped in Review.
         const contentPages: (LibraryInputPage & { exportUri: string })[] = [];
         for (let i = 0; i < total; i++) {
           const page = pages[i];
@@ -212,7 +217,12 @@ export function DeliverScreen() {
           const master = await renderPage(page.uri, edits, MASTER_PRESET);
           const exported = encoding === 'as-is' ? master : await renderPage(page.uri, edits, encoding);
           if (exported !== master) transientUris.add(exported.uri);
-          const ocr = await runOcr(master.uri, ocrScript);
+          // §16 G7: the text read at scan time still describes this page when nothing but its
+          // look changed since (same image, unturned, same script: geometryKey.ts) and the saved
+          // master has the same pixels across, so its word boxes land where they did. Anything
+          // else - a turn, a text read for another script, no text yet - is read from the master.
+          const keepText = ocrFitsPage(page, ocrScript) && master.width === page.width && master.height === page.height;
+          const ocr = keepText ? page.ocr : await runOcr(master.uri, ocrScript);
           contentPages.push({
             id: page.id,
             masterUri: master.uri,

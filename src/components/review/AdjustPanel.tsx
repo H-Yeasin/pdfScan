@@ -1,75 +1,60 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../../services/enhance/adjust';
 import type { AdjustValues } from '../../types/models';
 import { AdjustSlider } from './AdjustSlider';
+import type { LiveAdjust } from './useLiveAdjust';
 
 type AdjustPanelProps = {
+  // The page's stored values.
   value: AdjustValues;
+  // §16 G7: the values under the finger (useLiveAdjust); each slider writes its own from the UI
+  // thread, and the preview reads them there.
+  live: LiveAdjust;
   onCommit: (next: AdjustValues) => void;
-  // Every drag tick, for the live preview (it only re-records an SkPicture, so it's cheap).
-  onLive?: (next: AdjustValues) => void;
 };
 
-// Draft state mirrors `value` but updates on every drag tick (for a responsive label/thumb and the
-// live preview through `onLive`), while `onCommit` - the only call that reaches the store - fires
-// on release/tap (AdjustSlider's contract) or Reset. Re-synced from `value` when the page changes.
-export function AdjustPanel({ value, onCommit, onLive }: AdjustPanelProps) {
+// Three sliders over one page's adjust values. While one is dragged, nothing here renders: the
+// slider moves its own thumb and writes `live`. `onCommit` - the only call that reaches the store
+// - fires on release/tap (AdjustSlider's contract) or Reset, with the other two fields as stored.
+export const AdjustPanel = memo(function AdjustPanel({ value, live, onCommit }: AdjustPanelProps) {
   const { tokens } = useTheme();
   const { t } = useT();
-  const [draft, setDraft] = useState(value);
 
-  useEffect(() => setDraft(value), [value]);
+  const commitField = (field: keyof AdjustValues, v: number) => onCommit({ ...value, [field]: v });
 
-  const liveField = (field: keyof AdjustValues, v: number) => {
-    const next = { ...draft, [field]: v };
-    setDraft(next);
-    onLive?.(next);
-  };
-
-  const commitField = (field: keyof AdjustValues, v: number) => {
-    const next = { ...draft, [field]: v };
-    setDraft(next);
-    onCommit(next);
-  };
-
-  const reset = () => {
-    setDraft(DEFAULT_ADJUST);
-    onCommit(DEFAULT_ADJUST);
-  };
-
-  const atDefault = isDefaultAdjust(draft);
+  const atDefault = isDefaultAdjust(value);
 
   return (
     <View style={[styles.panel, { backgroundColor: tokens.surface2, borderColor: tokens.edge }]}>
       <AdjustSlider
         label={t('review.adjustPanel.brightness')}
-        value={draft.brightness}
-        onChange={(v) => liveField('brightness', v)}
+        value={value.brightness}
+        live={live.brightness}
         onCommit={(v) => commitField('brightness', v)}
       />
       <AdjustSlider
         label={t('review.adjustPanel.contrast')}
-        value={draft.contrast}
-        onChange={(v) => liveField('contrast', v)}
+        value={value.contrast}
+        live={live.contrast}
         onCommit={(v) => commitField('contrast', v)}
       />
       <AdjustSlider
         label={t('review.adjustPanel.saturation')}
-        value={draft.saturation}
-        onChange={(v) => liveField('saturation', v)}
+        value={value.saturation}
+        live={live.saturation}
         onCommit={(v) => commitField('saturation', v)}
       />
-      <Pressable accessibilityRole="button" style={styles.resetRow} onPress={reset} disabled={atDefault} hitSlop={6}>
+      <Pressable accessibilityRole="button" style={styles.resetRow} onPress={() => onCommit(DEFAULT_ADJUST)} disabled={atDefault} hitSlop={6}>
         <Ionicons name="refresh-outline" size={13} color={atDefault ? tokens.edge : tokens.muted} />
         <Text style={[styles.resetLabel, { color: atDefault ? tokens.edge : tokens.muted }]}>{t('review.adjustPanel.reset')}</Text>
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   panel: {

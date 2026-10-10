@@ -377,6 +377,15 @@ export async function loadPageOcr<T extends OcrRef>(db: SQLiteDatabase, pages: r
   });
 }
 
+// True when page `b` is page `a` with its word boxes loaded and nothing else: its row already says
+// the same.
+function pageBlocksLoadedOnly(a: LibraryPage, b: LibraryPage): boolean {
+  if (a.ocr?.blocksRow === undefined || !b.ocr || !loadedFromDb.has(b.ocr)) return false;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof LibraryPage)[]);
+  for (const key of keys) if (key !== 'ocr' && !Object.is(a[key], b[key])) return false;
+  return true;
+}
+
 // True when `after` is `before` with word boxes loaded (on at least one page) and nothing else:
 // the rows already say the same, so the pages aren't rewritten and the document doesn't count as
 // edited. Any other new array is a change, as it always was.
@@ -387,9 +396,7 @@ function blocksLoadedOnly(before: readonly LibraryPage[], after: readonly Librar
     const a = before[i];
     const b = after[i];
     if (a === b) continue;
-    if (a.ocr?.blocksRow === undefined || !b.ocr || !loadedFromDb.has(b.ocr)) return false;
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof LibraryPage)[]);
-    for (const key of keys) if (key !== 'ocr' && !Object.is(a[key], b[key])) return false;
+    if (!pageBlocksLoadedOnly(a, b)) return false;
     loaded += 1;
   }
   return loaded > 0;
@@ -529,12 +536,16 @@ export async function listSubmissions(
   return (await db.getAllAsync<SubmissionRow>(sql, params)).map(rowToSubmission);
 }
 
-// Writes one document and replaces its pages. Pages are deleted and re-inserted (rather than
-// INSERT OR REPLACE) because REPLACE's implicit delete doesn't fire the FTS delete trigger, which
-// would leave stale rows in pages_fts. Must run inside a transaction.
+// Writes one document and its pages. Must run inside a transaction.
 // `pagesUnchanged`: the caller knows the pages are the ones already stored (the reducer kept the
 // same array), so only the document row is written - a rename, a star, or the Reader saving the
 // page it's on (§7 R4) mustn't rewrite every page row.
+// `storedPages` (§16 G7): the page list the database holds for this document (the last snapshot
+// known to be on disk). With it, only the rows that differ are written and the ones that left are
+// deleted (changedPages): indexing a 300-page PDF saves its progress every 10 pages, and each
+// save used to delete and re-insert all 300 rows, with their full-text entries. Without it (a
+// document new to the database, or a caller with no snapshot) every row of the document is
+// replaced.
 // §8 B1: disk_bytes (the measured folder size) survives only a write that can't have changed the
 // files - same pages, same PDF, same size; any save or edit clears it for the storage report to
 // measure again. It isn't part of LibraryDocument, so a spread `...doc` can't carry a stale value.
@@ -549,7 +560,8 @@ async function writeDocument(
   conflict: 'upsert' | 'ignore',
   stored: ReadonlyMap<string, string>,
   pagesUnchanged = false,
-  edited = true
+  edited = true,
+  storedPages?: readonly LibraryPage[]
 ): Promise<void> {
   const params = [
     doc.id,
@@ -601,28 +613,80 @@ async function writeDocument(
       params
     );
     if (pagesUnchanged) return;
+    if (storedPages) {
+      const { rows, removedIds } = changedPages(storedPages, doc.pages);
+      // Only while the row is still this document's: a page that moved to another document was
+      // written there first, or will be.
+      for (const batch of batchesOf(removedIds)) {
+        await db.runAsync(`DELETE FROM pages WHERE document_id = ? AND id IN (${batch.map(() => '?').join(', ')})`, [doc.id, ...batch]);
+      }
+      await upsertPages(db, doc.id, rows, stored);
+      return;
+    }
     await db.runAsync('DELETE FROM pages WHERE document_id = ?', [doc.id]);
   }
 
+  await upsertPages(db, doc.id, doc.pages.map((page, idx) => ({ page, idx })), stored);
+}
+
+export type PageRowWrite = { page: LibraryPage; idx: number };
+
+// §16 G7: which rows turn the stored page list `before` into `after`. A page is written when it
+// is new, when its object was replaced (the reducer is immutable: the same object is the same
+// row) or when it sits at another position; a page that only had its word boxes loaded isn't.
+export function changedPages(
+  before: readonly LibraryPage[],
+  after: readonly LibraryPage[]
+): { rows: PageRowWrite[]; removedIds: string[] } {
+  const beforeIndex = new Map(before.map((page, i) => [page.id, i]));
+  const afterIds = new Set(after.map((page) => page.id));
+  const rows: PageRowWrite[] = [];
+  after.forEach((page, idx) => {
+    const at = beforeIndex.get(page.id);
+    const was = at === undefined ? undefined : before[at];
+    if (was !== undefined && at === idx && (was === page || pageBlocksLoadedOnly(was, page))) return;
+    rows.push({ page, idx });
+  });
+  return { rows, removedIds: before.filter((page) => !afterIds.has(page.id)).map((page) => page.id) };
+}
+
+// §16 G7: writes the given page rows of a document and no others. An existing row is updated in
+// place (never INSERT OR REPLACE: its implicit delete doesn't fire the FTS delete trigger, which
+// would leave stale rows in pages_fts; an UPDATE fires pages_au), so the full-text index is
+// touched once per written row. A row that belonged to another document moves to this one.
+// `stored`: see writeDocument; read here when the caller has none. Must run inside a transaction
+// when it is part of a larger write.
+export async function upsertPages(
+  db: SQLiteDatabase,
+  documentId: string,
+  rows: readonly PageRowWrite[],
+  stored?: ReadonlyMap<string, string>
+): Promise<void> {
+  if (rows.length === 0) return;
+  const storedJson = stored ?? (await storedOcrJson(db, rows.map((row) => row.page)));
   const pageStmt = await db.prepareAsync(
     `INSERT INTO pages (id, document_id, idx, master_path, display_path, thumb_path, width, height, ocr_text,
        ocr_json, ocr_failed, layout, text_source, rotation)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET document_id = excluded.document_id, idx = excluded.idx,
+       master_path = excluded.master_path, display_path = excluded.display_path, thumb_path = excluded.thumb_path,
+       width = excluded.width, height = excluded.height, ocr_text = excluded.ocr_text, ocr_json = excluded.ocr_json,
+       ocr_failed = excluded.ocr_failed, layout = excluded.layout, text_source = excluded.text_source,
+       rotation = excluded.rotation`
   );
   try {
-    for (let i = 0; i < doc.pages.length; i++) {
-      const page = doc.pages[i];
+    for (const { page, idx } of rows) {
       await pageStmt.executeAsync([
         page.id,
-        doc.id,
-        i,
+        documentId,
+        idx,
         toStoredPath(page.fileUri) ?? '',
         toStoredPath(page.displayUri),
         toStoredPath(page.thumbUri),
         Math.round(page.width),
         Math.round(page.height),
         page.ocr?.text ?? null,
-        ocrJsonOf(page, stored),
+        ocrJsonOf(page, storedJson),
         page.ocrFailed ? 1 : 0,
         page.layout ?? null,
         page.textSource ?? null,
@@ -870,9 +934,15 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
       const before = prevDocs.get(doc.id);
       return !!before && (before.pages === doc.pages || blocksLoadedOnly(before.pages, doc.pages));
     };
+    // §16 G7: only the rows that will be written (writeDocument's storedPages).
     const stored = await storedOcrJson(
       db,
-      documents.changed.filter((doc) => !samePages(doc)).flatMap((doc) => doc.pages)
+      documents.changed
+        .filter((doc) => !samePages(doc))
+        .flatMap((doc) => {
+          const before = prevDocs.get(doc.id);
+          return before ? changedPages(before.pages, doc.pages).rows.map((row) => row.page) : doc.pages;
+        })
     );
     // Removed documents go first: a merge or split (§7 R2) gives its new documents the removed
     // ones' page ids, which must be free again before the new page rows are written. Their
@@ -883,7 +953,7 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
     for (const doc of documents.changed) {
       const before = prevDocs.get(doc.id);
-      await writeDocument(db, doc, 'upsert', stored, samePages(doc), !before || documentEdited(before, doc));
+      await writeDocument(db, doc, 'upsert', stored, samePages(doc), !before || documentEdited(before, doc), before?.pages);
     }
     for (const slot of slots.changed) await writeSlot(db, slot);
     // After documents and courses, which they reference.

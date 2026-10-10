@@ -23,8 +23,29 @@ import { createId } from '../../utils/id';
 export const INDEX_MAX_PAGES = 300;
 
 // How often (in pages) a long run hands its progress to onCommit, so an interrupted run resumes
-// where it stopped instead of starting over.
+// where it stopped instead of starting over. §16 G7: a commit costs its ten rows and no more -
+// the library sync writes only the pages that changed (libraryRepo.changedPages).
 const COMMIT_EVERY = 10;
+
+// §16 G7: how often, at most, a run's progress reaches the screen. A PDF with a text layer is
+// read at many pages a second, and each report re-renders whatever shows the count.
+export const PROGRESS_EVERY_MS = 500;
+
+// `send`, held to one call per `everyMs`. The first report and the last one (done === total)
+// always go through, so the count never stops short of the end.
+export function throttleProgress(
+  send: (progress: BatchProgress) => void,
+  everyMs = PROGRESS_EVERY_MS,
+  now: () => number = Date.now
+): (progress: BatchProgress) => void {
+  let sentAt: number | null = null;
+  return (progress) => {
+    const at = now();
+    if (sentAt !== null && progress.done < progress.total && at - sentAt < everyMs) return;
+    sentAt = at;
+    send(progress);
+  };
+}
 
 export function needsIndexing(doc: LibraryDocument): boolean {
   return doc.sourceKind === 'imported_pdf' && doc.format === 'PDF' && !!doc.pdfUri && doc.indexedAt === undefined;

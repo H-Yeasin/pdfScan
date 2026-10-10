@@ -13,7 +13,7 @@ function errorMessage(error: unknown): string {
 }
 
 // Orchestrates a scan session outside the reducer: scanning -> processing (per-page progress,
-// cancellable, see ingestBatch.ts) -> one bulk commit -> success/error.
+// cancellable, each page added as it finishes, see ingestBatch.ts) -> success/error.
 export async function runNativeScannerPipeline(
   dispatch: Dispatch<AppAction>,
   script: OcrScript,
@@ -22,7 +22,7 @@ export async function runNativeScannerPipeline(
   options: { scannerUnavailable?: boolean } = {}
 ): Promise<void> {
   dispatch({ type: 'capture/SET_PROCESSING_STATUS', status: 'scanning' });
-  // "Scan more" relaunches in the same mode; BULK_ADD_PAGES appends.
+  // "Scan more" relaunches in the same mode; the new pages go to the end.
   const scanMore = () => {
     void runNativeScannerPipeline(dispatch, script, spec, options);
   };

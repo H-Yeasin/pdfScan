@@ -733,7 +733,65 @@ cache returns the same instance; snippet memoisation; `a11yLabels` (FlashList ro
 Device check: Verification 7.
 
 ## G7 · Heavy work off the hot path *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only, no new dev build. Nothing here has run on a phone.
+Open: Verification 8.
+
+As built:
+- **Review sliders.** `components/review/useLiveAdjust.ts` holds the three values as three shared
+  numbers (not one `SharedValue<Adjust>`: each slider writes only its own, and each matrix is derived
+  from one). `AdjustSlider` writes its `live` value in the pan worklet; `AdjustPanel` keeps no draft
+  state; `ReviewScreen` has no `liveAdjust` state and doesn't render during a drag.
+  `useFilteredPicture` could not take shared values (it records an SkPicture in a `useMemo`), so the
+  plan's second route is the one built: with `adjustLive` (the Adjust panel is open and the filter is
+  adjustable) the picture is recorded **without** the adjustment, and `FilteredPreview` draws it under
+  a layer whose paint is three nested `<ColorMatrix>` (brightness inside contrast inside saturation),
+  each from `useDerivedValue`. They are three filters, not one multiplied matrix, because Skia clamps
+  between them and `drawFiltered` chains them the same way; `brightnessMatrix`, `contrastMatrix` and
+  `saturationMatrix` in `filterMath.ts` are worklets now. The academic stamp is a separate
+  `overlayPicture` drawn over the layer, so the sliders don't tint it. With the panel closed the
+  picture carries the adjustment itself, as before (the exact export call).
+- **One `runOnJS` is left in a drag:** the "+35" beside the label (`SliderNumber`), sent only when the
+  whole number changes, and it re-renders that text alone. An animated `TextInput` would remove it,
+  but it could not be checked without a phone. `onChange` (JS, per frame) still exists on
+  `AdjustSlider` for the dev Filter Lab only.
+- **Scanning.** `ingestOne` makes a master and a thumbnail and nothing else; `ingestBatch` dispatches
+  `capture/ADD_PAGE` per page (`afterId` keeps the batch together; the first page takes a pending
+  retake's place, like `BULK_ADD_PAGES`), then sends the "added" message, then reads the pages one at
+  a time (`ingest.readPage`: stats through `capture/SET_PAGE_STATS`, text through
+  `capture/UPDATE_PAGE`). `SessionPage.ocrPending` shows "Reading text…" over the preview.
+  `ingestBatch` resolves before the reading ends; `textReadingDone()` is for tests.
+  `stopReadingText()` ends it after the current page: a new batch calls it, and so does Deliver when a
+  save starts (the save reads what is missing, so two jobs never read at once). After Cancel nothing
+  is read; the flags are cleared.
+- **Book split stays inside the batch,** per capture, not after it: the halves are the pages, and
+  showing a spread first and swapping it for its halves would only add churn. **ID card mode** still
+  commits once (`BULK_ADD_PAGES`) after composing, since a page is two scans.
+- **Deliver.** `services/capture/geometryKey.ts`: `geometryKey(page, script)` is the image's uri, its
+  size, its turn and the OCR script (the script was added to the plan's "crop, rotation, split": the
+  course picked in Deliver can have another one). OCR stores its key in `SessionPage.ocrGeometry`
+  (ingest, Review's manual OCR, ID card recompose). Deliver keeps `page.ocr` when `ocrFitsPage` and
+  the saved master has the page's pixel size; else it reads the master as before. A turned page is
+  read again (scan-time OCR is of the unturned image). "Render once when the preset is the master
+  spec" was already true (`encodingForQuality` → `'as-is'`).
+- **Not done: releasing each page's bytes in `buildPdfFromPages`.** pdf-lib keeps an embedded image's
+  bytes (and then its stream) in the document until `save()`; nothing in its API frees them earlier,
+  and forcing `image.embed()` per page only moves the same bytes. It needs a streaming PDF writer,
+  which is out of this step.
+- **Indexing.** `libraryRepo.upsertPages(db, docId, rows)` writes only the given rows
+  (`INSERT … ON CONFLICT (id) DO UPDATE`, so `pages_au` keeps the full-text index in step). It is
+  called **by the sync, not by the indexer**: `changedPages(before, after)` finds the rows that are
+  new, replaced or moved, and `writeDocument` writes those and deletes the ones that left. So there is
+  no `pagesWrittenAt` marker and no `library/PAGES_SYNCED`: a second writer beside the sync could be
+  overtaken by a queued sync holding an older page list, and the marker would then hide the loss.
+  Every page change gains from it (a thumbnail built for a list, a turn, word boxes saved), not just
+  indexing. A document new to the database still gets all its rows. `throttleProgress` holds
+  `libraryUi/SET_INDEXING` to one per 500 ms (first and last always sent).
+- **Device export.** `writeFileToTree` goes through `saveFileToFolder` (1 MB chunks); the base64 calls
+  are gone from the file. A missing source is counted as failed before any file is made in the folder.
+- Tests: `ingestBatch.test.ts` (order, one at a time, stop mid-reading, a new batch, ID cards,
+  `capture/ADD_PAGE`), `geometryKey.test.ts`, `libraryRepo.test.ts` "page rows are written one by one"
+  (triggers count the row writes), `deviceExportService.test.ts`, `throttleProgress`.
+- `npm run typecheck` is as G6 left it (`"jsx": "react"`); `npx tsc --noEmit --jsx react-jsx` is clean.
 
 Goal: sliders, scanning, saving and indexing never freeze the screen.
 
