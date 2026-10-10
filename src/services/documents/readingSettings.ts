@@ -1,4 +1,5 @@
 import { DEFAULT_MARK, normalizeMark, type MarkPrefs } from '../annotations/markMode';
+import { NIGHT_PALETTES, type NightPalette } from '../reader/darkMatrix';
 
 // §12 D2: how the Reader shows a document. One set for every document: the choices are about how
 // the student likes to read (page by page, screen kept on), not about one file, and a per-document
@@ -17,8 +18,9 @@ export type ReadingSettings = {
   fit: ReadingFit;
   // The gap between pages (pdf-jsi `spacing`). PDF engine only.
   spacing: ReadingSpacing;
-  // Night: a dim overlay on PDFs (pdf-jsi has no colour invert, see PdfPageView), dark colours in
-  // the text, sheet and Word viewers.
+  // Night: dark colours in the text, sheet and Word viewers. PDFs and scans: on the page surface
+  // (§18 W10) the pages themselves are redrawn dark, and `nightStrength` picks how dark the paper
+  // is (`nightPalette`); in pdf-jsi, which has no colour invert, a dim overlay of that strength.
   night: boolean;
   nightStrength: NightStrength;
   // Keep the screen on while the Reader is open (expo-keep-awake). Off by default: battery.
@@ -63,6 +65,11 @@ export function normalizeReading(raw: unknown): ReadingSettings {
     keepAwake: r.keepAwake === true,
     mark: normalizeMark(r.mark),
   };
+}
+
+// §18 W10: the page surface's night colours for these settings; null by day.
+export function nightPalette(reading: Pick<ReadingSettings, 'night' | 'nightStrength'>): NightPalette | null {
+  return reading.night ? NIGHT_PALETTES[reading.nightStrength] : null;
 }
 
 // The PDF engine's props for these settings (fitPolicy: 0 = width, 2 = both sides).

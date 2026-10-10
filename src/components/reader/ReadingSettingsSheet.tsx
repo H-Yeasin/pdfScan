@@ -10,13 +10,16 @@ type ReadingSettingsSheetProps = {
   reading: ReadingSettings;
   // Layout, fit and spacing are the PDF engine's; other viewers scroll their own way.
   showPageOptions: boolean;
+  // §18 W10: the page surface redraws the pages dark, so the strength picks the paper's colour
+  // (darkMatrix.NIGHT_PALETTES) where pdf-jsi only dims: other words for the same setting.
+  nightPages?: boolean;
   onChange: (patch: Partial<ReadingSettings>) => void;
   onClose: () => void;
 };
 
 // §12 D2: how the Reader shows documents. Changes apply at once (the viewer behind the sheet
 // updates) and are kept in settings for every document.
-export function ReadingSettingsSheet({ visible, reading, showPageOptions, onChange, onClose }: ReadingSettingsSheetProps) {
+export function ReadingSettingsSheet({ visible, reading, showPageOptions, nightPages, onChange, onClose }: ReadingSettingsSheetProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
@@ -65,12 +68,12 @@ export function ReadingSettingsSheet({ visible, reading, showPageOptions, onChan
             <SwitchRow label={t('reader.reading.night')} value={reading.night} onChange={(night) => onChange({ night })} />
             {reading.night && showPageOptions ? (
               <>
-                <Text style={[styles.label, { color: tokens.muted }]}>{t('reader.reading.nightStrength')}</Text>
+                <Text style={[styles.label, { color: tokens.muted }]}>{t(nightPages ? 'reader.reading.nightPaper' : 'reader.reading.nightStrength')}</Text>
                 <SegmentedControl
                   segments={[
-                    { id: 'low', label: t('reader.reading.strengthLow') },
-                    { id: 'medium', label: t('reader.reading.strengthMedium') },
-                    { id: 'high', label: t('reader.reading.strengthHigh') },
+                    { id: 'low', label: t(nightPages ? 'reader.reading.paperLow' : 'reader.reading.strengthLow') },
+                    { id: 'medium', label: t(nightPages ? 'reader.reading.paperMedium' : 'reader.reading.strengthMedium') },
+                    { id: 'high', label: t(nightPages ? 'reader.reading.paperHigh' : 'reader.reading.strengthHigh') },
                   ]}
                   value={reading.nightStrength}
                   onChange={(nightStrength) => onChange({ nightStrength })}

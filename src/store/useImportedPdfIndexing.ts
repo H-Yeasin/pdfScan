@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { indexImportedPdf, needsIndexing } from '../services/documents/importedPdfIndex';
 import { isPdfNativeAvailable } from '../services/pdf/pdfNative';
 import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { useReaderHeld } from '../services/reader/readerHold';
 import { resolveOcrScript } from '../services/scripts/registry';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // The abort reason when the document itself went away (as opposed to the app closing).
 const REMOVED = 'removed';
+// §18 W10: the page surface is on screen and needs the pdfium thread; the run stops after the
+// page it is on, keeps what it finished, and starts again when the Reader closes.
+const PAUSED = 'paused';
 
 // §7 R1: gives imported PDFs their thumbnails and searchable text, in the background, one
 // document at a time, never blocking the UI. The same loop serves a fresh import (it arrives with
@@ -25,9 +29,10 @@ export function useImportedPdfIndexing(libraryLoaded: boolean): void {
   const skipped = useRef(new Set<string>());
   // Bumped when a run ends, to look for the next document.
   const [finishedRuns, setFinishedRuns] = useState(0);
+  const paused = useReaderHeld();
 
   useEffect(() => {
-    if (!libraryLoaded || running.current || !isPdfNativeAvailable()) return;
+    if (!libraryLoaded || paused || running.current || !isPdfNativeAvailable()) return;
     const doc = files.find((f) => needsIndexing(f) && !skipped.current.has(f.id));
     if (!doc) return;
 
@@ -35,7 +40,7 @@ export function useImportedPdfIndexing(libraryLoaded: boolean): void {
     running.current = { id: doc.id, controller };
     const script = resolveOcrScript({ course: courses.find((c) => c.id === doc.courseId), settings });
     const commit = (pages: typeof doc.pages) => {
-      if (!controller.signal.aborted) dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: { pages } });
+      if (!controller.signal.aborted || controller.signal.reason === PAUSED) dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: { pages } });
     };
 
     indexImportedPdf(doc, {
@@ -64,7 +69,11 @@ export function useImportedPdfIndexing(libraryLoaded: boolean): void {
       });
     // `courses`/`settings` only pick the OCR script when a run starts; they don't restart one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [libraryLoaded, files, finishedRuns, dispatch]);
+  }, [libraryLoaded, paused, files, finishedRuns, dispatch]);
+
+  useEffect(() => {
+    if (paused) running.current?.controller.abort(PAUSED);
+  }, [paused]);
 
   // The document went away (deleted, or replaced by a merge) while it was being indexed.
   useEffect(() => {

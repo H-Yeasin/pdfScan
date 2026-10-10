@@ -33,6 +33,11 @@ type Props = {
   currentIdx: number;
   shownPage: PageLabel;
   goToPage: (page: number) => void;
+  // §18 W10: to a library page (0-based), exactly: the page surface shows a 2-in-1 sheet's two
+  // pages one by one, which a PDF page can't name.
+  goToIdx: (idx: number) => void;
+  // The page surface is the viewer: night redraws the pages (ReadingSettingsSheet).
+  nightPages: boolean;
   flashMark: (page: number, query: string) => void;
   moreItems: ReaderMoreItemId[];
   onSelectMore: (id: ReaderMoreItemId) => void;
@@ -50,6 +55,8 @@ export function ReaderSheets({
   currentIdx,
   shownPage,
   goToPage,
+  goToIdx,
+  nightPages,
   flashMark,
   moreItems,
   onSelectMore,
@@ -89,7 +96,8 @@ export function ReaderSheets({
           // The snack would sit under the prompt, so the prompt closes either way.
           close('jump');
           if (page === null) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noSuchPage', { count: shownPage.count }) });
-          else goToPage(shownPage.library && doc ? pdfPageFor(doc, page - 1).page : page);
+          else if (shownPage.library && doc) goToIdx(page - 1);
+          else goToPage(page);
         }}
       />
 
@@ -100,7 +108,7 @@ export function ReaderSheets({
           currentIdx={currentIdx}
           onPick={(idx) => {
             close('pages');
-            goToPage(pdfPageFor(doc, idx).page);
+            goToIdx(idx);
           }}
           onClose={() => close('pages')}
         />
@@ -110,6 +118,7 @@ export function ReaderSheets({
         visible={open === 'reading'}
         reading={reading}
         showPageOptions={isPageRaster}
+        nightPages={nightPages}
         onChange={(patch: Partial<ReadingSettings>) => dispatch({ type: 'settings/SET_READING', reading: patch })}
         onClose={() => close('reading')}
       />
@@ -150,7 +159,7 @@ export function ReaderSheets({
         items={docBookmarks}
         onOpen={(item) => {
           close('bookmarks');
-          if (doc) goToPage(pdfPageFor(doc, item.idx).page);
+          if (doc) goToIdx(item.idx);
         }}
         onRemove={(item) => dispatch({ type: 'library/REMOVE_BOOKMARK', id: item.bookmark.id })}
         onClose={() => close('bookmarks')}
@@ -163,7 +172,7 @@ export function ReaderSheets({
           close('notes');
           if (!doc) return;
           const { page } = pdfPageFor(doc, entry.pageIdx);
-          goToPage(page);
+          goToIdx(entry.pageIdx);
           const query = flashQuery(entry);
           if (query) flashMark(page, query);
         }}

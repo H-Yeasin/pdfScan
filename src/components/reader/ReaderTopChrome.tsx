@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fontFamily, spacing, useTheme, touchSlop, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
 import type { PageLabel } from '../../services/documents/readerPosition';
 
 type ReaderTopChromeProps = {
-  visible: Animated.AnimatedInterpolation<number> | Animated.Value;
+  // useReaderChrome's `progress`: 1 shown, 0 slid away.
+  visible: SharedValue<number>;
+  // §18 W10: the bar's measured height (the status bar inset and a subtitle line included).
+  onHeight?: (height: number) => void;
   name: string;
   onBack: () => void;
   onOverflow: () => void;
@@ -34,6 +38,7 @@ type ReaderTopChromeProps = {
 
 export function ReaderTopChrome({
   visible,
+  onHeight,
   name,
   onBack,
   onOverflow,
@@ -58,6 +63,12 @@ export function ReaderTopChrome({
   // shown, so that estimate is never on screen.
   const [height, setHeight] = useState(0);
   const hideBy = height || insets.top + ROW_HEIGHT;
+  const slide = useAnimatedStyle(() => ({ opacity: visible.value, transform: [{ translateY: (visible.value - 1) * hideBy }] }), [hideBy]);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const measured = Math.ceil(e.nativeEvent.layout.height);
+    setHeight(measured);
+    onHeight?.(measured);
+  };
 
   return (
     <Animated.View
@@ -70,12 +81,11 @@ export function ReaderTopChrome({
           // §14 Q3: in landscape the 3-button bar sits on a side.
           paddingLeft: insets.left,
           paddingRight: insets.right,
-          opacity: visible,
-          transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [-hideBy, 0] }) }],
         },
+        slide,
       ]}
       pointerEvents="box-none"
-      onLayout={(e) => setHeight(Math.ceil(e.nativeEvent.layout.height))}
+      onLayout={onLayout}
     >
       <View style={styles.row}>
         <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>

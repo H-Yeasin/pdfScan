@@ -8,13 +8,17 @@ import { useT } from '../../i18n/useT';
 import { useRouter } from '../../navigation/router';
 import { useScreenRole } from '../../navigation/screenRole';
 import { useBackHandler } from '../../navigation/useBackHandler';
-import { canFindInDoc, canSign, isPageRasterFormat } from '../../services/documents/formatCapabilities';
-import { libraryIdxFor, pdfPageFor } from '../../services/documents/pageMap';
+import { canFindInDoc, canSign, isPageRasterFormat, isPdfLevel } from '../../services/documents/formatCapabilities';
+import { libraryIdxFor, pdfPageCount, pdfPageFor } from '../../services/documents/pageMap';
 import { pageLabel, pdfPageAfterEdit } from '../../services/documents/readerPosition';
 import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../../services/documents/readerTools';
 import { NIGHT_OVERLAY_ALPHA, pdfViewOptions } from '../../services/documents/readingSettings';
+import { pdfNativeVersion } from '../../services/pdf/pdfNative';
 import { useIsPro } from '../../services/pro/entitlement';
+import { readerEngine } from '../../services/reader/readerEngine';
 import { chromeLocked, readerBackTarget } from '../../services/reader/readerSheets';
+import type { ContentInsets } from '../../services/reader/surfaceGeometry';
+import { useReaderSurfaceEnabled } from '../../services/remote/remoteConfig';
 import { submittedSummary } from '../../services/submit/history';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
@@ -27,10 +31,11 @@ import { MarkView } from './MarkView';
 import { PdfPageView, type PdfPageViewHandle } from './PdfPageView';
 import { ReaderLoadProblem, ReaderNotice, ReaderNoticeAction } from './ReaderLoadProblem';
 import { ReaderSheets } from './ReaderSheets';
-import { ReaderToolBar } from './ReaderToolBar';
+import { ReaderToolBar, toolBarHeight } from './ReaderToolBar';
 import { ReaderTopChrome, ROW_HEIGHT as TOP_BAR_ROW_HEIGHT } from './ReaderTopChrome';
 import { SelectTextSheet } from './SelectTextSheet';
 import { SheetView } from './SheetView';
+import { PageSurface, type PageSurfaceHandle } from './surface/PageSurface';
 import { TxtView } from './TxtView';
 import { useAnnotationPdfSync } from './useAnnotationPdfSync';
 import { useConvertToPdf } from './useConvertToPdf';
@@ -68,7 +73,37 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   const doc = external ? undefined : openDoc;
 
   const pdfRef = useRef<PdfPageViewHandle>(null);
-  const goToPage = useCallback((page: number) => pdfRef.current?.goToPage(page), []);
+  // §18 W10: the page surface (behind `reader_surface`) counts library pages from 0; the rest of
+  // the Reader, like pdf-jsi, counts PDF pages from 1. The two differ on a scan with a cover or
+  // 2-in-1 sheets (documents/pageMap): everything here converts at this edge.
+  const surfaceRef = useRef<PageSurfaceHandle>(null);
+  const surfaceOn = useReaderSurfaceEnabled();
+  const engine = readerEngine({ format: external?.format ?? openDoc?.format, nativeVersion: pdfNativeVersion(), surface: surfaceOn });
+  const onSurface = engine === 'surface';
+  // A scan's surface pages are its library pages; an imported PDF's and an outside file's are
+  // the PDF's own.
+  const mapped = !!doc && !isPdfLevel(doc);
+  const mappedDoc = useRef(doc);
+  mappedDoc.current = mapped ? doc : undefined;
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const goToPage = useCallback(
+    (page: number) => {
+      if (!onSurface) pdfRef.current?.goToPage(page);
+      else surfaceRef.current?.goToIndex(mappedDoc.current ? libraryIdxFor(mappedDoc.current, page) : page - 1);
+    },
+    [onSurface]
+  );
+  // A library page, exactly: on a 2-in-1 sheet the PDF page alone can't say left or right.
+  const goToIdx = useCallback(
+    (idx: number) => {
+      if (onSurface) surfaceRef.current?.goToIndex(idx);
+      else pdfRef.current?.goToPage(docRef.current ? pdfPageFor(docRef.current, idx).page : idx + 1);
+    },
+    [onSurface]
+  );
+  // The library page the surface is on (it shows a 2-in-1 document as single pages).
+  const [surfaceIdx, setSurfaceIdx] = useState<number | null>(null);
   const {
     format,
     isPageRaster,
@@ -104,7 +139,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   useBackHandler(find.close, readerBackTarget(sheets.state, find.open) === 'find');
   // §16 G2: a Reader kept under a detour (Pro, a cover's options) doesn't hold the screen on.
   const onScreen = useScreenRole() === 'active';
-  const chrome = useReaderChrome(reading.keepAwake && onScreen);
+  // §18 W10: the bars stay while Find, a sheet or a tool needs them.
+  const chrome = useReaderChrome(reading.keepAwake && onScreen, find.open || chromeLocked(sheets.state));
   const { onPage: onChromePage, toggle: toggleChrome, show: showChrome } = chrome;
   // §18 W2: a tap on the page hides the bars, but not while Find is open: its field is in the top
   // bar, and the tap is usually aimed at a match. A search result can open Find on a Reader kept
@@ -200,9 +236,14 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   // read.
   const syncAnnotations = useAnnotationPdfSync(useCallback(() => reload(), [reload]));
   // The library page on screen (on a 2-up sheet, its left page).
-  const currentIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
-  // §18 W5: the top bar and "Go to page" count library pages, like the page strip.
-  const shownPage = useMemo(() => pageLabel(doc, activeIndex + 1, pageCount), [doc, activeIndex, pageCount]);
+  const sheetIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
+  const currentIdx = onSurface && mapped && surfaceIdx !== null ? Math.min(surfaceIdx, Math.max(0, doc.pages.length - 1)) : sheetIdx;
+  // §18 W5: the top bar and "Go to page" count library pages, like the page strip. §18 W10: the
+  // surface shows one library page at a time, also where the PDF has two on a sheet.
+  const shownPage = useMemo(() => {
+    const label = pageLabel(doc, activeIndex + 1, pageCount);
+    return onSurface && mapped && label.library ? { ...label, first: currentIdx + 1, last: currentIdx + 1 } : label;
+  }, [doc, activeIndex, pageCount, onSurface, mapped, currentIdx]);
   const markFlash = useMarkFlash(pdfId);
   // §5 T5: the bookmark on the page on screen.
   const currentBookmark = doc ? state.library.bookmarks.find((b) => b.documentId === doc.id && b.pageId === doc.pages[currentIdx]?.id) : undefined;
@@ -228,10 +269,10 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     dispatch({ type: 'reader/SET_TARGET', target: null });
     const idx = doc.pages.findIndex((p) => p.id === target.pageId);
     if (idx < 0) return;
-    const { page } = pdfPageFor(doc, idx);
-    openOnPage(page, target.query);
-    goToPage(page);
-  }, [target, doc, pageCount, dispatch, openOnPage, goToPage]);
+    // §18 W10: Find comes to the surface in W12; until then a search hit only opens its page.
+    if (!onSurface) openOnPage(pdfPageFor(doc, idx).page, target.query);
+    goToIdx(idx);
+  }, [target, doc, pageCount, dispatch, openOnPage, goToIdx, onSurface]);
 
   const onPageChanged = useCallback(
     (page: number, count: number) => {
@@ -239,6 +280,31 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
       onChromePage(page);
     },
     [handlePageChanged, onChromePage]
+  );
+
+  // §18 W10: the surface's pages → the PDF pages useReaderDocument counts and saves (`lastPage`).
+  const surfaceCount = useRef(0);
+  const onSurfaceLoad = useCallback(
+    (count: number) => {
+      surfaceCount.current = mappedDoc.current ? pdfPageCount(mappedDoc.current) : count;
+      handleLoad(surfaceCount.current);
+    },
+    [handleLoad]
+  );
+  const onSurfacePage = useCallback(
+    (idx: number) => {
+      setSurfaceIdx(idx);
+      if (surfaceCount.current > 0) handlePageChanged(mappedDoc.current ? pdfPageFor(mappedDoc.current, idx).page : idx + 1, surfaceCount.current);
+    },
+    [handlePageChanged]
+  );
+  // What covers the surface's edges with the bars shown: their measured heights (an estimate
+  // until the first layout) and the safe area. A file with no tools has no bottom bar.
+  const topInset = chrome.bars.top || insets.top + TOP_BAR_ROW_HEIGHT;
+  const bottomInset = tools.length > 0 ? chrome.bars.bottom || toolBarHeight(insets.bottom) : insets.bottom;
+  const surfaceInsets = useMemo<ContentInsets>(
+    () => ({ top: topInset, bottom: bottomInset, left: insets.left, right: insets.right }),
+    [topInset, bottomInset, insets.left, insets.right]
   );
 
   const handleTool = useCallback(
@@ -311,7 +377,26 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
-      {isPageRaster ? (
+      {onSurface ? (
+        <PageSurface
+          key={`${pdfUri}:${reloadKey}`}
+          ref={surfaceRef}
+          subject={subject!}
+          pdfUri={pdfUri!}
+          owner={pdfId}
+          password={password}
+          reading={reading}
+          insets={surfaceInsets}
+          safeBottom={insets.bottom}
+          chrome={chrome.progress}
+          onScroll={chrome.scrolled}
+          initialIndex={mapped ? libraryIdxFor(doc, initialPage ?? 1) : (initialPage ?? 1) - 1}
+          onLoad={onSurfaceLoad}
+          onPage={onSurfacePage}
+          onTap={onViewerTap}
+          onError={handlePdfError}
+        />
+      ) : isPageRaster ? (
         <PdfPageView
           key={`${pdfUri}:${reloadKey}`}
           ref={pdfRef}
@@ -376,13 +461,15 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
       />
 
       <ReaderTopChrome
-        visible={chrome.visible}
+        visible={chrome.progress}
+        onHeight={chrome.onTopHeight}
         name={title}
         onBack={() => back()}
         onOverflow={() => openSheet({ kind: 'more' })}
         page={shownPage}
         onJump={isPageRaster ? () => openSheet({ kind: 'jump' }) : undefined}
-        onFind={format && canFindInDoc(format) ? find.toggle : undefined}
+        // §18 W10: Find is hidden on the surface until W12 brings it there.
+        onFind={format && canFindInDoc(format) && !onSurface ? find.toggle : undefined}
         findOpen={find.open}
         findQuery={find.query}
         onChangeFindQuery={find.changeQuery}
@@ -408,7 +495,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         />
       ) : null}
 
-      <ReaderToolBar visible={chrome.visible} tools={tools} onPress={handleTool} />
+      <ReaderToolBar visible={chrome.progress} onHeight={chrome.onBottomHeight} tools={tools} onPress={handleTool} />
 
       <ReaderSheets
         sheets={sheets}
@@ -417,6 +504,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         currentIdx={currentIdx}
         shownPage={shownPage}
         goToPage={goToPage}
+        goToIdx={goToIdx}
+        nightPages={onSurface}
         flashMark={markFlash.flash}
         moreItems={moreItems}
         onSelectMore={onSelectMore}
@@ -447,7 +536,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
             closeTool();
             // Back in the native viewer on the page last marked (§5 T1 pageMap: a 2-in-1 sheet
             // holds two library pages).
-            goToPage(pdfPageFor(doc, lastIdx).page);
+            goToIdx(lastIdx);
             if (changed) syncAnnotations(doc.id);
           }}
           textTool={{ unlocked: isPro || textUnlocked, pro: !isPro, onUnlock: () => unlockText(doc, () => setTextUnlocked(true)) }}

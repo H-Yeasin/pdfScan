@@ -187,6 +187,11 @@ export const en = {
       filterLabSubtitle: 'Compare every filter and tune its constants',
       readerLab: 'Reader Lab',
       readerLabSubtitle: 'Time PDF pages and tiles, check passwords, links and rotation',
+      // §18 W10: tries the page surface without the console's `reader_surface`.
+      readerSurface: 'Page surface in the Reader',
+      readerSurfaceOn: 'On until the app restarts. PDFs and scans open on the new surface.',
+      readerSurfaceOff: 'Off. PDFs and scans open in the old viewer.',
+      readerSurfaceUnavailable: 'Needs a dev build with pdf-native version 2.',
       // §16 G5: the render-count overlay (src/utils/renderCounts.ts).
       renderCounts: 'Render counts',
       renderCountsOn: 'Showing. Tap a count to reset; tap here to hide.',
@@ -579,6 +584,11 @@ export const en = {
       strengthLow: 'Low',
       strengthMedium: 'Medium',
       strengthHigh: 'High',
+      // §18 W10: the page surface redraws the pages; the strength is how dark the paper is.
+      nightPaper: 'Night page',
+      paperLow: 'Soft',
+      paperMedium: 'Dark',
+      paperHigh: 'Black',
       keepAwake: 'Keep screen on',
       keepAwakeHint: 'While a document is open',
     },
@@ -725,6 +735,8 @@ export const en = {
     noSuchPage: 'Type a page from 1 to {count}',
     pages: 'Pages',
     pageA11y: 'Page {page} of {count}. Tap to go to a page.',
+    // §18 W10: the thumb on the right edge of a long document.
+    fastScroll: 'Scroll through pages',
     pageRangeA11y: 'Pages {first} and {last} of {count}. Tap to go to a page.',
     cantOpen: "Can't open this file",
     cantOpenBody: 'It may be damaged, or not really a PDF.',

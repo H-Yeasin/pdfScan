@@ -389,7 +389,7 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W7 pdf-native v2 (pdfium sessions, tiles, dark, links, outline; iOS PDFKit) + `expo-screen-orientation` (done in code; iOS not built yet; new dev build + device check open)
 - [x] W8 Surface geometry (done in code; JS only, no device check)
 - [x] W9 Render queue, page cache, dark matrix
-- [ ] W10 Read-only surface behind a flag
+- [x] W10 Read-only surface behind a flag (done in code; device check open)
 - [ ] W11 Links, contents, landscape, TalkBack
 - [ ] W12 Find on the surface ("3 of 27")
 - [ ] W13 In-page text selection

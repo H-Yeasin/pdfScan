@@ -15,6 +15,10 @@ export type NightPalette = {
   ink: string;
 };
 
+// A page before its picture has loaded, by day: PDFs and scans are black on white whatever the
+// app's theme is, so a themed surface colour would flash to white under every page.
+export const DAY_PAPER = '#ffffff';
+
 // Stronger = darker paper. The ink dims with it on the first two so the contrast stays gentle;
 // on black the ink stays below pure white, which glares on an OLED screen.
 export const NIGHT_PALETTES: Record<NightStrength, NightPalette> = {

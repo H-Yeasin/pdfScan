@@ -46,6 +46,7 @@ wrong type or an out-of-range value uses the default.
 | `support_email` | String | (empty) | Empty = not shown. |
 | `pro_sales_enabled` | Boolean | `false` | Paid Pro (M9). Keep false. |
 | `min_supported_version` | String | (empty) | e.g. `1.2.0`; older builds see an update message. |
+| `reader_surface` | Boolean | `false` | §18 W10: PDFs and scans open on the new page surface. Keep false until its device checks pass (W17 removes it). |
 
 The app reads the values fetched last time a moment after start (they're cached, so this
 works offline), then fetches new ones (at most once an hour; every start in dev builds) and

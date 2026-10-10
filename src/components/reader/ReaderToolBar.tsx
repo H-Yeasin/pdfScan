@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, typeScale, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
@@ -17,7 +18,10 @@ const ICONS: Record<ReaderToolId, keyof typeof Ionicons.glyphMap> = {
 };
 
 type ReaderToolBarProps = {
-  visible: Animated.Value;
+  // useReaderChrome's `progress`: 1 shown, 0 slid away.
+  visible: SharedValue<number>;
+  // §18 W10: the bar's measured height (the navigation bar inset included).
+  onHeight?: (height: number) => void;
   // services/documents/readerTools.readerTools; with none, there's no bar.
   tools: ReaderTool[];
   onPress: (id: ReaderToolId) => void;
@@ -25,7 +29,7 @@ type ReaderToolBarProps = {
 
 // §12 D2: the Reader's bottom tool bar, study first: the actions used while reading are one tap
 // away. Sharing and managing the file live in More (OverflowSheet).
-export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
+export function ReaderToolBar({ visible, onHeight, tools, onPress }: ReaderToolBarProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
@@ -36,13 +40,16 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
   // first layout it is the row plus its paddings; the bar starts shown, so that estimate is
   // never on screen.
   const [height, setHeight] = useState(0);
-  const hideBy = height || ITEM_HEIGHT + spacing.sm + bottomPadding;
+  const hideBy = height || toolBarHeight(insets.bottom);
+  const slide = useAnimatedStyle(() => ({ opacity: visible.value, transform: [{ translateY: (1 - visible.value) * hideBy }] }), [hideBy]);
   const onLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      setHeight(Math.ceil(e.nativeEvent.layout.height));
+      const measured = Math.ceil(e.nativeEvent.layout.height);
+      setHeight(measured);
+      onHeight?.(measured);
       reportHeight(e);
     },
-    [reportHeight]
+    [reportHeight, onHeight]
   );
   if (tools.length === 0) return null;
 
@@ -58,9 +65,8 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
           paddingBottom: bottomPadding,
           paddingLeft: insets.left,
           paddingRight: insets.right,
-          opacity: visible,
-          transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [hideBy, 0] }) }],
         },
+        slide,
       ]}
       pointerEvents="box-none"
       onLayout={onLayout}
@@ -84,6 +90,11 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
 }
 
 const ITEM_HEIGHT = 52;
+
+// The bar's height before it has been measured: the row, its top padding, and the inset under it.
+export function toolBarHeight(bottomInset: number): number {
+  return ITEM_HEIGHT + spacing.sm + Math.max(bottomInset, spacing.sm);
+}
 
 const styles = StyleSheet.create({
   container: {

@@ -1060,8 +1060,9 @@ As built:
   `utils/__tests__/hash.test.ts`, `components/reader/surface/__tests__/useRenderQueue.test.tsx`.
 
 ## W10 · Read-only surface behind a flag *(L)*
-Status: planned. JS only. Split point: (a) layout, gestures, render, resume; (b) chrome, fast scroll,
-pill, dark pages, live settings.
+Status: **done in code** (2026-10-10), (a) and (b) together. JS only (it runs on W7's dev build). A first
+pass on the emulator is done (see "On the emulator" below); the device check on a real phone is open, and
+the surface stays behind `reader_surface` (default off) until it passes.
 
 Goal: PDFs and scans read on the new surface: sharp, fast, dark-capable, never covered, resuming in place.
 
@@ -1091,6 +1092,86 @@ Device check:
 - the pill and the thumb: drag to page 280;
 - memory steady below 350 MB PSS over 5 minutes;
 - `[2in1]` shows single pages; `[pw]` works as an external file.
+
+As built:
+- Turn the surface on in Settings → Developer → "Page surface in the Reader" (in memory: off again
+  after a restart), or with `reader_surface` in the console.
+- **On the emulator** (API 36 `sdk_gphone64_arm64`, W7's dev build, a 30-page text PDF with one landscape
+  page in seven, imported through "Open with"), 2026-10-10:
+  - works: opens below the top bar, sharp; scroll and fling (placeholders while fast, sharp after);
+    the bars hide going forward and return going back; double tap to 2.5× with sharp tiles; reopening
+    from Home lands on the saved page with no page-1 frame; night (dark paper, red and blue keep their
+    hues, no jump); the pill; the thumb drag with its bubble; page by page + whole page, one swipe one
+    page.
+  - **found and fixed:** an opacity of 0 on the thumb's own view (the one with the gesture and the
+    adjustable role) left the **whole window undrawn**; the fade is on the grip inside it now. The
+    bubble was squeezed to nothing (an absolute child wider than its parent): it has a fixed width.
+    The pill and the thumb did not show for a scroll that stayed on its pages: a movement now reports
+    when it begins.
+  - **not checked:** a pinch (adb has no two-finger input), `[300p]`, `[2in1]`, `[pw]`, a scan, memory
+    over time, TalkBack, a real phone's speed. At night a page can show plain dark paper for a moment
+    during a fast thumb drag (its placeholder is still in the queue).
+- **The flag:** `remoteConfig` `readerSurface` (`reader_surface`, default false), `isReaderSurfaceEnabled`
+  / `useReaderSurfaceEnabled`, `setReaderSurfaceOverride` (dev). **The engine:** new
+  `services/reader/readerEngine.ts` `readerEngine({ format, nativeVersion, surface })` → `'surface' |
+  'pdf' | 'own'` (not in the plan's file list: it is what the "engine choice" test tests).
+- **`components/reader/surface/`:**
+  - `PageSurface.tsx`: the session, the cache folder (chosen once per mount; `ReaderDocumentView` keys
+    it on `pdfUri:reloadKey` like `PdfPageView`), `surfacePagesFor`, the render queue, the page layer,
+    the pill and the thumb. Handle: `goToIndex(libraryIdx)`. It holds `readerHold` while it is the
+    active screen and calls `prunePageCache` when it unmounts.
+  - `useSurfaceView.ts`: the viewport, `surfaceLayout`, the three shared values (`scale`, `tx`, `ty`),
+    `moving`, the worklet `settled()`. **The UI thread reports to React only when the pages on screen or
+    the page being read change (during a movement) and when the movement ends.** The first view is set
+    in a layout effect before the layer mounts (no page-1 frame). Any later change of layout, viewport
+    or insets re-anchors through `anchorOf` / `viewForAnchor`; paged and not zoomed in, it goes to the
+    page being read (`viewForPage`) so the page sits in its stretch. React's copy of the view
+    (`view.current`) is exact at rest and a report behind during a fling.
+  - `useSurfaceGestures.ts`: **one pan (one or two fingers, `averageTouches`) simultaneous with the
+    pinch**, not the plan's separate `pan1` / `pan2` (they differ only once Mark has tools, W15);
+    `Race` with `Exclusive(doubleTap, singleTap)`. A fling is `withDecay` inside `scrollRange`; paged,
+    `pagedSnap` (a 220 ms glide), else a decay inside the page's own stretch. A touch that stops a
+    fling without dragging settles the view and is not a tap. No long press (W13).
+  - `SurfacePageView.tsx`: paper → thumbnail (by day; placed and turned through the page's
+    `PageSpace`, so a merged scan page's sits inside its margins) → `low` → `base` → tiles. A whole-page
+    image keeps the previous one under it until it has loaded. A scan's images are turned in the view
+    (`rotate: turn`). A page outside the memory window keeps only its thumbnail and `low`.
+  - `usePdfSession.ts`: acquire / release; `sessionErrorMessage` gives `handlePdfError` pdf-jsi's
+    words, so the password prompt works unchanged (`[pw]`: `reload()` remounts with the password).
+  - `FastScroller.tsx` (the bubble is the page label; no outline section until W11), `PagePill.tsx`.
+    Both show while the pages move and for `FAST_SCROLL_HIDE_MS` after.
+  - **No `SurfaceOverlay.tsx` yet.** W10 has nothing to draw on it; W12 adds it with its first layer.
+- **Speed** is measured in React between two reports (`isFastFling`): above it only placeholders are
+  wanted. The direction of the last scroll picks the prefetch side.
+- **Chrome:** `services/reader/chromeState.ts` (`chromeAfterScroll`, a worklet: hide after
+  `CHROME_HIDE_AFTER` 24 px forward, show after `CHROME_SHOW_AFTER` 8 px back, at either end, or
+  locked; `chromeAfterTap`). `useReaderChrome(keepAwake, locked)` → `progress` (a Reanimated shared
+  value; `ReaderTopChrome` and `ReaderToolBar` slide with it and report `onHeight`), `scrolled` (the
+  worklet the surface calls), `bars`. **Locked = Find, a sheet or a tool is open, for both engines.**
+  The surface's insets are the measured bar heights (an estimate until the first layout:
+  `toolBarHeight`) plus the side safe area.
+- **Pages and numbers.** The surface counts library pages from 0; `useReaderDocument`, `lastPage` and
+  pdf-jsi count PDF pages from 1. `ReaderDocumentView` converts at the edge (`libraryIdxFor` /
+  `pdfPageFor` for a scan; index + 1 otherwise) and has `goToIdx(libraryIdx)`, which the sheets (Go to
+  page, the page strip, bookmarks, notes), a search hit and leaving Mark mode now use. On the surface the
+  top bar shows one page for a 2-in-1 document, and Bookmark, Mark and Select act on that page.
+  `lastPage` is still a PDF page, so a 2-in-1 document reopens on its sheet's left page (W19's
+  `last_position` fixes that).
+- **Known gaps until later steps:** a scan's marks and signatures are not shown on the surface (they are
+  in `document.pdf`, the surface reads the page images; W15 / W16 draw them live). Imported PDFs show
+  theirs, baked in. The Notes panel's flash does nothing on the surface (W12). Find is hidden (W12).
+- **Night:** `readingSettings.nightPalette(reading)`; `darkMatrix.DAY_PAPER`. On the surface the
+  strength control reads "Night page: Soft / Dark / Black" (`ReadingSettingsSheet` `nightPages`).
+  At night the surround is the paper's colour and a hairline in the ink's keeps pages apart.
+- **Indexer:** `services/reader/readerHold.ts` (`holdReader`, `useReaderHeld`);
+  `useImportedPdfIndexing` aborts its run with `'paused'` (the finished pages are kept) and starts again
+  when the hold ends. `BootEffects` calls `prunePageCache` after boot.
+- **Tests:** `services/reader/__tests__/{chromeState,readerEngine}.test.ts` (the engine and the hold),
+  `services/documents/__tests__/readingSettings.test.ts` (the palette), `remoteConfig.test.ts`
+  (`reader_surface`, the override), `components/reader/surface/__tests__/usePdfSession.test.ts`.
+  `BottomBar.test.tsx` mocks Reanimated (its own mock needs the native worklets module).
+- **To tune on a device:** `PAGE_FLING`, `PAGE_TURN_SHARE`, the night inks (W8, W9), `GLIDE_MS`,
+  the two chrome distances.
 
 ## W11 · Links, contents, landscape, accessibility *(M; a dev build only if orientation needs `app.json`)*
 Status: planned.

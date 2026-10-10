@@ -3,6 +3,7 @@ import { useRenderCount } from '../utils/renderCounts';
 import { MIN_SESSIONS_FOR_ADS } from '../services/ads/adPolicy';
 import { startAds } from '../services/ads/adsSdk';
 import { loadEntitlement, useIsPro } from '../services/pro/entitlement';
+import { prunePageCache } from '../services/reader/pageCache';
 import { loadRemoteConfig, useRemoteConfig } from '../services/remote/remoteConfig';
 import { initCrashReporting } from '../services/telemetry/crash';
 import { logUsage, setUsageCollection } from '../services/telemetry/usage';
@@ -68,6 +69,11 @@ export const BootEffects = memo(function BootEffects({ afterBoot }: { afterBoot:
   // until then and whenever Firebase isn't there.
   useEffect(() => {
     if (afterBoot) void loadRemoteConfig();
+  }, [afterBoot]);
+  // §18 W10: the page surface's rendered pages stay under their limit (the Reader also prunes
+  // when it closes; this catches a run that was killed with it open).
+  useEffect(() => {
+    if (afterBoot) prunePageCache();
   }, [afterBoot]);
   // Reminders as banners while the app is open (§16 G3: deferred, not at import).
   useEffect(() => {

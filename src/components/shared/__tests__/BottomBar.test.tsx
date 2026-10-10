@@ -1,4 +1,5 @@
-import { Animated, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import type { SharedValue } from 'react-native-reanimated';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RouterProvider } from '../../../navigation/router';
@@ -11,6 +12,13 @@ import { BottomBar } from '../BottomBar';
 import { Snackbar } from '../Snackbar';
 import { spacing } from '../../../theme';
 
+// §18 W10: the Reader's bars slide with Reanimated, which needs its native module (and so does
+// the package's own mock). The bar only needs a view and its style computed once.
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: { View: jest.requireActual('react-native').View },
+  useAnimatedStyle: (style: () => object) => style(),
+}));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../SignatureCaptureModal', () => ({ SignatureCaptureModal: () => null }));
 jest.mock('../SignatureModal', () => ({ SignatureModal: () => null }));
@@ -65,7 +73,7 @@ describe('bottom insets', () => {
     let root!: ReactTestRenderer;
     act(() => {
       root = create(
-        wrap(<ReaderToolBar visible={new Animated.Value(1)} tools={[{ id: 'notes', pro: false }]} onPress={() => {}} />)
+        wrap(<ReaderToolBar visible={{ value: 1 } as SharedValue<number>} tools={[{ id: 'notes', pro: false }]} onPress={() => {}} />)
       );
     });
 
