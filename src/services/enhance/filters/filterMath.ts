@@ -33,6 +33,7 @@ export const GRAYSCALE_MATRIX: ColorMatrix = [
 ];
 
 export function contrastMatrix(contrast: number): ColorMatrix {
+  'worklet';
   // Skia's ColorFilter.MakeMatrix operates on unpremultiplied 0.0-1.0 float components (clamped
   // to that range), not 0-255 - a *255 term here made the translate wildly negative for any
   // contrast > 1, clamping every pixel to black regardless of input.
@@ -48,6 +49,7 @@ export function contrastMatrix(contrast: number): ColorMatrix {
 // brightness in -1..1, scaled to a max ±0.3 additive shift in Skia's unpremultiplied 0.0-1.0
 // pixel space (same convention as contrastMatrix above).
 export function brightnessMatrix(brightness: number): ColorMatrix {
+  'worklet';
   const t = brightness * 0.3;
   return [
     1, 0, 0, 0, t,
@@ -62,6 +64,7 @@ export function brightnessMatrix(brightness: number): ColorMatrix {
 // to an already-grayscale image this is a no-op (R=G=B collapses the interpolation to identity),
 // so it's safe to compose unconditionally even when the filter is gray.
 export function saturationMatrix(saturation: number): ColorMatrix {
+  'worklet';
   const s = 1 + saturation;
   const sr = (1 - s) * LUMA_R;
   const sg = (1 - s) * LUMA_G;
@@ -77,6 +80,10 @@ export function saturationMatrix(saturation: number): ColorMatrix {
 // The brightness -> contrast -> saturation slider stack as an ordered list of matrices (applied
 // first to last), or [] when every slider is at its default so callers can skip the extra compose
 // work entirely. contrast/saturation reuse the same 0..2-multiplier convention as contrastMatrix.
+// The three are kept as three filters, never multiplied into one: Skia clamps a matrix filter's
+// output, so brightness pushed past white and then pulled back by contrast isn't the same pixel
+// as the product would give. The live slider preview (§16 G7, components/review/FilteredPreview)
+// chains the same three, from the UI thread - which is why the three functions above are worklets.
 export function adjustMatrices(adjust: AdjustValues): ColorMatrix[] {
   if (isDefaultAdjust(adjust)) return [];
   return [

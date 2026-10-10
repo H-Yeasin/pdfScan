@@ -3,7 +3,7 @@ import MlkitOcr from 'rn-mlkit-ocr';
 import PdfNative from '../../../../modules/pdf-native';
 import { makeDoc } from '../../../test/fixtures';
 import { resetStorage } from '../../../test/db';
-import { INDEX_MAX_PAGES, indexImportedPdf, masterSizeFor, needsIndexing, pdfTextToOcr } from '../importedPdfIndex';
+import { INDEX_MAX_PAGES, indexImportedPdf, masterSizeFor, needsIndexing, pdfTextToOcr, throttleProgress } from '../importedPdfIndex';
 import { getDb, searchPages } from '../../persistence/dbService';
 import { loadAll, syncLibrary } from '../../persistence/libraryRepo';
 import { MASTER_MAX_DIM, THUMB_MAX_DIM } from '../../capture/imageSpec';
@@ -185,6 +185,27 @@ describe('indexImportedPdf', () => {
     expect(result.patch.pages.map((p) => !!p.thumbUri)).toEqual([true, false, true]);
     // Its text was still read.
     expect(result.patch.pages[1].ocr?.text).toContain('Lecture page 2');
+  });
+});
+
+describe('throttleProgress (§16 G7)', () => {
+  it('sends the first report, then one per interval, and always the last', () => {
+    let at = 0;
+    const sent: number[] = [];
+    const report = throttleProgress(({ done }) => sent.push(done), 500, () => at);
+    // 300 pages at 20 ms each.
+    for (let done = 0; done <= 300; done++) {
+      at = done * 20;
+      report({ done, total: 300 });
+    }
+    expect(sent).toEqual([0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]);
+  });
+
+  it('sends the end even right after another report', () => {
+    const sent: number[] = [];
+    const report = throttleProgress(({ done }) => sent.push(done), 500, () => 1000);
+    [0, 1, 2, 3].forEach((done) => report({ done, total: 3 }));
+    expect(sent).toEqual([0, 3]);
   });
 });
 

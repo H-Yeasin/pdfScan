@@ -18,6 +18,7 @@ jest.mock('../ingest', () => ({
     rotation: 0,
     enhance: options.enhance ?? 'auto',
   })),
+  readPage: jest.fn(async () => ({})),
 }));
 
 describe('runNativeScannerPipeline', () => {
@@ -33,9 +34,9 @@ describe('runNativeScannerPipeline', () => {
     expect(DocumentScanner.scanDocument).toHaveBeenCalledWith(
       expect.objectContaining({ maxNumDocuments: 50, galleryImportAllowed: true, scannerMode: 'full' })
     );
-    expect(ingestPage).toHaveBeenCalledWith('file:///a.jpg', 'latin', { deleteSource: true, enhance: 'ink' });
-    const added = dispatch.mock.calls.find(([action]) => action.type === 'capture/BULK_ADD_PAGES')?.[0];
-    expect(added.pages.map((p: { enhance: string }) => p.enhance)).toEqual(['ink', 'ink']);
+    expect(ingestPage).toHaveBeenCalledWith('file:///a.jpg', 'latin', { deleteSource: true, enhance: 'ink', ocr: false });
+    const added = dispatch.mock.calls.flatMap(([action]) => (action.type === 'capture/ADD_PAGE' ? [action.page] : []));
+    expect(added.map((p: { enhance: string }) => p.enhance)).toEqual(['ink', 'ink']);
   });
 
   it('limits ID card scans to two pages', async () => {

@@ -11,7 +11,7 @@ export type CaptureState = {
   // A separate small field, so updating it once per page is cheap.
   progress: { done: number; total: number } | null;
   // Set by ReviewScreen's "Retake" action right before navigating to Capture. The next
-  // BULK_ADD_PAGES splices its pages in at this page's position (replacing it) instead of
+  // BULK_ADD_PAGES (or a batch's first ADD_PAGE) splices its pages in at this page's position (replacing it) instead of
   // appending, then clears the flag. Every other entry point into Capture must clear it too, so a
   // cancelled retake can't leak into an unrelated later scan and silently replace the wrong page.
   retakeTargetId: string | null;
@@ -56,8 +56,29 @@ export type CaptureAction =
   | { type: 'capture/UNSPLIT'; groupId: string; id: string }
   | { type: 'capture/CLEAR_PAGES' }
   | { type: 'capture/BULK_ADD_PAGES'; pages: SessionPage[] }
+  // §16 G7: one page of a batch, as soon as it has its master and thumbnail. `afterId` is the page
+  // the batch added before it; without it (the batch's first page), or when that page is gone,
+  // the page goes where BULK_ADD_PAGES would put it.
+  | { type: 'capture/ADD_PAGE'; page: SessionPage; afterId?: string }
   | { type: 'capture/SET_PROCESSING_STATUS'; status: ProcessingStatus; errorMessage?: string }
   | { type: 'capture/SET_PROGRESS'; progress: { done: number; total: number } | null };
+
+// New pages take a pending retake's place (replacing that page), else go to the end.
+function addPages(state: CaptureState, added: SessionPage[]): CaptureState {
+  const targetId = state.retakeTargetId;
+  const targetIndex = targetId ? state.pages.findIndex((p) => p.id === targetId) : -1;
+  if (targetIndex !== -1) {
+    const pages = state.pages.slice();
+    pages.splice(targetIndex, 1, ...added);
+    return { ...state, pages, retakeTargetId: null };
+  }
+  return {
+    ...state,
+    pages: [...state.pages, ...added],
+    retakeTargetId: null,
+    startedAt: state.pages.length === 0 && added.length > 0 ? Date.now() : state.startedAt,
+  };
+}
 
 export function captureReducer(state: CaptureState, action: CaptureAction): CaptureState {
   switch (action.type) {
@@ -176,20 +197,14 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
       return state.scannerRequested === action.requested ? state : { ...state, scannerRequested: action.requested };
     case 'capture/CLEAR_PAGES':
       return { ...state, pages: [], startedAt: null };
-    case 'capture/BULK_ADD_PAGES': {
-      const targetId = state.retakeTargetId;
-      const targetIndex = targetId ? state.pages.findIndex((p) => p.id === targetId) : -1;
-      if (targetIndex !== -1) {
-        const pages = state.pages.slice();
-        pages.splice(targetIndex, 1, ...action.pages);
-        return { ...state, pages, retakeTargetId: null };
-      }
-      return {
-        ...state,
-        pages: [...state.pages, ...action.pages],
-        retakeTargetId: null,
-        startedAt: state.pages.length === 0 && action.pages.length > 0 ? Date.now() : state.startedAt,
-      };
+    case 'capture/BULK_ADD_PAGES':
+      return addPages(state, action.pages);
+    case 'capture/ADD_PAGE': {
+      const afterIndex = action.afterId ? state.pages.findIndex((p) => p.id === action.afterId) : -1;
+      if (afterIndex === -1) return addPages(state, [action.page]);
+      const pages = state.pages.slice();
+      pages.splice(afterIndex + 1, 0, action.page);
+      return { ...state, pages };
     }
     case 'capture/SET_PROCESSING_STATUS':
       return { ...state, processingStatus: action.status, errorMessage: action.errorMessage };

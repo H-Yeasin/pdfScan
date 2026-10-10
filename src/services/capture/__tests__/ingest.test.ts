@@ -1,7 +1,8 @@
 import { File, Paths } from 'expo-file-system';
 import { downscaleAndCompressPage } from '../../enhance/enhanceService';
 import { runOcr } from '../../ocr/ocrService';
-import { ingestPage } from '../ingest';
+import { masterGeometryKey } from '../geometryKey';
+import { ingestPage, readPage } from '../ingest';
 
 jest.mock('../../enhance/enhanceService', () => ({
   downscaleAndCompressPage: jest.fn(async (uri: string, maxDim: number) => ({
@@ -27,7 +28,20 @@ describe('ingestPage', () => {
       rotation: 0,
       enhance: 'auto',
       ocr: { text: 'Lab report', blocks: [] },
+      ocrGeometry: 'file:///gallery/IMG_1.HEIC.2400.jpg|2400x1800|0|latin',
     });
+  });
+
+  it('with ocr: false makes the master and thumbnail only; readPage does the rest later', async () => {
+    jest.mocked(runOcr).mockClear();
+    const page = await ingestPage('file:///scan/2.jpg', 'latin', { ocr: false });
+    expect(runOcr).not.toHaveBeenCalled();
+    expect(page.ocr).toBeUndefined();
+    expect(page.ocrGeometry).toBeUndefined();
+
+    const read = await readPage(page, 'latin');
+    expect(read.ocr).toEqual({ text: 'Lab report', blocks: [] });
+    expect(read.ocrGeometry).toBe(masterGeometryKey(page, 'latin'));
   });
 
   it("starts the page with the capture mode's default filter", async () => {

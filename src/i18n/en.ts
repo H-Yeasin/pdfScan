@@ -384,6 +384,7 @@ export const en = {
     checkCropStep: 'Check crop · {count} left',
     keepAsIs: 'Keep as is',
     mergeStep: 'Page {current} of {total}',
+    readingText: 'Reading text…',
     idCardUpdating: 'Updating ID card…',
     idCardInfo: 'ID card · prints at real size',
     idCardInfoLarge: 'ID card · enlarged to fill the page',

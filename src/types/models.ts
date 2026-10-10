@@ -80,6 +80,11 @@ export type SessionPage = {
   stats?: ImageStats;
   err?: boolean;
   ocr?: PageOcr;
+  // §16 G7: what `ocr` was read from (capture/geometryKey.ts): the image, its size and turn, the
+  // script. Deliver reads a page again only when this no longer describes it.
+  ocrGeometry?: string;
+  // §16 G7: the page is in Review already and its text is still being read (ingestBatch).
+  ocrPending?: boolean;
   // Set on both halves of a Book-mode spread split (C3): the original spread's master, so Review
   // can "Undo split" without re-encoding anything. Halves of one spread share `groupId`.
   splitFrom?: { groupId: string; uri: string; thumbUri?: string; width: number; height: number };

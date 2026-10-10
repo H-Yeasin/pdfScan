@@ -57,7 +57,7 @@ export async function recomposeIdCard(
 ): Promise<Partial<SessionPage>> {
   const card = await composeIdCardPage(next.front, next.back, script, page.enhance, next.size);
   cleanTemporaryCache(filesOf(page));
-  return { uri: card.uri, thumbUri: card.thumbUri, width: card.width, height: card.height, ocr: card.ocr, idCard: card.idCard };
+  return { uri: card.uri, thumbUri: card.thumbUri, width: card.width, height: card.height, ocr: card.ocr, ocrGeometry: card.ocrGeometry, idCard: card.idCard };
 }
 
 // "Retake back": one scanner page, ingested like any other capture (master spec, no OCR - the

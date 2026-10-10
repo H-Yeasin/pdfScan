@@ -7,7 +7,7 @@
 // already calls takePersistableUriPermission natively, so the granted tree URI survives restarts
 // with no extra JS-side bookkeeping.
 import { File, FileMode } from 'expo-file-system';
-import { EncodingType, readAsStringAsync, StorageAccessFramework } from 'expo-file-system/legacy';
+import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { annotatedPdfFor } from '../annotations/exportPdf';
 import { isPageRasterFormat } from '../documents/formatCapabilities';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
@@ -30,6 +30,9 @@ export function deriveFolderLabel(treeUri: string): string {
   }
 }
 
+// §16 G7: one file into the folder, streamed (saveFileToFolder). It used to be read whole into a
+// base64 string and handed back to the native side as one: three copies of a 40 MB PDF in the JS
+// heap at once, with the screen frozen while it was encoded.
 async function writeFileToTree(
   treeUri: string,
   fileNameWithoutExtension: string,
@@ -37,9 +40,10 @@ async function writeFileToTree(
   sourceUri: string
 ): Promise<boolean> {
   try {
-    const base64 = await readAsStringAsync(sourceUri, { encoding: EncodingType.Base64 });
-    const destUri = await StorageAccessFramework.createFileAsync(treeUri, fileNameWithoutExtension, mimeType);
-    await StorageAccessFramework.writeAsStringAsync(destUri, base64, { encoding: EncodingType.Base64 });
+    const source = new File(sourceUri);
+    // Before the copy makes its (empty) file in the user's folder.
+    if (!source.exists) throw new Error('the file is missing');
+    await saveFileToFolder(treeUri, fileNameWithoutExtension, mimeType, source);
     return true;
   } catch (error) {
     console.warn('deviceExportService: failed to export', fileNameWithoutExtension, error);
@@ -79,9 +83,9 @@ export async function exportCopyToDeviceFolder(treeUri: string, doc: LibraryDocu
   return { ok, failed };
 }
 
-// §8 B3: copies a big file (a backup zip) into the folder in 1 MB chunks. writeFileToTree reads the
-// whole file into one base64 string, which a backup of a few hundred MB would run out of memory
-// on. The SAF document is created through the legacy API (it takes a name without extension and
+// §8 B3: copies a file into the folder in 1 MB chunks, never holding more than one chunk - a
+// backup zip of a few hundred MB, and since §16 G7 every document copied to a device folder. The
+// SAF document is created through the legacy API (it takes a name without extension and
 // adds one from the mime type) and then written through the new API's file handle, which opens
 // SAF content:// documents for writing (write-only: they can't seek). A failed or cancelled copy
 // deletes the half-written file. Throws, unlike exportCopyToDeviceFolder: a backup that didn't

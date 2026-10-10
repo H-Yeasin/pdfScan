@@ -340,7 +340,7 @@ reports respect the opt-in.
 - [x] G4 Boot waterfall: embedded fonts, early DB and settings, `loadAll` without word boxes (loaded on demand), WAL, native layout backfill (done in code; schema v17; needs a new dev build; Verification 4–5 on a device are open)
 - [x] G5 Re-render hygiene: memo'd layers, `BootEffects`, UI fields out of `library` (the `libraryUi` slice), reducer identity (done in code; Verification 6 on a device is open)
 - [x] G6 FlashList + `expo-image`, thumbnails never fall back to masters (done in code; needs a new dev build; the thumbnail strip stays a ScrollView; Verification 7 on a device is open)
-- [ ] G7 Heavy work off the hot path (Review sliders, progressive ingest, OCR reuse, indexing writes)
+- [x] G7 Heavy work off the hot path (Review sliders, progressive ingest, OCR reuse, indexing writes) (done in code; JS only; pdf-lib still holds page bytes until save; Verification 8 on a device is open)
 - [ ] G8 Release build: R8 + resource shrinking, React Compiler trial (new dev build)
 - [ ] G9 Measure and record (`docs/qa/performance.md`)
 

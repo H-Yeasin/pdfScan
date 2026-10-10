@@ -1,13 +1,11 @@
 import { captureReducer, initialCaptureState } from '../../../store/slices/captureSlice';
 import type { SessionPage } from '../../../types/models';
 import { splitSpread } from '../../enhance/splitSpread';
-import { runOcr } from '../../ocr/ocrService';
 import { getCaptureModeSpec } from '../captureModes';
 import { ingestPage, pageFromMaster } from '../ingest';
 import { ingestOne } from '../ingestBatch';
 
 jest.mock('../../enhance/splitSpread', () => ({ splitSpread: jest.fn() }));
-jest.mock('../../ocr/ocrService', () => ({ runOcr: jest.fn(async (uri: string) => ({ text: `ocr:${uri}`, blocks: [] })) }));
 jest.mock('../ingest', () => ({
   ingestPage: jest.fn(async (uri: string, _s: string, o: { enhance?: string; ocr?: boolean }) => ({
     id: `p_${uri}`,
@@ -17,7 +15,6 @@ jest.mock('../ingest', () => ({
     height: 2000,
     rotation: 0,
     enhance: o.enhance ?? 'auto',
-    ocr: o.ocr === false ? undefined : { text: 'whole', blocks: [] },
   })),
   pageFromMaster: jest.fn(async (m: { uri: string; width: number; height: number }, _s: string, o: { enhance?: string }) => ({
     id: `p_${m.uri}`,
@@ -27,7 +24,6 @@ jest.mock('../ingest', () => ({
     height: m.height,
     rotation: 0,
     enhance: o.enhance ?? 'auto',
-    ocr: { text: `ocr:${m.uri}`, blocks: [] },
   })),
 }));
 
@@ -36,7 +32,7 @@ const book = { script: 'latin' as const, spec: getCaptureModeSpec('book'), ownsI
 beforeEach(() => jest.clearAllMocks());
 
 describe('Book mode ingest', () => {
-  it('splits a spread into left then right, OCRs each half and not the spread', async () => {
+  it('splits a spread into left then right, with no text read yet (the batch reads the halves)', async () => {
     jest.mocked(splitSpread).mockResolvedValue([
       { uri: 'left.jpg', width: 1410, height: 2000 },
       { uri: 'right.jpg', width: 1590, height: 2000 },
@@ -46,21 +42,21 @@ describe('Book mode ingest', () => {
 
     expect(ingestPage).toHaveBeenCalledWith('spread.jpg', 'latin', { deleteSource: true, enhance: 'auto', ocr: false });
     expect(splitSpread).toHaveBeenCalledWith('spread.jpg.master');
-    expect(pages.map((p) => [p.uri, p.ocr?.text])).toEqual([
-      ['left.jpg', 'ocr:left.jpg'],
-      ['right.jpg', 'ocr:right.jpg'],
+    expect(pages.map((p) => p.uri)).toEqual(['left.jpg', 'right.jpg']);
+    expect(jest.mocked(pageFromMaster).mock.calls.map(([, , o]) => o)).toEqual([
+      { enhance: 'auto', ocr: false },
+      { enhance: 'auto', ocr: false },
     ]);
     expect(pages[0].splitFrom).toEqual(pages[1].splitFrom);
     expect(pages[0].splitFrom).toMatchObject({ uri: 'spread.jpg.master', width: 3000, height: 2000 });
-    expect(runOcr).not.toHaveBeenCalled();
   });
 
-  it('keeps a portrait capture as one OCR\'d page', async () => {
+  it('keeps a portrait capture as one page', async () => {
     jest.mocked(splitSpread).mockResolvedValue(null);
     const pages = await ingestOne('portrait.jpg', book);
     expect(pages).toHaveLength(1);
     expect(pages[0].splitFrom).toBeUndefined();
-    expect(pages[0].ocr?.text).toBe('ocr:portrait.jpg.master');
+    expect(pages[0].uri).toBe('portrait.jpg.master');
   });
 
   it('keeps the whole spread if splitting fails', async () => {
