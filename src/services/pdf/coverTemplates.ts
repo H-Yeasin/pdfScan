@@ -1,5 +1,5 @@
 import { formatDate, getDocumentLocale, tDoc, type TKey } from '../../i18n';
-import { measureText, type MeasureText } from './visibleText';
+import type { MeasureText } from './visibleText';
 import type { Course, DocType, PageOcr, StudentProfile } from '../../types/models';
 
 // Cover page templates (§4 S4). layoutCover turns a template and its values into positioned items
@@ -209,7 +209,14 @@ export type CoverItem =
   | { kind: 'image'; uri: string; x: number; y: number; width: number; height: number };
 
 export type { MeasureText } from './visibleText';
-export { helveticaWidth } from './visibleText';
+
+// §16 G3: visibleText (pdf-lib and Helvetica's metrics) loads with the first layout, not with this
+// file: the template list is read at boot (submit presets load with the store), layouts aren't.
+function visibleText(): typeof import('./visibleText') {
+  return require('./visibleText') as typeof import('./visibleText');
+}
+const measureText: MeasureText = (text, size, bold) => visibleText().measureText(text, size, bold);
+export const helveticaWidth: MeasureText = (text, size, bold) => visibleText().helveticaWidth(text, size, bold);
 
 // A field's text as one line of words: any script is drawn as typed since §6 L3 (it used to turn
 // what Helvetica couldn't draw into '?').

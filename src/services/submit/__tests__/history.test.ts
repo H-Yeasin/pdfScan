@@ -26,7 +26,6 @@ function doc(): LibraryDocument {
     createdAt: 1,
     star: false,
     locked: false,
-    searchHaystack: '',
     courseId: 'cse',
     docType: 'assignment',
   } as LibraryDocument;

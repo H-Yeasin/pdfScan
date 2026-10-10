@@ -43,7 +43,6 @@ function doc(overrides: Partial<LibraryDocument> = {}): LibraryDocument {
     star: false,
     tag: 'HW',
     locked: false,
-    searchHaystack: '',
     courseId: 'course_cse',
     docType: 'assignment',
     ...overrides,

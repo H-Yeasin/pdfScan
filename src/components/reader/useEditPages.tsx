@@ -13,8 +13,9 @@ import { t } from '../../i18n';
 
 // §7 R3: "Edit pages" for the document open in the Reader - the editor, the document picker for
 // "Add pages from another document", and what each of their actions does. `onChanged` runs after
-// the document's PDF was rewritten (the viewer reloads it). Render `overlays` once.
-export function useEditPages(doc: LibraryDocument | undefined, onChanged: () => void) {
+// the document's PDF was rewritten, with the document before and after (the viewer reloads it on
+// the page being read, §18 W5). Render `overlays` once.
+export function useEditPages(doc: LibraryDocument | undefined, onChanged: (before: LibraryDocument, after: LibraryDocument) => void) {
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library');
   const { go } = useRouter();
@@ -60,7 +61,7 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: () => 
         const saved = await savePageEdit(doc, edit, annotationsOf(doc.id));
         // A removed page's bookmarks and annotations go with it (library/UPDATE_FILE).
         dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: saved });
-        onChanged();
+        onChanged(doc, saved);
         setOpen(false);
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.edit.saved') });
       });
@@ -105,7 +106,7 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: () => 
       run(async () => {
         const appended = await appendDocuments(doc, [source], annotationsOf(doc.id));
         dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: appended });
-        onChanged();
+        onChanged(doc, appended);
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.edit.added', { count: appended.pages.length - doc.pages.length }) });
       });
     },

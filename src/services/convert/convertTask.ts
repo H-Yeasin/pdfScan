@@ -4,8 +4,8 @@ import { canConvertToPdf } from '../documents/formatCapabilities';
 import { registerProTaskRunner, type ProTaskParams } from '../pro/proTask';
 import { resolveOcrScript } from '../scripts/registry';
 import type { AppState } from '../../store/appReducer';
-import { convertToWord, type WordSource } from './toDocx';
-import { convertToPdf, type ConvertSource } from './toPdf';
+import type { WordSource } from './toDocx';
+import type { ConvertSource } from './toPdf';
 
 // §12 D5: Office → PDF as a Pro task (D1). The Reader runs it with its own progress
 // (components/reader/useConvertToPdf); if Android kills the app during the ad, the task is
@@ -26,10 +26,12 @@ export function sourceFromParams(params: ProTaskParams): ConvertSource | null {
 }
 
 // Imported at start by components/pro/ProTaskResumeHost, so the runner is there before a pending
-// task is looked at.
+// task is looked at. The converters themselves (libraryOperations and pdf-lib with them) are
+// required when a task runs, not at start (§16 G3).
 registerProTaskRunner(OFFICE_TO_PDF_KIND, async (task, { store }) => {
   const source = sourceFromParams(task.params);
   if (!source) return;
+  const { convertToPdf } = require('./toPdf') as typeof import('./toPdf');
   const doc = await convertToPdf(source);
   store.dispatch({ type: 'library/ADD_FILE', file: doc });
   store.dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.convert.doneInLibrary', { name: doc.name }) });
@@ -69,6 +71,7 @@ registerProTaskRunner(PDF_TO_WORD_KIND, async (task, { store }) => {
   const target = wordTargetFromParams(task.params);
   const source = target && wordSourceFor(target, store.getState());
   if (!source) return;
+  const { convertToWord } = require('./toDocx') as typeof import('./toDocx');
   const doc = await convertToWord(source);
   store.dispatch({ type: 'library/ADD_FILE', file: doc });
   store.dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.word.doneInLibrary', { name: doc.name }) });

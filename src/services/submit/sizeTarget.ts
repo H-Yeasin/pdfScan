@@ -1,12 +1,12 @@
-import { formatNumber, t } from '../../i18n';
+import { t } from '../../i18n';
 import { File } from 'expo-file-system';
 import { SIZE_LADDER } from '../capture/imageSpec';
 import { encodedBytes } from '../enhance/skiaEnhance';
 import { buildPdfFromPages, type AcademicConfig, type BuildPdfOptions, type LayoutMode, type PageSizeId, type PdfSourcePage } from '../pdf/pdfService';
+import { formatLimit, MB } from './sizeFormat';
 
-// Upload forms count a megabyte as 1,000,000 bytes, so the limits here do too (unlike
-// utils/format.formatBytes, which divides by 1024 for storage sizes).
-export const MB = 1_000_000;
+// MB and formatLimit live in sizeFormat.ts, which loads at boot without pdf-lib (§16 G3).
+export { formatLimit, MB } from './sizeFormat';
 
 // What a scan PDF adds on top of its page images: fonts, structure, the cover page and footer
 // text (about 4 KB measured), and per page the page objects plus the invisible OCR text (0.3 to
@@ -100,13 +100,6 @@ export async function buildUnderLimit(
     if (ok || builds >= MAX_BUILDS || level >= lowestLevel) return { ...file, level, fits: ok, builds };
     level += 1;
   }
-}
-
-// "2 MB", "1.5 MB", "800 KB": a limit or a result, in the units the limit was given in.
-// Rounded up, so a file just over a 2 MB limit reads "2.01 MB", never "2 MB".
-export function formatLimit(bytes: number): string {
-  if (bytes < MB) return t('common.bytes.kb', { size: formatNumber(Math.ceil(bytes / 1000)) });
-  return t('common.bytes.mb', { size: formatNumber(Math.ceil((bytes / MB) * 100) / 100) });
 }
 
 // Shown after a save that couldn't get under the limit; the file is still saved.

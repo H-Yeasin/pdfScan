@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { backfillPdfInfo } from '../services/documents/pdfInfoBackfill';
 import { getDb, withWriteLock } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
@@ -7,6 +6,8 @@ import { t } from '../i18n';
 
 // Loads the library from SQLite, then mirrors every later change to state.library.files/courses/
 // semesters back to disk as a diff (only rows whose object identity changed are written).
+// §16 G4: the database is already opening when this mounts (dbService.warmDb, from App.tsx), and
+// the load reads no word boxes (libraryRepo.loadAll); nothing here opens a document's files.
 //
 // Data-loss guard: persistence only starts after a *successful* load. If the load fails, status
 // becomes 'failed', the Library shows an error with Retry, and nothing is written - so a read
@@ -50,14 +51,6 @@ export function useLibraryPersistence(): boolean {
         dispatch({ type: 'library/SET_ANNOTATIONS', annotations: stored.annotations ?? [] });
         dispatch({ type: 'library/SET_BOOKMARKS', bookmarks: stored.bookmarks ?? [] });
         dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' });
-        // §5 T1: record the PDF layout of documents built before it was stored. In the
-        // background, one document at a time; each result is saved like any other change.
-        backfillPdfInfo(stored.documents)
-          .then((patches) => {
-            if (cancelled) return;
-            for (const { id, patch } of patches) dispatch({ type: 'library/UPDATE_FILE', id, patch });
-          })
-          .catch((error) => console.warn('PDF layout backfill failed', error));
       })
       .catch((error) => {
         if (cancelled) return;

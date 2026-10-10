@@ -17,6 +17,8 @@ export function useReaderChrome(keepAwake: boolean) {
   }, [shown, visible]);
 
   const toggle = useCallback(() => setShown((v) => !v), []);
+  // §18 W2: Find lives in the top bar, so opening it brings the bars back.
+  const show = useCallback(() => setShown(true), []);
 
   const onPage = useCallback((page: number) => {
     if (lastPage.current !== null && page < lastPage.current) setShown(true);
@@ -39,5 +41,5 @@ export function useReaderChrome(keepAwake: boolean) {
     };
   }, [keepAwake]);
 
-  return { visible, shown, toggle, onPage, reset };
+  return { visible, shown, toggle, show, onPage, reset };
 }

@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
+import * as SQLite from 'expo-sqlite';
 import { resetStorage } from '../../../test/db';
 import { __resetDbForTests, getDb } from '../dbService';
 import { convertLegacyIndex, LEGACY_BACKUP_KEY, LEGACY_INDEX_KEY, migrateLibraryIndex } from '../legacyLibrary';
-import { loadAll } from '../libraryRepo';
+import { loadAll, loadPageOcr } from '../libraryRepo';
+import { getMeta, META_LEGACY_IMPORT_DONE } from '../meta';
+import { searchDocuments } from '../../search/searchService';
 
 beforeEach(resetStorage);
 
@@ -44,8 +47,12 @@ describe('legacy AsyncStorage import', () => {
     expect(documents).toHaveLength(1);
     expect(documents[0]).toMatchObject({ id: 'd1', star: true, courseId: undefined });
     expect(documents[0].pages[0].ocr?.text).toBe('photosynthesis notes');
-    expect(documents[0].pages[0].ocr?.blocks).toHaveLength(1);
-    expect(documents[0].searchHaystack).toBe('doc d1 photosynthesis notes');
+    // §16 G4: the boxes were imported, and stay in the database until asked for.
+    expect(documents[0].pages[0].ocr).toEqual({ text: 'photosynthesis notes', blocks: [], blocksRow: 'd1_p1' });
+    expect((await loadPageOcr(await getDb(), documents[0].pages))[0].ocr?.blocks).toHaveLength(1);
+    // The blob's stored search text is dropped; search derives its own (searchService).
+    expect(documents[0]).not.toHaveProperty('searchHaystack');
+    expect(searchDocuments(documents, 'photosynthesis')).toHaveLength(1);
     expect(await AsyncStorage.getItem(LEGACY_INDEX_KEY)).toBeNull();
     expect(await AsyncStorage.getItem(LEGACY_BACKUP_KEY)).toBe(blob);
   });
@@ -75,6 +82,32 @@ describe('legacy AsyncStorage import', () => {
     await AsyncStorage.setItem(LEGACY_INDEX_KEY, blob);
     __resetDbForTests();
 
+    const { documents } = await loadAll(await getDb());
+    expect(documents).toHaveLength(1);
+  });
+
+  // §16 G4: the database remembers that the import is over, so a launch doesn't read AsyncStorage.
+  it('checks AsyncStorage once per database, whether or not there was anything to import', async () => {
+    // The AsyncStorage mock's getItem is a jest.fn already, with the earlier tests' calls on it.
+    const reads = AsyncStorage.getItem as jest.Mock;
+    reads.mockClear();
+    const db = await getDb();
+    expect(reads.mock.calls.filter(([key]) => key === LEGACY_INDEX_KEY)).toHaveLength(1);
+    expect(await getMeta(db, META_LEGACY_IMPORT_DONE)).toBe('1');
+
+    // The next launch: the same database, a new connection.
+    reads.mockClear();
+    __resetDbForTests();
+    await getDb();
+    expect(reads).not.toHaveBeenCalled();
+  });
+
+  it('tries again next launch when the import failed', async () => {
+    await AsyncStorage.setItem(LEGACY_INDEX_KEY, '{not json');
+    await expect(getDb()).rejects.toThrow();
+    expect(await getMeta(await SQLite.openDatabaseAsync('pdfscan.db'), META_LEGACY_IMPORT_DONE)).toBeNull();
+
+    await AsyncStorage.setItem(LEGACY_INDEX_KEY, JSON.stringify({ version: 1, documents: [legacyDoc('d1')] }));
     const { documents } = await loadAll(await getDb());
     expect(documents).toHaveLength(1);
   });

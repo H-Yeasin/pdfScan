@@ -1,4 +1,5 @@
 import { Directory, File } from 'expo-file-system';
+import { moveReplacing } from '../files/atomicWrite';
 import { buildPdfFromPages, decoratePdf, inspectPdf, pageDimensions, toSourcePage, type AcademicConfig, type PageSizeId } from '../pdf/pdfService';
 import { renderCoverPageImage } from '../pdf/academicRasterService';
 import { extractPages, loadPdf, savePdf } from '../pdf/pdfOps';
@@ -8,7 +9,6 @@ import { pdfPageCount } from '../documents/pageMap';
 import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { MASTER_MAX_DIM, THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
-import { buildSearchHaystack } from '../search/searchService';
 import { cleanTemporaryCache, getDocumentDir } from './libraryFiles';
 import { copyPageInto, pageFiles } from './libraryOperations';
 import type { Annotation, Bookmark, LibraryDocument, LibraryPage } from '../../types/models';
@@ -78,7 +78,6 @@ export async function addCoverToDocument(input: AddCoverInput): Promise<AddCover
       coverKind: cover.mode,
       pdfLayout: built.pdfLayout,
       pdfPageSize: built.pdfPageSize,
-      searchHaystack: buildSearchHaystack(name, built.pages),
     } satisfies Partial<LibraryDocument>;
 
     if (mode === 'copy') {
@@ -140,8 +139,7 @@ function pdfDest(mode: AddCoverInput['mode'], dir: Directory, written: string[])
 
 function moveIntoPlace(temp: File, dir: Directory): string {
   const dest = new File(dir, 'document.pdf');
-  if (dest.exists) dest.delete();
-  temp.moveSync(dest);
+  moveReplacing(temp, dest);
   return dest.uri;
 }
 

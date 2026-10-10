@@ -530,7 +530,35 @@ type ViewerProps = { uri: string; night: boolean; insets: ContentInsets; onTap()
 ---
 
 ## W1 · Sign on the right page *(S)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: the device check below.
+
+As built:
+- `services/signature/signaturePlacement.ts`: `signatureDraw(doc, libraryIdx, placement)` as planned
+  (`pdfRectFor` gives the box; `boxMatrix` on that box gives the corner pdf-lib draws from; `rotate` is
+  pdf-lib's counter-clockwise angle, so a column turned 90° draws at 270). The `SignatureDraw` type
+  lives in `pdf/pdfService.ts`, next to `applySignatureToPdf(documentId, pdfUri, signatureUri, draw)`,
+  so `pdfService` still doesn't import the page map.
+- **Beyond the plan: Sign asks which page on a 2-in-1 sheet.** `libraryIdxFor(doc, activeIndex + 1)`
+  is always the left column, so the right one (this step's device check) couldn't be reached. New
+  `signTargets(doc, pdfPage)` lists the library pages on the PDF page on screen; with two, the Reader
+  shows an Alert ("Sign which page?", "Page 2" / "Page 3"; `reader.signWhichPage`, `reader.signPage`).
+  `signIdx` is therefore state, set when signing starts (`startSigning`), not a value derived on every
+  render. W16 removes the question (the surface shows single pages).
+- `signTargets` doesn't clamp: a PDF page with no library page (an imported PDF whose pages aren't all
+  listed yet) gives `[]` and Sign does nothing, instead of signing the nearest page.
+- `applySignatureToDocument`'s `pageIndex` is now a library page for every caller. PDF-level documents
+  still go through `pdfOps.stampImage` (1:1). The Library's call (page 1 = library page 0) didn't
+  change; it now lands in the left column of a 2-in-1 sheet instead of across the sheet.
+- Paper size comes from `doc.pdfPageSize` (through `pdfRectFor`), no longer from the PDF page itself.
+  `'fullPage'` pages are therefore right on Letter too (the old code scaled them to the sheet's width).
+- A turned **standard** page: the signature is drawn in the page's own space and `/Rotate` turns it
+  with the page, so it stays where it was put on the master (the overlay shows the unturned master).
+- The fresh drawing (view-shot's temporary PNG) is deleted with `cleanTemporaryCache` once
+  `saveSignatureForReuse` has copied it, in the Reader and the Library. Review's flow is untouched.
+- Tests (`signature/__tests__/signaturePlacement.test.ts`): each case builds a real PDF with
+  `buildPdfFromPages`, signs it, and reads the image matrices back with pdf.js. The signature's corners
+  must be the placement's corners on the page's own picture, so the check doesn't go through
+  `pdfRectFor`. Also: 180° and 270° columns, Letter, a turned standard page, `signTargets`.
 
 Goal: a signature lands on the library page on screen (also on 2-in-1, cover and turned pages), and the
 saved signature survives.
@@ -558,11 +586,25 @@ Tests: `signaturePlacement.test.ts` covers standard, template cover, imported-im
 left/right, a turned 90° column and `fullPage`. With the file-system mock: the signature input still
 exists after `applySignatureToPdf`.
 
-Device check: on `[2in1]`, sign page 3 (the right column of sheet 2); the shared PDF has it there.
-Sign again with the saved signature: it works.
+Device check: on `[2in1]`, sign page 3 (the right column of sheet 2; Sign asks "Sign which page?",
+choose "Page 3"); the shared PDF has it there. Sign again with the saved signature: it works.
 
 ## W2 · Find and chrome hygiene *(S)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: the device check below.
+
+As built:
+- `services/reader/findRunner.ts`: `createFindRunner(search)` → `{ run(query), close() }`. `run` resolves
+  to the results, or `null` when a newer run or a `close()` overtook it; a failed search rejects only
+  while it is still the newest.
+- `useReaderFind` owns one runner. It retires the search in flight on every query change, on `close()`,
+  when another document opens and on unmount. It returns `toggle` and `close` instead of `setOpen`;
+  `close()` clears the query, results, local match count and target page, and Android back uses it.
+- `highlightRects` is `undefined` when there are no results; the results state shares one empty list.
+- `ReaderScreen`: the viewers get `onViewerTap`, which does nothing while Find is open. Opening Find also
+  shows the bars (`useReaderChrome.show`): a search result can open Find on a Reader that §16 G2 kept
+  mounted with its bars hidden.
+- Both bars measure themselves with `onLayout` and slide by that height. Before the first layout they
+  use an estimate (the bars start shown, so it is never on screen).
 
 Goal: Find never shows a stale result or leaves highlights behind, and the bars behave.
 
@@ -585,7 +627,36 @@ Device check: on `[300p]` type fast: the final count wins. Close Find: no highli
 the bar stays. Find works on `[jpg]`. With 3-button navigation the bottom bar hides fully.
 
 ## W3 · Safe writes, preview preparation, external page count *(S)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: the device check below.
+
+As built:
+- `services/files/atomicWrite.ts`: `writeFileReplacing(dest, bytes)` and `moveReplacing(src, dest)`, both
+  synchronous. The temporary file is `.<name>.tmp-<id>` next to `dest`; `interruptedWriteTarget(name)`
+  reads the name back. `moveReplacing` first moves `src` under that name (from the cache this is the
+  copy across volumes, done while the old file is still there), then swaps.
+- If the **last** move fails, the temporary file is kept on purpose: it is then the only copy, and the
+  integrity check puts it in place. The error is still thrown.
+- The six sites use it: `pdfAnnotations.updatePdfAnnotations`, `pdfOps.savePdf`,
+  `pdfService.buildPdfFromPages` and `applySignatureToPdf`, `addCover.moveIntoPlace`,
+  `libraryOperations.compressImportedPdf`. **Not changed** (files that can be made again, not in this
+  step's list): `study/buildExamPack.ts:80`, `study/textExport.ts:11`, `documents/importedPdfIndex.ts:114`.
+- `storage/integrity.ts` `recoverInterruptedWrites()`: for each document folder in `library/` (top level
+  only), a temporary file with no `<name>` beside it is moved into place; one with `<name>` there is
+  deleted. `store/useStorageIntegrity` runs it before `findOrphans`, so the document isn't flagged as
+  missing files. It runs once per launch, in the background: a Reader opened on that document before the
+  check has reached it still says "Some files are missing" until it is opened again.
+- `pdfService.ensureDocumentPdfOnce(doc)`: one promise per document id while a build runs; removed when
+  it settles, so Retry starts a new build.
+- `useReaderDocument`: the backfill effect is keyed on the document's **id** (it used to start again on
+  every `doc` change), returns `previewFailed` and `retryPreview`. The Reader shows "Couldn't prepare the
+  preview." with Retry and Back (`reader.previewFailed`, `reader.retry`).
+- `externalFileService.importExternalFile`: `pdfNative.getPageCount`; any failure (ENCRYPTED, a damaged
+  file, a build without the module) gives `pageCount: undefined`. The file no longer imports pdf-lib or
+  `react-native-get-random-values`.
+- Test mock: `File.parentDirectory` in `test/mocks/expoFileSystem.ts`.
+- Tests: `files/__tests__/atomicWrite.test.ts`, `files/__tests__/externalFileService.test.ts` (pdf-lib is
+  mocked to throw if it loads), `pdf/__tests__/ensureDocumentPdf.test.ts`, and
+  `recoverInterruptedWrites` in `storage/__tests__/integrity.test.ts`.
 
 Goal: no write can lose a document, preparing a preview can't hang, and opening an outside PDF is fast.
 
@@ -611,7 +682,28 @@ without a PDF shows "Preparing preview", then the document or "Couldn't prepare 
 fast.
 
 ## W4 · Non-PDF quick fixes *(S)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: the device check below.
+
+As built:
+- **`SheetView`:** `sheetRowHeight(zoom)` and `sheetLineHeight(zoom)` (whole points). The row sets its
+  height and the cells' text has the line height, so `getItemLayout` is exact; `onScrollToIndexFailed` is
+  gone (it can't fail with `getItemLayout`). Rows are 31 pt at zoom 1 (they were about 30).
+- **`TxtView`:** a failed `scrollToIndex` scrolls to `averageItemLength × index`, then tries again after
+  80 ms, up to 3 times per Find jump; the timer is cleared on a new query and on unmount.
+- **`txtService`:** `readTextPrefix(uri, maxBytes = TXT_MAX_BYTES)` → `{ text, fallbackUsed, truncated }`
+  and `utf8Boundary(bytes, max)`. A file under the cap is read as before. The Latin-1 fallback now
+  decodes in 8 KB pieces instead of one `+=` per byte. `readTextWithEncodingFallback` (the editor, the
+  converters, CSV preview) still reads the whole file.
+- The banner is `reader.firstBytes` ("Showing the first 4 MB."), above the list like the not-UTF-8 one.
+  **Both banners sit under the top bar until it is hidden** (TXT has no top inset yet; W19/W20).
+- `promoteExternalToLibrary` uses the prefix for TXT **and CSV** search text.
+- **DOCX:** `docxPageHtml(..., { padTop })` adds to the body's 20 px; only a number reaches the CSS. The
+  Reader passes `insets.top + ROW_HEIGHT` (44, exported from `ReaderTopChrome`); a second title line
+  ("Submitted…") isn't counted. `DOCX_TAP_SCRIPT` goes in through `injectedJavaScript` (the page's CSP
+  blocks its own scripts); it skips taps on links and taps that end a text selection.
+  `isDocxTapMessage` accepts exactly `'tap'`. The WebView's security comment is updated.
+- Tests: `sheetRowHeight` in `components/reader/__tests__/sheetZoom.test.ts`, new
+  `documents/__tests__/txtService.test.ts`, padding and the message filter in `docxService.test.ts`.
 
 Goal: the worst DOCX, sheet and TXT problems are fixed before their full rework (W19–W22).
 
@@ -633,7 +725,40 @@ Device check: `[csv50k]` Find jumps to row 40,000. `[txt12]` opens with the bann
 heading sits below the bar, and a tap toggles the bars.
 
 ## W5 · Position robustness *(S)*
-Status: planned. JS only. Needs §16 G2 (`useScreenRole`).
+Status: done in code (2026-10-10). JS only. Open: the device check below.
+
+As built:
+- **Roles** (`useReaderDocument`, `readerPosition.heldSubject`): only the active Reader follows
+  `reader.readerId` / `reader.external`. A hidden or outgoing one keeps the document it had when it
+  was last active: it loads nothing new, saves nothing, and takes no search target. **Different from
+  the plan:** it is not blanked. Since G2 it is the same mounted instance, so there is nothing to
+  reload, and an empty view would show a blank page during the slide and lose the page and zoom after
+  a detour to Pro. Only a Reader that has never been active is inert (`inert` → an empty view).
+- **Saving `lastPage`:** only while active and after the viewer has reported (`restored`). The pending
+  save is written at once when the Reader stops being active, shows another document, or unmounts.
+- **Opening page:** `openingPage(lastPage, targetPage)` replaces `resumePage`. It goes to
+  `PdfPageView`'s `initialPage` on the first mount (the search hit's or bookmark's page wins), so the
+  post-load `goToPage` is gone (`useReaderDocument()` takes no argument now). It is not clamped before
+  load; pdf-jsi clamps `defaultPage` on Android (**check iOS** when it is built), and `handleLoad`
+  clamps the number shown.
+- **Reloads:** `reload(to?)` (`to`: a page, or `(page) => page`) remounts the viewer on the page being
+  read. The reload count belongs to one file (`reloaded.contentKey`), so opening another file in the
+  same Reader no longer mounts its viewer twice. ReaderScreen's `startPage` state is gone.
+- **`pdfPageAfterEdit(oldDoc, newDoc, pdfPage)`**: the page by id; if it was deleted, the next kept
+  page, else the one before. `useEditPages`' `onChanged(before, after)` passes both documents (Save
+  and "Add pages from another document"). Add to library sets `promoted.lastPage`.
+- **Edit pages draft:** keyed on `visible` and the joined page ids.
+- **Password card:** a `KeyboardAvoidingView` (`behavior="padding"`) padded by the insets.
+- **`pageLabel(doc, pdfPage, pdfCount)`** → `{ first, last, count, library }`. A third argument was
+  added: when `pdfPageCount(doc) !== pdfCount` (an imported PDF not yet indexed) or there is no
+  library document, it gives PDF numbers (`library: false`). A 2-in-1 sheet reads "3–4 / 12"
+  (`reader.pageRange`, `reader.pageRangeA11y`). `ReaderTopChrome` takes `page: PageLabel`.
+  **"Go to page" takes library numbers too**, so it agrees with the bar.
+- **`useAnnotationPdfSync`:** a write that ends while the Reader isn't active doesn't reload the viewer
+  then; a hidden Reader reloads when it is shown again. **The unmount flush stays** (different from "no
+  sync flush"): dropping it would leave the last marks out of `document.pdf`.
+- Tests (`documents/__tests__/readerPosition.test.ts`): `openingPage`, `heldSubject`, the role default,
+  `pdfPageAfterEdit`, `pageLabel`. No test renders `useReaderDocument` itself.
 
 Goal: the Reader always reopens where you left it, and edits never throw you back to page 1.
 

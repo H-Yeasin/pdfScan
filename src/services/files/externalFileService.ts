@@ -1,8 +1,7 @@
-import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues (see pdfService.ts's matching import)
 import { Directory, File, Paths } from 'expo-file-system';
-import { PDFDocument } from 'pdf-lib';
 import { createId } from '../../utils/id';
 import { detectDocFormat, EXTENSION_BY_FORMAT, isLegacyWordDoc } from '../../utils/docFormat';
+import { getPageCount } from '../pdf/pdfNative';
 import type { DocFormat, ExternalFileDocument } from '../../types/models';
 
 const EXTERNAL_OPEN_ROOT = 'external-open';
@@ -46,17 +45,16 @@ export async function importExternalFile(
   const src = new File(sourceUri);
   await src.copy(dest);
 
+  // §18 W3: pdfium reads the count from the file's cross-reference table, without loading the
+  // file into JavaScript (pdf-lib parsed every object of a 300-page PDF just to count its pages).
+  // Best-effort: a password-protected or damaged PDF, or a build without the native module, gives
+  // no count here, and the viewer's own load reports the count or the problem.
   let pageCount: number | undefined;
   if (format === 'PDF') {
     try {
-      const bytes = await dest.bytes();
-      const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
-      pageCount = pdfDoc.getPageCount();
-    } catch (e) {
-      // Best-effort only - a genuinely password-encrypted PDF (or a malformed one) can fail here
-      // even with ignoreEncryption:true. The PDF engine's own onLoadComplete/onError is the real
-      // source of truth once the reader actually mounts the file.
-      console.warn('importExternalFile: pdf-lib page-count probe failed (may be encrypted)', e);
+      pageCount = await getPageCount(dest.uri);
+    } catch {
+      pageCount = undefined;
     }
   }
 

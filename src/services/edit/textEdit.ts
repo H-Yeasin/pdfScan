@@ -3,7 +3,6 @@ import Papa from 'papaparse';
 import type { ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
-import { buildSearchHaystack } from '../search/searchService';
 import { PreviewTooLargeError, SHEET_MAX_BYTES, SHEET_MAX_CELLS } from '../documents/sheetService';
 import { readTextWithEncodingFallback } from '../documents/txtService';
 import { getDocumentDir } from '../persistence/libraryFiles';
@@ -139,7 +138,6 @@ export async function saveEditedText(target: EditTarget, format: EditFormat, tex
       contentUri: dest.uri,
       sizeBytes: dest.size ?? 0,
       pages,
-      searchHaystack: buildSearchHaystack(doc.name, pages),
     },
   };
 }

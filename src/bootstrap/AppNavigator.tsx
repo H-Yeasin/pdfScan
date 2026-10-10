@@ -12,21 +12,7 @@ import { loadRemoteConfig, useRemoteConfig } from '../services/remote/remoteConf
 import { loadEntitlement, useIsPro } from '../services/pro/entitlement';
 import { startAds } from '../services/ads/adsSdk';
 import { MIN_SESSIONS_FOR_ADS } from '../services/ads/adPolicy';
-import { HomeScreen } from '../screens/HomeScreen';
-import { CourseScreen } from '../screens/CourseScreen';
-import { CaptureScreen } from '../screens/CaptureScreen';
-import { ReviewScreen } from '../screens/ReviewScreen';
-import { DeliverScreen } from '../screens/DeliverScreen';
-import { LibraryScreen } from '../screens/LibraryScreen';
-import { ReaderScreen } from '../screens/ReaderScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
-import { ProScreen } from '../screens/ProScreen';
-import { ManageFoldersScreen } from '../screens/ManageFoldersScreen';
-import { AcademicOptionsScreen } from '../screens/AcademicOptionsScreen';
-import { ExamPackScreen } from '../screens/ExamPackScreen';
-import { StorageScreen } from '../screens/StorageScreen';
-import { BackupScreen } from '../screens/BackupScreen';
-import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { lazyScreens } from '../navigation/lazyScreens';
 import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
 import { AppLockGate } from '../components/security/AppLockGate';
@@ -35,38 +21,48 @@ import { ExportHost } from '../components/backup/ExportHost';
 import { ProTaskResumeHost } from '../components/pro/ProTaskResumeHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
 import { useAutoBackup } from '../store/useAutoBackup';
-import { FilterLabScreen } from '../dev/FilterLabScreen';
 import { useLibraryPersistence } from '../store/useLibraryPersistence';
 import { useSettingsPersistence } from '../store/useSettingsPersistence';
 import { useSignaturePersistence } from '../store/useSignaturePersistence';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
-import { useDeadlineReminders } from '../store/useDeadlines';
+import { usePdfInfoBackfill } from '../store/usePdfInfoBackfill';
+import { configureNotifications, useDeadlineReminders } from '../store/useDeadlines';
 import { useStorageIntegrity } from '../store/useStorageIntegrity';
 import { useAppDispatch, useAppSelector, useAppSlices } from '../store/AppStateContext';
 import { initCrashReporting } from '../services/telemetry/crash';
 import { logUsage, setUsageCollection } from '../services/telemetry/usage';
-import { useTheme } from '../theme';
+import { useAppFonts, useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
 
-const SCREENS: ScreenMap = {
-  home: HomeScreen,
-  course: CourseScreen,
-  capture: CaptureScreen,
-  review: ReviewScreen,
-  deliver: DeliverScreen,
-  library: LibraryScreen,
-  reader: ReaderScreen,
-  settings: SettingsScreen,
-  pro: ProScreen,
-  manageFolders: ManageFoldersScreen,
-  academicOptions: AcademicOptionsScreen,
-  examPack: ExamPackScreen,
-  storage: StorageScreen,
-  backup: BackupScreen,
-  onboarding: OnboardingScreen,
-  filterLab: FilterLabScreen,
-};
+// §16 G3: each screen loads on its first render (the start screen at boot, the others when they're
+// first opened), so the bundle's first run doesn't evaluate the Reader's viewers, Review's filters,
+// Deliver's PDF builder and the rest. See navigation/lazyScreens.ts; bootImports.test.ts keeps
+// the boot path (this file, and the start screens) clear of the heavy libraries.
+const SCREENS: ScreenMap = lazyScreens({
+  home: () => (require('../screens/HomeScreen') as typeof import('../screens/HomeScreen')).HomeScreen,
+  course: () => (require('../screens/CourseScreen') as typeof import('../screens/CourseScreen')).CourseScreen,
+  capture: () => (require('../screens/CaptureScreen') as typeof import('../screens/CaptureScreen')).CaptureScreen,
+  review: () => (require('../screens/ReviewScreen') as typeof import('../screens/ReviewScreen')).ReviewScreen,
+  deliver: () => (require('../screens/DeliverScreen') as typeof import('../screens/DeliverScreen')).DeliverScreen,
+  library: () => (require('../screens/LibraryScreen') as typeof import('../screens/LibraryScreen')).LibraryScreen,
+  reader: () => (require('../screens/ReaderScreen') as typeof import('../screens/ReaderScreen')).ReaderScreen,
+  settings: () => (require('../screens/SettingsScreen') as typeof import('../screens/SettingsScreen')).SettingsScreen,
+  pro: () => (require('../screens/ProScreen') as typeof import('../screens/ProScreen')).ProScreen,
+  manageFolders: () => (require('../screens/ManageFoldersScreen') as typeof import('../screens/ManageFoldersScreen')).ManageFoldersScreen,
+  academicOptions: () => (require('../screens/AcademicOptionsScreen') as typeof import('../screens/AcademicOptionsScreen')).AcademicOptionsScreen,
+  examPack: () => (require('../screens/ExamPackScreen') as typeof import('../screens/ExamPackScreen')).ExamPackScreen,
+  storage: () => (require('../screens/StorageScreen') as typeof import('../screens/StorageScreen')).StorageScreen,
+  backup: () => (require('../screens/BackupScreen') as typeof import('../screens/BackupScreen')).BackupScreen,
+  onboarding: () => (require('../screens/OnboardingScreen') as typeof import('../screens/OnboardingScreen')).OnboardingScreen,
+  // Dev only (Settings shows the way in under __DEV__). Metro folds __DEV__ before it collects a
+  // release bundle's requires, so the Filter Lab isn't in one.
+  filterLab: __DEV__ ? () => (require('../dev/FilterLabScreen') as typeof import('../dev/FilterLabScreen')).FilterLabScreen : () => NoScreen,
+});
+
+function NoScreen() {
+  return null;
+}
 
 export function AppNavigator() {
   const libraryLoaded = useLibraryPersistence();
@@ -79,10 +75,16 @@ export function AppNavigator() {
   useExternalFileLinking(libraryLoaded);
   useDeadlineReminders(libraryLoaded, libraryAfterBoot);
   useImportedPdfIndexing(libraryAfterBoot);
+  usePdfInfoBackfill(libraryAfterBoot);
   useStorageIntegrity(libraryAfterBoot);
   useAutoBackup(libraryAfterBoot);
   const { screen, nav, navTick, go, back, replace } = useRouter();
   const { tokens, theme } = useTheme();
+  // §16 G4: fonts gate the first screen here, with the data, instead of in a gate above the store
+  // (AppProviders' old FontGate): the boot hooks above start on the first render either way. Ready
+  // at once in a build with the fonts embedded (app.json's expo-font plugin); a runtime load in
+  // Expo Go, on the web and in a dev build made before that.
+  const { fontsReady } = useAppFonts();
 
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library', 'settings');
@@ -117,6 +119,10 @@ export function AppNavigator() {
   useEffect(() => {
     if (afterBoot) void loadRemoteConfig();
   }, [afterBoot]);
+  // Reminders as banners while the app is open (§16 G3: deferred, not at import).
+  useEffect(() => {
+    if (afterBoot) configureNotifications();
+  }, [afterBoot]);
   // §10 M5: the ads SDK (and its consent form, where the law needs one) only once a banner could
   // show: ads switched on in the console, the introduction done, from the third start, no Pro.
   // Before that the SDK is never loaded.
@@ -129,8 +135,8 @@ export function AppNavigator() {
   const { processingStatus, errorMessage } = state.capture;
   const prevProcessingStatus = useRef(processingStatus);
 
-  // Start screen (§9 O1, `chooseStartScreen`): picked once settings and the library index are in,
-  // before the first real render, while the splash still covers the app (the native one, then the
+  // Start screen (§9 O1, `chooseStartScreen`): picked once settings, the library index and the
+  // fonts are in, before the first real render, while the splash still covers the app (the native one, then the
   // splash intro's identical overlay, §15 V5) - so Capture never flashes up on the way to Home. A failed library load falls through to Capture (with F3's
   // load-error state on the Library); anything that already navigated (e.g. "Open with") wins.
   // If loading takes longer than SPLASH_TIMEOUT_MS the app shows anyway, and the start screen is
@@ -138,7 +144,7 @@ export function AppNavigator() {
   const startChosen = useRef(false);
   const libraryStatus = state.library.loadStatus;
   const hasActiveCourse = state.library.courses.some((c) => !c.archived);
-  const bootReady = libraryStatus !== 'loading' && state.settings.loaded;
+  const bootReady = libraryStatus !== 'loading' && state.settings.loaded && fontsReady;
   useEffect(() => {
     if (startChosen.current || !bootReady) return;
     startChosen.current = true;

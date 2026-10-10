@@ -22,7 +22,6 @@ import { DEFAULT_ADJUST } from '../services/enhance/adjust';
 import { renderPage } from '../services/enhance/skiaEnhance';
 import { MASTER_PRESET } from '../services/capture/imageSpec';
 import { runOcr } from '../services/ocr/ocrService';
-import { buildSearchHaystack } from '../services/search/searchService';
 import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
 import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../services/pdf/pdfService';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
@@ -311,7 +310,6 @@ export function DeliverScreen() {
         // The suggestion from this render, not `name`: right after the profile sheet the name in
         // state may still be the one suggested before the profile was filled in.
         const finalName = (nameEdited ? name.trim() : suggestedName) || suggestedName;
-        const haystack = buildSearchHaystack(finalName, libraryPages);
 
         const doc: LibraryDocument = {
           id: documentId,
@@ -325,7 +323,6 @@ export function DeliverScreen() {
           star: false,
           tag: finalName.slice(0, 4).toUpperCase(),
           locked: false,
-          searchHaystack: haystack,
           courseId: courseId ?? undefined,
           docType,
           // Only set when a cover page actually made it into libraryPages[0] - mirrors

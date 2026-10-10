@@ -1,7 +1,7 @@
 import { initialLibraryState, libraryReducer } from '../slices/librarySlice';
 import type { LibraryAction, LibraryState } from '../slices/librarySlice';
 import { COURSE_COLORS } from '../../services/courses/palette';
-import { makeDoc } from '../../test/fixtures';
+import { makeDoc, makePage } from '../../test/fixtures';
 
 function run(...actions: LibraryAction[]): LibraryState {
   return actions.reduce(libraryReducer, initialLibraryState);
@@ -217,5 +217,35 @@ describe('librarySlice selection and bulk delete', () => {
     expect(state.selection).toEqual(['b']);
     expect(state.annotations.map((a) => a.documentId)).toEqual(['b']);
     expect(state.bookmarks.map((b) => b.documentId)).toEqual(['b']);
+  });
+});
+
+// §16 G4: a document's word boxes arrive after the load (documents/pageOcr.ts).
+describe('library/SET_PAGE_OCR', () => {
+  const B = { left: 0, top: 0, width: 10, height: 10 };
+  const loadedOcr = { text: 'alpha', blocks: [{ text: 'alpha', bounding: B, lines: [] }] };
+  const waiting = makePage({ id: 'p1', ocr: { text: 'alpha', blocks: [], blocksRow: 'p1' } });
+  const plain = makePage({ id: 'p2', ocr: { text: 'plain', blocks: [] } });
+  const doc = makeDoc({ id: 'd1', pages: [waiting, plain] });
+  const other = makeDoc({ id: 'd2' });
+
+  it('gives the waiting pages their boxes and leaves everything else as it was', () => {
+    const state = run(
+      { type: 'library/SET_FILES', files: [doc, other] },
+      { type: 'library/SET_PAGE_OCR', id: 'd1', pages: [{ ...waiting, ocr: loadedOcr }, plain] }
+    );
+    expect(state.files[0].pages[0]).toEqual({ ...waiting, ocr: loadedOcr });
+    expect(state.files[0].pages[1]).toBe(plain);
+    expect(state.files[1]).toBe(other);
+  });
+
+  it('never replaces OCR the page got meanwhile, or a page that is gone', () => {
+    const recognisedAgain = { ...waiting, ocr: { text: 'beta', blocks: [] } };
+    const changed = { ...doc, pages: [recognisedAgain] };
+    const state = run(
+      { type: 'library/SET_FILES', files: [changed] },
+      { type: 'library/SET_PAGE_OCR', id: 'd1', pages: [{ ...waiting, ocr: loadedOcr }, { ...plain, ocr: loadedOcr }] }
+    );
+    expect(state.files[0]).toBe(changed);
   });
 });

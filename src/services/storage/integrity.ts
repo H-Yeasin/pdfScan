@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { interruptedWriteTarget } from '../files/atomicWrite';
 import type { LibraryDocument } from '../../types/models';
 
 // §8 B1: keeps the library's files and rows in step. Two things go wrong on a phone:
@@ -57,6 +58,39 @@ function newestModified(dir: Directory): number {
     if (time > newest) newest = time;
   }
   return newest;
+}
+
+// §18 W3: finishes or clears what files/atomicWrite left behind when the app was killed during a
+// write. A `.<name>.tmp-<id>` file with no `<name>` next to it is the complete new file (the old
+// one is deleted only after the new one is written), so it is moved into place. With `<name>`
+// there, it is a write that never finished, and is deleted. Run before findOrphans, so a document
+// whose PDF is waiting under its temporary name isn't flagged as missing files. Returns how many
+// files were put back.
+export async function recoverInterruptedWrites(): Promise<number> {
+  const root = libraryRoot();
+  if (!root.exists) return 0;
+  let recovered = 0;
+  for (const folder of root.list()) {
+    if (!(folder instanceof Directory) || !isDocumentFolderName(folder.name)) continue;
+    for (const entry of folder.list()) {
+      if (!(entry instanceof File)) continue;
+      const target = interruptedWriteTarget(entry.name);
+      if (target === null) continue;
+      try {
+        const dest = new File(folder, target);
+        if (dest.exists) {
+          entry.delete();
+        } else {
+          entry.moveSync(dest);
+          recovered += 1;
+        }
+      } catch (error) {
+        console.warn('integrity: could not finish an interrupted write', folder.name, entry.name, error);
+      }
+    }
+    await breathe();
+  }
+  return recovered;
 }
 
 export type IntegrityReport = {

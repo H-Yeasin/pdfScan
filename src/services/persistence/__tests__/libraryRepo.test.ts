@@ -1,8 +1,19 @@
 import { makeDoc, makePage } from '../../../test/fixtures';
 import { resetStorage } from '../../../test/db';
 import { getDb, searchDocumentsByText } from '../dbService';
-import { archiveSemester, deleteSemesters, diffById, documentEdited, loadAll, reorderCourses, syncLibrary, type LoadedLibrary } from '../libraryRepo';
-import type { Course, Semester } from '../../../types/models';
+import {
+  archiveSemester,
+  deleteSemesters,
+  diffById,
+  documentEdited,
+  hasDeferredBlocks,
+  loadAll,
+  loadPageOcr,
+  reorderCourses,
+  syncLibrary,
+  type LoadedLibrary,
+} from '../libraryRepo';
+import type { Course, PageOcr, Semester } from '../../../types/models';
 
 beforeEach(resetStorage);
 
@@ -37,7 +48,7 @@ describe('libraryRepo', () => {
 
     const loaded = await loadAll(await getDb());
     expect(loaded.courses).toEqual([course]);
-    expect(loaded.documents[0]).toEqual({ ...doc, searchHaystack: 'scan hello ', contentUri: undefined, sourceKind: undefined });
+    expect(loaded.documents[0]).toEqual({ ...doc, contentUri: undefined, sourceKind: undefined });
   });
 
   it("keeps a page's full-page layout (ID cards) through a save and reload", async () => {
@@ -274,9 +285,174 @@ describe('documents.updated_at', () => {
 
   it('documentEdited ignores bookkeeping only', () => {
     const doc = makeDoc();
-    expect(documentEdited(doc, { ...doc, lastPage: 3, missingFiles: true, searchHaystack: 'x' })).toBe(false);
+    expect(documentEdited(doc, { ...doc, lastPage: 3, missingFiles: true, pdfInfoFailed: true })).toBe(false);
     expect(documentEdited(doc, { ...doc })).toBe(false);
     expect(documentEdited(doc, { ...doc, star: true })).toBe(true);
     expect(documentEdited(doc, { ...doc, pages: [...doc.pages] })).toBe(true);
+  });
+});
+
+// §16 G4: the load reads a page's text and leaves its word boxes (ocr_json) in the database.
+describe('word boxes on demand', () => {
+  const empty: LoadedLibrary = { documents: [], courses: [], semesters: [], timetable: [] };
+  const B = { left: 1, top: 2, width: 30, height: 4 };
+  const boxes = (text: string): PageOcr => ({
+    text,
+    blocks: [{ text, bounding: B, lines: [{ text, bounding: B, words: [{ text, bounding: B }] }] }],
+  });
+  const storedOcr = async (pageId: string): Promise<PageOcr | null> => {
+    const row = await (await getDb()).getFirstAsync<{ ocr_json: string | null }>('SELECT ocr_json FROM pages WHERE id = ?', [pageId]);
+    return row?.ocr_json ? (JSON.parse(row.ocr_json) as PageOcr) : null;
+  };
+  // A document with boxes on p1, text only on p2 and nothing on p3, saved and loaded again.
+  async function savedAndLoaded(): Promise<LoadedLibrary> {
+    const doc = makeDoc({
+      id: 'd1',
+      pages: [makePage({ id: 'p1', ocr: boxes('alpha') }), makePage({ id: 'p2', ocr: { text: 'plain', blocks: [] } }), makePage({ id: 'p3' })],
+    });
+    await seed({ ...empty, documents: [doc] });
+    return loadAll(await getDb());
+  }
+
+  it('loadAll reads the text, not the boxes', async () => {
+    const db = await getDb();
+    const queries = jest.spyOn(db, 'getAllAsync');
+    const loaded = await savedAndLoaded();
+
+    const pageSql = queries.mock.calls.map(([sql]) => sql).filter((sql) => /FROM pages\b/.test(sql));
+    expect(pageSql).toHaveLength(1);
+    expect(pageSql[0]).not.toContain('*');
+    // Only asked whether there are any.
+    expect(pageSql[0].replace('ocr_json IS NOT NULL', '')).not.toContain('ocr_json');
+    expect(loaded.documents[0].pages.map((p) => p.ocr)).toEqual([
+      { text: 'alpha', blocks: [], blocksRow: 'p1' },
+      { text: 'plain', blocks: [] },
+      undefined,
+    ]);
+    queries.mockRestore();
+  });
+
+  it('loadPageOcr returns the blocks, and only touches the pages that were waiting', async () => {
+    const { pages } = (await savedAndLoaded()).documents[0];
+    expect(hasDeferredBlocks(pages)).toBe(true);
+
+    const withBoxes = await loadPageOcr(await getDb(), pages);
+    expect(withBoxes[0].ocr).toEqual(boxes('alpha'));
+    expect(withBoxes[1]).toBe(pages[1]);
+    expect(withBoxes[2]).toBe(pages[2]);
+    expect(hasDeferredBlocks(withBoxes)).toBe(false);
+    // Nothing left to load: the same array back, no query.
+    expect(await loadPageOcr(await getDb(), withBoxes)).toBe(withBoxes);
+  });
+
+  it('a page whose stored boxes are unreadable keeps its text and stops asking', async () => {
+    const { pages } = (await savedAndLoaded()).documents[0];
+    await (await getDb()).runAsync("UPDATE pages SET ocr_json = '{broken' WHERE id = 'p1'");
+    expect((await loadPageOcr(await getDb(), pages))[0].ocr).toEqual({ text: 'alpha', blocks: [] });
+  });
+
+  it('saving pages whose boxes were never loaded keeps the boxes', async () => {
+    const loaded = await savedAndLoaded();
+    const [doc] = loaded.documents;
+    const reordered = { ...doc, pages: [doc.pages[2], doc.pages[0], doc.pages[1]] };
+    await syncLibrary(await getDb(), loaded, { ...loaded, documents: [reordered] });
+
+    expect(await storedOcr('p1')).toEqual(boxes('alpha'));
+    expect(await storedOcr('p2')).toBeNull();
+    const again = await loadAll(await getDb());
+    expect(again.documents[0].pages.map((p) => p.id)).toEqual(['p3', 'p1', 'p2']);
+    expect(again.documents[0].pages[1].ocr).toEqual({ text: 'alpha', blocks: [], blocksRow: 'p1' });
+    expect(await searchDocumentsByText('alpha')).toEqual(['d1']);
+  });
+
+  it('a copy under a new id takes the boxes with it, and keeps them once the original is gone', async () => {
+    const loaded = await savedAndLoaded();
+    const [doc] = loaded.documents;
+    // copyPageInto: the same page under a new id, its boxes still in the original's row.
+    const copy = makeDoc({ id: 'd2', pages: [{ ...doc.pages[0], id: 'p9' }] });
+    const withCopy = { ...loaded, documents: [copy, doc] };
+    await syncLibrary(await getDb(), loaded, withCopy);
+    expect(await storedOcr('p9')).toEqual(boxes('alpha'));
+
+    // The original goes; later the copy's pages are written again, still naming the original.
+    const alone = { ...loaded, documents: [copy] };
+    await syncLibrary(await getDb(), withCopy, alone);
+    await syncLibrary(await getDb(), alone, { ...loaded, documents: [{ ...copy, pages: [...copy.pages, makePage({ id: 'p10' })] }] });
+    expect(await storedOcr('p9')).toEqual(boxes('alpha'));
+    expect((await loadPageOcr(await getDb(), copy.pages))[0].ocr).toEqual(boxes('alpha'));
+  });
+
+  it('a merge keeps the boxes of a page that moves as its document is deleted', async () => {
+    const loaded = await savedAndLoaded();
+    const [doc] = loaded.documents;
+    // library/REPLACE_FILES: the source is removed and its pages, ids kept, are the new document's.
+    const merged = makeDoc({ id: 'merged', pages: [doc.pages[0], doc.pages[1]] });
+    await syncLibrary(await getDb(), loaded, { ...loaded, documents: [merged] });
+
+    expect(await storedOcr('p1')).toEqual(boxes('alpha'));
+    const again = await loadAll(await getDb());
+    expect(again.documents.map((d) => d.id)).toEqual(['merged']);
+  });
+
+  it('loading the boxes into the state is not a change to write', async () => {
+    const loaded = await savedAndLoaded();
+    const [doc] = loaded.documents;
+    const db = await getDb();
+    await db.runAsync("UPDATE documents SET updated_at = 1000 WHERE id = 'd1'");
+    const rowid = async () => (await db.getFirstAsync<{ rowid: number }>("SELECT rowid FROM pages WHERE id = 'p1'"))!.rowid;
+    const before = await rowid();
+    const opened = { ...doc, pages: [...(await loadPageOcr(db, doc.pages))] };
+    expect(documentEdited(doc, opened)).toBe(false);
+
+    const transactions = jest.spyOn(db, 'withTransactionAsync');
+    await syncLibrary(db, loaded, { ...loaded, documents: [opened] });
+    expect(transactions).not.toHaveBeenCalled();
+    transactions.mockRestore();
+
+    // With the page the Reader is on: the document row is written, its pages are left alone.
+    await syncLibrary(db, loaded, { ...loaded, documents: [{ ...opened, lastPage: 2 }] });
+    expect(await rowid()).toBe(before);
+    expect(await storedOcr('p1')).toEqual(boxes('alpha'));
+    const row = await db.getFirstAsync<{ updated_at: number; last_page: number }>("SELECT updated_at, last_page FROM documents WHERE id = 'd1'");
+    expect(row).toEqual({ updated_at: 1000, last_page: 2 });
+  });
+
+  it('a page recognised again after its boxes were loaded is written', async () => {
+    const loaded = await savedAndLoaded();
+    const [doc] = loaded.documents;
+    const again = { ...doc, pages: [{ ...doc.pages[0], ocr: boxes('beta') }, doc.pages[1], doc.pages[2]] };
+    expect(documentEdited(doc, again)).toBe(true);
+    await syncLibrary(await getDb(), loaded, { ...loaded, documents: [again] });
+    expect(await storedOcr('p1')).toEqual(boxes('beta'));
+    expect(await searchDocumentsByText('beta')).toEqual(['d1']);
+    expect(await searchDocumentsByText('alpha')).toEqual([]);
+  });
+});
+
+describe('deleting rows', () => {
+  it('removes many documents in batches of 500, with their pages', async () => {
+    const docs = Array.from({ length: 1201 }, (_, i) => makeDoc({ id: `d${i}`, pages: [makePage({ id: `p${i}` })] }));
+    const empty: LoadedLibrary = { documents: [], courses: [], semesters: [], timetable: [] };
+    const saved = await seed({ ...empty, documents: docs });
+    const db = await getDb();
+    const runs = jest.spyOn(db, 'runAsync');
+    await syncLibrary(db, saved, { ...empty, documents: [docs[0]] });
+
+    const deletes = runs.mock.calls.filter(([sql]) => sql.startsWith('DELETE FROM documents'));
+    expect(deletes.map(([, params]) => (params as string[]).length)).toEqual([500, 500, 200]);
+    runs.mockRestore();
+    expect(await db.getAllAsync('SELECT id FROM documents')).toEqual([{ id: 'd0' }]);
+    expect(await db.getAllAsync('SELECT id FROM pages')).toEqual([{ id: 'p0' }]);
+  });
+
+  it("keeps a document's failed-PDF mark only while its layout is unknown", async () => {
+    const empty: LoadedLibrary = { documents: [], courses: [], semesters: [], timetable: [] };
+    const doc = makeDoc({ id: 'd1', pdfInfoFailed: true });
+    const saved = await seed({ ...empty, documents: [doc] });
+    expect((await loadAll(await getDb())).documents[0].pdfInfoFailed).toBe(true);
+
+    await syncLibrary(await getDb(), saved, { ...empty, documents: [{ ...doc, pdfLayout: 'standard' }] });
+    const [reloaded] = (await loadAll(await getDb())).documents;
+    expect(reloaded).toMatchObject({ pdfLayout: 'standard', pdfInfoFailed: undefined });
   });
 });

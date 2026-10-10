@@ -238,6 +238,9 @@ export async function exportRows(db: SQLiteDatabase, scope: BackupScope, schemaV
     };
     rewrite(doc, PATH_COLUMNS.documents!);
     doc.disk_bytes = null;
+    // §16 G4: "its PDF couldn't be read" is about the file on this phone; the copy that comes out
+    // of the backup gets its own try.
+    doc.pdf_info_failed = 0;
     for (const page of pagesByDoc.get(docId) ?? []) rewrite(page, PATH_COLUMNS.pages!);
   }
   for (const deadline of tables.deadlines) deadline.reminder_ids = '[]';

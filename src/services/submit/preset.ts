@@ -3,7 +3,7 @@ import { COVER_TEMPLATE_IDS, getCoverTemplate, type CoverTemplateId } from '../p
 import { defaultPageSize, type PageSizeId } from '../pdf/pageSize';
 import type { AcademicConfig, LayoutMode } from '../pdf/pdfService';
 import { footerPresetOf, footerPresetText, type FooterPreset } from './footerPresets';
-import { formatLimit } from './sizeTarget';
+import { formatLimit } from './sizeFormat';
 
 // How a course's work is handed in (§4 S6), remembered on the course after the first submit so
 // every later one is Review "Next", "Submit", pick the app.

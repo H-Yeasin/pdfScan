@@ -24,7 +24,6 @@ export function makeDoc(overrides: Partial<LibraryDocument> = {}): LibraryDocume
     createdAt: 1_700_000_000_000,
     star: false,
     locked: false,
-    searchHaystack: '',
     ...overrides,
   };
 }

@@ -27,7 +27,6 @@ function doc(overrides: Partial<LibraryDocument>): LibraryDocument {
     createdAt: 0,
     star: false,
     locked: false,
-    searchHaystack: '',
     ...overrides,
   } as LibraryDocument;
 }

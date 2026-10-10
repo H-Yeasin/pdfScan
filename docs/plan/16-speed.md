@@ -323,7 +323,67 @@ Tests:
 Device checks: Verification 2–3.
 
 ## G3 · Boot diet: load screens and heavy libraries on first use *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-10). JS only. Open: Verification 4 on a device (cold start against
+G9's baseline), the reminder check below, and the first-open cost of Reader, Review and Deliver.
+
+As built:
+- **Lazy screens.** `navigation/lazyScreens.ts`: `lazyScreens(loaders)` turns AppNavigator's
+  `{ review: () => require('../screens/ReviewScreen').ReviewScreen, ... }` into a `ScreenMap` whose
+  properties are getters. A loader runs on the first read (ScreenStack reads a screen when its layer
+  first renders) and the component is kept, so the memo'd layers always get the same one.
+  `ScreenStack` and its test didn't change. Each `require` is cast to `typeof import(...)`, so a
+  wrong export name fails the typecheck. `filterLab` is `__DEV__ ? loader : () => NoScreen`; Expo's
+  Metro worker folds `__DEV__` before it collects requires, so the Filter Lab isn't in a release
+  bundle (checked in an exported bundle).
+- **The plan's file list wasn't enough: the store itself loaded pdf-lib.** `store/appReducer` →
+  `deliverSlice` → `submit/preset` → `sizeTarget` (pdfService, and skiaEnhance → the filter registry)
+  and → `pdf/coverTemplates` → `visibleText` (pdf-lib; it builds Helvetica's metrics at module scope).
+  Fixed at the two edges: new `submit/sizeFormat.ts` holds `MB` and `formatLimit` (sizeTarget
+  re-exports them; `preset` and `useSubmitDocument` import them from there), and `coverTemplates`
+  requires `visibleText` on the first `measureText` / `helveticaWidth` call (both keep their names
+  and signatures).
+- **Boot hooks.** `pdfInfoBackfill`: the default `inspect` requires pdfService only when a document
+  needs reading. `externalFileService`: a local `pdfLib()`. `useExternalFileLinking`: requires
+  libraryOperations inside `openUri`. `convertTask`: the two runners are still registered at import
+  (ProTaskResumeHost didn't change), and each requires its converter when a task runs.
+- `enhance/filters/filterIds.ts`: `FILTER_IDS` (picker order) and `AVAILABLE_FILTER_IDS`;
+  `settingsStorage.sanitizeDefaultEnhance` reads them, `registry.ts` re-exports them, and
+  `filters/__tests__/filterIds.test.ts` fails if the registry and the list drift apart.
+- **Beyond the plan: the start screens are kept clean too.** A lazy screen map doesn't help the start
+  screen: it's required during boot. Home (and the Library) reached pdf-lib through three hooks:
+  `useDocumentListActions` → libraryOperations, `useCoverTarget` → addCover, `useSubmitDocument` →
+  submitDocument / history / sizeTarget. Each now requires its service inside the action (merge,
+  split, compress, sign, add a cover, submit, share again). Without this, pdf-lib would have loaded
+  with Home's first render and the step would have gained little.
+- `useDeadlines.configureNotifications()` (runs once) holds `setNotificationHandler`; AppNavigator
+  calls it in an `afterBoot` effect. **Check on a device:** a reminder that fires in the first ~2 s of
+  a cold start with the app open isn't shown as a banner. If that matters, call it from the first
+  effect instead.
+- Metro `inlineRequires` is not turned on (it waits for G9's numbers); `metro.config.js` didn't change.
+- **Test:** `src/__tests__/bootImports.test.ts` parses files with the TypeScript compiler (so a
+  comment or a string can't count, type-only imports are skipped, and a `require` inside a function
+  is lazy). Roots: `index.ts`, and each screen `chooseStartScreen` can return (Home, Capture,
+  Onboarding), whose files it reads from AppNavigator's `lazyScreens({...})`. It fails, with the import
+  chain, on `pdf-lib`, `xlsx`, `mammoth`, `react-native-webview`, `react-native-pdf-jsi` or
+  `filters/registry.ts`; the allow-list is empty. It's a little stricter than Babel: an `import { X }`
+  used only as a type counts, so write `import type`. Also `navigation/__tests__/lazyScreens.test.ts`.
+- **Measured on the bundle, not on a phone** (`npx expo export --platform android --no-minify
+  --no-bytecode`, then the modules reachable from the entry points through top-level requires):
+
+  | | Modules run at startup | Their source |
+  |---|---|---|
+  | Before (bb4dbf2), any start screen | 2,301 of 3,078 | 12.1 MB of 16.5 MB |
+  | After, Home | 1,854 | 9.0 MB (−25%) |
+  | After, Capture | 1,751 | 8.6 MB (−28%) |
+  | After, Onboarding | 1,705 | 8.5 MB (−30%) |
+
+  pdf-lib, `@pdf-lib/standard-fonts`, react-native-webview, react-native-pdf-jsi, papaparse, the filter
+  registry, pdfService and libraryOperations no longer run at startup (SheetJS and mammoth already
+  didn't). Source size is only a proxy for time: Verification 4 is still the test.
+- **The cost moved; measure it in G9.** The first open of the Reader (pdf-jsi, WebView), Review or
+  Deliver (pdf-lib) now evaluates those modules during that navigation, once per run. If the first
+  open stutters, load the likely next screen after `useDeferredBoot` (reading `SCREENS.reader` is
+  enough to load it).
 
 Goal: the first frame loads only what the start screen (and §15 V5's splash intro) needs. pdf-lib, xlsx,
 mammoth, the filter registry and the other screens load when they're first used.

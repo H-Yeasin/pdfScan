@@ -51,7 +51,7 @@ describe('shareFileName', () => {
 });
 
 describe('shareDocument', () => {
-  const base = { id: 'doc_1', createdAt: 0, sizeBytes: 0, star: false, tag: '', locked: false, searchHaystack: '' };
+  const base = { id: 'doc_1', createdAt: 0, sizeBytes: 0, star: false, tag: '', locked: false };
 
   it('shares a PDF under the document name', async () => {
     const doc = { ...base, name: '2021331045_Rahim_CSE101_HW3', format: 'PDF', pages: [], pdfUri: libraryFile('document.pdf', 'x') };

@@ -35,4 +35,9 @@ describe('Find in the Reader (§12 D11)', () => {
     for (const format of ['PDF', 'TXT', 'CSV', 'XLSX', 'XLS', 'DOCX'] as const) expect(canFindInDoc(format)).toBe(true);
     expect(canFindInDoc('DOC')).toBe(false);
   });
+
+  // §18 W2: its document.pdf has the OCR text layer, the same as a PDF-format scan's.
+  it('covers a JPG-format scan', () => {
+    expect(canFindInDoc('JPG')).toBe(true);
+  });
 });

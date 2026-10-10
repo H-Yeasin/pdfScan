@@ -1,18 +1,20 @@
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fontFamily, spacing, useTheme, touchSlop, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
+import type { PageLabel } from '../../services/documents/readerPosition';
 
 type ReaderTopChromeProps = {
   visible: Animated.AnimatedInterpolation<number> | Animated.Value;
   name: string;
   onBack: () => void;
   onOverflow: () => void;
-  // §12 D2: "12 / 40" next to the title; tap to type a page (R4). Hidden while pageCount is 0
-  // (still loading, or a viewer without pages).
-  pageCount: number;
-  activeIndex: number;
+  // §12 D2: "12 / 40" next to the title; tap to type a page (R4). Hidden while the count is 0
+  // (still loading, or a viewer without pages). §18 W5: library page numbers
+  // (readerPosition.pageLabel), "3–4 / 12" for the two pages of a 2-in-1 sheet.
+  page: PageLabel;
   onJump?: () => void;
   // Undefined: the format has no Find (formatCapabilities.IN_READER_FIND_FORMATS).
   onFind?: () => void;
@@ -35,8 +37,7 @@ export function ReaderTopChrome({
   name,
   onBack,
   onOverflow,
-  pageCount,
-  activeIndex,
+  page,
   onJump,
   onFind,
   findOpen,
@@ -52,6 +53,11 @@ export function ReaderTopChrome({
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  // §18 W2: the bar slides away by its own height (status bar inset and a subtitle line included),
+  // not by a fixed distance. Until the first layout it is the row under the inset; the bar starts
+  // shown, so that estimate is never on screen.
+  const [height, setHeight] = useState(0);
+  const hideBy = height || insets.top + ROW_HEIGHT;
 
   return (
     <Animated.View
@@ -65,10 +71,11 @@ export function ReaderTopChrome({
           paddingLeft: insets.left,
           paddingRight: insets.right,
           opacity: visible,
-          transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [-110, 0] }) }],
+          transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [-hideBy, 0] }) }],
         },
       ]}
       pointerEvents="box-none"
+      onLayout={(e) => setHeight(Math.ceil(e.nativeEvent.layout.height))}
     >
       <View style={styles.row}>
         <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onBack} accessibilityLabel={t('common.back')}>
@@ -106,16 +113,22 @@ export function ReaderTopChrome({
           </>
         ) : (
           <>
-            {pageCount > 0 ? (
+            {page.count > 0 ? (
               <Pressable
                 style={styles.indicator}
                 onPress={onJump}
                 disabled={!onJump}
                 accessibilityRole="button"
-                accessibilityLabel={t('reader.pageA11y', { page: activeIndex + 1, count: pageCount })}
+                accessibilityLabel={
+                  page.last > page.first
+                    ? t('reader.pageRangeA11y', { first: page.first, last: page.last, count: page.count })
+                    : t('reader.pageA11y', { page: page.first, count: page.count })
+                }
               >
                 <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.indicatorText, { color: tokens.ink }]} numberOfLines={1}>
-                  {t('reader.pageIndicator', { page: activeIndex + 1, count: pageCount })}
+                  {page.last > page.first
+                    ? t('reader.pageRange', { first: page.first, last: page.last, count: page.count })
+                    : t('reader.pageIndicator', { page: page.first, count: page.count })}
                 </Text>
               </Pressable>
             ) : null}
@@ -146,6 +159,9 @@ export function ReaderTopChrome({
   );
 }
 
+// Also what a viewer that the bar lies over leaves free above its first line (§18 W4, DocxView).
+export const ROW_HEIGHT = 44;
+
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
@@ -159,7 +175,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: spacing.sm,
-    minHeight: 44,
+    minHeight: ROW_HEIGHT,
   },
   iconButton: {
     width: 44,

@@ -236,7 +236,7 @@ describe('search over an indexed import', () => {
 
     const [reloaded] = (await loadAll(await getDb())).documents;
     expect(reloaded).toMatchObject({ indexState: 'done', indexedAt: expect.any(Number), pdfLayout: 'standard' });
-    expect(reloaded.searchHaystack).toContain('mitochondria23');
+    expect(reloaded.pages[22].ocr?.text).toContain('mitochondria23');
     expect(reloaded.pages[22].thumbUri).toBe(result.patch.pages[22].thumbUri);
   });
 });

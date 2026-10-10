@@ -23,6 +23,13 @@ const fontAssets = {
   Figtree_700Bold,
 };
 
+// §16 G4: on Android the five files are embedded at build time (app.json, the expo-font plugin's
+// android.fonts), where a font's family name is its file name - the names above. useFonts starts
+// out `loaded` when every family is already registered natively, so there the first render has
+// the fonts and nothing is loaded at run time. Everywhere else (Expo Go, the web, iOS, a dev build
+// made before the fonts were embedded) the same call loads them from the bundle, as before.
+// Changing a font means changing all three: `fontFamily`, `fontAssets` and app.json's list
+// (theme/__tests__/embeddedFonts.test.ts compares them).
 export function useAppFonts() {
   const [loaded, error] = useFonts(fontAssets);
   return { fontsReady: loaded || !!error };

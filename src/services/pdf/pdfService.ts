@@ -1,8 +1,10 @@
 import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues; also imported at the app entrypoint, but kept here too so this module is safe even if ever imported outside that graph (e.g. a future test file)
 import { File } from 'expo-file-system';
+import { writeFileReplacing } from '../files/atomicWrite';
 import { PDFDocument, PageSizes, degrees, rgb, type PDFFont, type PDFPage, type PDFRef } from 'pdf-lib';
 import { renderPage } from '../enhance/skiaEnhance';
 import { estimateExportBytes, exportPreset, isMasterQuality, type ExportPreset } from '../capture/imageSpec';
+import { withPageBlocks } from '../documents/pageOcr';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { fitBox, type BoxFit } from '../../utils/fitBox';
 import type { LibraryDocument, LibraryPage, PageLayout, PageOcr, PageRotation } from '../../types/models';
@@ -73,6 +75,9 @@ const HEADER_FONT_SIZE = 9;
 const FOOTER_FONT_SIZE = 9;
 
 export type PdfSourcePage = {
+  // The library page this is, when it is one: its word boxes may still be in the database, in
+  // its own row (§16 G4, documents/pageOcr.ts).
+  id?: string;
   uri: string;
   width: number;
   height: number;
@@ -85,7 +90,7 @@ export type PdfSourcePage = {
 
 // A library page as a build source: its master and everything that goes with it.
 export function toSourcePage(p: LibraryPage): PdfSourcePage {
-  return { uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout, rotation: p.rotation };
+  return { id: p.id, uri: p.fileUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout, rotation: p.rotation };
 }
 
 // The box a standard-layout page image is fit into: the margin box, or for a 'fullPage' image (an
@@ -479,13 +484,16 @@ export type BuildPdfOptions = {
 
 export async function buildPdfFromPages(
   documentId: string,
-  pages: PdfSourcePage[],
+  sourcePages: readonly PdfSourcePage[],
   encoding: PageImageEncoding,
   academicConfig?: AcademicConfig,
   layoutMode: LayoutMode = 'standard',
   pageSize: PageSizeId = 'A4',
   options: BuildPdfOptions = {}
 ): Promise<{ uri: string; sizeBytes: number }> {
+  // §16 G4: the text layer is drawn from word boxes, which library pages no longer carry from
+  // the load. Every build comes through here, so this is where they're read.
+  const pages = [...(await withPageBlocks(sourcePages))];
   const pageDims = pageDimensions(pageSize);
 
   const pdfDoc = await PDFDocument.create();
@@ -524,8 +532,7 @@ export async function buildPdfFromPages(
   const pdfBytes = await pdfDoc.save();
 
   const dest = options.dest ?? new File(getDocumentDir(documentId), 'document.pdf');
-  if (dest.exists) dest.delete();
-  dest.write(pdfBytes);
+  writeFileReplacing(dest, pdfBytes);
 
   return { uri: dest.uri, sizeBytes: dest.size ?? 0 };
 }
@@ -557,70 +564,37 @@ export async function decoratePdf(
   }
 }
 
-// Burns a captured signature PNG onto one page of an already-compiled PDF, in place.
-// `pageNaturalWidth`/`pageNaturalHeight` must be the natural pixel dimensions of the SOURCE PAGE
-// IMAGE that page was built from (LibraryPage.width/height), not the PDF's own point-space size —
-// they're the anchor used to convert `placement` (natural pixel space, top-left origin, same
-// convention as SessionPage.cropRect) into PDF points.
-// `fitToMarginBox` must be true for any page whose image was placed via fitBox inside
-// CONTENT_MARGIN_PT (every standard content page, and an 'imported_image' cover), and false only
-// for a 'template' cover page (text-only, no placed image, still sized full-page-proportional) —
-// see applySignatureToDocument in libraryOperations.ts for how callers determine which.
+// §18 W1: where a signature image goes on a built PDF, as pdf-lib draws it. `pageIndex` is the PDF
+// page (0-based), not a library page; (x, y) is the corner the image's own bottom-left lands on,
+// in points from the page's bottom-left; width × height is the image's own (unturned) size; and
+// `rotate` is pdf-lib's angle, degrees counter-clockwise about that corner. Worked out from the
+// page map by signature/signaturePlacement.signatureDraw - not here, so this module stays free of
+// the page map (see BuildPdfOptions.beforeSave).
+export type SignatureDraw = { pageIndex: number; x: number; y: number; width: number; height: number; rotate: number };
+
+// Burns a captured signature PNG onto one page of an already-compiled PDF, in place, at `draw`.
+// The signature file is only read: it is the caller's, and often the saved one that is used again
+// (savedSignatureStorage). Deleting it here is what made a second signature fail.
 export async function applySignatureToPdf(
   documentId: string,
   pdfUri: string,
-  pageIndex: number,
-  pageNaturalWidth: number,
-  pageNaturalHeight: number,
-  fitToMarginBox: boolean,
   signatureUri: string,
-  placement: { originX: number; originY: number; width: number; height: number }
+  draw: SignatureDraw
 ): Promise<{ uri: string; sizeBytes: number }> {
   const existingBytes = await new File(pdfUri).bytes();
   const pdfDoc = await PDFDocument.load(existingBytes);
 
-  const pdfPage = pdfDoc.getPages()[pageIndex];
-  if (!pdfPage) throw new Error(`applySignatureToPdf: page ${pageIndex} not found in ${pdfUri}`);
+  const pdfPage = pdfDoc.getPages()[draw.pageIndex];
+  if (!pdfPage) throw new Error(`applySignatureToPdf: page ${draw.pageIndex} not found in ${pdfUri}`);
 
-  const signatureFile = new File(signatureUri);
-  const sigBytes = await signatureFile.bytes();
-  const pngImage = await pdfDoc.embedPng(sigBytes);
-  if (signatureFile.exists) signatureFile.delete(); // tmpfile cleanup, mirrors embedPageImage above
-
-  // PDF origin is bottom-left; `placement.originY` is measured from the page image's top edge
-  // (same convention as drawOcrLine's flip above), hence the flip.
-  let xPt: number;
-  let yPt: number;
-  let widthPt: number;
-  let heightPt: number;
-  if (fitToMarginBox) {
-    // Reproduces the exact same fitBox placement the image itself was drawn with at build time
-    // (purely a function of the page's own natural dimensions + this page's margin box - its real
-    // size, A4 or Letter, read back from the PDF - so it's safe to recompute here rather than
-    // needing to store it), then maps `placement` through that box the same way drawOcrLine maps
-    // an OCR line's box - generalized here from a text line to an arbitrary signature rect.
-    const margin = marginBox({ width: pdfPage.getWidth(), height: pdfPage.getHeight() });
-    const box = fitBox(pageNaturalWidth, pageNaturalHeight, margin.x, margin.y, margin.width, margin.height);
-    widthPt = placement.width * box.scale;
-    heightPt = placement.height * box.scale;
-    xPt = box.origin.x + placement.originX * box.scale;
-    yPt = box.origin.y + box.height - (placement.originY + placement.height) * box.scale;
-  } else {
-    const scale = pdfPage.getWidth() / pageNaturalWidth;
-    widthPt = placement.width * scale;
-    heightPt = placement.height * scale;
-    xPt = placement.originX * scale;
-    yPt = pdfPage.getHeight() - placement.originY * scale - heightPt;
-  }
-
-  pdfPage.drawImage(pngImage, { x: xPt, y: yPt, width: widthPt, height: heightPt });
+  const pngImage = await pdfDoc.embedPng(await new File(signatureUri).bytes());
+  pdfPage.drawImage(pngImage, { x: draw.x, y: draw.y, width: draw.width, height: draw.height, rotate: degrees(draw.rotate) });
 
   const pdfBytes = await pdfDoc.save();
 
   const dir = getDocumentDir(documentId);
   const dest = new File(dir, 'document.pdf');
-  if (dest.exists) dest.delete();
-  dest.write(pdfBytes);
+  writeFileReplacing(dest, pdfBytes);
 
   return { uri: dest.uri, sizeBytes: dest.size ?? 0 };
 }
@@ -638,6 +612,19 @@ export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDo
     'as-is'
   );
   return { ...doc, pdfUri: result.uri, sizeBytes: doc.format === 'PDF' ? result.sizeBytes : doc.sizeBytes, pdfLayout: 'standard', pdfPageSize: 'A4' };
+}
+
+// §18 W3: one build per document at a time. The Reader's backfill effect runs again whenever the
+// document changes in the store (a bookmark, the last page), and two builds of the same
+// document.pdf would write over each other. A second call while the first is running gets the
+// same promise; once it settles (either way) the next call starts fresh, so Retry really retries.
+const ensuring = new Map<string, Promise<LibraryDocument>>();
+export function ensureDocumentPdfOnce(doc: LibraryDocument): Promise<LibraryDocument> {
+  const running = ensuring.get(doc.id);
+  if (running) return running;
+  const build = ensureDocumentPdf(doc).finally(() => ensuring.delete(doc.id));
+  ensuring.set(doc.id, build);
+  return build;
 }
 
 // Deliver's "≈ size" hint. Session pages are master-spec files, so their size scaled by the

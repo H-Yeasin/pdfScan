@@ -1,14 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 import type { ThemePref } from '../../theme';
-import { FILTERS } from '../enhance/filters/registry';
+import { AVAILABLE_FILTER_IDS } from '../enhance/filters/filterIds';
 
 const SETTINGS_KEY = 'app:settings';
 
 // Filter IDs are session-only and may be renamed (E1 renamed document_scan); a stored ID that no
-// longer exists is dropped rather than handed to the registry.
+// longer exists is dropped rather than handed to the registry. Read from filterIds, not the
+// registry, since settings load at boot (§16 G3).
 export function sanitizeDefaultEnhance(raw: Partial<Record<CaptureMode, EnhanceMode>> | undefined) {
-  const valid = new Set<string>(FILTERS.filter((spec) => spec.available).map((spec) => spec.id));
+  const valid = new Set<string>(AVAILABLE_FILTER_IDS);
   const out: Partial<Record<CaptureMode, EnhanceMode>> = {};
   for (const [mode, enhance] of Object.entries(raw ?? {})) if (enhance && valid.has(enhance)) out[mode as CaptureMode] = enhance;
   return out;
@@ -65,7 +66,7 @@ export type PersistedSettings = {
   reading?: unknown;
 };
 
-export async function loadSettings(): Promise<PersistedSettings | null> {
+async function readSettings(): Promise<PersistedSettings | null> {
   try {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!raw) return null;
@@ -74,6 +75,21 @@ export async function loadSettings(): Promise<PersistedSettings | null> {
     console.warn('Failed to load settings', error);
     return null;
   }
+}
+
+// §16 G4: App.tsx starts the read as the bundle loads, so it runs while React builds its first
+// tree; the boot's loadSettings() (useSettingsPersistence) then takes that read. Only that one:
+// a later call (a backup collecting the settings) reads what is stored by then.
+let warmed: Promise<PersistedSettings | null> | null = null;
+
+export function warmSettings(): void {
+  warmed ??= readSettings();
+}
+
+export function loadSettings(): Promise<PersistedSettings | null> {
+  const pending = warmed;
+  warmed = null;
+  return pending ?? readSettings();
 }
 
 export async function persistSettings(settings: PersistedSettings): Promise<void> {

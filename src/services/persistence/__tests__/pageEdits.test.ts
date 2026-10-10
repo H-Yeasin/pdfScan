@@ -42,7 +42,7 @@ async function scannedDoc(id: string, texts: string[]): Promise<LibraryDocument>
     ocr: ocrOf(text),
   }));
   const pdf = await buildPdfFromPages(id, pages.map(toSourcePage), 'as-is');
-  return { id, name: id, format: 'PDF', mode: 'doc', pages, pdfUri: pdf.uri, sizeBytes: pdf.sizeBytes, createdAt: 1, star: false, locked: false, searchHaystack: '', pdfLayout: 'standard' };
+  return { id, name: id, format: 'PDF', mode: 'doc', pages, pdfUri: pdf.uri, sizeBytes: pdf.sizeBytes, createdAt: 1, star: false, locked: false, pdfLayout: 'standard' };
 }
 
 async function importedDoc(id: string, texts: string[]): Promise<LibraryDocument> {
@@ -57,7 +57,7 @@ async function importedDoc(id: string, texts: string[]): Promise<LibraryDocument
     ocr: ocrOf(text),
     textSource: 'pdf',
   }));
-  return { id, name: id, format: 'PDF', mode: 'doc', pages, pdfUri: dest.uri, sizeBytes: dest.size, createdAt: 1, star: false, locked: false, searchHaystack: '', sourceKind: 'imported_pdf', pdfLayout: 'standard', indexedAt: 1, indexState: 'done' };
+  return { id, name: id, format: 'PDF', mode: 'doc', pages, pdfUri: dest.uri, sizeBytes: dest.size, createdAt: 1, star: false, locked: false, sourceKind: 'imported_pdf', pdfLayout: 'standard', indexedAt: 1, indexState: 'done' };
 }
 
 async function rotations(uri: string): Promise<number[]> {

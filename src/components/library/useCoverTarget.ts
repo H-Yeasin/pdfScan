@@ -3,7 +3,6 @@ import { useRouter } from '../../navigation/router';
 import { canAddCover, isPasswordProtected } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import type { AcademicConfig, PageSizeId } from '../../services/pdf/pdfService';
-import { addCoverToDocument, CoverPhotoError } from '../../services/persistence/addCover';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import type { CoverTarget } from '../../store/slices/deliverSlice';
 import type { LibraryDocument } from '../../types/models';
@@ -59,6 +58,9 @@ export function useApplyCover(target: CoverTarget | null, doc: LibraryDocument |
   const apply = useCallback(
     async (config: AcademicConfig, pageSize: PageSizeId, mode: 'copy' | 'replace') => {
       if (!doc || busy) return;
+      // Required here, not imported: addCover brings pdf-lib, and the Library and Home use this
+      // hook from their first frame (§16 G3).
+      const { addCoverToDocument, CoverPhotoError } = require('../../services/persistence/addCover') as typeof import('../../services/persistence/addCover');
       setBusy(true);
       try {
         const result = await addCoverToDocument({ doc, config, pageSize, mode, annotations, bookmarks });

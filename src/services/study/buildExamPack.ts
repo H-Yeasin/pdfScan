@@ -8,7 +8,6 @@ import { copyPageInto } from '../persistence/libraryOperations';
 import { footerPresetText } from '../submit/footerPresets';
 import { t, tDoc } from '../../i18n';
 import { getDocumentDir } from '../persistence/libraryFiles';
-import { buildSearchHaystack } from '../search/searchService';
 import type { Annotation, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import type { PackItem } from '../../store/slices/packSlice';
@@ -133,7 +132,6 @@ export async function buildExamPack(
     star: false,
     tag: 'PACK',
     locked: false,
-    searchHaystack: buildSearchHaystack(options.title, pages),
     courseId: options.courseId ?? undefined,
     docType: 'notes',
     pdfLayout: 'standard',

@@ -1,5 +1,6 @@
+import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, typeScale, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
 import { useT } from '../../i18n/useT';
@@ -28,7 +29,21 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const onLayout = useReportBottomBar();
+  const reportHeight = useReportBottomBar();
+  const bottomPadding = Math.max(insets.bottom, spacing.sm);
+  // §18 W2: the bar slides away by its own height. A fixed 60 px left its top edge, and its
+  // (invisible, still tappable) buttons, on screen above a 3-button navigation bar. Until the
+  // first layout it is the row plus its paddings; the bar starts shown, so that estimate is
+  // never on screen.
+  const [height, setHeight] = useState(0);
+  const hideBy = height || ITEM_HEIGHT + spacing.sm + bottomPadding;
+  const onLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      setHeight(Math.ceil(e.nativeEvent.layout.height));
+      reportHeight(e);
+    },
+    [reportHeight]
+  );
   if (tools.length === 0) return null;
 
   return (
@@ -40,11 +55,11 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
           borderTopColor: tokens.edge,
           // §14 Q3: the bar's background runs under the navigation bar; its buttons sit above it
           // (and clear of a side 3-button bar in landscape). Animated, so it can't be a BottomBar.
-          paddingBottom: Math.max(insets.bottom, spacing.sm),
+          paddingBottom: bottomPadding,
           paddingLeft: insets.left,
           paddingRight: insets.right,
           opacity: visible,
-          transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }],
+          transform: [{ translateY: visible.interpolate({ inputRange: [0, 1], outputRange: [hideBy, 0] }) }],
         },
       ]}
       pointerEvents="box-none"
@@ -68,6 +83,8 @@ export function ReaderToolBar({ visible, tools, onPress }: ReaderToolBarProps) {
   );
 }
 
+const ITEM_HEIGHT = 52;
+
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
@@ -83,7 +100,7 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    height: 52,
+    height: ITEM_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,

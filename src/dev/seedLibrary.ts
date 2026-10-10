@@ -74,7 +74,6 @@ export async function seedLibrary(dispatch: Dispatch<AppAction>, onProgress?: (d
       createdAt: now - i * 3_600_000,
       star: i % 11 === 0,
       locked: false,
-      searchHaystack: text,
       courseId,
     };
     dispatch({ type: 'library/ADD_FILE', file: doc });

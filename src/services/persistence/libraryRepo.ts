@@ -19,7 +19,6 @@ import type {
 import { COURSE_COLORS, isCourseColor } from '../courses/palette';
 import { parseOcrScript } from '../scripts/registry';
 import { parseSubmitPreset, serializeSubmitPreset } from '../submit/preset';
-import { buildSearchHaystack } from '../search/searchService';
 import { fromStoredPath, toStoredPath } from './libraryFiles';
 
 // Row shapes exactly as stored (see migrations.ts). Paths are relative to the document directory;
@@ -49,8 +48,11 @@ type DocumentRow = {
   last_page: number | null;
   missing_files: number;
   disk_bytes: number | null;
+  pdf_info_failed: number;
 };
 
+// As loadAll reads a page (PAGE_COLUMNS): `has_boxes` stands in for ocr_json, which stays in the
+// database until something needs the word boxes (§16 G4, loadPageOcr).
 type PageRow = {
   id: string;
   document_id: string;
@@ -61,7 +63,7 @@ type PageRow = {
   width: number;
   height: number;
   ocr_text: string | null;
-  ocr_json: string | null;
+  has_boxes: number;
   ocr_failed: number;
   layout: string | null;
   text_source: string | null;
@@ -154,15 +156,23 @@ function toDocType(value: string | null): DocType | undefined {
   return DOC_TYPES.includes(value as DocType) ? (value as DocType) : undefined;
 }
 
-function parseOcr(text: string | null, json: string | null): PageOcr | undefined {
+function parseOcr(text: string | null, json: string | null | undefined): PageOcr | undefined {
   if (json) {
     try {
-      return JSON.parse(json) as PageOcr;
+      const parsed = JSON.parse(json) as PageOcr;
+      if (typeof parsed.text === 'string' && Array.isArray(parsed.blocks)) return { text: parsed.text, blocks: parsed.blocks };
     } catch {
       // A corrupt blob loses box positions, not the text - fall through to text-only.
     }
   }
   return text === null ? undefined : { text, blocks: [] };
+}
+
+// §16 G4: the text only. A page with stored word boxes says where they are (PageOcr.blocksRow)
+// instead of carrying them.
+function rowToOcr(row: PageRow): PageOcr | undefined {
+  if (row.has_boxes) return { text: row.ocr_text ?? '', blocks: [], blocksRow: row.id };
+  return row.ocr_text === null ? undefined : { text: row.ocr_text, blocks: [] };
 }
 
 function rowToPage(row: PageRow): LibraryPage {
@@ -173,7 +183,7 @@ function rowToPage(row: PageRow): LibraryPage {
     thumbUri: fromStoredPath(row.thumb_path),
     width: row.width,
     height: row.height,
-    ocr: parseOcr(row.ocr_text, row.ocr_json),
+    ocr: rowToOcr(row),
     ocrFailed: row.ocr_failed ? true : undefined,
     layout: row.layout === 'fullPage' ? 'fullPage' : undefined,
     textSource: row.text_source === 'pdf' || row.text_source === 'ocr' ? row.text_source : undefined,
@@ -218,10 +228,17 @@ function rowToSemester(row: SemesterRow): Semester {
   };
 }
 
+// §16 G4: every page column but ocr_json. The word boxes are most of a library's bytes (a line of
+// JSON per recognised word) and no list, search or start screen reads them, so the load neither
+// copies them out of SQLite nor parses them: its cost follows the number of pages, not how much
+// text was recognised on them.
+const PAGE_COLUMNS = `id, document_id, idx, master_path, display_path, thumb_path, width, height, ocr_text,
+  ocr_json IS NOT NULL AS has_boxes, ocr_failed, layout, text_source, rotation`;
+
 // Newest first, matching the order the reducer keeps (ADD_FILE prepends).
 export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
   const docRows = await db.getAllAsync<DocumentRow>('SELECT * FROM documents ORDER BY created_at DESC, id');
-  const pageRows = await db.getAllAsync<PageRow>('SELECT * FROM pages ORDER BY document_id, idx');
+  const pageRows = await db.getAllAsync<PageRow>(`SELECT ${PAGE_COLUMNS} FROM pages ORDER BY document_id, idx`);
   const courseRows = await db.getAllAsync<CourseRow>('SELECT * FROM courses ORDER BY sort_order, created_at, id');
   const semesterRows = await db.getAllAsync<SemesterRow>('SELECT * FROM semesters ORDER BY starts_on DESC, created_at DESC, id');
   const slotRows = await db.getAllAsync<SlotRow>('SELECT * FROM timetable_slots ORDER BY weekday, start_min, id');
@@ -252,7 +269,6 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       star: !!row.star,
       tag: row.tag ?? undefined,
       locked: !!row.locked,
-      searchHaystack: buildSearchHaystack(row.name, pages),
       courseId: row.course_id ?? undefined,
       docType: toDocType(row.doc_type),
       coverKind: (row.cover_kind ?? undefined) as LibraryDocument['coverKind'],
@@ -264,6 +280,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       indexState: INDEX_STATES.includes(row.index_state as IndexState) ? (row.index_state as IndexState) : undefined,
       lastPage: row.last_page && row.last_page > 0 ? row.last_page : undefined,
       missingFiles: row.missing_files ? true : undefined,
+      pdfInfoFailed: row.pdf_info_failed ? true : undefined,
     };
   });
 
@@ -289,6 +306,90 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       createdAt: row.created_at,
     })),
   };
+}
+
+// --- Word boxes on demand (§16 G4) ---------------------------------------------------------------
+
+// SQLite's oldest builds take 999 bound values in one statement; 500 leaves room and keeps a
+// statement's text short.
+const ID_BATCH = 500;
+
+function batchesOf<T>(items: readonly T[], size = ID_BATCH): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+// A page as far as its word boxes go. `id` is missing on a page being built into a PDF that never
+// was a library page; the page itself is missing where a PDF has more pages than rows.
+type OcrRef = { id?: string; ocr?: PageOcr } | undefined;
+
+// The raw ocr_json of every row that `pages` still have their word boxes in, by row id. Both the
+// page's own row and the one its marker names are read: see storedJsonFor.
+async function storedOcrJson(db: SQLiteDatabase, pages: readonly OcrRef[]): Promise<Map<string, string>> {
+  const ids = new Set<string>();
+  for (const page of pages) {
+    if (page?.ocr?.blocksRow === undefined) continue;
+    ids.add(page.ocr.blocksRow);
+    if (page.id !== undefined) ids.add(page.id);
+  }
+  const out = new Map<string, string>();
+  for (const batch of batchesOf([...ids])) {
+    const rows = await db.getAllAsync<{ id: string; ocr_json: string }>(
+      `SELECT id, ocr_json FROM pages WHERE id IN (${batch.map(() => '?').join(', ')}) AND ocr_json IS NOT NULL`,
+      batch
+    );
+    for (const row of rows) out.set(row.id, row.ocr_json);
+  }
+  return out;
+}
+
+// The page's own row first: once a copy under a new id has been saved, its row holds the boxes,
+// and the original it still names may have been deleted since. Until then, the original's.
+function storedJsonFor(stored: ReadonlyMap<string, string>, page: NonNullable<OcrRef>): string | undefined {
+  const own = page.id !== undefined ? stored.get(page.id) : undefined;
+  return own ?? (page.ocr?.blocksRow !== undefined ? stored.get(page.ocr.blocksRow) : undefined);
+}
+
+// OCR objects that are what the database holds for their page, so putting one into the state
+// (library/SET_PAGE_OCR) isn't mistaken for a change to write back (blocksLoadedOnly).
+const loadedFromDb = new WeakSet<PageOcr>();
+
+export function hasDeferredBlocks(pages: readonly OcrRef[]): boolean {
+  return pages.some((page) => page?.ocr?.blocksRow !== undefined);
+}
+
+// `pages` with their word boxes read from the database. The same array when none are waiting, and
+// the same page objects for the ones that aren't. A page whose boxes are gone (or unreadable)
+// keeps its text and stops asking. Callers go through documents/pageOcr.ts, which reads between
+// writes.
+export async function loadPageOcr<T extends OcrRef>(db: SQLiteDatabase, pages: readonly T[]): Promise<readonly T[]> {
+  if (!hasDeferredBlocks(pages)) return pages;
+  const stored = await storedOcrJson(db, pages);
+  return pages.map((page) => {
+    if (page?.ocr?.blocksRow === undefined) return page;
+    const ocr = parseOcr(page.ocr.text, storedJsonFor(stored, page)) ?? { text: page.ocr.text, blocks: [] };
+    loadedFromDb.add(ocr);
+    return { ...page, ocr };
+  });
+}
+
+// True when `after` is `before` with word boxes loaded (on at least one page) and nothing else:
+// the rows already say the same, so the pages aren't rewritten and the document doesn't count as
+// edited. Any other new array is a change, as it always was.
+function blocksLoadedOnly(before: readonly LibraryPage[], after: readonly LibraryPage[]): boolean {
+  if (before === after || before.length !== after.length) return false;
+  let loaded = 0;
+  for (let i = 0; i < before.length; i++) {
+    const a = before[i];
+    const b = after[i];
+    if (a === b) continue;
+    if (a.ocr?.blocksRow === undefined || !b.ocr || !loadedFromDb.has(b.ocr)) return false;
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof LibraryPage)[]);
+    for (const key of keys) if (key !== 'ocr' && !Object.is(a[key], b[key])) return false;
+    loaded += 1;
+  }
+  return loaded > 0;
 }
 
 async function writeBookmark(db: SQLiteDatabase, b: Bookmark): Promise<void> {
@@ -436,10 +537,14 @@ export async function listSubmissions(
 // measure again. It isn't part of LibraryDocument, so a spread `...doc` can't carry a stale value.
 // `edited` (§8): false when only bookkeeping changed (documentEdited below), which then keeps the
 // stored updated_at.
+// `stored` (§16 G4): the ocr_json of pages whose word boxes were never loaded (storedOcrJson),
+// read by the caller before anything is deleted - the rows are replaced here, and a merge or
+// split has already deleted the document they were in.
 async function writeDocument(
   db: SQLiteDatabase,
   doc: LibraryDocument,
   conflict: 'upsert' | 'ignore',
+  stored: ReadonlyMap<string, string>,
   pagesUnchanged = false,
   edited = true
 ): Promise<void> {
@@ -467,11 +572,12 @@ async function writeDocument(
     doc.indexState ?? null,
     doc.lastPage ?? null,
     doc.missingFiles ? 1 : 0,
+    doc.pdfInfoFailed && !doc.pdfLayout ? 1 : 0,
   ];
   const insert = `INSERT INTO documents (id, name, format, mode, pdf_path, content_path, size_bytes, created_at,
        updated_at, star, tag, locked, cover_kind, source_kind, course_id, doc_type, archived, pdf_layout, pdf_page_size,
-       indexed_at, index_state, last_page, missing_files)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+       indexed_at, index_state, last_page, missing_files, pdf_info_failed)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   if (conflict === 'ignore') {
     const result = await db.runAsync(`${insert} ON CONFLICT (id) DO NOTHING`, params);
     if (result.changes === 0) return;
@@ -484,7 +590,7 @@ async function writeDocument(
          source_kind = excluded.source_kind, course_id = excluded.course_id, doc_type = excluded.doc_type,
          archived = excluded.archived, pdf_layout = excluded.pdf_layout, pdf_page_size = excluded.pdf_page_size,
          indexed_at = excluded.indexed_at, index_state = excluded.index_state, last_page = excluded.last_page,
-         missing_files = excluded.missing_files,
+         missing_files = excluded.missing_files, pdf_info_failed = excluded.pdf_info_failed,
          disk_bytes = CASE WHEN ${pagesUnchanged ? 1 : 0} AND documents.size_bytes = excluded.size_bytes
            AND documents.pdf_path IS excluded.pdf_path THEN documents.disk_bytes ELSE NULL END`,
       params
@@ -511,7 +617,7 @@ async function writeDocument(
         Math.round(page.width),
         Math.round(page.height),
         page.ocr?.text ?? null,
-        page.ocr && page.ocr.blocks.length > 0 ? JSON.stringify(page.ocr) : null,
+        ocrJsonOf(page, stored),
         page.ocrFailed ? 1 : 0,
         page.layout ?? null,
         page.textSource ?? null,
@@ -521,6 +627,15 @@ async function writeDocument(
   } finally {
     await pageStmt.finalizeAsync();
   }
+}
+
+// What goes in pages.ocr_json: the word boxes, when there are any. A page still waiting for its
+// boxes (PageOcr.blocksRow) keeps the stored ones, as the JSON they were read as.
+function ocrJsonOf(page: LibraryPage, stored: ReadonlyMap<string, string>): string | null {
+  const ocr = page.ocr;
+  if (!ocr) return null;
+  if (ocr.blocksRow !== undefined) return storedJsonFor(stored, page) ?? null;
+  return ocr.blocks.length > 0 ? JSON.stringify(ocr) : null;
 }
 
 async function writeCourse(db: SQLiteDatabase, course: Course, conflict: 'upsert' | 'ignore'): Promise<void> {
@@ -573,15 +688,20 @@ async function deleteRows(
   table: 'documents' | 'courses' | 'semesters' | 'timetable_slots' | 'submissions' | 'deadlines' | 'annotations' | 'bookmarks',
   ids: string[]
 ): Promise<void> {
-  for (const id of ids) await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [id]);
+  // §16 G4: one statement per batch, not per row (clearing a 300-document selection was 300
+  // round trips to the native side).
+  for (const batch of batchesOf(ids)) {
+    await db.runAsync(`DELETE FROM ${table} WHERE id IN (${batch.map(() => '?').join(', ')})`, batch);
+  }
 }
 
 // Used by the one-time legacy import: never overwrites a row that already exists, so re-running
 // an interrupted import is harmless.
 export async function insertIfMissing(db: SQLiteDatabase, library: LoadedLibrary): Promise<void> {
   await db.withTransactionAsync(async () => {
+    const stored = await storedOcrJson(db, library.documents.flatMap((doc) => doc.pages));
     for (const course of library.courses) await writeCourse(db, course, 'ignore');
-    for (const doc of library.documents) await writeDocument(db, doc, 'ignore');
+    for (const doc of library.documents) await writeDocument(db, doc, 'ignore', stored);
   });
 }
 
@@ -618,7 +738,8 @@ export async function documentIdsInDb(db: SQLiteDatabase): Promise<Set<string>> 
 
 export async function upsertDocuments(db: SQLiteDatabase, docs: LibraryDocument[]): Promise<void> {
   await db.withTransactionAsync(async () => {
-    for (const doc of docs) await writeDocument(db, doc, 'upsert');
+    const stored = await storedOcrJson(db, docs.flatMap((doc) => doc.pages));
+    for (const doc of docs) await writeDocument(db, doc, 'upsert', stored);
   });
 }
 
@@ -677,19 +798,29 @@ export async function archiveSemester(db: SQLiteDatabase, id: string): Promise<v
 }
 
 // §8: what isn't an edit of the document - the page the Reader is on (§7 R4), the integrity
-// check's missing-files flag (§8 B1) and the derived search text. A change to only these keeps
-// documents.updated_at, which backups compare (B2's importPlan: "already here" vs "changed since")
-// and which says when the library last changed (B5's reminder and automatic backups) - so reading
-// a document doesn't count as changing it.
-const NOT_EDITS: readonly (keyof LibraryDocument)[] = ['lastPage', 'missingFiles', 'searchHaystack'];
+// check's missing-files flag (§8 B1) and the backfill's "couldn't read the PDF" (§16 G4). A change
+// to only these keeps documents.updated_at, which backups compare (B2's importPlan: "already here"
+// vs "changed since") and which says when the library last changed (B5's reminder and automatic
+// backups) - so reading a document doesn't count as changing it. Nor does loading its word boxes
+// (§16 G4, blocksLoadedOnly).
+const NOT_EDITS: readonly (keyof LibraryDocument)[] = ['lastPage', 'missingFiles', 'pdfInfoFailed'];
 
 export function documentEdited(before: LibraryDocument, after: LibraryDocument): boolean {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)] as (keyof LibraryDocument)[]);
   for (const key of keys) {
     if (NOT_EDITS.includes(key)) continue;
+    if (key === 'pages' && blocksLoadedOnly(before.pages, after.pages)) continue;
     if (!Object.is(before[key], after[key])) return true;
   }
   return false;
+}
+
+// Nothing to store: the document is the one on disk with its word boxes loaded.
+function onlyBlocksLoaded(before: LibraryDocument, after: LibraryDocument): boolean {
+  if (!blocksLoadedOnly(before.pages, after.pages)) return false;
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)] as (keyof LibraryDocument)[]);
+  for (const key of keys) if (key !== 'pages' && !Object.is(before[key], after[key])) return false;
+  return true;
 }
 
 export type Diff<T> = { changed: T[]; removedIds: string[] };
@@ -713,6 +844,12 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
   const semesters = diffById(prev.semesters, next.semesters);
   const courses = diffById(prev.courses, next.courses);
   const documents = diffById(prev.documents, next.documents);
+  const prevDocs = new Map(prev.documents.map((d) => [d.id, d]));
+  // §16 G4: opening a document loads its word boxes into the state; that alone writes nothing.
+  documents.changed = documents.changed.filter((doc) => {
+    const before = prevDocs.get(doc.id);
+    return !before || !onlyBlocksLoaded(before, doc);
+  });
   const slots = diffById(prev.timetable, next.timetable);
   const submissions = diffById(prev.submissions ?? [], next.submissions ?? []);
   const deadlines = diffById(prev.deadlines ?? [], next.deadlines ?? []);
@@ -721,6 +858,17 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
   const diffs = [semesters, courses, documents, slots, submissions, deadlines, annotations, bookmarks];
   if (diffs.every((d) => d.changed.length + d.removedIds.length === 0)) return;
   await db.withTransactionAsync(async () => {
+    // §16 G4: before any row goes. Pages whose word boxes were never loaded are written back with
+    // the boxes their rows hold now, and those rows are about to be deleted (with a removed
+    // document, or by writeDocument replacing a document's pages).
+    const samePages = (doc: LibraryDocument) => {
+      const before = prevDocs.get(doc.id);
+      return !!before && (before.pages === doc.pages || blocksLoadedOnly(before.pages, doc.pages));
+    };
+    const stored = await storedOcrJson(
+      db,
+      documents.changed.filter((doc) => !samePages(doc)).flatMap((doc) => doc.pages)
+    );
     // Removed documents go first: a merge or split (§7 R2) gives its new documents the removed
     // ones' page ids, which must be free again before the new page rows are written. Their
     // submissions, annotations and bookmarks go with them (ON DELETE CASCADE); the ones that moved
@@ -728,10 +876,9 @@ export async function syncLibrary(db: SQLiteDatabase, prev: LoadedLibrary, next:
     await deleteRows(db, 'documents', documents.removedIds);
     for (const semester of semesters.changed) await writeSemester(db, semester);
     for (const course of courses.changed) await writeCourse(db, course, 'upsert');
-    const prevDocs = new Map(prev.documents.map((d) => [d.id, d]));
     for (const doc of documents.changed) {
       const before = prevDocs.get(doc.id);
-      await writeDocument(db, doc, 'upsert', before?.pages === doc.pages, !before || documentEdited(before, doc));
+      await writeDocument(db, doc, 'upsert', stored, samePages(doc), !before || documentEdited(before, doc));
     }
     for (const slot of slots.changed) await writeSlot(db, slot);
     // After documents and courses, which they reference.

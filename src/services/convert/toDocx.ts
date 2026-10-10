@@ -3,6 +3,7 @@ import { tDoc } from '../../i18n';
 import { MASTER_JPEG_Q, MASTER_MAX_DIM } from '../capture/imageSpec';
 import { pdfTextToOcr } from '../documents/importedPdfIndex';
 import { isPdfLevel } from '../documents/formatCapabilities';
+import { withPageBlocks } from '../documents/pageOcr';
 import { runOcr } from '../ocr/ocrService';
 import { PdfEncryptedError, PdfNativeUnavailableError, getPageCount, getPageText, renderPage } from '../pdf/pdfNative';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
@@ -203,9 +204,12 @@ export async function readPagesText(source: WordSource, onProgress?: (p: WordPro
   const out: (PageOcr | undefined)[] = [];
   if (source.kind === 'library') {
     const { doc, script } = source;
-    for (let i = 0; i < doc.pages.length; i += 1) {
-      onProgress?.({ done: i, total: doc.pages.length });
-      out.push(await libraryPageText(doc, doc.pages[i], i, script));
+    // §16 G4: paragraphs and headings are worked out from the lines' boxes, which the library
+    // load leaves in the database.
+    const pages = await withPageBlocks(doc.pages);
+    for (let i = 0; i < pages.length; i += 1) {
+      onProgress?.({ done: i, total: pages.length });
+      out.push(await libraryPageText(doc, pages[i], i, script));
     }
     return out;
   }

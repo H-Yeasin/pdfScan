@@ -295,6 +295,20 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // v17 (§16 G4): `meta` holds facts about this database as key/value rows (dbService's
+    // getMeta/setMeta); the first is that the one-time AsyncStorage import is over, so a launch no
+    // longer reads AsyncStorage to find that out. Not part of a backup: it describes this phone's
+    // file, not the library. documents.pdf_info_failed marks a document whose PDF the layout
+    // backfill couldn't read (documents/pdfInfoBackfill.ts), so it isn't opened on every launch.
+    version: 17,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+        ALTER TABLE documents ADD COLUMN pdf_info_failed INTEGER NOT NULL DEFAULT 0;
+      `);
+    },
+  },
 ];
 
 // v3 data move. The old free-text courses.semester becomes semesters rows: one per distinct name

@@ -678,11 +678,17 @@ export const en = {
     copy: 'Copy',
     copiedAll: 'Copied the text of every page',
     shareTxt: 'Share .txt',
+    // §18 W1: a 2-in-1 sheet shows two pages; Sign asks which one.
+    signWhichPage: 'Sign which page?',
+    signPage: 'Page {page}',
     deleteTitle: 'Delete document?',
     deleteBody: '"{name}" and its files will be permanently removed. This can\'t be undone.',
     delete: 'Delete',
     notFound: 'Document not found.',
     preparingPreview: 'Preparing preview…',
+    // §18 W3: the preview couldn't be built (ensureDocumentPdfOnce failed).
+    previewFailed: "Couldn't prepare the preview.",
+    retry: 'Retry',
     passwordTitle: "Couldn't open this PDF. It may be password protected.",
     passwordNeeded: 'This PDF needs a password.',
     password: 'Password',
@@ -700,15 +706,20 @@ export const en = {
     openFailed: "Couldn't open this file.",
     loading: 'Loading…',
     firstColumns: 'Showing the first {count} columns.',
+    // §18 W4: a text file over the preview cap ({size} is e.g. "4 MB").
+    firstBytes: 'Showing the first {size}.',
     tooLargeToPreview: 'File too large to preview',
     // §7 R4.
     pageIndicator: '{page} / {count}',
+    // §18 W5: a 2-in-1 sheet shows two pages.
+    pageRange: '{first}–{last} / {count}',
     jumpTitle: 'Go to page',
     jumpPlaceholder: '1–{count}',
     go: 'Go',
     noSuchPage: 'Type a page from 1 to {count}',
     pages: 'Pages',
     pageA11y: 'Page {page} of {count}. Tap to go to a page.',
+    pageRangeA11y: 'Pages {first} and {last} of {count}. Tap to go to a page.',
     cantOpen: "Can't open this file",
     cantOpenBody: 'It may be damaged, or not really a PDF.',
     filesMissing: 'Some files are missing',

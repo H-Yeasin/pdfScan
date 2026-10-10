@@ -3,7 +3,6 @@ import { isPdfLevel } from '../documents/formatCapabilities';
 import { extractPages, rearrangePages } from '../pdf/pdfOps';
 import { buildPdfFromPages, pageSizeOfPdf, toSourcePage } from '../pdf/pdfService';
 import { normalizeRotation } from '../pdf/rotation';
-import { buildSearchHaystack } from '../search/searchService';
 import type { Annotation, LibraryDocument, LibraryPage, PageRotation } from '../../types/models';
 import { createId } from '../../utils/id';
 import { annotationsHook, copyPageInto, fullyIndexed, pageFiles } from './libraryOperations';
@@ -116,7 +115,7 @@ export async function savePageEdit(
     };
   }
   cleanTemporaryCache(removed.flatMap(pageFiles));
-  return { ...next, searchHaystack: buildSearchHaystack(next.name, pages) };
+  return next;
 }
 
 // An imported PDF still being read (R1): Edit pages waits until every page has its row.
@@ -149,7 +148,6 @@ export async function extractToNewDocument(doc: LibraryDocument, pageIds: readon
     star: false,
     tag: doc.tag,
     locked: false,
-    searchHaystack: buildSearchHaystack(name, pages),
     courseId: doc.courseId,
     docType: doc.docType,
     pdfLayout: 'standard',

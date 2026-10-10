@@ -11,10 +11,18 @@ import type { Deadline } from '../types/models';
 import { createId } from '../utils/id';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 
-// Reminders show while the app is open too (a banner, not silently in the tray).
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
-});
+// Reminders show while the app is open too (a banner, not silently in the tray). Called once by
+// AppNavigator's deferred boot (§16 G3), not at module scope, so importing this file does no work.
+// Until then the default handler shows nothing in the foreground: a reminder due in the first
+// seconds of a cold start isn't shown while the app is open.
+let notificationsConfigured = false;
+export function configureNotifications(): void {
+  if (notificationsConfigured) return;
+  notificationsConfigured = true;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+  });
+}
 
 // Always mounted (AppNavigator). Keeps scheduled reminders in step with the deadlines - a deleted
 // deadline, one deleted with its course, or one marked done loses its reminders - and opens the

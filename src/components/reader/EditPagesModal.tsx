@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../../theme';
@@ -49,13 +49,19 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
   // The draft before the last delete, for Undo.
   const [beforeDelete, setBeforeDelete] = useState<{ edit: PageEdit; count: number } | null>(null);
 
-  // A fresh draft each time it opens, and whenever the saved document changes under it.
+  // A fresh draft each time it opens, and when the document's pages change under it (pages added
+  // from another document). §18 W5: not on every change to the document: the store hands over a
+  // new object when the Reader saves the page being read or the indexer adds a thumbnail, and
+  // that threw the draft away mid-edit.
+  const pageIds = doc.pages.map((p) => p.id).join('|');
+  const latestDoc = useRef(doc);
+  latestDoc.current = doc;
   useEffect(() => {
     if (!visible) return;
-    setEdit(startEdit(doc));
+    setEdit(startEdit(latestDoc.current));
     setSelected([]);
     setBeforeDelete(null);
-  }, [visible, doc]);
+  }, [visible, pageIds]);
 
   const pages = useMemo(() => editedPages(doc, edit), [doc, edit]);
   const dirty = isEdited(doc, edit);

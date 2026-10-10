@@ -56,9 +56,11 @@ so they're saved like real documents. Do this in a dev build, then install the r
 ## Open decisions (decide from the numbers)
 
 - **pdf-lib + fontkit** are imported at module level by about ten services (save, tools, text
-  layer). If cold start is over budget, make them lazy like `sheetService`'s `XLSX()`; or try Metro's
-  `inlineRequires` globally (Expo leaves it off; turning it on changes module side-effect order, so
-  test the whole app).
+  layer). **Decided in §16 G3 (2026-10-10):** the services keep their imports, and everything on
+  the boot path (the store, the boot hooks, the start screens) reaches them through a lazy
+  `require`; the screens themselves load on first render. `src/__tests__/bootImports.test.ts` keeps
+  it that way. Still open: Metro's `inlineRequires` globally (Expo leaves it off; turning it on
+  changes module side-effect order, so test the whole app), only if G9's numbers ask for it.
 - **FlashList / expo-image:** add only if budget 2 is missed after the selector change. Record the
   before/after numbers here.
 
@@ -83,6 +85,26 @@ move. Measure it anyway, on the same phone, with a release build:
 |---|---|---|---|---|---|
 | | | before M5 (`80456a1`) | | n/a | |
 | | | M5 | | | |
+
+## §16 G3: the boot diet
+
+Measured on the release bundle, not on a phone yet (`npx expo export --platform android --no-minify
+--no-bytecode`, then the modules reachable from the bundle's entry points through top-level
+requires, which is what runs before the first screen):
+
+| | Modules run at startup | Their source |
+|---|---|---|
+| Before G3 (`bb4dbf2`), any start screen | 2,301 of 3,078 | 12.1 MB of 16.5 MB |
+| After, starting on Home | 1,854 | 9.0 MB |
+| After, starting on Capture | 1,751 | 8.6 MB |
+| After, starting on Onboarding | 1,705 | 8.5 MB |
+
+On a phone (the "Cold start" row above, before and after G3, same release build settings):
+- cold start to the first usable screen, on Home and on Capture (§16 Verification 4 asks for 30%
+  with G4);
+- **the first open** of the Reader, Review and Deliver after a cold start, against the second open:
+  those screens' modules (pdf-jsi and the WebView; pdf-lib) now load then. If the first open
+  stutters, preload after `useDeferredBoot` (see `docs/plan/16-speed.md` G3).
 
 ## §15 V5: the splash intro
 

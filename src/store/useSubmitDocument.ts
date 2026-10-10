@@ -3,9 +3,7 @@ import { canSubmit, isPasswordProtected } from '../services/documents/formatCapa
 import { typeNumberOf } from '../services/courses/docTypes';
 import { shareAs } from '../services/sharing/shareService';
 import { defaultSubmitPreset } from '../services/submit/preset';
-import { formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
-import { submitDocument } from '../services/submit/submitDocument';
-import { ensureSubmissionFile, submissionRecord } from '../services/submit/history';
+import { formatLimit } from '../services/submit/sizeFormat';
 import { matchDeadline } from '../services/submit/deadlines';
 import type { LibraryDocument, Submission } from '../types/models';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
@@ -35,6 +33,11 @@ export function useSubmitDocument() {
       const preset = course?.submitPreset ?? defaultSubmitPreset(doc.courseId ?? null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: preset.sizeLimitBytes ? t('deliver.progress.fitting', { size: formatLimit(preset.sizeLimitBytes) }) : t('deliver.progress.building') });
       try {
+        // Required here, not imported: building a submission brings pdf-lib, and Home and the
+        // Library use this hook from their first frame (§16 G3).
+        const { submitDocument } = require('../services/submit/submitDocument') as typeof import('../services/submit/submitDocument');
+        const { submissionRecord } = require('../services/submit/history') as typeof import('../services/submit/history');
+        const { tooLargeMessage } = require('../services/submit/sizeTarget') as typeof import('../services/submit/sizeTarget');
         const n = typeNumberOf(doc, files);
         const result = await submitDocument({
           doc,
@@ -93,6 +96,8 @@ export function useShareSubmission() {
       if (!doc) return;
       try {
         const course = courses.find((c) => c.id === doc.courseId);
+        // Required, not imported, like useSubmitDocument's builders.
+        const { ensureSubmissionFile } = require('../services/submit/history') as typeof import('../services/submit/history');
         const { uri, rebuilt } = await ensureSubmissionFile(submission, doc, { profile, course, docs: files, annotations, logoUri: institutionLogoUri(institutionLogo) });
         if (rebuilt) dispatch({ type: 'ui/SHOW_SNACK', msg: t('submit.rebuilt', { file: submission.fileName }) });
         await shareAs(uri, submission.fileName, 'application/pdf');

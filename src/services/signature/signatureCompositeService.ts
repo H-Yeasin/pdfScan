@@ -5,8 +5,9 @@ import { createId } from '../../utils/id';
 // Burns a captured signature PNG onto a plain page image (a SessionPage, pre-save - no PDF, no
 // compiled document yet). `placement` is natural pixel space, top-left origin - the same
 // convention SessionPage.cropRect and SignaturePlacementOverlay's onConfirm already use, so no
-// axis flip is needed here (that flip only exists in pdfService.ts's applySignatureToPdf because
-// PDF's own coordinate space is bottom-left-origin; a plain raster image has no such quirk).
+// axis flip is needed here (that flip only exists on the way into a PDF, in documents/pageMap.ts's
+// pdfRectFor, because PDF's own coordinate space is bottom-left-origin; a plain raster image has no
+// such quirk).
 // Always writes a new JPEG file; never touches the source page's original image.
 export async function applySignatureToPage(
   pageUri: string,

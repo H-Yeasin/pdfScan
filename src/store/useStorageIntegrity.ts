@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getDb } from '../services/persistence/dbService';
 import { documentIdsInDb } from '../services/persistence/libraryRepo';
-import { findOrphans, repair } from '../services/storage/integrity';
+import { findOrphans, recoverInterruptedWrites, repair } from '../services/storage/integrity';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 
 // §8 B1: once per launch, after the library has loaded, checks that every document's files are
@@ -23,6 +23,8 @@ export function useStorageIntegrity(libraryLoaded: boolean): void {
     ran.current = loadAttempt;
     let cancelled = false;
     (async () => {
+      // §18 W3: first, so a file waiting under its temporary name isn't reported as missing.
+      await recoverInterruptedWrites();
       const rowIds = await documentIdsInDb(await getDb());
       const report = await findOrphans(files.current, rowIds);
       const changes = await repair(report);

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { DocTypePickerModal } from '../components/courses/DocTypeChips';
 import { OverflowSheet, type OverflowItemId } from '../components/reader/OverflowSheet';
 import { docTypeOf, getDocType } from '../services/courses/docTypes';
 import { PdfPageView, type PdfPageViewHandle } from '../components/reader/PdfPageView';
 import { ReaderToolBar } from '../components/reader/ReaderToolBar';
-import { ReaderTopChrome } from '../components/reader/ReaderTopChrome';
+import { ReaderTopChrome, ROW_HEIGHT as TOP_BAR_ROW_HEIGHT } from '../components/reader/ReaderTopChrome';
 import { ReadingSettingsSheet } from '../components/reader/ReadingSettingsSheet';
 import { useReaderChrome } from '../components/reader/useReaderChrome';
 import { useReaderDocument } from '../components/reader/useReaderDocument';
+import { usePageOcr } from '../components/reader/usePageOcr';
 import { useReaderFind } from '../components/reader/useReaderFind';
 import { SheetView } from '../components/reader/SheetView';
 import { TxtView } from '../components/reader/TxtView';
@@ -21,13 +22,13 @@ import { usePageImage } from '../components/shared/usePageImage';
 import { useEditPages } from '../components/reader/useEditPages';
 import { useOpenCoverOptions } from '../components/library/useCoverTarget';
 import { PageScrubberSheet } from '../components/reader/PageScrubberSheet';
-import { parseJumpInput } from '../services/documents/readerPosition';
+import { pageLabel, parseJumpInput, pdfPageAfterEdit } from '../services/documents/readerPosition';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignatureModal } from '../components/shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
 import { useRouter } from '../navigation/router';
 import { useScreenRole } from '../navigation/screenRole';
-import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import {
   applySignedPage,
   applySignatureToDocument,
@@ -35,6 +36,7 @@ import {
 } from '../services/persistence/libraryOperations';
 import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../services/sharing/shareService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
+import { signTargets, type SignaturePlacement } from '../services/signature/signaturePlacement';
 import { canFindInDoc, canSign, isPageRasterFormat } from '../services/documents/formatCapabilities';
 import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../services/documents/readerTools';
 import { NIGHT_OVERLAY_ALPHA, pdfViewOptions, type ReadingSettings } from '../services/documents/readingSettings';
@@ -60,6 +62,7 @@ import { writeDocumentText, writeExportText } from '../services/study/textExport
 import { extractDocumentText } from '../services/study/textSelection';
 import { MIME_BY_FORMAT } from '../utils/docFormat';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
+import type { LibraryDocument } from '../types/models';
 import { spacing, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 import { Hint } from '../components/shared/Hint';
@@ -83,6 +86,7 @@ export function ReaderScreen() {
   const pdfRef = useRef<PdfPageViewHandle>(null);
   const goToPage = useCallback((page: number) => pdfRef.current?.goToPage(page), []);
   const {
+    inert,
     doc,
     external,
     format,
@@ -94,6 +98,8 @@ export function ReaderScreen() {
     contentKey,
     fileMissing,
     backfilling,
+    previewFailed,
+    retryPreview,
     pageCount,
     activeIndex,
     password,
@@ -102,18 +108,30 @@ export function ReaderScreen() {
     needsPassword,
     loadProblem,
     reloadKey,
+    initialPage,
     reload,
     handleLoad,
     handlePageChanged,
     handlePdfError,
     submitPassword,
-  } = useReaderDocument(goToPage);
+  } = useReaderDocument();
+  usePageOcr(doc);
   const find = useReaderFind({ pdfUri, pdfId, pageCount, contentKey, goToPage });
   // §16 G2: a Reader kept under a detour (Pro, a cover's options) doesn't hold the screen on.
   const onScreen = useScreenRole() === 'active';
   const chrome = useReaderChrome(reading.keepAwake && onScreen);
-  const { reset: resetChrome, onPage: onChromePage } = chrome;
+  const { reset: resetChrome, onPage: onChromePage, toggle: toggleChrome, show: showChrome } = chrome;
   useEffect(() => resetChrome(), [contentKey, resetChrome]);
+  // §18 W2: a tap on the page hides the bars, but not while Find is open: its field is in the top
+  // bar, and the tap is usually aimed at a match. A search result can open Find on a Reader kept
+  // mounted with its bars hidden, so opening it shows them.
+  const findOpen = find.open;
+  const onViewerTap = useCallback(() => {
+    if (!findOpen) toggleChrome();
+  }, [findOpen, toggleChrome]);
+  useEffect(() => {
+    if (findOpen) showChrome();
+  }, [findOpen, showChrome]);
 
   const submit = useSubmitDocument();
   const shareSubmission = useShareSubmission();
@@ -170,13 +188,22 @@ export function ReaderScreen() {
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [jumpOpen, setJumpOpen] = useState(false);
   const [scrubberOpen, setScrubberOpen] = useState(false);
-  // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it.
-  const editPages = useEditPages(doc && !external ? doc : undefined, reload);
+  // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it, §18 W5:
+  // on the page that was being read, wherever the edit moved it.
+  const onPagesEdited = useCallback(
+    (before: LibraryDocument, after: LibraryDocument) => reload((page) => pdfPageAfterEdit(before, after, page)),
+    [reload]
+  );
+  const editPages = useEditPages(doc && !external ? doc : undefined, onPagesEdited);
   // §14 Q7: Academic options for this document; Back (or Apply) returns here.
   const openCoverOptions = useOpenCoverOptions();
   const [signing, setSigning] = useState(false);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
+  // §18 W1: the library page being signed, set when signing starts. Everything in the flow uses it
+  // (the page shown for placing, the page written, the snack), never the PDF page on screen: after
+  // a cover or on a 2-in-1 sheet the two numbers differ.
+  const [signIdx, setSignIdx] = useState(0);
   // §5 T3: the library page open in "Select text", or null.
   const [selectTextIdx, setSelectTextIdx] = useState<number | null>(null);
   // §12 D3: the library page Mark mode opened on, or null.
@@ -201,22 +228,15 @@ export function ReaderScreen() {
     };
   }, [markOpen, doc, isTextUnlocked]);
   // §12 D3: marks reach document.pdf in the background; the viewer then reloads on the page being
-  // read (tagged with the reload it's for, so another reload doesn't reuse it).
-  const [startPage, setStartPage] = useState<{ contentKey: string | undefined; reloadKey: number; page: number } | null>(null);
-  const position = useRef({ activeIndex, contentKey, reloadKey });
-  position.current = { activeIndex, contentKey, reloadKey };
-  const syncAnnotations = useAnnotationPdfSync(
-    useCallback(() => {
-      const { activeIndex: idx, contentKey: key, reloadKey: current } = position.current;
-      setStartPage({ contentKey: key, reloadKey: current + 1, page: idx + 1 });
-      reload();
-    }, [reload])
-  );
+  // read.
+  const syncAnnotations = useAnnotationPdfSync(useCallback(() => reload(), [reload]));
   // §5 T5: bookmarks of this document, and the one on the page on screen.
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [labelling, setLabelling] = useState(false);
   const docBookmarks = useMemo(() => (doc ? documentBookmarks(state.library.bookmarks, doc) : []), [doc, state.library.bookmarks]);
   const currentIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
+  // §18 W5: the top bar and "Go to page" count library pages, like the page strip.
+  const shownPage = useMemo(() => pageLabel(doc && !external ? doc : undefined, activeIndex + 1, pageCount), [doc, external, activeIndex, pageCount]);
   // §12 D4: the notes panel: marks, notes and bookmarks by page.
   const [notesOpen, setNotesOpen] = useState(false);
   const docNotes = useMemo(
@@ -244,8 +264,9 @@ export function ReaderScreen() {
   };
 
   // A page search result: once the PDF has loaded, jump to that library page's PDF page and
-  // highlight the query there.
-  const target = state.reader.target;
+  // highlight the query there. (The viewer already opened on it, useReaderDocument's first page;
+  // the jump is for a Reader that was open.) §18 W5: only the Reader on screen takes the target.
+  const target = onScreen ? state.reader.target : null;
   const { openOnPage } = find;
   useEffect(() => {
     if (!target || !doc || pageCount === 0) return;
@@ -297,6 +318,26 @@ export function ReaderScreen() {
     [doc, activeIndex, proTasks, toWord, convertToPdf, convertToWord, editFile, fillForm, t]
   );
 
+  // Starts signing library page `idx`: a PDF-format document gets the signature drawn onto its
+  // PDF page (capture, then place); a JPG one has it flattened into the page's master.
+  const startSigning = useCallback(
+    (idx: number) => {
+      if (!doc) return;
+      setSignIdx(idx);
+      if (doc.format === 'PDF') {
+        if (state.signature.saved) {
+          setCapturedSignature(state.signature.saved);
+          setSignStep('place');
+        } else {
+          setSignStep('capture');
+        }
+      } else {
+        setSigning(true);
+      }
+    },
+    [doc, state.signature.saved]
+  );
+
   const handleOverflowSelect = useCallback(
     async (id: OverflowItemId) => {
       if (id === 'share') {
@@ -320,19 +361,21 @@ export function ReaderScreen() {
         fillForm();
       } else if (id === 'sign') {
         if (!doc || !signVisible) return;
-        if (doc.format === 'PDF') {
-          if (state.signature.saved) {
-            setCapturedSignature(state.signature.saved);
-            setSignStep('place');
-          } else {
-            setSignStep('capture');
-          }
-        } else {
-          setSigning(true);
+        // The library pages on the PDF page on screen. A 2-in-1 sheet shows two: ask which one.
+        const targets = signTargets(doc, activeIndex + 1);
+        if (targets.length > 1) {
+          Alert.alert(t('reader.signWhichPage'), undefined, [
+            { text: t('common.cancel'), style: 'cancel' },
+            ...targets.map((idx) => ({ text: t('reader.signPage', { page: idx + 1 }), onPress: () => startSigning(idx) })),
+          ]);
+        } else if (targets.length === 1) {
+          startSigning(targets[0]);
         }
       } else if (id === 'addToLibrary') {
         if (!external) return;
         const promoted = await promoteExternalToLibrary(external);
+        // §18 W5: the library copy opens on the page being read, not on page 1.
+        if (isPageRaster && pageCount > 0) promoted.lastPage = activeIndex + 1;
         dispatch({ type: 'library/ADD_FILE', file: promoted });
         dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.addedToLibrary') });
@@ -393,7 +436,7 @@ export function ReaderScreen() {
         );
       }
     },
-    [doc, external, pdfUri, title, signVisible, dispatch, back, state.signature.saved, submit, activeIndex, editPages, convertToPdf, convertToWord, editFile, fillForm, openCoverOptions, t]
+    [doc, external, pdfUri, title, signVisible, dispatch, back, startSigning, submit, activeIndex, isPageRaster, pageCount, editPages, convertToPdf, convertToWord, editFile, fillForm, openCoverOptions, t]
   );
 
   const handleSignConfirm = useCallback(
@@ -401,20 +444,22 @@ export function ReaderScreen() {
       if (!doc) return;
       const updated = await applySignedPage(
         doc,
-        activeIndex,
+        signIdx,
         flattenedUri,
         state.library.annotations.filter((a) => a.documentId === doc.id)
       );
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSigning(false);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: activeIndex + 1 }) });
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: signIdx + 1 }) });
     },
-    [doc, activeIndex, dispatch]
+    [doc, signIdx, dispatch, state.library.annotations, t]
   );
 
   const handleSignatureCaptured = useCallback(
     async (signature: { uri: string; aspectRatio: number }) => {
       const saved = await saveSignatureForReuse(signature.uri, signature.aspectRatio);
+      // The drawing was a temporary file; the saved copy is the one placed, now and next time.
+      cleanTemporaryCache([signature.uri]);
       dispatch({ type: 'signature/SET_SAVED', saved });
       setCapturedSignature(saved);
       setSignStep('place');
@@ -432,19 +477,22 @@ export function ReaderScreen() {
   }, []);
 
   // The page the signature is placed on: its master, or for an imported PDF the page rendered now.
-  const signPage = usePageImage(doc, activeIndex, signStep === 'place');
+  const signPage = usePageImage(doc, signIdx, signStep === 'place');
 
   const handlePlacementConfirm = useCallback(
-    async (placement: { originX: number; originY: number; width: number; height: number }) => {
+    async (placement: SignaturePlacement) => {
       if (!doc || !capturedSignature || !signPage) return;
-      const updated = await applySignatureToDocument(doc, activeIndex, capturedSignature.uri, placement, signPage);
+      const updated = await applySignatureToDocument(doc, signIdx, capturedSignature.uri, placement, signPage);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       setSignStep(null);
       setCapturedSignature(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.added') });
     },
-    [doc, activeIndex, capturedSignature, signPage, dispatch]
+    [doc, signIdx, capturedSignature, signPage, dispatch, t]
   );
+
+  // §18 W5: a Reader that has never been on screen has no document to show.
+  if (inert) return <View style={[styles.container, { backgroundColor: tokens.bg }]} />;
 
   if (!doc && !external) {
     return (
@@ -461,6 +509,20 @@ export function ReaderScreen() {
         <Text style={{ color: tokens.muted, textAlign: 'center' }}>{t('reader.filesMissingBody')}</Text>
         <Pressable accessibilityRole="button" onPress={() => back()} hitSlop={8}>
           <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('common.back')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (doc && !external && isPageRaster && !pdfUri && previewFailed) {
+    return (
+      <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
+        <Text style={{ color: tokens.muted, textAlign: 'center' }}>{t('reader.previewFailed')}</Text>
+        <Pressable accessibilityRole="button" onPress={retryPreview} hitSlop={8}>
+          <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('reader.retry')}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => back()} hitSlop={8}>
+          <Text style={{ color: tokens.muted, fontWeight: '600' }}>{t('common.back')}</Text>
         </Pressable>
       </View>
     );
@@ -499,10 +561,10 @@ export function ReaderScreen() {
           fitPolicy={pdfOptions.fitPolicy}
           spacing={pdfOptions.spacing}
           highlightRects={markFlash.rects ?? find.highlightRects}
-          initialPage={startPage && startPage.contentKey === contentKey && startPage.reloadKey === reloadKey ? startPage.page : undefined}
+          initialPage={initialPage}
           onLoad={handleLoad}
           onPageChanged={onPageChanged}
-          onTap={chrome.toggle}
+          onTap={onViewerTap}
           onError={handlePdfError}
         />
       ) : format === 'CSV' || format === 'XLSX' || format === 'XLS' ? (
@@ -513,7 +575,7 @@ export function ReaderScreen() {
           night={night}
           findQuery={find.query}
           onMatchCount={find.setLocalMatchCount}
-          onTap={chrome.toggle}
+          onTap={onViewerTap}
         />
       ) : format === 'TXT' ? (
         <TxtView
@@ -522,10 +584,18 @@ export function ReaderScreen() {
           night={night}
           findQuery={find.query}
           onMatchCount={find.setLocalMatchCount}
-          onTap={chrome.toggle}
+          onTap={onViewerTap}
         />
       ) : format === 'DOCX' ? (
-        <DocxView key={nativeUri} uri={nativeUri!} night={night} findQuery={find.query} onMatchCount={find.setLocalMatchCount} />
+        <DocxView
+          key={nativeUri}
+          uri={nativeUri!}
+          night={night}
+          findQuery={find.query}
+          onMatchCount={find.setLocalMatchCount}
+          padTop={insets.top + TOP_BAR_ROW_HEIGHT}
+          onTap={onViewerTap}
+        />
       ) : format === 'DOC' ? (
         // Only on documents added before R5 dropped .doc; there's no viewer for it.
         <View style={styles.unsupported}>
@@ -548,7 +618,13 @@ export function ReaderScreen() {
       )}
 
       {needsPassword && (
-        <View style={styles.passwordOverlay} pointerEvents="box-none">
+        // §18 W5 (§14 Q4's rule): the card moves up with the keyboard. The app is edge-to-edge,
+        // so Android doesn't resize the window for it.
+        <KeyboardAvoidingView
+          style={[styles.passwordOverlay, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }]}
+          behavior="padding"
+          pointerEvents="box-none"
+        >
           <View style={[styles.passwordCard, { backgroundColor: tokens.surface }]}>
             <Text style={[styles.passwordTitle, { color: tokens.ink }]}>
               {loadProblem === 'password' || loadProblem === 'wrongPassword' ? t('reader.passwordNeeded') : t('reader.passwordTitle')}
@@ -574,7 +650,7 @@ export function ReaderScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       <ReaderTopChrome
@@ -582,10 +658,9 @@ export function ReaderScreen() {
         name={title}
         onBack={() => back()}
         onOverflow={() => setOverflowOpen(true)}
-        pageCount={pageCount}
-        activeIndex={activeIndex}
+        page={shownPage}
         onJump={isPageRaster ? () => setJumpOpen(true) : undefined}
-        onFind={format && canFindInDoc(format) ? () => find.setOpen((v) => !v) : undefined}
+        onFind={format && canFindInDoc(format) ? find.toggle : undefined}
         findOpen={find.open}
         findQuery={find.query}
         onChangeFindQuery={find.changeQuery}
@@ -615,16 +690,16 @@ export function ReaderScreen() {
       <TextPromptModal
         visible={jumpOpen}
         title={t('reader.jumpTitle')}
-        placeholder={t('reader.jumpPlaceholder', { count: pageCount })}
+        placeholder={t('reader.jumpPlaceholder', { count: shownPage.count })}
         submitLabel={t('reader.go')}
         keyboardType="number-pad"
         onCancel={() => setJumpOpen(false)}
         onSubmit={(value) => {
-          const page = parseJumpInput(value, pageCount);
+          const page = parseJumpInput(value, shownPage.count);
           // The snack would sit under the prompt, so the prompt closes either way.
           setJumpOpen(false);
-          if (page === null) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noSuchPage', { count: pageCount }) });
-          else goToPage(page);
+          if (page === null) dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noSuchPage', { count: shownPage.count }) });
+          else goToPage(shownPage.library && doc ? pdfPageFor(doc, page - 1).page : page);
         }}
       />
 
@@ -742,12 +817,12 @@ export function ReaderScreen() {
         />
       ) : null}
 
-      {signing && doc && doc.pages[activeIndex] && (
+      {signing && doc && doc.pages[signIdx] && (
         <SignatureModal
           visible
-          uri={doc.pages[activeIndex].fileUri}
-          naturalWidth={doc.pages[activeIndex].width}
-          naturalHeight={doc.pages[activeIndex].height}
+          uri={doc.pages[signIdx].fileUri}
+          naturalWidth={doc.pages[signIdx].width}
+          naturalHeight={doc.pages[signIdx].height}
           onCancel={() => setSigning(false)}
           onConfirm={handleSignConfirm}
         />

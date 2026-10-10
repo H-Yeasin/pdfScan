@@ -11,15 +11,7 @@ import { useBackupExport } from '../backup/useBackupExport';
 import { useOpenCoverOptions } from './useCoverTarget';
 import { useRouter } from '../../navigation/router';
 import { saveSignatureForReuse } from '../../services/signature/savedSignatureStorage';
-import {
-  applySignedPage,
-  applySignatureToDocument,
-  compressDocument,
-  compressImportedPdf,
-  mergeDocuments,
-  splitDocument,
-} from '../../services/persistence/libraryOperations';
-import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
+import { cleanTemporaryCache, deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { canSign, isPasswordProtected, isPdfLevel } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import { usePageImage } from '../shared/usePageImage';
@@ -31,6 +23,12 @@ import type { AppAction } from '../../store/appReducer';
 import type { Annotation, LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
 import { hapticSelection } from '../../services/feedback/haptics';
+
+// §16 G3: libraryOperations (and pdf-lib with it) loads with the first merge, split, compress or
+// signature, not with Home and the Library, which use this hook from their first frame.
+function libraryOps(): typeof import('../../services/persistence/libraryOperations') {
+  return require('../../services/persistence/libraryOperations') as typeof import('../../services/persistence/libraryOperations');
+}
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
 export function useOpenDocument() {
@@ -58,7 +56,7 @@ export async function compressDocuments(
   let notSmaller = 0;
   for (const doc of docs) {
     if (isPdfLevel(doc)) {
-      const result = await compressImportedPdf(doc);
+      const result = await libraryOps().compressImportedPdf(doc);
       if (result.smaller) {
         rasterized += 1;
         dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: result.doc });
@@ -66,7 +64,7 @@ export async function compressDocuments(
         notSmaller += 1;
       }
     } else {
-      const compressed = await compressDocument(doc, undefined, annotations.filter((a) => a.documentId === doc.id));
+      const compressed = await libraryOps().compressDocument(doc, undefined, annotations.filter((a) => a.documentId === doc.id));
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
     }
   }
@@ -218,14 +216,14 @@ export function useDocumentListActions() {
 
       async function runPageTool(tool: SelectionToolId) {
         if (tool === 'merge' && selectedDocs.length >= 2) {
-          const merged = await mergeDocuments(selectedDocs, annotationsOf(selectedDocs));
+          const merged = await libraryOps().mergeDocuments(selectedDocs, annotationsOf(selectedDocs));
           selectedDocs.forEach((doc) => deleteDocumentFiles(doc.id));
           dispatch({ type: 'library/REPLACE_FILES', ids: selection, files: [merged] });
           dispatch({ type: 'library/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.merged', { count: selectedDocs.length }) });
         } else if (tool === 'split' && selectedDocs.length === 1) {
           const [doc] = selectedDocs;
-          const split = await splitDocument(doc, annotationsOf([doc]));
+          const split = await libraryOps().splitDocument(doc, annotationsOf([doc]));
           deleteDocumentFiles(doc.id);
           dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
           dispatch({ type: 'library/CLEAR_SELECTION' });
@@ -256,7 +254,7 @@ export function useDocumentListActions() {
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!signTarget) return;
-      const updated = await applySignedPage(
+      const updated = await libraryOps().applySignedPage(
         signTarget,
         0,
         flattenedUri,
@@ -273,6 +271,8 @@ export function useDocumentListActions() {
   const handleSignatureCaptured = useCallback(
     async (signature: { uri: string; aspectRatio: number }) => {
       const saved = await saveSignatureForReuse(signature.uri, signature.aspectRatio);
+      // The drawing was a temporary file; the saved copy is the one placed, now and next time.
+      cleanTemporaryCache([signature.uri]);
       dispatch({ type: 'signature/SET_SAVED', saved });
       setCapturedSignature(saved);
       setSignStep('place');
@@ -292,7 +292,9 @@ export function useDocumentListActions() {
   const handlePlacementConfirm = useCallback(
     async (placement: { originX: number; originY: number; width: number; height: number }) => {
       if (!signTarget || !capturedSignature || !signPage) return;
-      const updated = await applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement, signPage);
+      // Library page 0 (§18 W1): the service finds it in the PDF, also as the left column of a
+      // 2-in-1 sheet. The saved signature is only read, so it is there for the next document.
+      const updated = await libraryOps().applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement, signPage);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'library/CLEAR_SELECTION' });
       setSignStep(null);

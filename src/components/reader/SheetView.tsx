@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { spacing, tokens as themes, useTheme, type ThemeTokens } from '../../theme';
@@ -13,6 +13,18 @@ const CHAR_WIDTH = 8;
 const CELL_FONT_SIZE = 13;
 const CELL_PADDING_H = 6;
 const CELL_PADDING_V = 6;
+const CELL_LINE_HEIGHT = 18;
+
+// §18 W4: every row is exactly this tall (the row sets it, the cells' text has the matching line
+// height), so the list knows where row 40,000 is without having drawn the rows before it. Without
+// it, Find's scrollToIndex failed silently on any row not yet laid out. Whole points, so 50,000
+// rows don't add up a rounding error; + 1 for the line under the row.
+export function sheetLineHeight(zoom: number): number {
+  return Math.round(CELL_LINE_HEIGHT * zoom);
+}
+export function sheetRowHeight(zoom: number): number {
+  return sheetLineHeight(zoom) + 2 * Math.round(CELL_PADDING_V * zoom) + 1;
+}
 
 // §12 D11: pinch zoom scales the grid itself (font, padding, column widths), not a picture of it,
 // so text stays sharp and rows stay virtualized. Steps of 0.1 keep a pinch to a handful of renders.
@@ -132,6 +144,12 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
     []
   );
 
+  const rowHeight = sheetRowHeight(zoom);
+  const getItemLayout = useCallback(
+    (_: ArrayLike<string[]> | null | undefined, index: number) => ({ length: rowHeight, offset: rowHeight * index, index }),
+    [rowHeight]
+  );
+
   const onScrollX = useMemo(
     () => Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: true }),
     [scrollX]
@@ -198,7 +216,7 @@ export function SheetView({ uri, format, night, findQuery, onMatchCount, onTap }
                 onTap={onTap}
               />
             )}
-            onScrollToIndexFailed={() => {}}
+            getItemLayout={getItemLayout}
           />
         </Animated.ScrollView>
       </View>
@@ -222,14 +240,15 @@ type SheetRowProps = {
 const SheetRow = memo(function SheetRow({ row, widths, zoom, header, needle, scrollX, colors, onTap }: SheetRowProps) {
   const cellSize = {
     fontSize: CELL_FONT_SIZE * zoom,
+    lineHeight: sheetLineHeight(zoom),
     paddingHorizontal: CELL_PADDING_H * zoom,
-    paddingVertical: CELL_PADDING_V * zoom,
+    paddingVertical: Math.round(CELL_PADDING_V * zoom),
     borderColor: colors.edge,
   };
   const rowBg = header ? colors.surface2 : colors.bg;
   const tint = (value: string) => (needle && value.toLowerCase().includes(needle) ? colors.accentSoft : undefined);
   return (
-    <Pressable accessibilityRole="button" style={[styles.row, { backgroundColor: rowBg }]} onPress={onTap}>
+    <Pressable accessibilityRole="button" style={[styles.row, { backgroundColor: rowBg, height: sheetRowHeight(zoom) }]} onPress={onTap}>
       {widths.map((width, i) => {
         const value = String(row[i] ?? '');
         const style = [

@@ -115,7 +115,6 @@ describe('§12 D7 saving', () => {
     // The original stays until the database points at the new file.
     expect(new File(doc.contentUri).exists).toBe(true);
     expect(patch.pages![0]).toMatchObject({ id: 'page1', ocr: { text: 'Café — নতুন' } });
-    expect(patch.searchHaystack).toContain('নতুন');
     expect(patch.sizeBytes).toBe(new File(patch.contentUri!).size);
 
     // The next save removes the copy that's no longer pointed at.

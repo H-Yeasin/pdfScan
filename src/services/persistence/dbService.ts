@@ -14,10 +14,17 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
       const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+      // §16 G4: write-ahead logging, so a commit appends to the log instead of rewriting pages of
+      // the main file and syncing twice, and `synchronous = NORMAL`, which with WAL syncs at
+      // checkpoints only: a power cut can lose the last commits but can't corrupt the file.
+      // journal_mode is stored in the file (set once, a no-op after); synchronous is per
+      // connection. Nothing copies pdfscan.db itself: backups read rows through this connection
+      // (backup/format.ts), and Android's backup takes the whole SQLite/ folder, log included
+      // (plugins/withBackupRules.js) - so no checkpoint is needed before either.
       // foreign_keys is a per-connection PRAGMA, not persisted in the db file itself, so it must
       // be re-applied on every open - this is what makes pages' ON DELETE CASCADE (and therefore
       // the FTS delete trigger) and documents' ON DELETE SET NULL actually fire.
-      await db.execAsync('PRAGMA foreign_keys = ON;');
+      await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;');
       await runMigrations(db);
       await importLegacyLibraryIfPresent(db);
       return db;
@@ -27,6 +34,14 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
     });
   }
   return dbPromise;
+}
+
+// §16 G4: App.tsx calls this as the bundle loads, so the open, the migration check and the
+// legacy-import check run while React builds its first tree instead of after it. The library load
+// (useLibraryPersistence) awaits the same promise through getDb(); a failed open is reported
+// there, and retried by it.
+export function warmDb(): void {
+  void getDb().catch(() => undefined);
 }
 
 // For tests: forget the memoized connection so the next getDb() starts from scratch.

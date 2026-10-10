@@ -1,6 +1,5 @@
-import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, Semester, Submission, TimetableSlot } from '../../types/models';
+import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, LibraryPage, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
-import { buildSearchHaystack } from '../../services/search/searchService';
 
 export type LibraryTab = 'starred' | 'recent' | 'courses';
 
@@ -79,6 +78,8 @@ export type LibraryAction =
   | { type: 'library/REMOVE_FILES'; ids: string[] }
   | { type: 'library/TOGGLE_STAR'; id: string }
   | { type: 'library/UPDATE_FILE'; id: string; patch: Partial<LibraryDocument> }
+  // §16 G4: a document's word boxes, read from the database after the load (documents/pageOcr.ts).
+  | { type: 'library/SET_PAGE_OCR'; id: string; pages: readonly LibraryPage[] }
   | { type: 'library/REPLACE_FILES'; ids: string[]; files: LibraryDocument[] }
   | { type: 'library/TOGGLE_SELECTION'; id: string }
   | { type: 'library/SET_SEL_MODE'; on: boolean }
@@ -213,14 +214,21 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
           : state.bookmarks,
         files: state.files.map((f) => {
           if (f.id !== action.id) return f;
-          const next = { ...f, ...action.patch };
-          // Keep the derived search text in step with a rename or new pages.
-          if (action.patch.name !== undefined || action.patch.pages !== undefined) {
-            next.searchHaystack = buildSearchHaystack(next.name, next.pages);
-          }
-          return next;
+          return { ...f, ...action.patch };
         }),
       };
+    case 'library/SET_PAGE_OCR': {
+      // By page id, and only for a page still waiting for its boxes: the document may have changed
+      // while they were read (a page removed, or recognised again), and what it has now wins.
+      const loaded = new Map(action.pages.map((p) => [p.id, p.ocr]));
+      return {
+        ...state,
+        files: state.files.map((f) => {
+          if (f.id !== action.id || !f.pages.some((p) => p.ocr?.blocksRow !== undefined && loaded.has(p.id))) return f;
+          return { ...f, pages: f.pages.map((p) => (p.ocr?.blocksRow !== undefined && loaded.has(p.id) ? { ...p, ocr: loaded.get(p.id) } : p)) };
+        }),
+      };
+    }
     case 'library/REPLACE_FILES':
       return {
         ...state,

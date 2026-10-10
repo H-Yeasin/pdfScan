@@ -23,7 +23,14 @@ export type OcrBounding = { left: number; top: number; width: number; height: nu
 export type OcrWord = { text: string; bounding: OcrBounding };
 export type OcrLine = { text: string; bounding: OcrBounding; words?: OcrWord[] };
 export type OcrBlock = { text: string; lines: OcrLine[]; bounding: OcrBounding };
-export type PageOcr = { text: string; blocks: OcrBlock[] };
+// §16 G4: `blocksRow` is set while the blocks are still in the database. The library load reads a
+// page's text but not its word boxes (pages.ocr_json: most of the load, and no list needs them);
+// `blocks` is [] until something that needs them loads them for its document
+// (services/documents/pageOcr.ts). It names the pages row that holds them: the page's own id at
+// load, and still the original's on a copy made under a new id (copyPageInto), whose own row is
+// written from it. Saving such a page keeps the stored boxes (libraryRepo). Never set on OCR that
+// was just recognised, and never stored.
+export type PageOcr = { text: string; blocks: OcrBlock[]; blocksRow?: string };
 
 // Manual tone adjustments layered on top of `enhance`. Each field is -1..1, where 0 is a no-op;
 // see services/enhance/filters/filterMath.ts's adjustMatrices for the actual color-matrix math.
@@ -157,9 +164,6 @@ export type LibraryDocument = {
   // UI-only signal: no real PDF encryption is implemented. Every surface that shows
   // this badge must also show the "not actually protected" disclosure.
   locked: boolean;
-  // Derived from name + OCR text when the library loads (and when a document is created); never
-  // persisted.
-  searchHaystack: string;
   // The Course this document is filed under. Undefined means "Unsorted". Purely logical: a
   // document's files always live in library/<id>/ regardless of course, so moving a document
   // between courses never touches the filesystem. Unrelated to AcademicConfig.coverPage.courseCode
@@ -169,9 +173,9 @@ export type LibraryDocument = {
   docType?: DocType;
   // Mirrors the AcademicConfig.coverPage.mode this document's page 0 was built with, if any.
   // undefined means "no cover page" OR "saved before this field existed" - both are treated
-  // identically (fitToMarginBox=true) by applySignatureToDocument, since a missing cover is far
-  // more common than a pre-migration template cover. See pdfService.ts's applySignatureToPdf for
-  // why this distinction matters (a template cover has no placed image and isn't fit into
+  // identically (page 0 is an image fit inside the margins) by the page map, since a missing cover
+  // is far more common than a pre-migration template cover. See documents/pageMap.ts's pdfRectFor
+  // for why this distinction matters (a template cover has no placed image and isn't fit into
   // CONTENT_MARGIN_PT, unlike every other page).
   coverKind?: 'template' | 'imported_image';
   // undefined ≡ 'scanned' (every document saved before this field existed, or made via the
@@ -185,6 +189,10 @@ export type LibraryDocument = {
   // before T1; filled in by the backfill), read as standard A4.
   pdfLayout?: 'standard' | '2_in_1';
   pdfPageSize?: 'A4' | 'Letter';
+  // §16 G4: the backfill (documents/pdfInfoBackfill.ts) couldn't read this document's PDF (it is
+  // missing or damaged), so it isn't opened again on every launch. Only means something while
+  // pdfLayout is unknown. Undefined: not tried, or read.
+  pdfInfoFailed?: boolean;
   // §3 K6: put away. Hidden from lists (behind "Show archived") but still found by search; it
   // stays in its course. Undefined = not archived.
   archived?: boolean;

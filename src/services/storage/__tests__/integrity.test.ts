@@ -3,7 +3,7 @@ import { makeDoc, makePage } from '../../../test/fixtures';
 import { resetStorage } from '../../../test/db';
 import { getDb } from '../../persistence/dbService';
 import { documentIdsInDb, loadAll, syncLibrary } from '../../persistence/libraryRepo';
-import { documentFilesMissing, emptyOldTrash, findOrphans, ORPHAN_MIN_AGE_MS, repair, TRASH_KEEP_MS, trashDir } from '../integrity';
+import { documentFilesMissing, emptyOldTrash, findOrphans, ORPHAN_MIN_AGE_MS, recoverInterruptedWrites, repair, TRASH_KEEP_MS, trashDir } from '../integrity';
 import type { LibraryDocument } from '../../../types/models';
 
 const LATER = () => Date.now() + ORPHAN_MIN_AGE_MS + 1000;
@@ -122,5 +122,36 @@ describe('documents.missing_files', () => {
     const db = await getDb();
     await syncLibrary(db, { documents: [], courses: [], semesters: [], timetable: [] }, { documents: [doc], courses: [], semesters: [], timetable: [] });
     expect((await loadAll(db)).documents[0].missingFiles).toBe(true);
+  });
+});
+
+describe('recoverInterruptedWrites (§18 W3)', () => {
+  const folder = (id: string) => new Directory(Paths.document, 'library', id);
+
+  it('puts a complete temporary file in place when the file itself is gone', async () => {
+    const doc = writeDoc({ id: 'doc_killed' });
+    new File(doc.pdfUri!).delete();
+    new File(folder(doc.id), '.document.pdf.tmp-w_abc_1').write('%PDF-new');
+    expect(documentFilesMissing(doc)).toBe(true);
+
+    expect(await recoverInterruptedWrites()).toBe(1);
+    expect(await new File(doc.pdfUri!).text()).toBe('%PDF-new');
+    expect(documentFilesMissing(doc)).toBe(false);
+    expect(folder(doc.id).list().map((e) => e.name).sort()).toEqual(['document.pdf', 'page_1.jpg']);
+  });
+
+  it('deletes a temporary file whose write never finished', async () => {
+    const doc = writeDoc({ id: 'doc_half' });
+    new File(folder(doc.id), '.document.pdf.tmp-w_abc_2').write('%PDF-ha');
+    expect(await recoverInterruptedWrites()).toBe(0);
+    expect(await new File(doc.pdfUri!).text()).toBe('%PDF-1.4');
+    expect(folder(doc.id).list().map((e) => e.name).sort()).toEqual(['document.pdf', 'page_1.jpg']);
+  });
+
+  it('leaves every other file alone', async () => {
+    const doc = writeDoc({ id: 'doc_plain' });
+    new File(folder(doc.id), 'document.cover.tmp.pdf').write('cover');
+    expect(await recoverInterruptedWrites()).toBe(0);
+    expect(folder(doc.id).list()).toHaveLength(3);
   });
 });

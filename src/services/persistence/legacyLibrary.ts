@@ -4,9 +4,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { COURSE_COLORS, nextCourseColor } from '../courses/palette';
 import type { Course, LibraryDocument, LibraryPage } from '../../types/models';
 import { sanitizeFolderSegment } from '../../utils/sanitize';
-import { buildSearchHaystack } from '../search/searchService';
 import { legacyCourseDocumentDir } from './libraryFiles';
 import { insertIfMissing, type LoadedLibrary } from './libraryRepo';
+import { getMeta, META_LEGACY_IMPORT_DONE, setMeta } from './meta';
 
 // --- The pre-SQLite library format ------------------------------------------------------------
 // Before schema v1 the whole library was one JSON blob in AsyncStorage. Everything in this file
@@ -18,7 +18,8 @@ export const LEGACY_BACKUP_KEY = 'library:index:migrated-v1';
 
 export type LegacyFolder = { id: string; name: string; createdAt: number };
 
-export type LegacyDocument = Omit<LibraryDocument, 'courseId' | 'searchHaystack'> & {
+export type LegacyDocument = Omit<LibraryDocument, 'courseId'> & {
+  // Stored in the old blob; derived now (search/searchService.ts), so it is dropped on import.
   searchHaystack?: string;
   // Logical folder id; undefined meant "unfiled".
   folderId?: string;
@@ -128,7 +129,7 @@ function relocateLegacyDocument(doc: LegacyDocument): LegacyDocument {
 export function toLibraryDocuments(converted: ReturnType<typeof convertLegacyIndex>): LibraryDocument[] {
   return converted.documents.map((legacy) => {
     const doc = relocateLegacyDocument(legacy);
-    const { folderId: _folderId, courseFolder: _courseFolder, ...rest } = doc;
+    const { folderId: _folderId, courseFolder: _courseFolder, searchHaystack: _searchHaystack, ...rest } = doc;
     return {
       ...rest,
       pages: Array.isArray(rest.pages) ? rest.pages : [],
@@ -137,7 +138,6 @@ export function toLibraryDocuments(converted: ReturnType<typeof convertLegacyInd
       sizeBytes: rest.sizeBytes ?? 0,
       createdAt: rest.createdAt ?? Date.now(),
       courseId: converted.courseIdByDoc.get(legacy.id),
-      searchHaystack: buildSearchHaystack(rest.name, rest.pages ?? []),
     };
   });
 }
@@ -145,18 +145,23 @@ export function toLibraryDocuments(converted: ReturnType<typeof convertLegacyInd
 // Imports the AsyncStorage library (if one is still there) into SQLite. Throws on an unreadable
 // or unparseable blob - the caller must treat that as a failed load and never write, so a
 // transient read error can't be mistaken for an empty library.
+// §16 G4: runs to the end once per database. After that the database says so itself (meta), and
+// a launch doesn't wait on AsyncStorage to learn there's nothing to import. The mark is written
+// last, so an import interrupted anywhere before it runs again (harmlessly: insertIfMissing).
 export async function importLegacyLibraryIfPresent(db: SQLiteDatabase): Promise<boolean> {
+  if ((await getMeta(db, META_LEGACY_IMPORT_DONE)) !== null) return false;
   const raw = await AsyncStorage.getItem(LEGACY_INDEX_KEY);
-  if (raw === null) return false;
+  if (raw !== null) {
+    const index = migrateLibraryIndex(JSON.parse(raw));
+    const converted = convertLegacyIndex(index);
+    const library: LoadedLibrary = { courses: converted.courses, documents: toLibraryDocuments(converted), semesters: [], timetable: [] };
+    await insertIfMissing(db, library);
 
-  const index = migrateLibraryIndex(JSON.parse(raw));
-  const converted = convertLegacyIndex(index);
-  const library: LoadedLibrary = { courses: converted.courses, documents: toLibraryDocuments(converted), semesters: [], timetable: [] };
-  await insertIfMissing(db, library);
-
-  // Only once the rows are committed: keep the blob as a backup, then retire the live key so the
-  // import never runs again.
-  await AsyncStorage.setItem(LEGACY_BACKUP_KEY, raw);
-  await AsyncStorage.removeItem(LEGACY_INDEX_KEY);
-  return true;
+    // Only once the rows are committed: keep the blob as a backup, then retire the live key so
+    // the import never runs again.
+    await AsyncStorage.setItem(LEGACY_BACKUP_KEY, raw);
+    await AsyncStorage.removeItem(LEGACY_INDEX_KEY);
+  }
+  await setMeta(db, META_LEGACY_IMPORT_DONE, '1');
+  return raw !== null;
 }

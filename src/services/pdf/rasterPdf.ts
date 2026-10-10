@@ -2,6 +2,7 @@ import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues
 import { File } from 'expo-file-system';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportPreset } from '../capture/imageSpec';
+import { withPageBlocks } from '../documents/pageOcr';
 import { cleanTemporaryCache } from '../persistence/libraryFiles';
 import type { LibraryPage } from '../../types/models';
 import { getPageCount, getPageSize, renderPage } from './pdfNative';
@@ -28,10 +29,12 @@ export type RasterBuildOptions = {
 // text) just gets no text layer. The PDF's own page count decides how many pages there are.
 export async function buildRasterPdf(
   uri: string,
-  pages: readonly (LibraryPage | undefined)[],
+  pageRows: readonly (LibraryPage | undefined)[],
   spec: Pick<ExportPreset, 'maxDim' | 'q'>,
   options: RasterBuildOptions
 ): Promise<PdfFile> {
+  // §16 G4: the text layer needs the word boxes, which the library load leaves in the database.
+  const pages = await withPageBlocks(pageRows);
   const pdfDoc = await PDFDocument.create();
   const font = await embedGlyphlessFont(pdfDoc);
   const count = await getPageCount(uri);

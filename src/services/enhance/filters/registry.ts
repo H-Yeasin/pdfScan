@@ -13,6 +13,9 @@ import { makeSauvolaShader, SAMPLE_RADIUS_RATIO, SAUVOLA_K, SAUVOLA_R } from './
 import type { TKey } from '../../../i18n';
 import type { AdjustValues, EnhanceMode, FilterOptions, ImageStats } from '../../../types/models';
 
+// §16 G3: the ids live on their own (boot code reads them without loading the filters).
+export { AVAILABLE_FILTER_IDS, FILTER_IDS } from './filterIds';
+
 export type FilterContext = {
   image: SkImage;
   // What the filter draws from, in image space: the light-corrected page when the spec has

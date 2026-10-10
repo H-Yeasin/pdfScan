@@ -1,5 +1,6 @@
 import 'react-native-get-random-values'; // pdf-lib needs crypto.getRandomValues (see pdfService.ts)
 import { File } from 'expo-file-system';
+import { writeFileReplacing } from '../files/atomicWrite';
 import { PDFDocument, degrees, type PDFPage } from 'pdf-lib';
 import { PdfEncryptedError } from './pdfErrors';
 
@@ -30,8 +31,7 @@ export async function loadPdf(uri: string): Promise<PDFDocument> {
 
 export async function savePdf(pdfDoc: PDFDocument, dest: File): Promise<PdfFile> {
   const bytes = await pdfDoc.save();
-  if (dest.exists) dest.delete();
-  dest.write(bytes);
+  writeFileReplacing(dest, bytes);
   return { uri: dest.uri, sizeBytes: dest.size ?? 0, pageCount: pdfDoc.getPageCount() };
 }
 

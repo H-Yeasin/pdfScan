@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
 import { importExternalFile, LegacyWordDocError, pruneExternalOpens } from '../services/files/externalFileService';
-import { promoteExternalToLibrary } from '../services/persistence/libraryOperations';
 import { useAppDispatch } from './AppStateContext';
 import { File } from 'expo-file-system';
 import { looksLikeZip } from '../services/backup/incomingZip';
@@ -52,6 +51,9 @@ export function useExternalFileLinking(libraryLoaded: boolean): void {
       }
       try {
         const ext = await importExternalFile(uri);
+        // Required here, not imported: libraryOperations brings pdf-lib, and this hook runs from
+        // boot (§16 G3).
+        const { promoteExternalToLibrary } = require('../services/persistence/libraryOperations') as typeof import('../services/persistence/libraryOperations');
         // Promoted straight to the Library (not left as an ephemeral SET_EXTERNAL view) so a file
         // handed to the app via an OS "Open with"/share intent - e.g. from WhatsApp - is still
         // findable afterwards without an extra "Add to Library" tap: it lands in Library's

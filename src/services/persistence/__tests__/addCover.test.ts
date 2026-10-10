@@ -57,7 +57,6 @@ async function importedDoc(id: string, texts: string[], extra: Partial<LibraryDo
     createdAt: 1,
     star: false,
     locked: false,
-    searchHaystack: '',
     sourceKind: 'imported_pdf',
     pdfLayout: 'standard',
     indexedAt: 1,
@@ -75,7 +74,7 @@ async function scannedDoc(id: string, n: number): Promise<LibraryDocument> {
     height: 1400,
   }));
   const pdf = await pdfService.buildPdfFromPages(id, pages.map(pdfService.toSourcePage), 'as-is');
-  return { id, name: id, format: 'PDF', mode: 'doc', pages, pdfUri: pdf.uri, sizeBytes: pdf.sizeBytes, createdAt: 1, star: false, locked: false, searchHaystack: '', pdfLayout: 'standard' };
+  return { id, name: id, format: 'PDF', mode: 'doc', pages, pdfUri: pdf.uri, sizeBytes: pdf.sizeBytes, createdAt: 1, star: false, locked: false, pdfLayout: 'standard' };
 }
 
 function input(doc: LibraryDocument, extra: Partial<AddCoverInput> = {}): AddCoverInput {

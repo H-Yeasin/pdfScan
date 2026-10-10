@@ -1,21 +1,20 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { moveReplacing } from '../files/atomicWrite';
 import { applySignatureToPdf, buildPdfFromPages, encodingForQuality, pageSizeOfPdf, toSourcePage } from '../pdf/pdfService';
 import { mergePdfs, splitPdf, stampImage } from '../pdf/pdfOps';
 import { buildRasterPdf } from '../pdf/rasterPdf';
 import { isPdfLevel } from '../documents/formatCapabilities';
+import { signatureDraw, type SignaturePlacement } from '../signature/signaturePlacement';
 import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { exportPreset, THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { cleanTemporaryCache, getDocumentDir } from './libraryFiles';
-import { buildSearchHaystack } from '../search/searchService';
-import { readTextWithEncodingFallback } from '../documents/txtService';
+import { readTextPrefix } from '../documents/txtService';
 import { extractDocxText } from '../documents/docxService';
 import type { Annotation, ExternalFileDocument, LibraryDocument, LibraryPage } from '../../types/models';
 import { createId } from '../../utils/id';
 import { EXTENSION_BY_FORMAT } from '../../utils/docFormat';
 import { t } from '../../i18n';
-
-const buildHaystack = buildSearchHaystack;
 
 function copyIfPresent(uri: string | undefined, dest: File): string | undefined {
   if (!uri) return undefined;
@@ -190,7 +189,6 @@ export async function mergeDocuments(docs: LibraryDocument[], annotations: reado
     locked: false,
     courseId: docs.every((d) => d.courseId === docs[0].courseId) ? docs[0].courseId : undefined,
     ...combined,
-    searchHaystack: buildHaystack(name, combined.pages),
   };
 }
 
@@ -207,7 +205,7 @@ export async function appendDocuments(
     [{ doc: target, keepIds: true }, ...sources.map((doc) => ({ doc, keepIds: false }))],
     annotations.filter((a) => a.documentId === target.id)
   );
-  return { ...target, ...combined, coverKind: undefined, searchHaystack: buildHaystack(target.name, combined.pages) };
+  return { ...target, ...combined, coverKind: undefined };
 }
 
 // One document per page. Split output stays in the source document's course; pages keep their
@@ -237,7 +235,6 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
         star: false,
         tag: doc.tag,
         locked: false,
-        searchHaystack: buildHaystack(name, [page]),
         courseId: doc.courseId,
         docType: doc.docType,
         sourceKind: 'imported_pdf',
@@ -284,7 +281,6 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
       star: false,
       tag: doc.tag,
       locked: false,
-      searchHaystack: buildHaystack(name, [page]),
       courseId: doc.courseId,
       docType: doc.docType,
       pdfLayout: 'standard',
@@ -311,8 +307,7 @@ export async function compressImportedPdf(
     const built = await buildRasterPdf(doc.pdfUri, doc.pages, exportPreset(quality), { dest: temp });
     if (built.sizeBytes >= (new File(doc.pdfUri).size ?? doc.sizeBytes)) return { doc, smaller: false };
     const dest = new File(getDocumentDir(doc.id), 'document.pdf');
-    if (dest.exists) dest.delete();
-    temp.moveSync(dest);
+    moveReplacing(temp, dest);
     return { doc: { ...doc, pdfUri: dest.uri, sizeBytes: dest.size ?? built.sizeBytes }, smaller: true };
   } finally {
     cleanTemporaryCache([tempUri]);
@@ -402,7 +397,7 @@ export async function applySignedPage(
 //    come afterwards from the background indexer (§7 R1, store/useImportedPdfIndexing →
 //    documents/importedPdfIndex) - so saving stays instant even for a 300-page file.
 //  - CSV/TXT: a single synthetic page whose ocr.text holds the whole file's decoded text, reusing
-//    the existing OCR-text search plumbing (buildHaystack, dbService's FTS indexing) for free.
+//    the existing OCR-text search plumbing (searchService, dbService's FTS indexing) for free.
 //  - DOCX (§7 R5): the same single synthetic page, holding the document's text from mammoth.
 //    Best-effort: if it can't be read, the file is still added and found by name.
 //  - XLSX/XLS: no text extraction - pages stays empty and search is filename-only (title-LIKE
@@ -418,7 +413,8 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
   new File(ext.uri).copySync(dest);
 
   const text = await (async () => {
-    if (ext.format === 'CSV' || ext.format === 'TXT') return (await readTextWithEncodingFallback(dest.uri)).text;
+    // §18 W4: the first 4 MB (TXT_MAX_BYTES), like the preview; more would only slow search down.
+    if (ext.format === 'CSV' || ext.format === 'TXT') return (await readTextPrefix(dest.uri)).text;
     if (ext.format !== 'DOCX') return undefined;
     try {
       return await extractDocxText(dest.uri);
@@ -443,7 +439,6 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
       star: false,
       tag: ext.format,
       locked: false,
-      searchHaystack: buildHaystack(name, pages),
     };
   }
 
@@ -459,7 +454,6 @@ export async function promoteExternalToLibrary(ext: ExternalFileDocument): Promi
     star: false,
     tag: ext.format,
     locked: false,
-    searchHaystack: name.toLowerCase(),
   };
 }
 
@@ -503,7 +497,6 @@ export function addPdfFileToLibrary(uri: string, name: string, pageCount?: numbe
     star: false,
     tag: 'PDF',
     locked: false,
-    searchHaystack: name.toLowerCase(),
   };
 }
 
@@ -511,11 +504,14 @@ export function addPdfFileToLibrary(uri: string, name: string, pageCount?: numbe
 // applySignedPage, doc.pages is untouched — only the compiled document.pdf binary changes, so
 // only pdfUri/sizeBytes are patched. The on-screen page preview (which renders doc.pages[i]
 // directly) will not reflect the signature; only an exported/shared/printed copy will.
+// `pageIndex` is a library page (doc.pages), not a PDF page: on a 2-in-1 sheet or after a cover
+// the two differ (§18 W1), and `placement` is in that page's master pixels. The signature file is
+// only read; a caller that passes a temporary one cleans it up (cleanTemporaryCache).
 export async function applySignatureToDocument(
   doc: LibraryDocument,
   pageIndex: number,
   signatureUri: string,
-  placement: { originX: number; originY: number; width: number; height: number },
+  placement: SignaturePlacement,
   // §7 R2, PDF-level documents: the size of the page image the signature was placed on (the page
   // rendered on demand), since `placement` is in its pixels.
   shownSize?: { width: number; height: number }
@@ -541,21 +537,12 @@ export async function applySignatureToDocument(
     return { ...doc, pdfUri: result.uri, sizeBytes: result.sizeBytes };
   }
 
-  // Only a template cover (text-only, no placed image) skips the fit-to-margin-box placement math
-  // - every other page, including page 0 when there's no cover or an imported-image cover, was
-  // built with its image fit inside CONTENT_MARGIN_PT. See coverKind's doc comment in models.ts.
-  const isTemplateCover = pageIndex === 0 && doc.coverKind === 'template';
-  // A full-page (true-size ID card) image fills the sheet just like a template cover does.
-  const fillsPage = isTemplateCover || page.layout === 'fullPage';
-  const pdfResult = await applySignatureToPdf(
-    doc.id,
-    doc.pdfUri,
-    pageIndex,
-    page.width,
-    page.height,
-    !fillsPage,
-    signatureUri,
-    placement
-  );
+  // A scan: the page map says which PDF page holds this library page and where on it (a cover in
+  // front, a template cover filling its page, a 2-in-1 column, a turned column, a true-size ID
+  // page), the same way marks get there. That replaces the fit-to-margin-box maths this had of
+  // its own, which only knew standard pages.
+  const draw = signatureDraw(doc, pageIndex, placement);
+  if (!draw) throw new Error(`applySignatureToDocument: page ${pageIndex} has no place in the PDF`);
+  const pdfResult = await applySignatureToPdf(doc.id, doc.pdfUri, signatureUri, draw);
   return { ...doc, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes };
 }

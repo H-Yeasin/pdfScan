@@ -51,7 +51,6 @@ async function scannedDoc(id: string, texts: string[]): Promise<LibraryDocument>
     createdAt: 1,
     star: false,
     locked: false,
-    searchHaystack: '',
     pdfLayout: 'standard',
   };
 }
@@ -80,7 +79,6 @@ async function importedDoc(id: string, texts: string[]): Promise<LibraryDocument
     createdAt: 1,
     star: false,
     locked: false,
-    searchHaystack: '',
     sourceKind: 'imported_pdf',
     pdfLayout: 'standard',
     indexedAt: 1,

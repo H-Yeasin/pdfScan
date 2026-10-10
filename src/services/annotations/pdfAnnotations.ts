@@ -1,4 +1,5 @@
 import { File } from 'expo-file-system';
+import { writeFileReplacing } from '../files/atomicWrite';
 import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFRef, PDFString, type PDFPage } from 'pdf-lib';
 import { pdfRectFor, type PdfRect } from '../documents/pageMap';
 import { isPdfLevel } from '../documents/formatCapabilities';
@@ -328,7 +329,6 @@ export async function updatePdfAnnotations(doc: MappedDoc & Pick<LibraryDocument
   removeOurAnnotations(pdfDoc);
   writeAnnotations(pdfDoc, doc, annotations);
   const bytes = await pdfDoc.save();
-  file.delete();
-  file.write(bytes);
+  writeFileReplacing(file, bytes);
   return file.size;
 }

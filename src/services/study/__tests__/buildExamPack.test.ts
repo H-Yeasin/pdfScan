@@ -26,7 +26,7 @@ function sourceDoc(id: string, name: string, n: number, createdAt: number): Libr
     const bounding = { left: 10, top: 10, width: 500, height: 40 };
     return { id: `${id}_p${i}`, fileUri: file.uri, width: 1000, height: 1400, ocr: { text, blocks: [{ text, bounding, lines: [{ text, bounding }] }] } };
   });
-  return { id, name, format: 'PDF', mode: 'doc', pages, sizeBytes: 0, createdAt, star: false, locked: false, searchHaystack: '', courseId: 'bio' } as LibraryDocument;
+  return { id, name, format: 'PDF', mode: 'doc', pages, sizeBytes: 0, createdAt, star: false, locked: false, courseId: 'bio' } as LibraryDocument;
 }
 
 // The contents page: a small image, with the layout's text checked through its OCR.

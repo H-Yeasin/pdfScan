@@ -1,10 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { spacing, useTheme } from '../../theme';
-import { readTextWithEncodingFallback } from '../../services/documents/txtService';
+import { readTextPrefix, TXT_MAX_BYTES } from '../../services/documents/txtService';
+import { formatBytes } from '../../utils/format';
 import { useT } from '../../i18n/useT';
 
 const CHUNK_SIZE = 3000;
+// §18 W4: the chunks have no fixed height, so a jump to one that was never laid out fails. Then
+// the list goes to where it should be going by the average height so far, lays out what is there,
+// and tries again; each try measures more, so a few are enough.
+const SCROLL_RETRIES = 3;
+const SCROLL_RETRY_MS = 80;
+const FIND_VIEW_POSITION = 0.2;
 
 // Splits into FlatList-sized chunks snapped to the nearest preceding newline (so no line ever
 // splits mid-way across two chunks) - a multi-MB file as one Text node is a known perf/crash
@@ -61,6 +68,7 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
   const { t } = useT();
   const [chunks, setChunks] = useState<string[] | null>(null);
   const [fallbackUsed, setFallbackUsed] = useState(false);
+  const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState(false);
   const listRef = useRef<FlatList<string>>(null);
 
@@ -68,11 +76,12 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
     let cancelled = false;
     setChunks(null);
     setError(false);
-    readTextWithEncodingFallback(uri)
-      .then(({ text, fallbackUsed }) => {
+    readTextPrefix(uri)
+      .then(({ text, fallbackUsed, truncated }) => {
         if (cancelled) return;
         setChunks(chunkText(text));
         setFallbackUsed(fallbackUsed);
+        setTruncated(truncated);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -93,9 +102,34 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
     onMatchCount(total);
   }, [total, onMatchCount]);
 
+  const retriesLeft = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopRetry = useCallback(() => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+  }, []);
+  useEffect(() => stopRetry, [stopRetry]);
+
   useEffect(() => {
-    if (firstChunkIndex >= 0) listRef.current?.scrollToIndex({ index: firstChunkIndex, viewPosition: 0.2 });
-  }, [firstChunkIndex]);
+    stopRetry();
+    if (firstChunkIndex < 0) return;
+    retriesLeft.current = SCROLL_RETRIES;
+    listRef.current?.scrollToIndex({ index: firstChunkIndex, viewPosition: FIND_VIEW_POSITION });
+  }, [firstChunkIndex, stopRetry]);
+
+  const onScrollToIndexFailed = useCallback(
+    (info: { index: number; averageItemLength: number }) => {
+      listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+      if (retriesLeft.current <= 0) return;
+      retriesLeft.current -= 1;
+      stopRetry();
+      retryTimer.current = setTimeout(() => {
+        retryTimer.current = null;
+        listRef.current?.scrollToIndex({ index: info.index, viewPosition: FIND_VIEW_POSITION, animated: false });
+      }, SCROLL_RETRY_MS);
+    },
+    [stopRetry]
+  );
 
   if (error) {
     return (
@@ -122,6 +156,13 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
           </Text>
         </View>
       )}
+      {truncated && (
+        <View style={[styles.banner, { backgroundColor: tokens.accentSoft }]}>
+          <Text style={[styles.bannerText, { color: tokens.accentInk }]}>
+            {t('reader.firstBytes', { size: formatBytes(TXT_MAX_BYTES) })}
+          </Text>
+        </View>
+      )}
       <FlatList
         ref={listRef}
         data={chunks}
@@ -131,7 +172,7 @@ export function TxtView({ uri, night, findQuery, onMatchCount, onTap }: TxtViewP
             <Text style={[styles.text, { color: night ? '#f2eade' : tokens.ink }]}>{item}</Text>
           </Pressable>
         )}
-        onScrollToIndexFailed={() => {}}
+        onScrollToIndexFailed={onScrollToIndexFailed}
         contentContainerStyle={styles.content}
       />
     </View>

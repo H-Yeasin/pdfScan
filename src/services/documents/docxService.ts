@@ -53,29 +53,58 @@ export const PRINT_PAGE_CSS = `
   table { display: table; width: auto; max-width: 100%; }
   tr, img { break-inside: avoid; page-break-inside: avoid; }`;
 
+const BODY_PAD_TOP = 20;
+
+// §18 W4: a tap on the page hides or shows the Reader's bars, as in every other viewer. The page
+// can't run scripts (its CSP), so DocxView injects this one, fixed line; the document's content
+// never becomes part of it. It says exactly one thing, DOCX_TAP_MESSAGE, and not when the tap was
+// on a link or ended a text selection.
+export const DOCX_TAP_MESSAGE = 'tap';
+export const DOCX_TAP_SCRIPT = `(function () {
+  if (window.__pdfscanTap) return;
+  window.__pdfscanTap = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest('a')) return;
+    var s = window.getSelection ? String(window.getSelection()) : '';
+    if (s.length > 0) return;
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('${DOCX_TAP_MESSAGE}');
+  }, true);
+})(); true;`;
+
+// The only message the app acts on. The bridge exists for the script above, but a message is
+// untrusted input all the same: anything that isn't exactly the tap is dropped, never parsed.
+export function isDocxTapMessage(data: unknown): boolean {
+  return data === DOCX_TAP_MESSAGE;
+}
+
 // A complete page around docxToHtml's body. The CSP is the second lock after the WebView's own
-// settings (no bridge, navigation blocked): no scripts of the document's own (inline, linked or a
+// settings (navigation blocked, a bridge that accepts one fixed word): no scripts of the document's own (inline, linked or a
 // javascript: link), no network, images only as data: URIs. The app's own injected script (§12
 // D11's scroll to a find mark) runs outside the CSP.
+// `padTop` (§18 W4): extra space above the first line, in CSS px - the Reader's top bar lies over
+// the page, and without it the document's first lines sat hidden under the bar.
 // `print`: for expo-print (D5), which renders it the same locked-down way. `find`: the colours of
 // §12 D11's find marks (services/documents/docxFind), the first match stronger than the rest.
 export function docxPageHtml(
   body: string,
   colors: { bg: string; ink: string; muted: string; edge: string; accent: string },
-  opts: { print?: boolean; find?: { fill: string; current: string; onCurrent: string } } = {}
+  opts: { print?: boolean; find?: { fill: string; current: string; onCurrent: string }; padTop?: number } = {}
 ): string {
   const findCss = opts.find
     ? `
   mark.pdfscan-find { background: ${opts.find.fill}; color: inherit; border-radius: 2px; }
   mark.pdfscan-current { background: ${opts.find.current}; color: ${opts.find.onCurrent}; }`
     : '';
+  // A number only, so nothing but a length can reach the style sheet.
+  const padTop = BODY_PAD_TOP + Math.max(0, Math.round(Number(opts.padTop) || 0));
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body { background: ${colors.bg}; color: ${colors.ink}; font: 16px/1.55 -apple-system, Roboto, sans-serif; margin: 0; padding: 20px 18px 48px; overflow-wrap: break-word; }
+  body { background: ${colors.bg}; color: ${colors.ink}; font: 16px/1.55 -apple-system, Roboto, sans-serif; margin: 0; padding: ${padTop}px 18px 48px; overflow-wrap: break-word; }
   h1, h2, h3, h4 { line-height: 1.25; margin: 1.2em 0 0.5em; }
   p { margin: 0 0 0.8em; }
   img { max-width: 100%; height: auto; }

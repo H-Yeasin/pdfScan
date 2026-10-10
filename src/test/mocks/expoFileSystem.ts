@@ -110,6 +110,9 @@ export class File {
   get name(): string {
     return path.basename(toPath(this.uri));
   }
+  get parentDirectory(): Directory {
+    return new Directory(path.dirname(toPath(this.uri)));
+  }
   get exists(): boolean {
     const p = toPath(this.uri);
     return fs.existsSync(p) && fs.statSync(p).isFile();
