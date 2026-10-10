@@ -18,6 +18,8 @@ export type RenderContext = {
   session?: PdfSession | null;
   // Night: applied natively while drawing.
   colorMatrix?: PdfColorMatrix;
+  // False: PDF pages are drawn without the file's annotations (§18 W17, annotations/cleanBases).
+  annotations?: boolean;
 };
 
 // Draws one spec into the cache and returns its file. A file that is already there is the
@@ -32,7 +34,7 @@ export async function renderToCache(spec: RenderSpec, context: RenderContext): P
   }
   if (!context.session) throw new Error('A PDF page was wanted without an open session');
   // The PDF's own annotations and form values are part of the page.
-  await context.session.renderPage(spec.source.page, { ...common, matrix: spec.source.matrix, annotations: true });
+  await context.session.renderPage(spec.source.page, { ...common, matrix: spec.source.matrix, annotations: context.annotations !== false });
   return out;
 }
 
@@ -147,6 +149,8 @@ export type RenderQueueOptions = {
   session?: PdfSession | null;
   // Night pages; null or undefined by day.
   palette?: NightPalette | null;
+  // See RenderContext. The caller gives such a queue a cache folder of its own.
+  annotations?: boolean;
 };
 
 export type RenderQueueHandle = {
@@ -160,7 +164,7 @@ export type RenderQueueHandle = {
   epoch: number;
 };
 
-export function useRenderQueue({ cache, session, palette }: RenderQueueOptions): RenderQueueHandle {
+export function useRenderQueue({ cache, session, palette, annotations = true }: RenderQueueOptions): RenderQueueHandle {
   const images = useMemo(createRenderImages, []);
   const queue = useRef<RenderQueue<RenderSpec> | null>(null);
   const [epoch, setEpoch] = useState(0);
@@ -169,7 +173,7 @@ export function useRenderQueue({ cache, session, palette }: RenderQueueOptions):
 
   useEffect(() => {
     if (!cache) return;
-    const context: RenderContext = { cache, session, colorMatrix: palette ? nightMatrix(palette) : undefined };
+    const context: RenderContext = { cache, session, colorMatrix: palette ? nightMatrix(palette) : undefined, annotations };
     const built = createRenderQueue<RenderSpec, string>({
       run: (spec) => renderToCache(spec, context),
       onDone: (spec, uri) => images.add(spec, uri),

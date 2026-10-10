@@ -10,10 +10,9 @@ import { useAppDispatch, useAppStore } from '../../../store/AppStateContext';
 import type { LibraryDocument } from '../../../types/models';
 import { createId } from '../../../utils/id';
 
-// §18 W13 (A8): what can be done with selected words, for the page surface's menu and the old
-// Select text sheet alike (the logic moved here from SelectTextSheet). The words are a page's
-// tokens in its own space, so a mark made of them is stored like one drawn in Mark mode. The
-// store is read when an action runs, not subscribed to: the surface doesn't render for it.
+// §18 W13 (A8): what can be done with selected words, for the page surface's menu. The words are
+// a page's tokens in its own space, so a mark made of them is stored like one drawn in Mark mode.
+// The store is read when an action runs, not subscribed to: the surface doesn't render for it.
 export function useSelectionActions(doc: LibraryDocument | undefined) {
   const { t } = useT();
   const dispatch = useAppDispatch();

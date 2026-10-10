@@ -47,6 +47,7 @@ function context(overrides: Partial<ReaderOverflowContext> = {}): ReaderOverflow
     doc: makeDoc(),
     external: null,
     pdfUri: 'file:///library/doc/document.pdf',
+    annotations: [],
     title: 'Notes',
     isPageRaster: true,
     pageCount: 4,

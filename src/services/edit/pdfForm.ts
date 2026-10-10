@@ -16,9 +16,10 @@ import {
   type PDFFont,
 } from 'pdf-lib';
 import { t } from '../../i18n';
-import type { ExternalFileDocument, LibraryDocument } from '../../types/models';
+import type { Annotation, ExternalFileDocument, LibraryDocument } from '../../types/models';
 import { createId } from '../../utils/id';
-import { NM_PREFIX } from '../annotations/pdfAnnotations';
+import { annotatedPdfFor } from '../annotations/exportPdf';
+import { releaseOurAnnotations } from '../annotations/pdfAnnotations';
 import { PreviewTooLargeError } from '../documents/sheetService';
 import { addPdfFileToLibrary } from '../persistence/libraryOperations';
 import { ASCENT, helveticaFontDict, LINE_HEIGHT, textLinesAppearance } from '../pdf/textAppearance';
@@ -188,19 +189,6 @@ function setField(pdfDoc: PDFDocument, field: PDFField, value: string | boolean,
   }
 }
 
-// Our marks in the copy (Mark mode's annotations, written into a library PDF) become plain PDF
-// annotations: the copy is a new document with no marks of its own, so a Mark session there would
-// otherwise remove them as "ours".
-function releaseOurAnnotations(pdfDoc: PDFDocument) {
-  for (const page of pdfDoc.getPages()) {
-    for (const ref of page.node.Annots()?.asArray() ?? []) {
-      const dict = ref instanceof PDFRef ? pdfDoc.context.lookup(ref) : ref;
-      if (!(dict instanceof PDFDict)) continue;
-      if (decoded(dict.get(PDFName.of('NM')))?.startsWith(NM_PREFIX)) dict.delete(PDFName.of('NM'));
-    }
-  }
-}
-
 // The filled form's bytes. Pure apart from pdf-lib, for the tests.
 export async function fillPdfForm(bytes: Uint8Array, values: FormValues, opts: { flatten: boolean }): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(bytes);
@@ -223,10 +211,19 @@ export function filledCopyName(name: string): string {
 
 // Fills the form into a new library document, from a temp file (`cache/edit/`, deleted after). A
 // library document's copy stays in its course, with its type. The original is never written.
-export async function saveFilledForm(target: FormTarget, values: FormValues, opts: { flatten: boolean }): Promise<LibraryDocument> {
+// §18 W14: a library document's marks and signatures are rows, not part of its file; the copy is
+// made from the file with them written in (`annotations`: the library's), where
+// releaseOurAnnotations then leaves them as the copy's own, plain annotations.
+export async function saveFilledForm(
+  target: FormTarget,
+  values: FormValues,
+  opts: { flatten: boolean },
+  annotations: readonly Annotation[] = []
+): Promise<LibraryDocument> {
   const source = formSourceFor(target);
   if (!source) throw new Error('The document has no PDF');
-  const file = new File(source.uri);
+  const marked = target.doc?.pdfUri ? await annotatedPdfFor(target.doc, annotations) : undefined;
+  const file = new File(marked ?? source.uri);
   if ((file.size ?? 0) > PDF_FORM_MAX_BYTES) throw new PreviewTooLargeError('PDF form');
   const out = await fillPdfForm(await file.bytes(), values, opts);
   const temp = new File(Paths.cache, 'edit', `${createId('form')}.pdf`);

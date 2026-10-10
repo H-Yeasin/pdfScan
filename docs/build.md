@@ -443,9 +443,6 @@ come from. Pick one route for Play uploads and use local builds for testing.
 changed the package's folder layout. Update `firebasePluginHalf` in `app.config.js` to the new
 path (look in `node_modules/@react-native-firebase/app/plugin/build/index.js` for the names).
 
-**`[react-native-pdf-jsi] Remember to install peer dependencies`.** The plugin prints this every
-time. Both packages it names are installed. Ignore it.
-
 **`[@sentry/react-native/expo] Missing config for organization, project`.** `app.json` lists the
 Sentry plugin twice: `@sentry/react-native` (no options) and `@sentry/react-native/expo` (with
 `organization` and `project`). The plugin runs only once and the first entry wins, so the

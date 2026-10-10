@@ -7,7 +7,9 @@ import { loadPdf, savePdf } from '../pdf/pdfOps';
 import { buildRasterPdf, renderedPageBytes } from '../pdf/rasterPdf';
 import { isPdfLevel } from '../documents/formatCapabilities';
 import { SIZE_LADDER } from '../capture/imageSpec';
-import { writeAnnotations } from '../annotations/pdfAnnotations';
+import { annotatedPdfFor } from '../annotations/exportPdf';
+import { writeMarks } from '../annotations/pdfAnnotations';
+import { isSignature } from '../signature/signatureRows';
 import { getDocumentDir } from '../persistence/libraryFiles';
 import { sanitizeFileName } from '../../utils/sanitize';
 import type { Annotation, Course, LibraryDocument, LibraryPage, StudentProfile } from '../../types/models';
@@ -35,7 +37,8 @@ export type SubmitInput = {
   fileName?: string;
   date?: Date;
   onProgress?: (text: string) => void;
-  // The document's annotations; written only when the preset says includeAnnotations.
+  // The document's annotations. Marks are written only when the preset says includeAnnotations;
+  // a signature (§18 W16) is part of what is handed in, and always is.
   annotations?: readonly Annotation[];
   // §10 M4: whether the preset's Pro cover template may be drawn (Pro is active, or the file
   // being rebuilt was made with it). Otherwise its free fallback is. Default false.
@@ -122,20 +125,20 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
   const contentPages: LibraryPage[] = doc.coverKind ? doc.pages.slice(1) : doc.pages;
   const hasCover = !!academicConfig?.coverPage;
   const coverStandIn: LibraryPage = { id: '__submission_cover__', fileUri: '', width: 1, height: 1 };
-  const beforeSave =
-    preset.includeAnnotations && input.annotations?.length
-      ? (pdf: Parameters<typeof writeAnnotations>[0]) =>
-          writeAnnotations(
-            pdf,
-            {
-              pages: hasCover ? [coverStandIn, ...contentPages] : contentPages,
-              coverKind: hasCover ? 'imported_image' : undefined,
-              pdfLayout: preset.layout === '2_in_1' ? '2_in_1' : 'standard',
-              pdfPageSize: preset.pageSize,
-            },
-            input.annotations!
-          )
-      : undefined;
+  const rows = submittedRows(input);
+  const beforeSave = rows.length
+    ? (pdf: Parameters<typeof writeMarks>[0]) =>
+        writeMarks(
+          pdf,
+          {
+            pages: hasCover ? [coverStandIn, ...contentPages] : contentPages,
+            coverKind: hasCover ? 'imported_image' : undefined,
+            pdfLayout: preset.layout === '2_in_1' ? '2_in_1' : 'standard',
+            pdfPageSize: preset.pageSize,
+          },
+          rows
+        )
+    : undefined;
 
   if (preset.sizeLimitBytes !== null) {
     onProgress?.(t('deliver.progress.fitting', { size: formatLimit(preset.sizeLimitBytes) }));
@@ -154,12 +157,20 @@ export async function submitDocument(input: SubmitInput): Promise<SubmitResult> 
   return { uri: built.uri, fileName, sizeBytes: built.sizeBytes, fits: true, level: 0 };
 }
 
+// The rows a submission carries: every mark with `includeAnnotations`, the signatures always.
+function submittedRows(input: Pick<SubmitInput, 'preset' | 'annotations'>): readonly Annotation[] {
+  const all = input.annotations ?? [];
+  return input.preset.includeAnnotations ? all : all.filter(isSignature);
+}
+
 // §7 R2: a submission of an imported PDF (or a merge containing one). The original file is sent
 // as it is - vector text, links and all - with the preset's cover put in front and its
 // border/header/footer stamped on every page. Only when that is over the size limit are the pages
 // turned into images, through the same ladder as scans (S3): sampled renders pick the starting
-// level, then build and step down. The 2-in-1 layout and annotations don't apply here: the pages
-// stay as the PDF has them (annotations on scanned parts are already in it).
+// level, then build and step down. The 2-in-1 layout doesn't apply here: the pages stay as the
+// PDF has them. §18 W14: the file sent is the copy with the rows written in (exportPdf), made
+// before the cover goes in front, while the pages still line up with the library's; the images
+// of the size ladder are rendered from that copy too.
 async function submitPdfLevel(
   input: SubmitInput,
   academicConfig: AcademicConfig | undefined,
@@ -168,7 +179,7 @@ async function submitPdfLevel(
   onPage: (done: number, total: number) => void
 ): Promise<SubmitResult> {
   const { doc, preset, onProgress } = input;
-  const uri = doc.pdfUri;
+  const uri = await annotatedPdfFor(doc, submittedRows(input));
   if (!uri) throw new Error(`submitDocument: ${doc.id} has no PDF`);
 
   const original = await loadPdf(uri);

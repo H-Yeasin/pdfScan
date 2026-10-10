@@ -1,8 +1,9 @@
 import type { LibraryPage, OcrBounding } from '../../types/models';
 import { HIGHLIGHT_COLORS, PEN_COLORS, PEN_WIDTHS } from './palette';
 
-// §12 D3 Mark mode: the remembered tool, and the geometry of the page column (MarkView), kept pure
-// so it can be tested without rendering.
+// §12 D3 Mark mode: the tools, the remembered one, and a text box's size and place on its page,
+// kept pure so they can be tested without rendering. The page column's geometry is
+// services/reader/surfaceGeometry.ts (§18 W8).
 
 // §12 D10: 'text', a typed text box, is the one Pro tool (through D1's gate, `pdfForms`).
 export type MarkTool = 'highlight' | 'underline' | 'strike' | 'pen' | 'note' | 'text' | 'eraser' | 'hand';
@@ -101,27 +102,3 @@ export function moveBox(page: Pick<LibraryPage, 'width' | 'height'>, box: OcrBou
 export function isDrawingTool(tool: MarkTool): tool is 'highlight' | 'underline' | 'strike' | 'pen' {
   return tool === 'highlight' || tool === 'underline' || tool === 'strike' || tool === 'pen';
 }
-
-// The pages kept in memory around the one on screen: the current page ±radius. A page image
-// (a 2400 px master, or a PDF page rendered on demand) is big, so the rest are empty boxes.
-export function markWindow(current: number, count: number, radius = 1): number[] {
-  const out: number[] = [];
-  for (let i = Math.max(0, current - radius); i <= Math.min(count - 1, current + radius); i++) out.push(i);
-  return out;
-}
-
-// The column's geometry (every page at the column's width, one under the other, zoomed and moved
-// as one layer) moved to services/reader/surfaceGeometry.ts in §18 W8, where the page surface
-// builds on it. Re-exported here so MarkView keeps working until the surface replaces it (W18).
-export {
-  clampView,
-  columnLayout,
-  contentToMaster,
-  currentPage,
-  pageAtY,
-  screenToContent,
-  viewForPage,
-  zoomAbout,
-  type ColumnLayout,
-  type ColumnView,
-} from '../reader/surfaceGeometry';

@@ -3,9 +3,9 @@ import { isPdfLevel } from '../documents/formatCapabilities';
 import { extractPages, rearrangePages } from '../pdf/pdfOps';
 import { buildPdfFromPages, pageSizeOfPdf, toSourcePage } from '../pdf/pdfService';
 import { normalizeRotation } from '../pdf/rotation';
-import type { Annotation, LibraryDocument, LibraryPage, PageRotation } from '../../types/models';
+import type { LibraryDocument, LibraryPage, PageRotation } from '../../types/models';
 import { createId } from '../../utils/id';
-import { annotationsHook, copyPageInto, fullyIndexed, pageFiles } from './libraryOperations';
+import { copyPageInto, fullyIndexed, pageFiles } from './libraryOperations';
 import { cleanTemporaryCache, getDocumentDir } from './libraryFiles';
 
 // §7 R3, "Edit pages" on a saved document: the student's changes are a draft (PageEdit) until
@@ -76,12 +76,10 @@ export function isEdited(doc: LibraryDocument, edit: PageEdit): boolean {
 // turns (/Rotate - nothing re-encoded); an imported PDF's pages are rearranged and turned with
 // pdf-lib, untouched otherwise. Removed pages' files are deleted once the new PDF is written.
 // An imported PDF must be fully indexed first: its page rows are what say which PDF page is which.
-export async function savePageEdit(
-  doc: LibraryDocument,
-  edit: PageEdit,
-  annotations: readonly Annotation[] = []
-): Promise<LibraryDocument> {
-  if (!doc.pdfUri) throw new Error(`savePageEdit: ${doc.id} has no PDF`);
+// §18 W17: marks and signatures are rows on pages (by id), so they follow whatever moves and
+// nothing of them is written here. A scan needs no document.pdf to begin with: it gets one.
+export async function savePageEdit(doc: LibraryDocument, edit: PageEdit): Promise<LibraryDocument> {
+  if (isPdfLevel(doc) && !doc.pdfUri) throw new Error(`savePageEdit: ${doc.id} has no PDF`);
   const pages = editedPages(doc, edit);
   if (pages.length === 0) throw new RangeError('A document needs at least one page');
   const kept = new Set(pages.map((p) => p.id));
@@ -93,15 +91,11 @@ export async function savePageEdit(
     if (!fullyIndexed(doc)) throw new PagesNotReadyError();
     const indexOf = new Map(doc.pages.map((p, i) => [p.id, i]));
     const turnBy = pages.map((p) => (p.rotation ?? 0) - (doc.pages[indexOf.get(p.id)!].rotation ?? 0));
-    const result = await rearrangePages(doc.pdfUri, pages.map((p) => indexOf.get(p.id)!), turnBy, dest);
+    const result = await rearrangePages(doc.pdfUri!, pages.map((p) => indexOf.get(p.id)!), turnBy, dest);
     next = { ...doc, pages, pdfUri: result.uri, sizeBytes: result.sizeBytes };
   } else {
     const pageSize = await pageSizeOfPdf(doc.pdfUri);
-    const keptAnnotations = annotations.filter((a) => a.documentId === doc.id && kept.has(a.pageId));
-    const result = await buildPdfFromPages(doc.id, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize, {
-      dest,
-      beforeSave: annotationsHook(pages, pageSize, keptAnnotations),
-    });
+    const result = await buildPdfFromPages(doc.id, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize, { dest });
     // A rebuild lays every page out as a plain content page (see compressDocument), so a cover
     // is a cover no longer.
     next = {

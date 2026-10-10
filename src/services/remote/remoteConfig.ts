@@ -46,9 +46,6 @@ export type RemoteConfig = {
   proSalesEnabled: boolean;
   // Builds older than this get a message asking to update; never blocks the app. '' = none.
   minSupportedVersion: string;
-  // §18 W10: PDFs and scans read on the page surface instead of react-native-pdf-jsi. Off until
-  // the surface has passed its device checks (W17 removes the switch).
-  readerSurface: boolean;
 };
 
 export const REMOTE_DEFAULTS: RemoteConfig = {
@@ -68,7 +65,6 @@ export const REMOTE_DEFAULTS: RemoteConfig = {
   supportEmail: '',
   proSalesEnabled: false,
   minSupportedVersion: '',
-  readerSurface: false,
 };
 
 // A parser returns undefined for a value it can't accept, which keeps the default.
@@ -127,7 +123,6 @@ const KEYS: { [K in keyof RemoteConfig]: { key: string; parse: Parser<RemoteConf
   supportEmail: { key: 'support_email', parse: matching(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) },
   proSalesEnabled: { key: 'pro_sales_enabled', parse: bool },
   minSupportedVersion: { key: 'min_supported_version', parse: matching(/^\d+(\.\d+)*$/) },
-  readerSurface: { key: 'reader_surface', parse: bool },
 };
 
 // Raw console values (strings, as Remote Config hands them over) → a full, typed config.
@@ -201,30 +196,10 @@ export function useRemoteConfigSource(): RemoteConfigSource {
   return useSyncExternalStore(subscribe, getRemoteConfigSource, getRemoteConfigSource);
 }
 
-// §18 W10: a development build's own answer to `reader_surface` (Settings → Developer), so the
-// surface can be tried without the console. null: follow the config. Kept in memory only: it is
-// off again after a restart.
-let readerSurfaceOverride: boolean | null = null;
-
-export function isReaderSurfaceEnabled(): boolean {
-  return readerSurfaceOverride ?? current.readerSurface;
-}
-
-export function setReaderSurfaceOverride(next: boolean | null): void {
-  if (next === readerSurfaceOverride) return;
-  readerSurfaceOverride = next;
-  listeners.forEach((l) => l());
-}
-
-export function useReaderSurfaceEnabled(): boolean {
-  return useSyncExternalStore(subscribe, isReaderSurfaceEnabled, isReaderSurfaceEnabled);
-}
-
 // For tests.
 export function resetRemoteConfig(): void {
   current = REMOTE_DEFAULTS;
   source = 'defaults';
-  readerSurfaceOverride = null;
 }
 
 // Between fetches the cached values are used. An hour keeps a console change to "the next

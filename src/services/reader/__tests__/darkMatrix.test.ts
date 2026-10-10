@@ -1,4 +1,4 @@
-import { darkPageMatrix, NIGHT_PALETTES, nightMatrix, paletteKey } from '../darkMatrix';
+import { darkPageMatrix, NIGHT_PALETTES, nightColor, nightMatrix, paletteKey, skiaNightMatrix } from '../darkMatrix';
 
 type Rgb = [number, number, number];
 
@@ -68,6 +68,24 @@ describe('§18 W9 dark page matrix', () => {
     expect(paletteKey({ paper: '#201E1D', ink: '#d4cfc6' })).toBe('201e1dd4cfc6');
     const keys = Object.values(NIGHT_PALETTES).map(paletteKey);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('§18 W15: a mark drawn over a night page takes the colour the page\'s own ink would', () => {
+    const palette = NIGHT_PALETTES.medium;
+    // Black ink is the palette's ink, white is its paper, and a red pen is still reddish.
+    expect(nightColor('#000000', palette)).toBe(palette.ink);
+    expect(nightColor('#ffffff', palette)).toBe(palette.paper);
+    const red = nightColor('#e03131', palette);
+    const [r, g, b] = [1, 3, 5].map((at) => parseInt(red.slice(at, at + 2), 16));
+    expect(r).toBeGreaterThan(g);
+    expect(r).toBeGreaterThan(b);
+    // Skia takes the same matrix with its offsets in 0..1.
+    const skia = skiaNightMatrix(palette);
+    const plain = nightMatrix(palette);
+    expect(skia).toHaveLength(20);
+    expect(skia[4]).toBeCloseTo(plain[4] / 255);
+    expect(skia[0]).toBe(plain[0]);
+    expect(skia[18]).toBe(1);
   });
 
   it('refuses anything but #rrggbb', () => {

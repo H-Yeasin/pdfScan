@@ -7,9 +7,9 @@ import { layoutCover, type CoverItem, type CoverPageConfig } from './coverTempla
 import { fillPageNumbers, pageDimensions, type AcademicConfig, type PageSizeId } from './pdfService';
 import { drawShaped } from './skiaText';
 
-// ReaderScreen now renders the real compiled PDF (via PdfPageView), so this module's cover/
-// border/header-footer visuals are no longer needed to make the in-app reader match the export.
-// It's still load-bearing for two other things that DO consume LibraryPage.fileUri directly:
+// These cover/border/header-footer visuals are what the Reader shows for a scan: the page
+// surface draws each page's display copy (surfacePages.scanPage), so the app matches the export.
+// They are also load-bearing for two other things that consume LibraryPage.fileUri directly:
 // FileRow's library-list thumbnail (doc.pages[0].fileUri), and the JPG-format Sign flow (which
 // edits doc.pages[i].fileUri in place). This module never touches the images fed into
 // buildPdfFromPages, which keeps drawing its own crisp vector version for the actual PDF.

@@ -6,7 +6,7 @@ import { FormFillSheet, type FormFillRequest } from './FormFillSheet';
 import { PreviewTooLargeError } from '../../services/documents/sheetService';
 import { formSourceFor, PdfFormLockedError, readPdfForm, saveFilledForm, type FormTarget, type FormValues } from '../../services/edit/pdfForm';
 import { carryProTaskGrant, checkProTask } from '../../services/pro/proTaskFlow';
-import { useAppDispatch } from '../../store/AppStateContext';
+import { useAppDispatch, useAppStore } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import type { LibraryDocument } from '../../types/models';
 
@@ -28,6 +28,8 @@ function grantIdOf(target: FormTarget): string {
 export function useFillForm(opts: { preload: boolean }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
+  // Read when the copy is made (the document's marks go into it), not subscribed to.
+  const store = useAppStore();
   const gate = useProTask('pdfForms', { preload: opts.preload });
   const { start: startTask } = gate;
   const [checking, setChecking] = useState(false);
@@ -65,7 +67,7 @@ export function useFillForm(opts: { preload: boolean }) {
     async (values: FormValues, saveOpts: { flatten: boolean }): Promise<boolean> => {
       if (!open) return false;
       try {
-        const copy = await saveFilledForm(open.target, values, saveOpts);
+        const copy = await saveFilledForm(open.target, values, saveOpts, store.getState().library.annotations);
         dispatch({ type: 'library/ADD_FILE', file: copy });
         await carryProTaskGrant('pdfForms', grantIdOf(open.target), copy.id);
         dispatch({ type: 'reader/SET_READER_ID', id: copy.id });
@@ -79,7 +81,7 @@ export function useFillForm(opts: { preload: boolean }) {
         return false;
       }
     },
-    [open, dispatch, t]
+    [open, dispatch, t, store]
   );
 
   // Mark mode's Text tool on `doc`: `onUnlocked` runs once the gate lets it through (straight

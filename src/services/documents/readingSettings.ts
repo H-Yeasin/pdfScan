@@ -12,15 +12,14 @@ export type ReadingSpacing = 'none' | 'small' | 'large';
 export type NightStrength = 'low' | 'medium' | 'high';
 
 export type ReadingSettings = {
-  // Continuous scroll, or one page at a time (pdf-jsi `enablePaging`). PDF engine only.
+  // Continuous scroll, or one page at a time. PDFs and scans only.
   layout: ReadingLayout;
-  // Fit the page's width, or the whole page on screen (pdf-jsi `fitPolicy`). PDF engine only.
+  // Fit the page's width, or the whole page on screen. PDFs and scans only.
   fit: ReadingFit;
-  // The gap between pages (pdf-jsi `spacing`). PDF engine only.
+  // The gap between pages. PDFs and scans only.
   spacing: ReadingSpacing;
-  // Night: dark colours in the text, sheet and Word viewers. PDFs and scans: on the page surface
-  // (§18 W10) the pages themselves are redrawn dark, and `nightStrength` picks how dark the paper
-  // is (`nightPalette`); in pdf-jsi, which has no colour invert, a dim overlay of that strength.
+  // Night: dark colours in the text, sheet and Word viewers. PDFs and scans (§18 W10): the pages
+  // themselves are redrawn dark, and `nightStrength` picks how dark the paper is (`nightPalette`).
   night: boolean;
   nightStrength: NightStrength;
   // Keep the screen on while the Reader is open (expo-keep-awake). Off by default: battery.
@@ -32,7 +31,6 @@ export type ReadingSettings = {
 export const DEFAULT_READING: ReadingSettings = {
   layout: 'continuous',
   fit: 'width',
-  // pdf-jsi's own default gap is 10.
   spacing: 'small',
   night: false,
   nightStrength: 'medium',
@@ -41,8 +39,6 @@ export const DEFAULT_READING: ReadingSettings = {
 };
 
 export const READING_SPACING_PX: Record<ReadingSpacing, number> = { none: 0, small: 10, large: 24 };
-// The overlay's opacity. 'medium' is the strength night mode always had.
-export const NIGHT_OVERLAY_ALPHA: Record<NightStrength, number> = { low: 0.5, medium: 0.72, high: 0.85 };
 
 const LAYOUTS: readonly ReadingLayout[] = ['continuous', 'paged'];
 const FITS: readonly ReadingFit[] = ['width', 'page'];
@@ -70,13 +66,4 @@ export function normalizeReading(raw: unknown): ReadingSettings {
 // §18 W10: the page surface's night colours for these settings; null by day.
 export function nightPalette(reading: Pick<ReadingSettings, 'night' | 'nightStrength'>): NightPalette | null {
   return reading.night ? NIGHT_PALETTES[reading.nightStrength] : null;
-}
-
-// The PDF engine's props for these settings (fitPolicy: 0 = width, 2 = both sides).
-export function pdfViewOptions(reading: ReadingSettings): { enablePaging: boolean; fitPolicy: 0 | 2; spacing: number } {
-  return {
-    enablePaging: reading.layout === 'paged',
-    fitPolicy: reading.fit === 'page' ? 2 : 0,
-    spacing: READING_SPACING_PX[reading.spacing],
-  };
 }

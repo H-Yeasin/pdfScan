@@ -37,8 +37,6 @@ type Props = {
   // §18 W10: to a library page (0-based), exactly: the page surface shows a 2-in-1 sheet's two
   // pages one by one, which a PDF page can't name.
   goToIdx: (idx: number) => void;
-  // The page surface is the viewer: night redraws the pages (ReadingSettingsSheet).
-  nightPages: boolean;
   // §18 W11: the PDF's contents, read by the page surface ([] elsewhere), and a library page's
   // text for the "Read page text" sheet.
   outline: OutlineEntry[];
@@ -62,7 +60,6 @@ export function ReaderSheets({
   shownPage,
   goToPage,
   goToIdx,
-  nightPages,
   outline,
   pageText,
   flashNote,
@@ -140,7 +137,6 @@ export function ReaderSheets({
         visible={open === 'reading'}
         reading={reading}
         showPageOptions={isPageRaster}
-        nightPages={nightPages}
         onChange={(patch: Partial<ReadingSettings>) => dispatch({ type: 'settings/SET_READING', reading: patch })}
         onClose={() => close('reading')}
       />

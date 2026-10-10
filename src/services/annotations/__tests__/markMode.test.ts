@@ -1,28 +1,7 @@
 import { makeDoc, makePage } from '../../../test/fixtures';
 import { libraryIdxFor, pdfPageFor } from '../../documents/pageMap';
-import {
-  clampView,
-  columnLayout,
-  contentToMaster,
-  currentPage,
-  DEFAULT_MARK,
-  markWindow,
-  normalizeMark,
-  pageAtY,
-  screenToContent,
-  viewForPage,
-  zoomAbout,
-} from '../markMode';
-
-describe('§12 D3 Mark mode window', () => {
-  it('keeps the page on screen and its neighbours', () => {
-    expect(markWindow(0, 10)).toEqual([0, 1]);
-    expect(markWindow(4, 10)).toEqual([3, 4, 5]);
-    expect(markWindow(9, 10)).toEqual([8, 9]);
-    expect(markWindow(0, 1)).toEqual([0]);
-    expect(markWindow(5, 10, 2)).toEqual([3, 4, 5, 6, 7]);
-  });
-});
+import { clampView, columnLayout, contentToMaster, currentPage, pageAtY, screenToContent, viewForPage, zoomAbout } from '../../reader/surfaceGeometry';
+import { DEFAULT_MARK, normalizeMark } from '../markMode';
 
 describe('§12 D3 Mark mode column', () => {
   // Two A4-ish pages and a landscape one, at a 400 pt wide screen, 10 pt apart.

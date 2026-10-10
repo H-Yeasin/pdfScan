@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { annotatedPdfFor } from '../../services/annotations/exportPdf';
 import { libraryIdxFor } from '../../services/documents/pageMap';
 import type { ReaderMoreItemId } from '../../services/documents/readerTools';
 import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
@@ -10,7 +11,7 @@ import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, sha
 import { writeDocumentText } from '../../services/study/textExport';
 import { extractDocumentText } from '../../services/study/textSelection';
 import type { AppAction } from '../../store/appReducer';
-import type { ExternalFileDocument, LibraryDocument } from '../../types/models';
+import type { Annotation, ExternalFileDocument, LibraryDocument } from '../../types/models';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import type { t as translate } from '../../i18n';
 
@@ -20,6 +21,8 @@ export type ReaderOverflowContext = {
   doc: LibraryDocument | undefined;
   external: ExternalFileDocument | null;
   pdfUri: string | undefined;
+  // §18 W14: the document's marks and signatures, which go out with every copy of its PDF.
+  annotations: readonly Annotation[];
   title: string;
   isPageRaster: boolean;
   pageCount: number;
@@ -46,24 +49,29 @@ export type ReaderOverflowActions = Record<ReaderMoreItemId, () => void | Promis
 // readerTools.readerMoreItems decides which items a file shows; a handler still checks what it
 // needs, since the file can change under an open sheet.
 export function readerOverflowActions(ctx: ReaderOverflowContext): ReaderOverflowActions {
-  const { doc, external, pdfUri, title, dispatch, t } = ctx;
+  const { doc, external, pdfUri, annotations, title, dispatch, t } = ctx;
   const openCover = () => {
     if (doc) ctx.openCoverOptions(doc);
   };
   return {
     share: async () => {
       if (external) await shareFileUri(external.uri, MIME_BY_FORMAT[external.format], external.name);
-      else if (doc) await shareDocument(doc);
+      else if (doc) await shareDocument(doc, annotations);
     },
     print: async () => {
       if (external) await printFileUri(external.uri);
-      else if (doc) await printDocument(doc);
+      else if (doc) await printDocument(doc, annotations);
     },
     export: async () => {
       // A library PDF is shared under the document's name, not as `document.pdf` (see
       // shareAs); an external file already has its own name.
       if (external && pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
-      else if (pdfUri) await shareAs(pdfUri, shareFileName(title, 'pdf'), 'application/pdf');
+      else if (doc) {
+        // §18 W14: the copy with the marks in it (a JPG-format scan's PDF too). §18 W17: a scan
+        // that never had a PDF gets one now.
+        const annotated = await annotatedPdfFor(doc, annotations);
+        if (annotated) await shareAs(annotated, shareFileName(title, 'pdf'), 'application/pdf');
+      }
     },
     convertToPdf: ctx.convertToPdf,
     convertToWord: ctx.convertToWord,

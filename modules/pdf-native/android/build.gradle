@@ -18,7 +18,8 @@ android {
 }
 
 dependencies {
-  // Text extraction with character boxes (PdfRenderer has none). Pinned to the version
-  // react-native-pdf-jsi already brings in, so the app ships one copy of pdfium's native library.
+  // pdfium: page and region rendering, text with character boxes, links, the outline, passwords
+  // (PdfRenderer has none of the last four). Since §18 W18 this is the app's only copy of
+  // pdfium's native library (react-native-pdf-jsi, which used to bring the same version, is gone).
   implementation 'io.legere:pdfiumandroid:1.0.32'
 }

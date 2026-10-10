@@ -5,7 +5,7 @@ import { mergePdfs, splitPdf, stampImage } from '../pdf/pdfOps';
 import { buildRasterPdf } from '../pdf/rasterPdf';
 import { isPdfLevel } from '../documents/formatCapabilities';
 import { signatureDraw, type SignaturePlacement } from '../signature/signaturePlacement';
-import { writeAnnotations } from '../annotations/pdfAnnotations';
+import { copySignatureFiles } from '../signature/signatureRows';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { exportPreset, THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { cleanTemporaryCache, getDocumentDir } from './libraryFiles';
@@ -54,14 +54,6 @@ export function pageFiles(page: LibraryPage): string[] {
   return [page.fileUri, page.displayUri, page.thumbUri].filter((uri): uri is string => !!uri);
 }
 
-// Annotations a rebuild writes into a standard, coverless document.pdf (§5 T4).
-export function annotationsHook(pages: LibraryPage[], pageSize: Awaited<ReturnType<typeof pageSizeOfPdf>>, annotations: readonly Annotation[]) {
-  return annotations.length
-    ? (pdf: Parameters<typeof writeAnnotations>[0]) =>
-        writeAnnotations(pdf, { pages, coverKind: undefined, pdfLayout: 'standard', pdfPageSize: pageSize }, annotations)
-    : undefined;
-}
-
 export function tempPdf(): File {
   const dir = new Directory(Paths.cache, 'pdf-ops');
   if (!dir.exists) dir.create({ intermediates: true });
@@ -69,9 +61,10 @@ export function tempPdf(): File {
 }
 
 // A scan's pages as a PDF with one page per library page, for a PDF-level merge: its own
-// document.pdf when that is already laid out so (it then also carries a signature burned in by
-// Sign, and its annotations), otherwise a standard rebuild from the masters into the cache.
-export async function standardPdfOf(doc: LibraryDocument, annotations: readonly Annotation[]): Promise<{ uri: string; temp: boolean }> {
+// document.pdf when that is already laid out so, otherwise a standard rebuild from the masters
+// into the cache. §18 W17: neither holds the document's marks or signatures. Those are rows,
+// which follow their pages by id into the merged document and are drawn there.
+export async function standardPdfOf(doc: LibraryDocument): Promise<{ uri: string; temp: boolean }> {
   const ownIsStandard = (doc.pdfLayout ?? 'standard') === 'standard' && !doc.coverKind;
   if (doc.pdfUri && ownIsStandard && new File(doc.pdfUri).exists) return { uri: doc.pdfUri, temp: false };
   const pageSize = await pageSizeOfPdf(doc.pdfUri);
@@ -82,7 +75,7 @@ export async function standardPdfOf(doc: LibraryDocument, annotations: readonly 
     undefined,
     'standard',
     pageSize,
-    { dest: tempPdf(), beforeSave: annotationsHook(doc.pages, pageSize, annotations) }
+    { dest: tempPdf() }
   );
   return { uri: built.uri, temp: true };
 }
@@ -103,6 +96,8 @@ type Combined = Pick<LibraryDocument, 'pages' | 'pdfUri' | 'sizeBytes' | 'source
 // The pages of `parts`, in order, as document `documentId`'s pages and document.pdf. A part that
 // is that document itself (an append) keeps its rows and files where they are; every other part's
 // pages are copied in (keeping their ids when `keepIds`: the source goes away).
+// §18 W17 (A9): no rebuild here writes marks into document.pdf; `annotations` only says which
+// signature PNGs come along.
 // All scans → rebuilt from the masters. Any imported PDF among them (§7 R2) → combined as PDFs
 // (pdfOps.mergePdfs): imported pages are copied untouched, keeping their text and quality; a scan
 // contributes its standard PDF (standardPdfOf); the result is a PDF-level document.
@@ -114,6 +109,11 @@ async function combineInto(
   const dir = getDocumentDir(documentId);
   const rowFor = (doc: LibraryDocument, row: LibraryPage, keepIds: boolean, n: number) =>
     doc.id === documentId ? row : copyPageInto(row, dir, n, { keepId: keepIds, byId: true });
+  // §18 W16: a part that goes away takes its rows along (keepIds), and a signature row's PNG is
+  // a file of its document: it comes too.
+  for (const { doc, keepIds } of parts) {
+    if (keepIds && doc.id !== documentId) copySignatureFiles(annotations.filter((a) => a.documentId === doc.id), documentId);
+  }
 
   if (parts.some((part) => isPdfLevel(part.doc))) {
     const sources: { uri: string; temp: boolean }[] = [];
@@ -122,7 +122,7 @@ async function combineInto(
         if (!doc.pdfUri) throw new Error(`combineInto: ${doc.id} has no PDF`);
         sources.push({ uri: doc.pdfUri, temp: false });
       } else {
-        sources.push(await standardPdfOf(doc, annotations.filter((a) => a.documentId === doc.id)));
+        sources.push(await standardPdfOf(doc));
       }
     }
     // mergePdfs reads every source before writing, so the target's own document.pdf can be both.
@@ -161,9 +161,7 @@ async function combineInto(
   // Rebuilds keep the paper size (A4 or Letter) the document was saved with; a combine takes the
   // first document's.
   const pageSize = await pageSizeOfPdf(parts[0]?.doc.pdfUri);
-  const pdfResult = await buildPdfFromPages(documentId, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize, {
-    beforeSave: annotationsHook(pages, pageSize, annotations),
-  });
+  const pdfResult = await buildPdfFromPages(documentId, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize);
   return { pages, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes, pdfLayout: 'standard', pdfPageSize: pageSize };
 }
 
@@ -195,16 +193,9 @@ export async function mergeDocuments(docs: LibraryDocument[], annotations: reado
 // §7 R3 "Add pages": `sources`' pages (copied; the sources stay) go at the end of `target`, which
 // keeps its id, its pages' ids and everything that points at them. A later rebuild (compress,
 // sign) may drop a former cover's special placement, so the cover is cleared like a rebuild does.
-export async function appendDocuments(
-  target: LibraryDocument,
-  sources: readonly LibraryDocument[],
-  annotations: readonly Annotation[] = []
-): Promise<LibraryDocument> {
-  const combined = await combineInto(
-    target.id,
-    [{ doc: target, keepIds: true }, ...sources.map((doc) => ({ doc, keepIds: false }))],
-    annotations.filter((a) => a.documentId === target.id)
-  );
+export async function appendDocuments(target: LibraryDocument, sources: readonly LibraryDocument[]): Promise<LibraryDocument> {
+  // The target's rows stay with its pages; the sources' rows stay with the sources.
+  const combined = await combineInto(target.id, [{ doc: target, keepIds: true }, ...sources.map((doc) => ({ doc, keepIds: false }))], []);
   return { ...target, ...combined, coverKind: undefined };
 }
 
@@ -221,6 +212,7 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
     return files.map((file, i): LibraryDocument => {
       const row = doc.pages[i];
       const page = row ? copyPageInto(row, getDocumentDir(ids[i]), 1, { keepId: true }) : stubPage();
+      if (row) copySignatureFiles(annotations.filter((a) => a.documentId === doc.id && a.pageId === row.id), ids[i]);
       const name = `${doc.name}_p${i + 1}`;
       const indexed = !!page.thumbUri;
       return {
@@ -253,19 +245,13 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
     const documentId = createId('doc');
     const dir = getDocumentDir(documentId);
     const page = copyPageInto(source, dir, 1, { keepId: true });
+    // §18 W16: the page's signature rows follow it; their PNGs come along.
+    copySignatureFiles(annotations.filter((a) => a.documentId === doc.id && a.pageId === source.id), documentId);
     const name = `${doc.name}_p${i + 1}`;
 
     // Always rebuilds a document.pdf, regardless of doc.format - the unified reader needs a real
     // PDF for every library document (see DeliverScreen.tsx's matching change).
-    const pdfResult = await buildPdfFromPages(
-      documentId,
-      [toSourcePage(page)],
-      'as-is',
-      undefined,
-      'standard',
-      pageSize,
-      { beforeSave: annotationsHook([page], pageSize, annotations) }
-    );
+    const pdfResult = await buildPdfFromPages(documentId, [toSourcePage(page)], 'as-is', undefined, 'standard', pageSize);
     const pdfUri: string = pdfResult.uri;
     const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : new File(page.fileUri).size ?? 0;
 
@@ -317,21 +303,11 @@ export async function compressImportedPdf(
 // Rebuilds only document.pdf, from the untouched library masters, at the requested export
 // quality. Page images are never overwritten, so compressing is reversible: compress again at a
 // higher quality and the detail is still there.
-export async function compressDocument(doc: LibraryDocument, quality = 2, annotations: readonly Annotation[] = []): Promise<LibraryDocument> {
+export async function compressDocument(doc: LibraryDocument, quality = 2): Promise<LibraryDocument> {
   const pageSize = await pageSizeOfPdf(doc.pdfUri);
-  // §5 T4: the rebuilt PDF gets the document's annotations again (laid out as rebuilt: standard,
-  // no separate cover).
-  const mapped = { pages: doc.pages, coverKind: undefined, pdfLayout: 'standard' as const, pdfPageSize: pageSize };
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
-  const pdfResult = await buildPdfFromPages(
-    doc.id,
-    doc.pages.map(toSourcePage),
-    encodingForQuality(quality),
-    undefined,
-    'standard',
-    pageSize,
-    { beforeSave: (pdf) => writeAnnotations(pdf, mapped, annotations) }
-  );
+  // §18 W17: without the document's marks; they are rows, written into what leaves the app.
+  const pdfResult = await buildPdfFromPages(doc.id, doc.pages.map(toSourcePage), encodingForQuality(quality), undefined, 'standard', pageSize);
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 
   // Rebuilds by feeding doc.pages (including any former cover raster at index 0) straight through
@@ -344,12 +320,7 @@ export async function compressDocument(doc: LibraryDocument, quality = 2, annota
 
 // Replaces one page's image with a signed (flattened) version, in place, and rebuilds the
 // PDF if the document is PDF-format so the signature survives into the exported file.
-export async function applySignedPage(
-  doc: LibraryDocument,
-  pageIndex: number,
-  flattenedUri: string,
-  annotations: readonly Annotation[] = []
-): Promise<LibraryDocument> {
+export async function applySignedPage(doc: LibraryDocument, pageIndex: number, flattenedUri: string): Promise<LibraryDocument> {
   const dir = getDocumentDir(doc.id);
   const old = doc.pages[pageIndex];
   // New file names (not page_N): since §7 R3 a page's position no longer matches its file names,
@@ -371,18 +342,7 @@ export async function applySignedPage(
   const pageSize = await pageSizeOfPdf(doc.pdfUri);
 
   // Always rebuilds document.pdf, regardless of doc.format - see splitDocument's matching comment.
-  const pdfResult = await buildPdfFromPages(
-    doc.id,
-    pages.map(toSourcePage),
-    'as-is',
-    undefined,
-    'standard',
-    pageSize,
-    {
-      beforeSave: (pdf) =>
-        writeAnnotations(pdf, { pages, coverKind: undefined, pdfLayout: 'standard', pdfPageSize: pageSize }, annotations),
-    }
-  );
+  const pdfResult = await buildPdfFromPages(doc.id, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize);
   const pdfUri: string = pdfResult.uri;
   const sizeBytes = doc.format === 'PDF' ? pdfResult.sizeBytes : doc.sizeBytes;
 

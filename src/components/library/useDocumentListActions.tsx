@@ -20,7 +20,7 @@ import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { docTypeOf } from '../../services/courses/docTypes';
 import type { Dispatch } from 'react';
 import type { AppAction } from '../../store/appReducer';
-import type { Annotation, LibraryDocument } from '../../types/models';
+import type { LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
 import { hapticSelection } from '../../services/feedback/haptics';
 
@@ -47,11 +47,7 @@ export function useOpenDocument() {
 // Compresses each document, one at a time, and returns the message to show. Shared by the
 // selection bar and Settings → Storage's biggest documents (§8 B1). An imported PDF can only get
 // smaller by becoming images; the message says when that happened, and when it wouldn't have helped.
-export async function compressDocuments(
-  docs: readonly LibraryDocument[],
-  annotations: readonly Annotation[],
-  dispatch: Dispatch<AppAction>
-): Promise<string> {
+export async function compressDocuments(docs: readonly LibraryDocument[], dispatch: Dispatch<AppAction>): Promise<string> {
   let rasterized = 0;
   let notSmaller = 0;
   for (const doc of docs) {
@@ -64,7 +60,7 @@ export async function compressDocuments(
         notSmaller += 1;
       }
     } else {
-      const compressed = await libraryOps().compressDocument(doc, undefined, annotations.filter((a) => a.documentId === doc.id));
+      const compressed = await libraryOps().compressDocument(doc);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
     }
   }
@@ -230,7 +226,7 @@ export function useDocumentListActions() {
           dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.splitInto', { count: split.length }) });
         } else if (tool === 'compress') {
-          const msg = await compressDocuments(selectedDocs, state.library.annotations, dispatch);
+          const msg = await compressDocuments(selectedDocs, dispatch);
           dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({ type: 'ui/SHOW_SNACK', msg });
         }
@@ -255,18 +251,13 @@ export function useDocumentListActions() {
   const handleSignConfirm = useCallback(
     async (flattenedUri: string) => {
       if (!signTarget) return;
-      const updated = await libraryOps().applySignedPage(
-        signTarget,
-        0,
-        flattenedUri,
-        state.library.annotations.filter((a) => a.documentId === signTarget.id)
-      );
+      const updated = await libraryOps().applySignedPage(signTarget, 0, flattenedUri);
       dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
       dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
       setSignTarget(null);
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: 1 }) });
     },
-    [signTarget, dispatch, state.library.annotations]
+    [signTarget, dispatch]
   );
 
   const handleSignatureCaptured = useCallback(
@@ -293,10 +284,21 @@ export function useDocumentListActions() {
   const handlePlacementConfirm = useCallback(
     async (placement: { originX: number; originY: number; width: number; height: number }) => {
       if (!signTarget || !capturedSignature || !signPage) return;
-      // Library page 0 (§18 W1): the service finds it in the PDF, also as the left column of a
-      // 2-in-1 sheet. The saved signature is only read, so it is there for the next document.
-      const updated = await libraryOps().applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement, signPage);
-      dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
+      // §18 W16 (A10): a signature is a row with its own copy of the PNG
+      // (signature/signatureRows): the Reader draws it and every copy that leaves the app
+      // carries it, while document.pdf stays as it is.
+      const { createSignatureRow, signatureOnPicture } = require('../../services/signature/signatureRows') as typeof import('../../services/signature/signatureRows');
+      const placed = signatureOnPicture(signTarget, 0, placement, signPage);
+      const row = placed ? createSignatureRow(signTarget, 0, capturedSignature.uri, placed) : null;
+      if (row) {
+        dispatch({ type: 'library/ADD_ANNOTATION', annotation: row });
+      } else {
+        // A page with no space to keep a row in (an imported page not indexed yet, a scan's
+        // page inside a merged PDF): the signature is drawn into the page itself, which the
+        // Reader then shows as part of it. The saved signature is only read.
+        const updated = await libraryOps().applySignatureToDocument(signTarget, 0, capturedSignature.uri, placement, signPage);
+        dispatch({ type: 'library/UPDATE_FILE', id: signTarget.id, patch: updated });
+      }
       dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
       setSignStep(null);
       setCapturedSignature(null);

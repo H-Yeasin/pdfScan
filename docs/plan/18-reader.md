@@ -1360,7 +1360,52 @@ Device check: long-press, drag across lines, Copy (a scan and `[300p]`). Externa
 highlight made from the selection appears at once with no reload.
 
 ## W14 · Exports carry the marks *(M)*
-Status: planned. JS only. Works with both engines (idempotent). Can move anywhere before W15.
+Status: **done in code (2026-10-10).** JS only, no new dev build. Works with both engines (idempotent).
+**Device check open** (below).
+
+What was built, and where it differs from the plan:
+- **`services/annotations/exportPdf.ts`**: `annotatedPdfFor(doc, annotations)` gives the PDF to hand over.
+  - A document with no rows goes out as its own `document.pdf` (nothing is loaded).
+  - Else the copy `<cache>/export/<hash(docId)>-<fingerprint>.pdf`: `removeOurAnnotations`, then
+    `writeMarks`, written atomically. `exportFingerprint` = the file's stamp (`pageCache.fileStamp`: uri,
+    size, modified time) + each row's `id:updatedAt`. A copy that exists is returned as it is.
+  - A new copy deletes the document's older ones; the folder is kept under 150 MB, newest first.
+  - A file the rows can't be written into (encrypted, damaged) is handed over as it is, with a warning in
+    the log: the rows stay in the app.
+  - pdf-lib and `pdfAnnotations` are `require`d inside the function, so the share and backup code that is
+    loaded at boot stays light.
+- **`pdfAnnotations.ts`**: `writeMarks` (marks + W16's signatures, async), `releaseOurAnnotations` (moved
+  from `pdfForm.ts`), and `updatePdfAnnotations` leaves a file alone when it holds none of ours and there
+  is nothing to write.
+- **Share, Print, Export, device folder:** `shareDocument(doc, annotations)`, `printDocument(doc,
+  annotations)`, `exportCopyToDeviceFolder(folder, doc, annotations)`, and the Reader's `'export'` item
+  (`ReaderOverflowContext.annotations`). JPG-format documents still go out as their page images.
+- **Submit:** `submitPdfLevel` builds from the annotated copy (so the cover goes in front of pages that
+  already carry the rows, and the size ladder's images are rendered from it). A scan's submission writes
+  through `writeMarks`. Marks follow `preset.includeAnnotations`; **signatures always go** (`submittedRows`).
+- **Backup:** the readable PDF of a document with rows is the annotated copy, made when its turn in the
+  zip comes. `manifest.annotated` lists those documents (optional field, older backups have none).
+- **Restore** (`restoredPdfsToSettle`, `exportPdf.settleOurAnnotations`), one file at a time, best-effort:
+  - a full restore takes ours out of a restored **imported** PDF that has rows, **only while
+    `reader_surface` is on**. The old viewer shows marks from the file alone, so with the flag off the
+    file keeps them. **W17 drops the condition.**
+  - a "PDFs only" restore (no rows come back) **releases** them: they stay in the file as its own
+    annotations. Not in the plan; without it the first Mark session in such a document removed them.
+- **`BuildPdfOptions.beforeSave` is awaited** now, and every rebuild hook (`annotationsHook`,
+  `compressDocument`, `applySignedPage`, `addCover`, `buildExamPack`) calls `writeMarks`.
+
+Not as planned, or left open:
+- **Fill form copy:** the plan wanted the rows copied to the copy's page ids. The copy is a new imported
+  PDF whose pages are indexed afresh (stub rows until then, and an added turn is folded into the file),
+  so a row's box would land wrong until indexing ends. Instead the copy is made **from the annotated
+  PDF** and `releaseOurAnnotations` leaves the marks in it as plain annotations: what the copy showed
+  before, but they can't be edited there as rows.
+- **A document with no rows is not loaded to check it.** That is only right while "no rows" means "none
+  of ours in the file". The old engine keeps that (it rewrites the file after every Mark session). On the
+  surface, which writes nothing for a mark (W15), `ReaderDocumentView` runs the old sync once when a
+  document's **last** row goes. **W17 must keep this, or clean the file some other way**, when it deletes
+  `useAnnotationPdfSync`.
+- No guard test yet (`writeAnnotations(` only in two files): that is W17's, once the hooks are gone.
 
 Files: new `services/annotations/exportPdf.ts`; `sharing/shareService.ts`; the Reader's `'export'` handler
 (in `useReaderOverflowActions` after W6); `export/deviceExportService.ts`; `submit/submitDocument.ts`
@@ -1371,13 +1416,64 @@ Changes: the table in A9.
 
 Tests: real pdf-lib with the fixtures in `src/test/pdfs.ts`: marks present exactly once; a cache hit; a new
 fingerprint after an annotation update; the backup's readable copy has the marks; restore strips them.
+(`annotations/__tests__/exportPdf.test.ts`.)
 
 Device check: mark, then share at once (the received PDF has the marks); print preview; device-folder
-export; submit an imported PDF with marks.
+export; submit an imported PDF with marks. Also: back up a library with a marked imported PDF, open the
+readable PDF on a laptop (marks there), restore it on the phone (marks there once, in both engines).
 
 ## W15 · Mark mode on the surface *(L)*
-Status: planned. JS only. Split point: (a) the arbiter + live ink + the overlay; (b) the toolbar, the text
-and notes tools, undo.
+Status: **done in code (2026-10-10)**, (a) and (b) together. JS only, no new dev build. **Device check
+open** (below): nothing here has run on a phone yet.
+
+What was built, and where it differs from the plan:
+- **`services/reader/gestureArbiter.ts`** (pure): `SurfaceTool`, `panMode` (what one finger does: scroll,
+  draw, drag a box, sign), `hasReadingTaps`, `strokeOutcome` (the pinch race: commit / tap / discard),
+  `routeTap`.
+- **`useSurfaceGestures`**: still one pan and one pinch. The pan takes a role when it starts:
+  - `'draw'`: a provisional stroke. Its points go into a shared value (`ink`, content coordinates); no
+    React render per move. `onFinalize` asks `strokeOutcome`. A second finger (`onTouchesDown`) or a pinch
+    drops the ink and the same gesture carries on as a scroll (the plan's `manager.fail()` would have
+    ended the scroll too).
+  - `'drag'` (note, text, eraser): moves the box it began on; JS hit-tests it (`useMarkTool.drag`).
+  - a Mark tool gets taps at once: no double tap, no long press.
+- **`services/annotations/markHistory.ts`** (pure): `recordChange`, `undoChange`, `redoChange`,
+  `changeAction`, `editChange`. It lasts as long as the tool is open.
+- **`services/reader/markShapes.ts`** (pure, the "overlay builder"): one row → shapes in the page's own
+  space (`rect`, `stroke`, `dot`, `note`, `text`, `signature`). **`SurfaceOverlay`** draws a page's shapes
+  under `overlayMatrix(box, page.space)`, so turned pages and merged scans need no mapping; plus `LiveInk`
+  (`usePathValue` over the shared points). Text boxes are Skia paragraphs with system fonts.
+- **`components/reader/surface/useMarkTool.tsx`**: the tools (MarkView's logic against the surface's
+  geometry), the Text tool's gate, the note and text prompts. **`MarkToolbar.tsx`** holds `MarkHeader` and
+  `MarkToolbar` (one file, not two).
+- **The bars:** while Mark (or Sign) is on, `ReaderDocumentView` doesn't render the Reader's two bars and
+  the surface shows the tool's in the same places. The palette is taller than the bottom bar, so its
+  measured height becomes the bottom inset (the last page ends above it). The fast-scroll thumb is away
+  while a tool is on.
+- **No write, no reload:** on the surface a mark is only its row. `useAnnotationPdfSync` runs there in one
+  case, see W14 ("last row goes"). The W13 leftovers are gone (`onMarked`, the "fresh" set).
+- **Night pages:** ink-like marks (pen, underline, strike, typed text, a signature) are shown through the
+  palette's colour change (`darkMatrix.nightColor`, `skiaNightMatrix`), or a black pen would vanish on dark
+  paper. Highlights keep their colour at the night alpha. Not in the plan; the plan's `screen` blend is
+  not used (a blend can't reach the page layer under the canvas, as W12 found).
+- **Boxes that read upright on a turned page** (not in the plan): a text box typed on a page shown
+  turned (§7 R3) gets `turn` in its data (`marks.turnedQuad`, `reader/markPlacement.ts`), and
+  `pdfAnnotations.writeTextBox` writes it turned the same way. Older boxes have no `turn` and draw as before.
+
+Not as planned, or left open:
+- **Marks an older build wrote into an imported PDF's file are still drawn by pdfium**, under the live
+  ones. They look doubled, and one that is erased stays visible until the file is cleaned. That is W17's
+  migration (`useCleanPdfBases`); until then it only shows with the dev switch on, on documents marked
+  before. A scan is not affected (the surface reads its page images).
+- **`routeTap` is written and tested but not called.** `PageSurface.onSurfaceTap` routes a tap itself, in the
+  same order, because a page's links may still be loading when the tap lands.
+- **The note, text and eraser tools don't scroll with one finger** (two fingers do), as in MarkView.
+- **A signature can be moved with those three tools** (a drag that begins on it), a text box with the
+  Text tool only.
+- Pen widths and the note icon are in the page's own pixels, so on an imported page (indexed smaller than
+  a 2400 px scan) they look a little bigger. As in MarkView.
+- Landscape: the screen still turns upright for Mark (the palette wants the width).
+- MarkView stays for the other engine until W18.
 
 Files: new `services/annotations/markHistory.ts`, `services/reader/gestureArbiter.ts`,
 `components/reader/surface/{MarkHeader,MarkToolbar,useMarkTool}.tsx/ts` (the palette UI extracted from
@@ -1391,13 +1487,53 @@ Changes:
   `palette.ts`. The Text tool stays Pro (through §12 D1's gate).
 
 Tests: `strokeOutcome` for the pinch-race sequences; `markHistory` do/undo/redo/edit; the overlay builder
-per kind.
+per kind. (`reader/__tests__/{gestureArbiter,markShapes}.test.ts`, `annotations/__tests__/markHistory.test.ts`.)
 
 Device check: 120 fast pen strokes, no lag; pinch with a finger already down, no stray mark; eraser, note,
-Text (Pro) drag; marks crisp at 5×; Done: no reload, same position.
+Text (Pro) drag; marks crisp at 5×; Done: no reload, same position. Also: a tap on a word with the
+highlighter; undo and redo; a mark on a page turned in Edit pages; night mode (a black pen stroke shows);
+the last page's bottom edge above the palette.
 
 ## W16 · Sign on the surface, as a row *(M)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only, no new dev build. **Device check open** (below): nothing
+here has run on a phone yet.
+
+What was built, and where it differs from the plan:
+- **`types/models.ts`**: `AnnotationKind` + `'signature'`, data `{ box, file, turn? }`. `annotations.kind`
+  is free text in SQLite, so no migration; `libraryRepo`'s list of known kinds got the new one.
+- **`services/signature/signatureRows.ts`** (new; the plan put the PNG copy in `libraryFiles.ts`):
+  `createSignatureRow` (copies the saved PNG to `library/<docId>/sig_<id>.png`), `signatureFile` (only a
+  name of that shape is ever read: a row can come from someone else's backup), `copySignatureFiles`
+  (merge, split, exam pack), `pruneSignatureFiles` (when the Reader lets go of the document),
+  `signatureOnPicture` (the Library).
+- **`services/signature/signaturePlacement.ts`**: `bottomRightBox`, `moveSignatureBox`,
+  `resizeSignatureBox`, `signatureGrip` (worklets), `placedSignature`.
+- **On the surface:** `useReaderSigning({ surface: { idx } })` gives `request` to `PageSurface`. The box is
+  a shared value in content coordinates, moved and resized on the UI thread (`'sign'` pan mode), drawn by
+  `SurfaceOverlay`'s `SignBox`. `SignBar.tsx`: Cancel · Redraw · Bottom right · Place. The page is the
+  one being read: no "which page" question.
+- **`turn`** (not in the plan): a signature placed on a page shown turned is stored with the turn that
+  keeps it upright there, like W15's text boxes.
+- **In the PDF** (`pdfAnnotations.writeSignatures`): a `/Stamp` annotation whose appearance is the PNG,
+  with `/NM` like every mark. An annotation and not page content, so a copy made from a file that already
+  carries it has it once. Through the same page map as marks (2-in-1, cover, turned column).
+- **Backup:** the PNG is in the document's folder, which `exportRows` already zips whole; nothing changed
+  in `format.ts`.
+- **The Library's page-1 signing** makes a row when `reader_surface` is on (`signatureOnPicture`), and
+  writes into the file as before when it is off or the page has no space to keep a row in (an imported
+  page not indexed, a scan's page inside a merged PDF). **W17 drops the branch.**
+- `hitTest.ts` needed no change: a signature's `box` is hit like a text box's.
+
+Not as planned, or left open:
+- **A JPG-format document is still signed by flattening** (`SignatureModal`, `applySignedPage`), on both
+  engines. Its export is the page image, where a row has nowhere to go; making it a row would lose the
+  signature from every shared JPG. Open for W17: either composite signature rows into exported JPGs, or
+  keep this.
+- **`SignaturePlacementOverlay` is retired in the Reader only on the surface**; the other engine and the
+  Library still use it.
+- **With the flag off, a signature row is not shown** by the old viewer until something rewrites the file
+  (a Mark session, a rebuild). Rows are only made with the flag on, so this needs a flag flip to see.
+- A signature erased in Mark mode keeps its PNG until the Reader closes the document (so undo works).
 
 Files: `types/models.ts` (`AnnotationKind` + `'signature'`, its `AnnotationData`), `services/signature/signaturePlacement.ts`,
 `services/annotations/{pdfAnnotations,exportPdf}.ts` (draw signature rows), `useReaderSigning.ts` (the surface
@@ -1412,39 +1548,125 @@ Changes: A10. The migration at `persistence/migrations.ts` isn't needed if `anno
 Tests: placement maths; a signature row flattened through `exportPdf` lands on the right PDF page and rect
 for `[2in1]`, a cover and a turned page (pdf-lib fixtures); the PNG copy (replacing the saved signature
 doesn't change the row's file); rebuilds (`savePageEdit`, `compressDocument`) keep the row.
+(`signature/__tests__/signatureRows.test.ts`; the rebuild cases are Compress and Merge.)
 
 Device check: sign page 3 of `[2in1]`: it shows at once, at the same zoom. The shared PDF has it on the
 right column. It survives Edit pages and Compress. Erase it, then share again: gone. An imported PDF shows
-it at once.
+it at once. Also: drag and resize the box, "Bottom right", Redraw; sign a page turned in Edit pages (upright
+on screen and in the PDF); move a placed signature with the eraser tool on; back up and restore a signed
+document.
 
 ## W17 · The surface becomes the reader *(M)*
-Status: planned. JS only.
+Status: **done in code (2026-10-10).** JS only. **Device check open** (below). W15 and W16 had not run
+on a phone when this was built, and W18 (same session) removed the other viewer: run their checks first.
 
-Files:
-- the flag defaults to true;
-- remove `beforeSave`/`annotationsHook` from `libraryOperations.ts`, `pageEdits.ts`, `addCover.ts` and
-  `buildExamPack.ts`;
-- new guard test `annotations/__tests__/annotationWriters.test.ts`;
-- new `store/useCleanPdfBases.ts` (one-shot, `processSequentially`, a settings key with the cleaned ids);
-- delete `useAnnotationPdfSync.ts`;
-- scans no longer need `document.pdf` to be read (`ensureDocumentPdfOnce` runs only at export).
+What was built, and where it differs from the plan:
+- **The switch is gone**, not defaulted to true: W18 removed the only thing it chose between.
+  `remoteConfig.readerSurface`, `isReaderSurfaceEnabled`, the Settings → Developer row, its strings and
+  the `reader_surface` row in `docs/firebase.md` are deleted. (Delete the parameter in the console too.)
+- **No rebuild writes marks into `document.pdf`.** `annotationsHook` is deleted; `standardPdfOf`,
+  `combineInto` (merge, append), `splitDocument`, `compressDocument`, `applySignedPage`, `savePageEdit`,
+  `addCover.buildScanned` and `buildExamPack` build without `beforeSave`. `BuildPdfOptions.beforeSave`
+  stays for a submission's own build. Parameters that only fed the hooks are gone (`compressDocument`,
+  `applySignedPage`, `savePageEdit`, `appendDocuments`, `compressDocuments`); merge and split still take
+  the rows, for the signature PNGs.
+- **`updatePdfAnnotations` is out of the app** (it rewrote `document.pdf` in place). Tests that need a
+  file "as an older build left it" use `src/test/bakeAnnotations.ts`.
+- **Guard: `annotations/__tests__/annotationWriters.test.ts`.** `writeMarks(`, `writeAnnotations(` and
+  `writeSignatures(` only in `pdfAnnotations.ts`, `exportPdf.ts` and `submitDocument.ts`.
+- **The migration: `services/annotations/cleanBases.ts` + `store/useCleanPdfBases.ts`** (mounted in
+  `BootEffects`).
+  - The first run plans it: every document with a PDF **and at least one row**, scans too (their file
+    is what leaves the app when the last row is deleted later).
+  - The plan is stored as **the list still to do** (`meta` table, key `cleanPdfBases`, `{ pending: { id:
+    failed tries } }`), not as "the cleaned ids" in settings: a done list would have every newly marked
+    document loaded with pdf-lib at each start, for ever. `meta` describes this phone's copy and is not
+    in a backup.
+  - `runClean`: `processSequentially`, `exportPdf.settleOurAnnotations(uri, 'remove')` (atomic, only
+    rewrites a file that held any), the list stored after each document. A document that is gone
+    leaves the list; one that fails stays for the next start, three times at most (a file pdf-lib can't
+    open never got ours written into it either).
+  - The list is read as soon as the library is loaded; the cleaning waits for `afterBoot`.
+  - **Until an imported PDF is clean** (`useBasePending`), `PageSurface` gets `plainPages`: pdfium
+    draws it with `annotations: false`, into a cache folder of its own (`pageCacheName(…, 'plain')`), so
+    those renders are never taken for the usual ones. When the document leaves the list the Reader
+    reloads on the page being read.
+- **Documents with no rows** (the carried-over question): not cleaned, and shown to be covered. An older
+  build took ours out of the file when the last row went (`useAnnotationPdfSync`; on the surface, W15's
+  one case). From now on nothing writes them. The gap "rows deleted before the migration reached the
+  document" is closed by keeping the list: such a document is still on it. A restored backup is settled
+  by the restore.
+- **`useAnnotationPdfSync` is deleted**, with the "last row goes" effect in `ReaderDocumentView`.
+- **Scans open without `document.pdf`.** `useReaderDocument` lost the backfill effect and
+  `backfilling` / `previewFailed` / `retryPreview` (and their notices and strings).
+  `annotatedPdfFor` builds a missing PDF for a scan (`ensureDocumentPdfOnce`) when one is asked for; the
+  store is not told, so until something rebuilds the document the next export builds it again (only
+  documents from before every document got a PDF). `savePageEdit` no longer needs a scan's PDF to exist.
+  An imported PDF without its file reads as "files missing".
+- **Restore:** `restoredPdfsToSettle` lost its `surface` argument, and a full restore now takes ours out
+  of **every** document that has rows, a scan too (the plan only named the condition).
+- **The Library's page-1 signing** makes a row whenever the page can keep one; `applySignatureToDocument`
+  stays only for a page that can't (an imported page not indexed, a scan's page inside a merged PDF),
+  where the signature is drawn into the page itself.
+- **JPG-format documents: kept as flattening** (`SignatureModal`, `applySignedPage`). Their export is the
+  page image; a row would be missing from every shared JPG.
 
-Tests: the guard; the migration runner (sequential, resumable, skips documents without rows).
+Not as planned, or left open:
+- `applySignatureToDocument`'s scan branch (`signatureDraw`, `applySignatureToPdf`) has no caller left in
+  the app (its tests still run). Remove it with W23's page tools, or when the Library signs through the
+  Reader.
+- A scan whose `document.pdf` was deleted outside the app still reads as "files missing" (the check is
+  on the PDF when the document has one), although the surface could show it.
+
+Files: `services/remote/remoteConfig.ts`, `screens/SettingsScreen.tsx`, `persistence/{libraryOperations,
+pageEdits,addCover}.ts`, `study/buildExamPack.ts`, `annotations/{pdfAnnotations,exportPdf,cleanBases}.ts`,
+`store/useCleanPdfBases.ts`, `bootstrap/BootEffects.tsx`, `backup/restoreBackup.ts`,
+`components/library/useDocumentListActions.tsx`, `components/reader/{ReaderDocumentView,useReaderDocument,
+useReaderSigning,useEditPages}`, `components/reader/surface/{PageSurface,useRenderQueue}`,
+`reader/pageCache.ts`, `pdf/pdfService.ts` (`ensureDocumentPdf` takes any document shape it needs).
+
+Tests: the guard; `annotations/__tests__/cleanBases.test.ts` (the plan skips documents without rows; one
+at a time; the list stored after each; a run cut short carries on; a failure is kept three starts; a
+deleted document is dropped; a real file comes out clean); Compress and the exam pack leave the file clean
+and the exported copy has the marks; a full restore settles scans too.
 
 Device check: a full regression on `[300p] [ext300] [pw] [2in1] [jpg]`: marks, sign, share, print, backup,
-restore.
+restore. Also: on a phone that has documents marked by an older build, the first start cleans them (an
+imported one shows each mark once, before and after); delete a document's last mark, share it: no mark in
+the PDF; Compress and Edit pages keep the marks on screen and in the shared PDF.
 
 ## W18 · Remove react-native-pdf-jsi *(M; needs a new dev build)*
-Status: planned. Needs W7(b) so the iOS build keeps working.
+Status: **done in code (2026-10-10).** **Needs `npx expo prebuild --clean` and a new dev build** (a native
+module left). **Device check open** (below); iOS has still never been built.
 
-Files:
-- delete `PdfPageView.tsx`, `useMarkFlash.ts`, `MarkView.tsx`, `useMarkPageImages.ts`, `SelectTextSheet.tsx`,
-  `PageCanvas.tsx` (if unused) and pdf-jsi's Find code;
-- `readerPosition.classifyPdfError` → `classifyNativePdfError(code)`;
-- the `app.json` plugin and the `package.json` dependency (review the diffs: security rule);
-- the `pdf-native` gradle comment about sharing pdfium with pdf-jsi (pdfiumandroid stays, ours now);
-- `AGENTS.md` (the Reader pipeline paragraph);
-- a guard test: no imports of `react-native-pdf-jsi`.
+What was built, and where it differs from the plan:
+- **Deleted:** `PdfPageView.tsx`, `useMarkFlash.ts`, `MarkView.tsx`, `useMarkPageImages.ts`,
+  `SelectTextSheet.tsx`, `PageCanvas.tsx` (unused after those), and with them `services/study/canvasMath.ts`,
+  `services/reader/findRunner.ts` (pdf-jsi's Find), `services/reader/readerEngine.ts` (nothing to choose),
+  `notesPanel.flashQuery`, `readingSettings.pdfViewOptions` / `NIGHT_OVERLAY_ALPHA`, `markMode.markWindow`
+  and its re-exports of the column functions (import them from `surfaceGeometry`),
+  `signaturePlacement.signTargets` (the surface shows one library page: no "which page" question).
+- **`ReaderDocumentView`:** `onSurface` is `isPageRaster`. No `MarkView`, `SelectTextSheet`, `PdfPageView`.
+  `useReaderFind()` is the open/query/target state and the other viewers' match count; `useReaderSigning`
+  takes the library page being read (`idx`) and has no placement overlay of its own.
+- **Load errors:** `usePdfSession.sessionErrorCode` → `'password' | 'failed'`;
+  `readerPosition.classifyNativePdfError(code)`; `LoadProblem` lost `'unknown'` (the session always says
+  which it is).
+- **Reading settings:** the night strength is always "Night page" (the dim-overlay wording is gone).
+- **`package.json`:** `react-native-pdf-jsi` removed, and **`react-native-blob-util`** too (not in the
+  plan): it was installed only as pdf-jsi's peer and nothing imports it. `app.json`: the plugin entry
+  removed. Both diffs were read line by line (the lockfile's too: removals only, plus one package now
+  marked dev/optional).
+- **`modules/pdf-native/android/build.gradle`:** the comment; `pdfiumandroid:1.0.32` stays, ours now.
+- **Guards:** `src/__tests__/noPdfJsi.test.ts` (no import, not a dependency, not a plugin);
+  `bootImports` no longer lists the package.
+- `AGENTS.md` (the Reader pipeline paragraph, the boot-path rule), `README.md`, `docs/build.md` (the
+  plugin's warning is gone).
+
+Not as planned, or left open:
+- A dev build made **before W7** (no pdfium sessions) can no longer read a PDF at all ("Can't open this
+  file"); there is no older viewer to fall back to.
+- `SignaturePlacementOverlay` and `usePageImage` stay: the Library's page-1 signing uses them.
 
 Device check: `npx expo prebuild --clean`; APK size before and after; pdfium `.so` packaged once; a full
 reader regression; the iOS build compiles.

@@ -78,7 +78,7 @@ export function ReaderLoadProblem({ loadProblem, needsPassword, passwordDraft, o
         >
           <View style={[styles.card, { backgroundColor: tokens.surface }]}>
             <Text style={[styles.title, { color: tokens.ink }]}>
-              {loadProblem === 'password' || loadProblem === 'wrongPassword' ? t('reader.passwordNeeded') : t('reader.passwordTitle')}
+              {t('reader.passwordNeeded')}
             </Text>
             {loadProblem === 'wrongPassword' ? <Text style={{ color: tokens.danger }}>{t('reader.wrongPassword')}</Text> : null}
             <TextInput

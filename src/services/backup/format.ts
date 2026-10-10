@@ -64,6 +64,9 @@ export type Manifest = {
   restorable: 'full' | 'pdfs';
   counts: { courses: number; documents: number; pages: number; bytes: number };
   readable: Record<string, ReadableFile>;
+  // §18 W14: the documents whose readable PDF has their marks and signatures written in (the
+  // rows are in library.json as well). Missing in backups made before.
+  annotated?: string[];
 };
 
 export type LibraryJson = { formatVersion: number; schemaVersion: number; tables: Tables };
@@ -260,7 +263,7 @@ export async function exportRows(db: SQLiteDatabase, scope: BackupScope, schemaV
 
 export function buildManifest(
   exported: ExportedLibrary,
-  info: { kind: BackupKind; appVersion: string; createdAt: number; restorable?: Manifest['restorable'] }
+  info: { kind: BackupKind; appVersion: string; createdAt: number; restorable?: Manifest['restorable']; annotated?: string[] }
 ): Manifest {
   return {
     format: BACKUP_FORMAT,
@@ -272,6 +275,7 @@ export function buildManifest(
     restorable: info.restorable ?? 'full',
     counts: exported.counts,
     readable: exported.readable,
+    ...(info.annotated?.length ? { annotated: info.annotated } : {}),
   };
 }
 

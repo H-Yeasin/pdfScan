@@ -22,8 +22,7 @@ import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
 import { passEndLabel } from '../components/pro/passEndLabel';
 import { APP_VERSION } from '../config/appInfo';
-import { setReaderSurfaceOverride, useReaderSurfaceEnabled, useRemoteConfig, useRemoteConfigSource } from '../services/remote/remoteConfig';
-import { hasPdfSessions } from '../services/pdf/pdfNative';
+import { useRemoteConfig, useRemoteConfigSource } from '../services/remote/remoteConfig';
 import { useAdsSdk } from '../services/ads/adsSdk';
 import { isCrashReportingActive, reportCrash } from '../services/telemetry/crash';
 import { setRenderCountsShown, useRenderCountsShown } from '../utils/renderCounts';
@@ -40,7 +39,6 @@ export function SettingsScreen() {
   const [timetableOpen, setTimetableOpen] = useState(false);
   const { go, back } = useRouter();
   const renderCountsOn = useRenderCountsShown();
-  const readerSurfaceOn = useReaderSurfaceEnabled();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const entitlement = useEntitlement();
@@ -251,17 +249,6 @@ export function SettingsScreen() {
               subtitle={t('settings.developer.readerLabSubtitle')}
               chevron
               onPress={() => go('readerLab')}
-            />
-            <SettingRow
-              title={t('settings.developer.readerSurface')}
-              subtitle={t(
-                !hasPdfSessions()
-                  ? 'settings.developer.readerSurfaceUnavailable'
-                  : readerSurfaceOn
-                    ? 'settings.developer.readerSurfaceOn'
-                    : 'settings.developer.readerSurfaceOff'
-              )}
-              onPress={() => setReaderSurfaceOverride(!readerSurfaceOn)}
             />
             <SettingRow
               title={t('settings.developer.renderCounts')}

@@ -2,13 +2,11 @@ import {
   REMOTE_DEFAULTS,
   getRemoteConfig,
   getRemoteConfigSource,
-  isReaderSurfaceEnabled,
   isVersionBelow,
   loadRemoteConfig,
   parseRemoteConfig,
   remoteValuesOf,
   resetRemoteConfig,
-  setReaderSurfaceOverride,
   setRemoteConfig,
 } from '../remoteConfig';
 
@@ -87,7 +85,6 @@ describe('parseRemoteConfig', () => {
       supportEmail: 'help@example.com',
       proSalesEnabled: true,
       minSupportedVersion: '1.2.0',
-      readerSurface: false,
     });
   });
 
@@ -117,28 +114,6 @@ describe('parseRemoteConfig', () => {
     const config = parseRemoteConfig({ ads_enabled: 'true', some_future_key: 'x' });
     expect(config).toEqual({ ...REMOTE_DEFAULTS, adsEnabled: true });
     expect(config).not.toHaveProperty('some_future_key');
-  });
-});
-
-// §18 W10.
-describe('reader_surface', () => {
-  afterEach(resetRemoteConfig);
-
-  it('is off unless the console turns it on', () => {
-    expect(REMOTE_DEFAULTS.readerSurface).toBe(false);
-    expect(parseRemoteConfig({ reader_surface: 'true' }).readerSurface).toBe(true);
-    expect(parseRemoteConfig({ reader_surface: 'on' }).readerSurface).toBe(false);
-  });
-
-  it("follows the config until a development build's override answers instead", () => {
-    expect(isReaderSurfaceEnabled()).toBe(false);
-    setReaderSurfaceOverride(true);
-    expect(isReaderSurfaceEnabled()).toBe(true);
-    setReaderSurfaceOverride(null);
-    setRemoteConfig({ ...REMOTE_DEFAULTS, readerSurface: true });
-    expect(isReaderSurfaceEnabled()).toBe(true);
-    setReaderSurfaceOverride(false);
-    expect(isReaderSurfaceEnabled()).toBe(false);
   });
 });
 

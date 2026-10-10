@@ -1,10 +1,11 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { annotatedPdfFor } from '../annotations/exportPdf';
 import { isPageRasterFormat } from '../documents/formatCapabilities';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import { sanitizeFileName } from '../../utils/sanitize';
-import type { LibraryDocument } from '../../types/models';
+import type { Annotation, LibraryDocument } from '../../types/models';
 
 const FALLBACK_FILE_NAME = 'document';
 
@@ -37,8 +38,10 @@ export function shareFileName(name: string, extension: string, suffix = ''): str
 // expo-sharing shares exactly one file per call. A multi-page JPG document has no single
 // combined file, so sharing it shares only its first page, with the caller responsible for
 // surfacing that as a visible note rather than silently doing something unexpected.
-export async function shareDocument(doc: LibraryDocument): Promise<void> {
-  const uri = doc.format === 'PDF' ? doc.pdfUri : isPageRasterFormat(doc.format) ? doc.pages[0]?.fileUri : doc.contentUri;
+// §18 W14: a PDF goes out with the document's marks and signatures written in (`annotations`:
+// the library's; annotations/exportPdf keeps the copy).
+export async function shareDocument(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<void> {
+  const uri = doc.format === 'PDF' ? await annotatedPdfFor(doc, annotations) : isPageRasterFormat(doc.format) ? doc.pages[0]?.fileUri : doc.contentUri;
   if (!uri) return;
   const suffix = doc.format === 'JPG' && doc.pages.length > 1 ? '_1' : '';
   await shareAs(uri, shareFileName(doc.name, doc.format.toLowerCase(), suffix), MIME_BY_FORMAT[doc.format]);
@@ -50,9 +53,10 @@ export async function shareFileUri(uri: string, mimeType: string, dialogTitle?: 
   await Sharing.shareAsync(uri, { mimeType, dialogTitle });
 }
 
-export async function printDocument(doc: LibraryDocument): Promise<void> {
-  if (doc.format === 'PDF' && doc.pdfUri) {
-    await Print.printAsync({ uri: doc.pdfUri });
+export async function printDocument(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<void> {
+  const pdf = doc.format === 'PDF' ? await annotatedPdfFor(doc, annotations) : undefined;
+  if (pdf) {
+    await Print.printAsync({ uri: pdf });
   } else if (isPageRasterFormat(doc.format) && doc.pages[0]) {
     await Print.printAsync({ uri: doc.pages[0].fileUri });
   } else if (doc.contentUri) {

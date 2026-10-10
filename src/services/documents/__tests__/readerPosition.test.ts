@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { act, create } from 'react-test-renderer';
 import { ScreenRoleContext, useScreenRole, type ScreenRole } from '../../../navigation/screenRole';
-import { classifyPdfError, heldSubject, openingPage, pageLabel, parseJumpInput, pdfPageAfterEdit } from '../readerPosition';
+import { classifyNativePdfError, heldSubject, openingPage, pageLabel, parseJumpInput, pdfPageAfterEdit } from '../readerPosition';
 import { initialLibraryState, libraryReducer } from '../../../store/slices/librarySlice';
 import { makeDoc, makePage } from '../../../test/fixtures';
 import { resetStorage } from '../../../test/db';
@@ -116,13 +116,11 @@ describe('parseJumpInput', () => {
   });
 });
 
-describe('classifyPdfError', () => {
-  it("tells a password apart from a damaged file, from pdf-jsi's messages", () => {
-    expect(classifyPdfError('Password required or incorrect password.')).toBe('password');
-    expect(classifyPdfError('Load pdf failed. path=/x.pdf')).toBe('damaged');
-    expect(classifyPdfError('cannot create document: File not in PDF format or corrupted.')).toBe('damaged');
-    expect(classifyPdfError(undefined)).toBe('unknown');
-    expect(classifyPdfError('{}')).toBe('unknown');
+describe('classifyNativePdfError', () => {
+  it('tells a password apart from a file that can not be read', () => {
+    expect(classifyNativePdfError('password')).toBe('password');
+    expect(classifyNativePdfError('failed')).toBe('damaged');
+    expect(classifyNativePdfError(undefined)).toBe('damaged');
   });
 });
 

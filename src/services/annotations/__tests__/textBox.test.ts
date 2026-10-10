@@ -5,7 +5,8 @@ import type { Annotation, LibraryPage } from '../../../types/models';
 import { setTextRaster } from '../../pdf/textAppearance';
 import { annotationAt } from '../hitTest';
 import { DEFAULT_MARK, moveBox, normalizeMark, textBoxAt, textSizeFor } from '../markMode';
-import { removeOurAnnotations, updatePdfAnnotations } from '../pdfAnnotations';
+import { updatePdfAnnotations } from '../../../test/bakeAnnotations';
+import { removeOurAnnotations } from '../pdfAnnotations';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');

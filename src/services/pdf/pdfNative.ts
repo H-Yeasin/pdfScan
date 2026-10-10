@@ -63,7 +63,7 @@ export class PdfOutOfRangeError extends Error {
 }
 
 // What the build's module can do: 0 without the module, 1 before §18 W7, 2 with sessions (the
-// functions below `renderPage`'s group). The page surface needs 2 and the old viewer stays for less.
+// functions below `renderPage`'s group). The page surface, the Reader's viewer for PDFs and scans, needs 2.
 export const PDF_NATIVE_SESSIONS = 2;
 
 export function pdfNativeVersion(): number {

@@ -9,6 +9,7 @@ import { initCrashReporting } from '../services/telemetry/crash';
 import { logUsage, setUsageCollection } from '../services/telemetry/usage';
 import { useAppSelector } from '../store/AppStateContext';
 import { useAutoBackup } from '../store/useAutoBackup';
+import { useCleanPdfBases } from '../store/useCleanPdfBases';
 import { configureNotifications, useDeadlineReminders } from '../store/useDeadlines';
 import { useExternalFileLinking } from '../store/useExternalFileLinking';
 import { useImportedPdfIndexing } from '../store/useImportedPdfIndexing';
@@ -39,6 +40,7 @@ export const BootEffects = memo(function BootEffects({ afterBoot }: { afterBoot:
   usePdfInfoBackfill(libraryAfterBoot);
   useStorageIntegrity(libraryAfterBoot);
   useAutoBackup(libraryAfterBoot);
+  useCleanPdfBases(libraryLoaded, libraryAfterBoot);
 
   const settingsLoaded = useAppSelector((s) => s.settings.loaded);
   const crashReportsEnabled = useAppSelector((s) => s.settings.crashReportsEnabled);

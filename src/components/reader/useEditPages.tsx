@@ -52,13 +52,11 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: (befor
     [fail]
   );
 
-  const annotationsOf = useCallback((id: string) => state.library.annotations.filter((a) => a.documentId === id), [state.library.annotations]);
-
   const handleSave = useCallback(
     (edit: PageEdit) => {
       if (!doc) return;
       run(async () => {
-        const saved = await savePageEdit(doc, edit, annotationsOf(doc.id));
+        const saved = await savePageEdit(doc, edit);
         // A removed page's bookmarks and annotations go with it (library/UPDATE_FILE).
         dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: saved });
         onChanged(doc, saved);
@@ -66,7 +64,7 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: (befor
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.edit.saved') });
       });
     },
-    [doc, run, annotationsOf, dispatch, onChanged]
+    [doc, run, dispatch, onChanged]
   );
 
   const handleExtract = useCallback(
@@ -104,13 +102,13 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: (befor
       if (!doc) return;
       setPickerOpen(false);
       run(async () => {
-        const appended = await appendDocuments(doc, [source], annotationsOf(doc.id));
+        const appended = await appendDocuments(doc, [source]);
         dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: appended });
         onChanged(doc, appended);
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.edit.added', { count: appended.pages.length - doc.pages.length }) });
       });
     },
-    [doc, run, annotationsOf, dispatch, onChanged]
+    [doc, run, dispatch, onChanged]
   );
 
   const sources = useMemo(

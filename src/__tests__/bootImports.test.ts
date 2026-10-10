@@ -18,7 +18,7 @@ const ROOT = join(__dirname, '../..');
 const ENTRY = 'index.ts';
 const NAVIGATOR = 'src/bootstrap/AppNavigator.tsx';
 
-const HEAVY_PACKAGES = ['pdf-lib', 'xlsx', 'mammoth', 'react-native-webview', 'react-native-pdf-jsi'];
+const HEAVY_PACKAGES = ['pdf-lib', 'xlsx', 'mammoth', 'react-native-webview'];
 const HEAVY_FILES = ['src/services/enhance/filters/registry.ts'];
 
 // `file -> import` pairs that may stay. Empty on purpose: a new static import of a heavy library

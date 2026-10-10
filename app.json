@@ -180,7 +180,6 @@
         }
       ],
       "expo-asset",
-      "react-native-pdf-jsi",
       "@sentry/react-native",
       [
         "expo-notifications",

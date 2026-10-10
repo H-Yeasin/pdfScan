@@ -4,7 +4,7 @@ import { applySignatureToPdf, buildPdfFromPages, pageDimensions, toSourcePage, t
 import { applyMatrix, type Matrix } from '../../pdf/rotation';
 import { applySignatureToDocument } from '../../persistence/libraryOperations';
 import type { LibraryDocument, LibraryPage, PageLayout, PageRotation } from '../../../types/models';
-import { signTargets, signatureDraw, type SignaturePlacement } from '../signaturePlacement';
+import { signatureDraw, type SignaturePlacement } from '../signaturePlacement';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
@@ -131,28 +131,6 @@ async function signAndCheck(doc: LibraryDocument, idx: number, pdfPage: number, 
   expectAt(applyMatrix(signature, 0, 1), on(placement.originX, placement.originY));
   return signed;
 }
-
-describe('signTargets', () => {
-  it('standard: the one library page of that PDF page', async () => {
-    const doc = await scan({ content: 3 });
-    expect(signTargets(doc, 1)).toEqual([0]);
-    expect(signTargets(doc, 3)).toEqual([2]);
-  });
-
-  it('2-in-1 with a cover: the cover alone, then two pages a sheet', async () => {
-    const doc = await scan({ content: 3, layout: '2_in_1', cover: 'imported_image' });
-    expect(signTargets(doc, 1)).toEqual([0]);
-    expect(signTargets(doc, 2)).toEqual([1, 2]);
-    // The odd last page has its sheet to itself.
-    expect(signTargets(doc, 3)).toEqual([3]);
-  });
-
-  it('is empty for a PDF page with no library page, not the nearest one', async () => {
-    const doc = await scan({ content: 2 });
-    expect(signTargets(doc, 5)).toEqual([]);
-    expect(signTargets({ ...doc, pages: [] }, 1)).toEqual([]);
-  });
-});
 
 describe('signatureDraw', () => {
   it('standard: on its own PDF page, unturned, where the page picture has it', async () => {

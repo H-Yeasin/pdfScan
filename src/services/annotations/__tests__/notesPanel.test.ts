@@ -4,7 +4,6 @@ import {
   ALL_NOTES,
   documentNotes,
   filterNotes,
-  flashQuery,
   flashRects,
   formatNotesExport,
   groupNotesByPage,
@@ -62,13 +61,6 @@ describe('§12 D4 notes panel', () => {
     const entries = documentNotes(doc, annotations, bookmarks);
     expect(notesFilterOptions(entries)).toEqual({ kinds: ['highlight', 'underline', 'strike', 'note', 'bookmark'], colors: ['yellow', 'black', 'red'] });
     expect(notesFilterOptions(documentNotes(doc, [mark({})], []))).toEqual({ kinds: [], colors: [] });
-  });
-
-  it('flashes a mark by its first words; notes and bookmarks have nothing to find', () => {
-    expect(flashQuery({ kind: 'highlight', text: ' one  two\nthree four five six seven' })).toBe('one two three four five');
-    expect(flashQuery({ kind: 'highlight', text: '' })).toBeNull();
-    expect(flashQuery({ kind: 'note', text: 'a note' })).toBeNull();
-    expect(flashQuery({ kind: 'bookmark', text: 'label' })).toBeNull();
   });
 
   it('flashes a mark where it is: its boxes, a note\'s icon, a drawing\'s bounds', () => {

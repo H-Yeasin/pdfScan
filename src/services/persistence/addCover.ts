@@ -6,7 +6,6 @@ import { extractPages, loadPdf, savePdf } from '../pdf/pdfOps';
 import { renderPage } from '../pdf/pdfNative';
 import { isPdfLevel } from '../documents/formatCapabilities';
 import { pdfPageCount } from '../documents/pageMap';
-import { writeAnnotations } from '../annotations/pdfAnnotations';
 import { downscaleAndCompressPage } from '../enhance/enhanceService';
 import { MASTER_MAX_DIM, THUMB_JPEG_Q, THUMB_MAX_DIM } from '../capture/imageSpec';
 import { cleanTemporaryCache, getDocumentDir } from './libraryFiles';
@@ -171,13 +170,10 @@ async function buildScanned(input: AddCoverInput, id: string, dir: Directory, wr
   const pages = [coverRow, ...contentRows];
   const pdfLayout = doc.pdfLayout ?? 'standard';
   const mapped = { pages, coverKind: cover.mode, pdfLayout, pdfPageSize: pageSize };
-  const annotations = mode === 'replace' ? input.annotations.filter((a) => a.documentId === doc.id) : [];
 
   const pdf = pdfDest(mode, dir, written);
-  await buildPdfFromPages(id, contentRows.map(toSourcePage), 'as-is', config, pdfLayout === '2_in_1' ? '2_in_1' : 'standard', pageSize, {
-    dest: pdf,
-    beforeSave: annotations.length ? (pdfDoc) => writeAnnotations(pdfDoc, mapped, annotations) : undefined,
-  });
+  // §18 W17: the rebuilt file holds no marks; a replaced document's rows stay on its pages.
+  await buildPdfFromPages(id, contentRows.map(toSourcePage), 'as-is', config, pdfLayout === '2_in_1' ? '2_in_1' : 'standard', pageSize, { dest: pdf });
   // buildCoverPage skips a cover image it can't embed (a format pdf-lib can't read).
   if ((await inspectPdf(pdf.uri))?.pageCount !== pdfPageCount(mapped)) throw new CoverPhotoError();
   return { pdf, pages, pdfLayout, pdfPageSize: pageSize };

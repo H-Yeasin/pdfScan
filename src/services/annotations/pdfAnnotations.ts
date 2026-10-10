@@ -1,19 +1,21 @@
-import { File } from 'expo-file-system';
-import { writeFileReplacing } from '../files/atomicWrite';
 import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFRef, PDFString, type PDFPage } from 'pdf-lib';
 import { pdfRectFor, type PdfRect } from '../documents/pageMap';
 import { isPdfLevel } from '../documents/formatCapabilities';
 import { imagePlacement } from '../pdf/pdfService';
 import { HELV, textLinesAppearance } from '../pdf/textAppearance';
-import type { Annotation, LibraryDocument, OcrBounding } from '../../types/models';
-import { isRectMark, markLine } from './marks';
+import { isSignature, signatureFile } from '../signature/signatureRows';
+import type { Annotation, LibraryDocument, OcrBounding, PageRotation } from '../../types/models';
+import { isRectMark, markLine, turnedContentSize, turnedQuad } from './marks';
 import { annotationColor, rgb01 } from './palette';
 
-// §5 T4: annotations are data (master pixels); every PDF of a document gets them as real PDF
-// annotation objects - /Highlight, /Underline, /StrikeOut (§12 D3), /Ink, /Text, /FreeText (§12 D10) - so other PDF apps show them, can hide or delete
-// them, and they survive rebuilds (the builder writes them again). Each carries
+// §5 T4: annotations are data (master pixels); every PDF of a document that leaves the app gets
+// them as real PDF annotation objects - /Highlight, /Underline, /StrikeOut (§12 D3), /Ink, /Text,
+// /FreeText (§12 D10) - so other PDF apps show them and can hide or delete them. Each carries
 // /NM (pdfscan:<id>) so ours can be found and replaced, and an appearance stream (/AP) so viewers
 // that don't draw annotations themselves still show them.
+// §18 W17 (A9): never into `document.pdf`. The writers here are called by the export copy
+// (exportPdf.annotatedPdfFor) and a submission's build (submitDocument), nowhere else
+// (__tests__/annotationWriters.test.ts).
 
 export const NM_PREFIX = 'pdfscan:';
 
@@ -131,7 +133,8 @@ const RECT_SUBTYPE = { highlight: 'Highlight', underline: 'Underline', strike: '
 
 // Writes `annotations` into `pdfDoc`, which must have been laid out as `doc` says (pages, cover,
 // pdfLayout, pdfPageSize), or be the document's own file for an imported PDF. Annotations on
-// pages the document doesn't have are skipped. Returns how many were written.
+// pages the document doesn't have are skipped. Returns how many were written. Signatures (§18
+// W16) are images, read from disk: `writeMarks` writes those too.
 export function writeAnnotations(pdfDoc: PDFDocument, doc: MappedDoc, annotations: readonly Annotation[]): number {
   const pages = pdfDoc.getPages();
   const toPdf = mapperFor(pdfDoc, doc);
@@ -219,7 +222,7 @@ export function writeAnnotations(pdfDoc: PDFDocument, doc: MappedDoc, annotation
         { Name: 'Comment', Open: false }
       );
       written += 1;
-    } else if ('box' in a.data && a.kind === 'text') {
+    } else if ('size' in a.data && a.kind === 'text') {
       if (writeTextBox(pdfDoc, pages, a, idx, a.data, point)) written += 1;
     }
   }
@@ -236,23 +239,25 @@ function writeTextBox(
   pages: PDFPage[],
   a: Annotation,
   idx: number,
-  data: { box: OcrBounding; size: number },
+  data: { box: OcrBounding; size: number; turn?: PageRotation },
   point: (idx: number, x: number, y: number) => Point | null
 ): boolean {
   const { box, size } = data;
   const lines = (a.text ?? '').split('\n');
   if (!lines.some((l) => l.trim())) return false;
-  const tl = point(idx, box.left, box.top);
-  const tr = point(idx, box.left + box.width, box.top);
-  const bl = point(idx, box.left, box.top + box.height);
-  const br = point(idx, box.left + box.width, box.top + box.height);
+  // §18 W15: the text's own frame inside the box (turned with `turn`), corner by corner.
+  const quad = turnedQuad(box, data.turn);
+  const tl = point(idx, quad.tl.x, quad.tl.y);
+  const tr = point(idx, quad.tr.x, quad.tr.y);
+  const bl = point(idx, quad.bl.x, quad.bl.y);
   const page = tl && pages[tl.page - 1];
-  if (!tl || !tr || !bl || !br || !page) return false;
+  if (!tl || !tr || !bl || !page) return false;
+  const br = { x: tr.x + bl.x - tl.x, y: tr.y + bl.y - tl.y };
   const across = Math.hypot(tr.x - tl.x, tr.y - tl.y);
   const down = Math.hypot(bl.x - tl.x, bl.y - tl.y);
   if (across <= 0 || down <= 0) return false;
   // Points per master pixel, and the frame's axes: x along the text, y up the page as it reads.
-  const k = across / Math.max(1, box.width);
+  const k = across / Math.max(1, turnedContentSize(box, data.turn).width);
   const ux = [(tr.x - tl.x) / across, (tr.y - tl.y) / across];
   const uy = [(tl.x - bl.x) / down, (tl.y - bl.y) / down];
   const sizePt = size * k;
@@ -269,9 +274,68 @@ function writeTextBox(
   return true;
 }
 
+// A signature's PNG bytes, or null when it can't be read (the row then writes nothing).
+export type SignatureReader = (a: Annotation) => Promise<Uint8Array | null>;
+
+async function readSignatureFile(a: Annotation): Promise<Uint8Array | null> {
+  const file = signatureFile(a);
+  return file?.exists ? file.bytes() : null;
+}
+
+// §18 W16 (A10): signature rows as /Stamp annotations whose appearance is the signature's PNG.
+// An annotation and not page content, so it is ours to find and replace like every mark (/NM),
+// and a file that already carries it never gets it twice. The image's corners are mapped one by
+// one (signatureQuad), so it lands turned the way it was placed on a turned page or a 2-in-1
+// column. Returns how many were written.
+export async function writeSignatures(
+  pdfDoc: PDFDocument,
+  doc: MappedDoc,
+  annotations: readonly Annotation[],
+  read: SignatureReader = readSignatureFile
+): Promise<number> {
+  const rows = annotations.filter(isSignature);
+  if (!rows.length) return 0;
+  const pages = pdfDoc.getPages();
+  const toPdf = mapperFor(pdfDoc, doc);
+  const point = (idx: number, p: { x: number; y: number }) => toPdf(idx, { left: p.x, top: p.y, width: 0, height: 0 });
+  let written = 0;
+  for (const a of rows) {
+    const idx = doc.pages.findIndex((p) => p.id === a.pageId);
+    if (idx < 0) continue;
+    const quad = turnedQuad(a.data.box, a.data.turn);
+    const tl = point(idx, quad.tl);
+    const tr = point(idx, quad.tr);
+    const bl = point(idx, quad.bl);
+    const page = tl && pages[tl.page - 1];
+    if (!tl || !tr || !bl || !page) continue;
+    const bytes = await read(a).catch(() => null);
+    if (!bytes) continue;
+    let image;
+    try {
+      image = await pdfDoc.embedPng(bytes);
+    } catch {
+      // Not a PNG after all: one bad file must not stop the document from leaving the app.
+      continue;
+    }
+    // An image is drawn in the unit square, its bottom-left corner at the origin: x runs along
+    // its bottom edge, y up its left one.
+    const br = { x: bl.x + (tr.x - tl.x), y: bl.y + (tr.y - tl.y) };
+    const frame = [br.x - bl.x, br.y - bl.y, tl.x - bl.x, tl.y - bl.y, bl.x, bl.y].map(fmt).join(' ');
+    const bounds = boundsOf([tl, tr, bl, br].map((p) => ({ x: p.x, y: p.y, width: 0, height: 0 })));
+    addAnnot(pdfDoc, page, a, 'Stamp', bounds, `q ${frame} cm /Sig Do Q`, { Name: 'Signature', C: [] }, { XObject: { Sig: image.ref } });
+    written += 1;
+  }
+  return written;
+}
+
+// Every row a document's PDF copy carries: the marks, then the signatures.
+export async function writeMarks(pdfDoc: PDFDocument, doc: MappedDoc, annotations: readonly Annotation[], read?: SignatureReader): Promise<number> {
+  return writeAnnotations(pdfDoc, doc, annotations) + (await writeSignatures(pdfDoc, doc, annotations, read));
+}
+
 // A text box's appearance has its own objects (the Helvetica dict, a shaped line's image and its
-// mask). pdf-lib writes every registered object, used or not, so they go with the annotation, or
-// each Mark session would leave a copy behind in document.pdf.
+// mask), and so has a signature's (its image and mask). pdf-lib writes every registered object,
+// used or not, so they go with the annotation, or a copy would be left behind in the file.
 function deleteAppearanceResources(pdfDoc: PDFDocument, normal: PDFRef) {
   const ctx = pdfDoc.context;
   const stream = ctx.lookup(normal);
@@ -318,17 +382,22 @@ export function removeOurAnnotations(pdfDoc: PDFDocument): number {
   return removed;
 }
 
-// After a Mark session: rewrites only the annotations in the existing document.pdf (no image
-// rebuild), in place. For an imported PDF that file is the student's own copy in the library (the
-// original outside the app is never touched). Returns the new file size.
-export async function updatePdfAnnotations(doc: MappedDoc & Pick<LibraryDocument, 'pdfUri'>, annotations: readonly Annotation[]): Promise<number | null> {
-  if (!doc.pdfUri) return null;
-  const file = new File(doc.pdfUri);
-  if (!file.exists) return null;
-  const pdfDoc = await PDFDocument.load(await file.bytes());
-  removeOurAnnotations(pdfDoc);
-  writeAnnotations(pdfDoc, doc, annotations);
-  const bytes = await pdfDoc.save();
-  writeFileReplacing(file, bytes);
-  return file.size;
+// Our annotations in a file become plain PDF annotations (their /NM goes): for a copy that is a
+// new document with no rows of its own (a filled form, a "PDFs only" backup restored), where
+// they would otherwise be removed as "ours" the first time that document's marks are written.
+// Returns how many were released.
+export function releaseOurAnnotations(pdfDoc: PDFDocument): number {
+  let released = 0;
+  for (const page of pdfDoc.getPages()) {
+    for (const ref of page.node.Annots()?.asArray() ?? []) {
+      const dict = ref instanceof PDFRef ? pdfDoc.context.lookup(ref) : ref;
+      if (!(dict instanceof PDFDict)) continue;
+      const nm = dict.get(PDFName.of('NM'));
+      const name = nm instanceof PDFString || nm instanceof PDFHexString ? nm.decodeText() : '';
+      if (!name.startsWith(NM_PREFIX)) continue;
+      dict.delete(PDFName.of('NM'));
+      released += 1;
+    }
+  }
+  return released;
 }

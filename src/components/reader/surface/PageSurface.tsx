@@ -2,35 +2,39 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { AccessibilityInfo, Alert, Keyboard, Linking, PixelRatio, StyleSheet, View, type AccessibilityActionInfo } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { useT } from '../../../i18n/useT';
 import { useBackHandler } from '../../../navigation/useBackHandler';
 import { useScreenRole } from '../../../navigation/screenRole';
-import { isRectMark, markLine } from '../../../services/annotations/marks';
-import { annotationColor } from '../../../services/annotations/palette';
 import { isPdfLevel } from '../../../services/documents/formatCapabilities';
+import type { NativePdfErrorCode } from '../../../services/documents/readerPosition';
 import type { ReaderSubject } from '../../../services/documents/readerTools';
 import { nightPalette, READING_SPACING_PX, type ReadingSettings } from '../../../services/documents/readingSettings';
 import type { PdfLink } from '../../../services/pdf/pdfNative';
-import { DAY_PAPER } from '../../../services/reader/darkMatrix';
+import { DAY_PAPER, nightColor, skiaNightMatrix } from '../../../services/reader/darkMatrix';
 import { FAST_SCROLL_HIDE_MS, showsFastScroll } from '../../../services/reader/fastScroll';
+import { hasReadingTaps, panMode, type SurfaceTool } from '../../../services/reader/gestureArbiter';
 import { LINK_SLOP, linkAt, linkTarget, shownUrl, tapOnPage } from '../../../services/reader/links';
 import { currentSection, flattenOutline, type OutlineEntry } from '../../../services/reader/outline';
 import { openPageCache, prunePageCache } from '../../../services/reader/pageCache';
-import { mapRect, overlayMatrix, spaceToShown, type UnitRect } from '../../../services/reader/pageSpace';
+import { boxToSpace, mapRect, spaceScale, spaceToShown, type UnitRect } from '../../../services/reader/pageSpace';
 import { holdReader } from '../../../services/reader/readerHold';
 import { isFastFling, memoryWindow, planRenders, type PageRange } from '../../../services/reader/renderPlan';
 import { selectionMenuItems, type Band, type SelectionMenuItem } from '../../../services/reader/selection';
-import { anchorOf, currentPage, pageBox, visiblePages, type ContentInsets, type SurfaceView } from '../../../services/reader/surfaceGeometry';
+import { anchorOf, currentPage, pageBox, visiblePages, type ContentInsets, type ContentRect, type SurfaceLayout, type SurfaceView } from '../../../services/reader/surfaceGeometry';
 import { surfacePagesFor } from '../../../services/reader/surfacePages';
+import { bottomRightBox, placedSignature } from '../../../services/signature/signaturePlacement';
 import { useAppDispatch } from '../../../store/AppStateContext';
 import { useTheme } from '../../../theme';
-import type { Annotation, OcrBounding } from '../../../types/models';
+import type { Annotation, OcrBounding, PageRotation } from '../../../types/models';
 import { FastScroller } from './FastScroller';
+import { MarkHeader, MarkToolbar } from './MarkToolbar';
 import { PagePill } from './PagePill';
 import { SelectBar, SelectionMenu } from './SelectionMenu';
-import { SurfaceOverlay, type SurfaceFlash, type SurfaceMark } from './SurfaceOverlay';
+import { SignBar } from './SignBar';
+import { SurfaceOverlay, type MarkOutlines, type NightInk, type SurfaceFlash } from './SurfaceOverlay';
 import { SurfacePageView } from './SurfacePageView';
+import { useMarkTool, type MarkTextTool } from './useMarkTool';
 import { usePdfSession } from './usePdfSession';
 import { useSelectionActions } from './useSelectionActions';
 import { useRenderQueue } from './useRenderQueue';
@@ -61,13 +65,24 @@ const NO_LINKS: PdfLink[] = [];
 // How long a mark picked in the Notes panel stays lit.
 const FLASH_MS = 1600;
 const NO_MARKS: readonly Annotation[] = [];
-const NO_DRAWN_MARKS: SurfaceMark[] = [];
+const NO_PAGE_MARKS: ReadonlyMap<number, readonly Annotation[]> = new Map();
+const NO_OUTLINES: MarkOutlines = { text: false, signature: false };
+// The Mark palette's and the Sign bar's height before they are measured (two rows; one).
+const MARK_BAR_ESTIMATE = 132;
+const SIGN_BAR_ESTIMATE = 64;
+
+// §18 W16: the signature the Reader wants placed, and the library page it goes on.
+export type SurfaceSignRequest = { uri: string; aspectRatio: number; idx: number };
+export type PlacedSignature = { box: OcrBounding; turn: PageRotation };
 
 type PageSurfaceProps = {
   subject: ReaderSubject;
   // `document.pdf`, or the outside file. Opened only for what is read through pdfium (an imported
-  // or merged PDF, an outside file); a scan reads from its page images.
-  pdfUri: string;
+  // or merged PDF, an outside file); a scan reads from its page images and may have no PDF yet.
+  pdfUri: string | undefined;
+  // §18 W17: the file may still hold marks an older build wrote into it (annotations/cleanBases):
+  // its pages are drawn without the file's annotations, or ours would show twice.
+  plainPages?: boolean;
   // The cache folder's owner: the document's id, or the outside file's uri.
   owner: string;
   password?: string;
@@ -99,13 +114,21 @@ type PageSurfaceProps = {
   // Done. A long press selects a word with or without it.
   selecting?: boolean;
   onSelectDone?: () => void;
-  // The document's marks. Until W15 draws them all here, the surface shows the highlights and
-  // underlines that the page images don't carry: a scan's, and the ones just made from a
-  // selection (`onMarked` tells the Reader, which writes them into the file).
+  // The document's marks and signatures (the library's rows). §18 W15: all of them are drawn
+  // here, live; nothing of them is in the page images.
   marks?: readonly Annotation[];
-  onMarked?: () => void;
-  // The file can't be opened (usePdfSession.sessionErrorMessage's words).
-  onError: (message: string) => void;
+  // §18 W15: the Mark tool is on (its bars replace the Reader's), its Text tool's gate, and Done.
+  marking?: boolean;
+  markText?: MarkTextTool;
+  onMarkDone?: () => void;
+  // §18 W16 (A10): a signature to place on a library page (null: not signing), and its ways out:
+  // placed (the box in the page's own space), cancelled, or drawn again.
+  signing?: SurfaceSignRequest | null;
+  onSignPlaced?: (idx: number, placed: PlacedSignature) => void;
+  onSignCancel?: () => void;
+  onSignRedraw?: () => void;
+  // The file can't be opened (usePdfSession.sessionErrorCode).
+  onError: (code: NativePdfErrorCode) => void;
 };
 
 type Windows = { images: PageRange; thumbs: PageRange };
@@ -117,29 +140,76 @@ function sameRange(a: PageRange, b: PageRange): boolean {
 // §18 W10: the page surface, read-only. PDFs and scans as one column of pages on a single layer
 // that zooms and scrolls on the UI thread (useSurfaceView, useSurfaceGestures); each page is
 // plain images, rendered into the page cache by pdfium or the image decoder as the view comes to
-// rest (renderPlan → useRenderQueue). Night pages are redrawn dark, not dimmed. Behind the
-// `reader_surface` switch until W17; selection, marks and signatures arrive in W13–W16.
+// rest (renderPlan → useRenderQueue). Night pages are redrawn dark, not dimmed. Since §18 W17 it
+// is the Reader's only viewer for PDFs and scans.
 // §18 W11: a tap is routed here (a PDF link under it jumps, or asks before leaving the app; else
 // it is the Reader's), the outline is read for the Contents tab and the thumb's bubble, and each
 // page is an element a screen reader can name, turn, zoom and read.
 // §18 W12: Find (useSurfaceFind) and the Notes panel's flash, drawn on SurfaceOverlay.
 // §18 W13: selection on the page (useSurfaceSelection): a long press takes a word, two handles
 // move its ends, SelectionMenu floats by it.
+// §18 W15: Mark mode on the same pages (useMarkTool; gestureArbiter says what a finger does), with
+// every mark drawn live by SurfaceOverlay. §18 W16: a signature is placed on the page itself.
+// Neither changes this component's identity, so zoom and position survive every tool.
 export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(function PageSurface(
-  { subject, pdfUri, owner, password, reading, insets, safeBottom, chrome, onScroll, initialIndex, onLoad, onPage, onTap, onOutline, onReadText, findQuery = '', findFrom = null, onFindStatus, selecting = false, onSelectDone, marks = NO_MARKS, onMarked, onError },
+  {
+    subject,
+    pdfUri,
+    plainPages = false,
+    owner,
+    password,
+    reading,
+    insets: barInsets,
+    safeBottom,
+    chrome,
+    onScroll,
+    initialIndex,
+    onLoad,
+    onPage,
+    onTap,
+    onOutline,
+    onReadText,
+    findQuery = '',
+    findFrom = null,
+    onFindStatus,
+    selecting = false,
+    onSelectDone,
+    marks = NO_MARKS,
+    marking = false,
+    markText,
+    onMarkDone,
+    signing = null,
+    onSignPlaced,
+    onSignCancel,
+    onSignRedraw,
+    onError,
+  },
   ref
 ) {
   const { tokens } = useTheme();
   const { t } = useT();
   const dispatch = useAppDispatch();
+  // A5: what the surface is doing. The same pages either way.
+  const tool: SurfaceTool = signing ? 'sign' : marking ? 'mark' : selecting ? 'select' : 'read';
+  // The Mark palette and the Sign bar stand where the Reader's bottom bar was and are taller:
+  // the last page ends above them, as it does above the bar.
+  const [toolBar, setToolBar] = useState(0);
+  const toolBarHeight = tool === 'mark' ? toolBar || MARK_BAR_ESTIMATE + safeBottom : tool === 'sign' ? toolBar || SIGN_BAR_ESTIMATE + safeBottom : 0;
+  useEffect(() => {
+    if (tool !== 'mark' && tool !== 'sign') setToolBar(0);
+  }, [tool]);
+  const insets = useMemo<ContentInsets>(
+    () => (toolBarHeight > barInsets.bottom ? { ...barInsets, bottom: toolBarHeight } : barInsets),
+    [barInsets, toolBarHeight]
+  );
   const doc = subject.doc;
   const fromPdf = !doc || isPdfLevel(doc);
-  const session = usePdfSession(fromPdf ? pdfUri : null, password, onError);
+  const session = usePdfSession(fromPdf && pdfUri ? pdfUri : null, password, onError);
   // One folder per state of the file. This component is mounted again when the file is rewritten
-  // (ReaderDocumentView keys it on the reload), so the folder is chosen once.
-  const [cache] = useState(() => openPageCache(owner, fromPdf ? pdfUri : undefined));
+  // (ReaderDocumentView keys it on the reload, which also follows `plainPages`), so the folder is chosen once.
+  const [cache] = useState(() => openPageCache(owner, fromPdf ? pdfUri : undefined, undefined, fromPdf && plainPages ? 'plain' : ''));
   const palette = nightPalette(reading);
-  const queue = useRenderQueue({ cache, session, palette });
+  const queue = useRenderQueue({ cache, session, palette, annotations: !plainPages });
   const { images, want, night, epoch } = queue;
 
   // Saving the page being read hands over a new document object each time; the pages are the
@@ -424,9 +494,10 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     if (!selecting) clearSelection();
   }, [selecting, clearSelection]);
   useBackHandler(clearSelection, !!selected || !!empty);
-  // The marks made here since this surface was mounted: a PDF page shows them only once the file
-  // has been rewritten and opened again (which mounts the surface anew, with this empty).
-  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  // A selection belongs to reading: Mark and Sign start without one.
+  useEffect(() => {
+    if (tool === 'mark' || tool === 'sign') clearSelection();
+  }, [tool, clearSelection]);
   const onMenuPick = useCallback(
     (item: SelectionMenuItem) => {
       switch (item) {
@@ -437,11 +508,9 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
           return actions.share(selectedWords);
         case 'highlight':
         case 'underline': {
-          const id = selected ? actions.mark(item, selected.pageId, selectedWords) : null;
-          if (!id) return;
-          setFresh((prev) => new Set(prev).add(id));
-          clearSelection();
-          return onMarked?.();
+          // The row is in the store, and the overlay draws it from there at once.
+          if (selected && actions.mark(item, selected.pageId, selectedWords)) clearSelection();
+          return;
         }
         case 'selectAll':
           return selectAll();
@@ -452,7 +521,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
         }
       }
     },
-    [actions, selected, selectedWords, empty, clearSelection, selectAll, onMarked]
+    [actions, selected, selectedWords, empty, clearSelection, selectAll]
   );
   const external = !doc;
   const menuPage = selected ? pages[selected.page] : empty ? pages[empty.page] : undefined;
@@ -473,26 +542,114 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     [viewport, insets]
   );
 
-  // The highlights and underlines to draw (see `marks`), as content rectangles.
-  const drawnMarks = useMemo<SurfaceMark[]>(() => {
-    if (!layout || !marks.length) return NO_DRAWN_MARKS;
+  // §18 W15 (A6): the document's rows by library page, as the overlay draws them and the Mark
+  // tools hit-test them. A row whose page is gone is left out.
+  const marksByPage = useMemo<ReadonlyMap<number, readonly Annotation[]>>(() => {
+    if (!marks.length) return NO_PAGE_MARKS;
     const indexOf = new Map(pages.map((page, index) => [page.id, index]));
-    const out: SurfaceMark[] = [];
+    const out = new Map<number, Annotation[]>();
     for (const mark of marks) {
       const index = indexOf.get(mark.pageId);
-      const kind = mark.kind;
-      if (index === undefined || index >= layout.tops.length || (kind !== 'highlight' && kind !== 'underline') || !isRectMark(kind) || !('rects' in mark.data)) continue;
-      const page = pages[index];
-      if (page.source.kind !== 'image' && !fresh.has(mark.id)) continue;
-      const toBox = overlayMatrix(pageBox(layout, index), page.space);
-      const rects = mark.data.rects.map((rect) => {
-        const r = mapRect(toBox, kind === 'highlight' ? rect : markLine(kind, rect));
-        return { x: r.left, y: r.top, width: r.width, height: r.height };
-      });
-      out.push({ id: mark.id, index, kind, color: annotationColor(mark.color), rects });
+      if (index === undefined) continue;
+      const rows = out.get(index);
+      if (rows) rows.push(mark);
+      else out.set(index, [mark]);
     }
-    return out.length ? out : NO_DRAWN_MARKS;
-  }, [marks, pages, layout, fresh]);
+    return out.size ? out : NO_PAGE_MARKS;
+  }, [marks, pages]);
+
+  // §18 W15 (A5): the Mark tools. The stroke being drawn lives in these shared values: the
+  // gesture writes them, the overlay draws from them, and React hears only of the finished mark.
+  const ink = useSharedValue<number[]>([]);
+  const inkId = useSharedValue(0);
+  const inkWidth = useSharedValue(1);
+  // Marks lie over the page, not in its picture: on a night page the ink-like ones are shown the
+  // way the page's own ink is (darkMatrix).
+  const nightInk = useMemo<NightInk | null>(
+    () => (palette ? { color: (hex: string) => nightColor(hex, palette), matrix: skiaNightMatrix(palette) } : null),
+    [palette]
+  );
+  const mark = useMarkTool({
+    active: marking,
+    doc,
+    pages,
+    docPages,
+    marks: marksByPage,
+    prefs: reading.mark,
+    geometry: surface.geometry,
+    view: surface.view,
+    textTool: markText,
+    nightInk: nightInk?.color ?? null,
+    ink,
+    inkId,
+  });
+  const { tap: markTap, stroke: markStroke, drag: markDrag } = mark;
+  // Content units per unit of each page's own space: a stroke's width under the finger.
+  const inkScales = useMemo(
+    () => (layout ? pages.map((page, index) => (index < layout.tops.length ? spaceScale(pageBox(layout, index), page.space) : 1)) : NO_SCALES),
+    [pages, layout]
+  );
+  const mode = panMode(tool, mark.tool);
+  const liveInk = useMemo(
+    () => (mode === 'draw' ? { points: ink, width: inkWidth, color: mark.inkStyle.color, opacity: mark.inkStyle.opacity } : null),
+    [mode, ink, inkWidth, mark.inkStyle]
+  );
+  const outlines = useMemo<MarkOutlines>(
+    () => (tool === 'mark' && mode === 'drag' ? { text: mark.tool === 'text', signature: true } : NO_OUTLINES),
+    [tool, mode, mark.tool]
+  );
+
+  // §18 W16 (A10): the signature being placed, a box on the page in content coordinates that the
+  // gesture moves and resizes on the UI thread. It starts at the page's bottom-right corner; a
+  // new layout (the bar measured, a turn of the phone) keeps it where it was on the page.
+  const signBox = useSharedValue<ContentRect | null>(null);
+  const signUri = signing?.uri;
+  const signIdx = signing?.idx ?? -1;
+  const signRatio = signing?.aspectRatio ?? 0;
+  const signedOn = useRef<{ key: string; layout: SurfaceLayout } | null>(null);
+  useEffect(() => {
+    if (!signUri || !layout || signIdx < 0 || signIdx >= layout.tops.length) {
+      signedOn.current = null;
+      signBox.value = null;
+      return;
+    }
+    const key = `${signUri}:${signIdx}`;
+    const page = pageBox(layout, signIdx);
+    const prev = signedOn.current;
+    const box = signBox.value;
+    signedOn.current = { key, layout };
+    if (prev?.key === key && box) {
+      if (prev.layout === layout) return;
+      const old = pageBox(prev.layout, signIdx);
+      const k = page.width / Math.max(1, old.width);
+      signBox.value = { x: page.x + (box.x - old.x) * k, y: page.y + (box.y - old.y) * k, width: box.width * k, height: box.height * k };
+      return;
+    }
+    const start = bottomRightBox(page, signRatio);
+    signBox.value = start;
+    reveal(start);
+  }, [signUri, signIdx, signRatio, layout, signBox, reveal]);
+  const signBottomRight = useCallback(() => {
+    const g = surface.geometry.current;
+    if (!g || signIdx < 0 || signIdx >= g.layout.tops.length) return;
+    const start = bottomRightBox(pageBox(g.layout, signIdx), signRatio);
+    signBox.value = start;
+    reveal(start);
+  }, [surface.geometry, signIdx, signRatio, signBox, reveal]);
+  const signPlace = useCallback(() => {
+    const g = surface.geometry.current;
+    const box = signBox.value;
+    const page = pages[signIdx];
+    if (!g || !box || !page || signIdx >= g.layout.tops.length) return;
+    // An imported page that isn't indexed has no space of its own to keep the box in.
+    if (!page.canMark) {
+      dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.mark.pageNotReady') });
+      return;
+    }
+    const toSpace = boxToSpace(pageBox(g.layout, signIdx), page.space);
+    onSignPlaced?.(signIdx, placedSignature(box, (rect) => mapRect(toSpace, rect), page.space.turn));
+  }, [surface.geometry, signBox, pages, signIdx, dispatch, t, onSignPlaced]);
+  const signingOverlay = useMemo(() => (signUri ? { box: signBox, uri: signUri } : null), [signUri, signBox]);
 
   // A5's tap routing: an open selection first (the tap closes it, or in the Select tool picks a
   // word), then a link under the finger, else the Reader's tap (the bars).
@@ -505,6 +662,9 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
   );
   const onSurfaceTap = useCallback(
     (x: number, y: number) => {
+      // A Mark tool's tap is its own; the signature is placed by its buttons.
+      if (tool === 'mark') return markTap(x, y);
+      if (tool === 'sign') return;
       if (selectionTap(x, y)) return;
       const g = surface.geometry.current;
       const hit = g ? tapOnPage(g.layout, surface.view.current, x, y) : null;
@@ -530,7 +690,7 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
         });
       }
     },
-    [selectionTap, surface.geometry, surface.view, pages, linksOf, goToIndex, askLink]
+    [tool, markTap, selectionTap, surface.geometry, surface.view, pages, linksOf, goToIndex, askLink]
   );
 
   const step = useCallback((index: number) => goToIndex(Math.max(0, Math.min(pages.length - 1, index))), [goToIndex, pages.length]);
@@ -568,7 +728,27 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     []
   );
 
-  const gesture = useSurfaceGestures({ layout, viewport, insets, motion, onTap: onSurfaceTap, onLongPress: selection.longPress, handles: selection.handles, onHandle: selection.onHandle });
+  const gesture = useSurfaceGestures({
+    layout,
+    viewport,
+    insets,
+    motion,
+    onTap: onSurfaceTap,
+    onLongPress: selection.longPress,
+    handles: selection.handles,
+    onHandle: selection.onHandle,
+    mode,
+    readingTaps: hasReadingTaps(tool),
+    ink,
+    inkId,
+    inkWidth,
+    inkTool: mark.inkStyle.width,
+    inkScales,
+    onStroke: markStroke,
+    onMarkDrag: markDrag,
+    signBox,
+    signPage: signIdx,
+  });
   const { scale, tx, ty } = motion;
   const layerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
@@ -583,12 +763,8 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
     for (let i = windows.thumbs.first; i <= Math.min(windows.thumbs.last, pageCount - 1, layout.tops.length - 1); i += 1) mounted.push(i);
   }
   const onStep = useCallback((by: 1 | -1) => step(current + by), [step, current]);
-  // Only the mounted pages' marks are drawn.
-  const shownMarks = useMemo(() => {
-    if (!windows || drawnMarks === NO_DRAWN_MARKS) return NO_DRAWN_MARKS;
-    const near = drawnMarks.filter((mark) => mark.index >= windows.thumbs.first && mark.index <= windows.thumbs.last);
-    return near.length ? near : NO_DRAWN_MARKS;
-  }, [drawnMarks, windows]);
+  // The Reader's own aids make room for a tool's bars.
+  const tooled = tool === 'mark' || tool === 'sign';
 
   return (
     <View style={[styles.container, { backgroundColor: palette ? palette.paper : tokens.surface2 }]} onLayout={surface.onLayout}>
@@ -626,17 +802,23 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
       </GestureDetector>
 
       {/* Mounted only while there is something to draw: an empty canvas still costs a layer. */}
-      {layout && ready && (find.hits.size > 0 || flashed || shownMarks.length > 0 || drawn) ? (
+      {layout && ready && (find.hits.size > 0 || flashed || marksByPage.size > 0 || drawn || tooled) ? (
         <SurfaceOverlay
           layout={layout}
           motion={motion}
           pages={mounted}
+          surfacePages={pages}
           hits={find.hits}
           cursor={find.cursor}
           flash={flashed}
-          marks={shownMarks}
+          marks={marksByPage}
+          moved={mark.moved}
+          outlines={outlines}
+          outlineColor={tokens.accent}
           selected={drawn}
-          night={!!palette}
+          ink={liveInk}
+          signing={signingOverlay}
+          night={nightInk}
         />
       ) : null}
 
@@ -658,7 +840,8 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
       {ready && pageCount ? (
         <PagePill label={label} visible={aids && !thumbHeld} barHeight={insets.bottom} safeBottom={safeBottom} chrome={chrome} />
       ) : null}
-      {ready && layout && viewport && showsFastScroll(pageCount) ? (
+      {/* Not beside a Mark tool: a stroke along the right edge would land on the thumb. */}
+      {ready && layout && viewport && showsFastScroll(pageCount) && !tooled ? (
         <FastScroller
           layout={layout}
           viewport={viewport}
@@ -672,9 +855,29 @@ export const PageSurface = forwardRef<PageSurfaceHandle, PageSurfaceProps>(funct
           onHold={setThumbHeld}
         />
       ) : null}
+
+      {ready && tool === 'mark' ? (
+        <>
+          <MarkHeader
+            title={t('reader.mark.pageOf', { page: current + 1, total: pageCount })}
+            canUndo={mark.canUndo}
+            canRedo={mark.canRedo}
+            onUndo={mark.undo}
+            onRedo={mark.redo}
+            onDone={() => onMarkDone?.()}
+          />
+          <MarkToolbar tool={mark.tool} prefs={reading.mark} onPickTool={mark.pickTool} onPrefs={mark.setPrefs} textPro={markText?.pro ?? false} onHeight={setToolBar} />
+        </>
+      ) : null}
+      {mark.modals}
+      {ready && tool === 'sign' ? (
+        <SignBar onCancel={() => onSignCancel?.()} onRedraw={onSignRedraw} onBottomRight={signBottomRight} onPlace={signPlace} onHeight={setToolBar} />
+      ) : null}
     </View>
   );
 });
+
+const NO_SCALES: number[] = [];
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

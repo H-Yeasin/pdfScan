@@ -116,3 +116,24 @@ export function spaceScale(box: ContentRect, space: PageSpace): number {
 export function matrix3(m: Matrix): number[] {
   return [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1];
 }
+
+// §18 W15: the page as shown, in the space's own unit (a master pixel is a master pixel either
+// way up): what an upright box on a page shown turned is measured in before it is stored.
+export function shownSize(space: PageSpace): Size2 {
+  const part = space.placement ?? { x: 0, y: 0, width: 1, height: 1 };
+  const across = space.width / part.width;
+  const down = space.height / part.height;
+  return space.turn % 180 === 0 ? { width: across, height: down } : { width: down, height: across };
+}
+
+type Size2 = { width: number; height: number };
+
+// The space → the shown page in that unit, and back.
+export function spaceToShownUnits(space: PageSpace): Matrix {
+  const size = shownSize(space);
+  return multiply([size.width, 0, 0, size.height, 0, 0], spaceToShown(space));
+}
+
+export function shownUnitsToSpace(space: PageSpace): Matrix {
+  return invert(spaceToShownUnits(space));
+}

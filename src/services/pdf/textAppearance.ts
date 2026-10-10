@@ -3,8 +3,7 @@ import { rasterizeShapedAlpha, type ShapedRun } from './skiaText';
 import { isWinAnsiSafe } from './winAnsi';
 
 // §12 D10: typed text inside an appearance stream (a text box annotation, a filled form field), in
-// any script, built synchronously (pdfAnnotations.writeAnnotations runs inside the PDF builder's
-// synchronous beforeSave hook). Like visibleText (§6 L3), per line:
+// any script, built synchronously (pdfAnnotations' writers are synchronous per mark). Like visibleText (§6 L3), per line:
 //   - text Helvetica can draw (WinAnsi) is Helvetica vector text (a standard font: nothing embedded);
 //   - anything else is shaped by Skia and drawn as an image in the text's colour, masked by the
 //     shaped run's alpha (raw pixels into Flate streams; a PNG would need pdf-lib's async embedder).

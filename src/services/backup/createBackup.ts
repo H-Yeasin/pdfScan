@@ -3,11 +3,14 @@ import { APP_VERSION } from '../../config/appInfo';
 import { tDoc } from '../../i18n';
 import { toLocalDateString } from '../../utils/localDate';
 import { sanitizeFileName } from '../../utils/sanitize';
+import { annotatedPdfFor } from '../annotations/exportPdf';
 import { getDb } from '../persistence/dbService';
+import { loadAll } from '../persistence/libraryRepo';
 import { getSchemaVersion } from '../persistence/migrations';
 import { loadSettings, type PersistedSettings } from '../persistence/settingsStorage';
 import { checkSpaceFor } from '../storage/usage';
-import { buildManifest, exportRows, LIBRARY_ENTRY, MANIFEST_ENTRY, SETTINGS_ENTRY, type BackupKind, type BackupScope, type Manifest } from './format';
+import type { Annotation, LibraryDocument } from '../../types/models';
+import { buildManifest, exportRows, LIBRARY_ENTRY, MANIFEST_ENTRY, SETTINGS_ENTRY, type BackupKind, type BackupScope, type ExportedLibrary, type Manifest } from './format';
 import { addFileFromDisk, createZip, ZipAbortedError } from './zip';
 
 // §8 B3: makes a backup or export zip in Paths.cache/backup/, one document at a time, with
@@ -120,6 +123,25 @@ function signatureFiles(): { zipPath: string; file: File }[] {
     .map((file) => ({ zipPath: `signature/${file.name}`, file }));
 }
 
+// §18 W14 (A9): a document's marks and signatures are rows; its `document.pdf` is not where they
+// live. The readable copy in a backup is what someone opens on a laptop, so for a document with
+// rows it is the PDF with them written in (annotations/exportPdf). These are the documents that
+// applies to, with what the writer needs. The copy itself is made when its turn in the zip
+// comes: the export cache keeps only so many.
+type MarkedReadables = { documents: Map<string, LibraryDocument>; annotations: readonly Annotation[] };
+
+async function markedReadables(db: Awaited<ReturnType<typeof getDb>>, exported: ExportedLibrary): Promise<MarkedReadables> {
+  const marked = new Set(exported.libraryJson.tables.annotations.map((row) => String(row.document_id)));
+  const documents = new Map<string, LibraryDocument>();
+  if (marked.size === 0) return { documents, annotations: [] };
+  const library = await loadAll(db);
+  for (const doc of library.documents) {
+    const readable = exported.readable[doc.id];
+    if (marked.has(doc.id) && doc.pdfUri && readable?.path.toLowerCase().endsWith('.pdf')) documents.set(doc.id, doc);
+  }
+  return { documents, annotations: library.annotations ?? [] };
+}
+
 // Zip headers and the central directory: a little per file, on top of the files themselves.
 const ZIP_OVERHEAD_PER_FILE = 200;
 
@@ -143,9 +165,10 @@ async function writeBackup(request: BackupRequest, options: CreateBackupOptions)
   // PDFs only: the readable copies; everything under data/ stays behind.
   const files = pdfsOnly ? exported.files.filter((file) => !file.zipPath.startsWith('data/')) : exported.files;
   const bytesTotal = files.reduce((sum, file) => sum + file.bytes, 0);
+  const marked = await markedReadables(db, exported);
   const manifest = buildManifest(
     { ...exported, counts: { ...exported.counts, bytes: bytesTotal } },
-    { kind: kindOf(request.scope), appVersion: APP_VERSION, createdAt: now, restorable: pdfsOnly ? 'pdfs' : 'full' }
+    { kind: kindOf(request.scope), appVersion: APP_VERSION, createdAt: now, restorable: pdfsOnly ? 'pdfs' : 'full', annotated: [...marked.documents.keys()] }
   );
 
   // A full backup also brings the student's settings and saved signature.
@@ -181,7 +204,11 @@ async function writeBackup(request: BackupRequest, options: CreateBackupOptions)
       if (currentDoc !== null && file.documentId !== currentDoc) progress.documentsDone += 1;
       currentDoc = file.documentId;
       const before = progress.bytesDone;
-      await addFileFromDisk(writer, file.zipPath, new File(file.uri), {
+      // The readable PDF of a document with marks: the copy that has them (the same file when
+      // they couldn't be written).
+      const markedDoc = file.zipPath === exported.readable[file.documentId]?.path ? marked.documents.get(file.documentId) : undefined;
+      const uri = (markedDoc && (await annotatedPdfFor(markedDoc, marked.annotations))) || file.uri;
+      await addFileFromDisk(writer, file.zipPath, new File(uri), {
         signal: options.signal,
         onProgress: (copied) => {
           progress.bytesDone = before + copied;

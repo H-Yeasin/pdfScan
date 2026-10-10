@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 import { processSequentially } from '../capture/processSequentially';
-import { writeAnnotations } from '../annotations/pdfAnnotations';
+import { copySignatureFiles } from '../signature/signatureRows';
 import { renderLayoutImage } from '../pdf/academicRasterService';
 import { formatCoverDate, itemsAsOcr, layoutContents, type ContentsEntry } from '../pdf/coverTemplates';
 import { buildPdfFromPages, pageDimensions, type PageSizeId, toSourcePage } from '../pdf/pdfService';
@@ -102,11 +102,14 @@ export async function buildExamPack(
   const packAnnotations: Annotation[] = options.includeAnnotations
     ? annotations.flatMap((a) => {
         const pageId = newPageIdFor.get(`${a.documentId}:${a.pageId}`);
-        return pageId ? [{ ...a, id: createId('annot'), documentId, pageId, createdAt: now, updatedAt: now }] : [];
+        if (!pageId) return [];
+        // §18 W16: a signature row's PNG is a file of its document; the pack gets its own copy.
+        copySignatureFiles([a], documentId);
+        return [{ ...a, id: createId('annot'), documentId, pageId, createdAt: now, updatedAt: now }];
       })
     : [];
 
-  const mapped = { pages, coverKind: undefined, pdfLayout: 'standard' as const, pdfPageSize: options.pageSize };
+  // §18 W17: the pack's marks are its rows (returned below), not part of its file.
   const pdf = await buildPdfFromPages(
     documentId,
     pages.map(toSourcePage),
@@ -116,7 +119,6 @@ export async function buildExamPack(
     options.pageSize,
     {
       onPage: (done, total) => options.onProgress?.(t('deliver.progress.buildingPage', { current: done, total })),
-      beforeSave: packAnnotations.length ? (pdfDoc) => writeAnnotations(pdfDoc, mapped, packAnnotations) : undefined,
     }
   );
 

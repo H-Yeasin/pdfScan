@@ -97,15 +97,6 @@ export function groupNotesByPage(entries: readonly NoteEntry[]): NotesGroup[] {
   return groups;
 }
 
-// The words pdf-jsi searches for to flash a mark after jumping to its page. A mark over several
-// lines may not match as one phrase in the PDF's text, so only its first words are searched.
-const FLASH_WORDS = 5;
-export function flashQuery(entry: Pick<NoteEntry, 'kind' | 'text'>): string | null {
-  if (!isMarkEntry(entry.kind)) return null;
-  const words = entry.text.split(/\s+/).filter(Boolean);
-  return words.length ? words.slice(0, FLASH_WORDS).join(' ') : null;
-}
-
 // §18 W12: where a mark is on its page, for the flash on the page surface: the mark's own boxes
 // (the space marks are stored in), so it needs no text to search for and a note or a mark on a
 // page without words flashes too. Pen strokes aren't listed in the panel; they give their bounds.

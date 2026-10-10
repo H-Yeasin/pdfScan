@@ -1,7 +1,7 @@
 import { makeDoc } from '../../../test/fixtures';
 import type { ProTaskFeature } from '../../pro/proTask';
 import { readerMoreItems, readerProTasks, readerTools } from '../readerTools';
-import { DEFAULT_READING, normalizeReading, pdfViewOptions } from '../readingSettings';
+import { DEFAULT_READING, normalizeReading } from '../readingSettings';
 
 const allLive = () => true;
 const ids = (tools: { id: string }[]) => tools.map((t) => t.id);
@@ -161,14 +161,5 @@ describe('§12 D2 reading settings', () => {
 
   it('keeps Mark mode\'s last tool (§12 D3)', () => {
     expect(normalizeReading({ mark: { tool: 'underline', lineColor: 'blue' } }).mark).toEqual({ ...DEFAULT_READING.mark, tool: 'underline', lineColor: 'blue' });
-  });
-
-  it('maps to the PDF engine props', () => {
-    expect(pdfViewOptions(DEFAULT_READING)).toEqual({ enablePaging: false, fitPolicy: 0, spacing: 10 });
-    expect(pdfViewOptions({ ...DEFAULT_READING, layout: 'paged', fit: 'page', spacing: 'none' })).toEqual({
-      enablePaging: true,
-      fitPolicy: 2,
-      spacing: 0,
-    });
   });
 });

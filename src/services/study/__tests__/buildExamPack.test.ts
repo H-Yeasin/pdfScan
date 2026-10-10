@@ -1,5 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 import { makePng } from '../../../test/png';
+import { annotatedPdfFor } from '../../annotations/exportPdf';
 import * as sequential from '../../capture/processSequentially';
 import { pageList } from '../../pdf/coverTemplates';
 import { deleteDocumentFiles } from '../../persistence/libraryFiles';
@@ -86,14 +87,17 @@ describe('buildExamPack', () => {
     expect(copied).toHaveLength(1);
     expect(copied[0]).toMatchObject({ documentId: doc.id, pageId: doc.pages[2].id, text: 'mitochondria' });
 
-    // The PDF: searchable pages, the annotation, the footer.
+    // The PDF: searchable pages and the footer. §18 W17: the annotation is the pack's row, not
+    // in its file; the copy that leaves the app has it.
     const pdf = await pdfjs.getDocument({ data: await new File(doc.pdfUri!).bytes(), verbosity: 0, disableFontFace: true }).promise;
     expect(pdf.numPages).toBe(5);
     const page3 = await pdf.getPage(3);
     const text = ((await page3.getTextContent()).items as { str: string }[]).map((i) => i.str).join(' ').replace(/\s+/g, ' ');
     expect(text).toContain('mitochondria');
     expect(text).toContain('Page 3 of 5');
-    expect((await page3.getAnnotations()).map((a: { subtype: string }) => a.subtype)).toEqual(['Highlight']);
+    expect(await page3.getAnnotations()).toEqual([]);
+    const exported = await pdfjs.getDocument({ data: await new File((await annotatedPdfFor(doc, copied))!).bytes(), verbosity: 0, disableFontFace: true }).promise;
+    expect((await (await exported.getPage(3)).getAnnotations()).map((a: { subtype: string }) => a.subtype)).toEqual(['Highlight']);
   });
 
   it('stays whole when a source document is deleted', async () => {

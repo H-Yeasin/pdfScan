@@ -59,6 +59,25 @@ export function nightMatrix(palette: NightPalette): PdfColorMatrix {
   return darkPageMatrix(palette.paper, palette.ink);
 }
 
+// §18 W15: the marks are drawn over the page, not into its picture, so on a night page the
+// ink-like ones (pen, underline, strike, typed text, a signature) go through the same change as
+// the page's own ink: a black pen stroke would vanish on dark paper. One colour through the
+// matrix ('#rrggbb' in and out):
+export function nightColor(hex: string, palette: NightPalette): string {
+  const m = nightMatrix(palette);
+  const [r, g, b] = channels(hex);
+  const out = [0, 1, 2].map((row) => {
+    const value = m[row * 5] * r + m[row * 5 + 1] * g + m[row * 5 + 2] * b + m[row * 5 + 4];
+    return Math.max(0, Math.min(255, Math.round(value)));
+  });
+  return `#${out.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// The same matrix as Skia's colour filter takes it (offsets in 0..1), for a signature's image.
+export function skiaNightMatrix(palette: NightPalette): number[] {
+  return nightMatrix(palette).map((value, i) => (i % 5 === 4 ? value / 255 : value));
+}
+
 // Names the palette in a cache key: its colours, so a retuned palette never shows files rendered
 // with the old one.
 export function paletteKey(palette: NightPalette): string {

@@ -8,9 +8,10 @@
 // with no extra JS-side bookkeeping.
 import { File, FileMode } from 'expo-file-system';
 import { EncodingType, readAsStringAsync, StorageAccessFramework } from 'expo-file-system/legacy';
+import { annotatedPdfFor } from '../annotations/exportPdf';
 import { isPageRasterFormat } from '../documents/formatCapabilities';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
-import type { LibraryDocument } from '../../types/models';
+import type { Annotation, LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
 
 export type DeviceExportResult = { ok: number; failed: number };
@@ -48,12 +49,14 @@ async function writeFileToTree(
 
 // Best-effort per file: one failed page shouldn't abort the rest, and never throws — the
 // caller folds { ok, failed } into a single snackbar rather than surfacing a hard error.
-export async function exportCopyToDeviceFolder(treeUri: string, doc: LibraryDocument): Promise<DeviceExportResult> {
+// §18 W14: a PDF is copied with the document's marks and signatures written in.
+export async function exportCopyToDeviceFolder(treeUri: string, doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<DeviceExportResult> {
   let ok = 0;
   let failed = 0;
 
-  if (doc.format === 'PDF' && doc.pdfUri) {
-    const success = await writeFileToTree(treeUri, doc.name, 'application/pdf', doc.pdfUri);
+  const pdf = doc.format === 'PDF' ? await annotatedPdfFor(doc, annotations).catch(() => doc.pdfUri) : undefined;
+  if (pdf) {
+    const success = await writeFileToTree(treeUri, doc.name, 'application/pdf', pdf);
     if (success) ok++;
     else failed++;
     return { ok, failed };

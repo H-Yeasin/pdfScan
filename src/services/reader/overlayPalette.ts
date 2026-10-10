@@ -12,7 +12,7 @@ export type OverlayPalette = {
   // §18 W13: the selected words, and the handles at their ends (solid).
   selection: string;
   handle: string;
-  // How see-through a highlight is drawn (MarkView's and the PDF's own are close to the day one).
+  // How see-through a highlight is drawn (the PDF's own is close to the day one).
   highlightAlpha: number;
 };
 

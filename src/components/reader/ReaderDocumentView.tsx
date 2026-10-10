@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOpenCoverOptions } from '../library/useCoverTarget';
 import { Hint } from '../shared/Hint';
 import { useHint } from '../shared/useHint';
 import { useT } from '../../i18n/useT';
-import { flashQuery, flashRects, type NoteEntry } from '../../services/annotations/notesPanel';
+import { useBasePending } from '../../services/annotations/cleanBases';
+import { flashRects, type NoteEntry } from '../../services/annotations/notesPanel';
 import { useRouter } from '../../navigation/router';
 import { useScreenRole } from '../../navigation/screenRole';
 import { useBackHandler } from '../../navigation/useBackHandler';
@@ -13,40 +14,32 @@ import { canFindInDoc, canSign, isPageRasterFormat, isPdfLevel } from '../../ser
 import { libraryIdxFor, pdfPageCount, pdfPageFor } from '../../services/documents/pageMap';
 import { pageLabel, pdfPageAfterEdit } from '../../services/documents/readerPosition';
 import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../../services/documents/readerTools';
-import { NIGHT_OVERLAY_ALPHA, pdfViewOptions } from '../../services/documents/readingSettings';
-import { pdfNativeVersion } from '../../services/pdf/pdfNative';
 import { useIsPro } from '../../services/pro/entitlement';
-import { readerEngine } from '../../services/reader/readerEngine';
 import type { OutlineEntry } from '../../services/reader/outline';
 import { chromeLocked, readerBackTarget } from '../../services/reader/readerSheets';
 import type { ContentInsets } from '../../services/reader/surfaceGeometry';
-import { useReaderSurfaceEnabled } from '../../services/remote/remoteConfig';
 import { submittedSummary } from '../../services/submit/history';
-import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
+import { pruneSignatureFiles } from '../../services/signature/signatureRows';
+import { useAppDispatch, useAppSlices, useAppStore } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
 import { spacing, useTheme } from '../../theme';
 import type { Annotation, LibraryDocument } from '../../types/models';
 import { formatShortDate } from '../../utils/format';
 import { createId } from '../../utils/id';
 import { DocxView } from './DocxView';
-import { MarkView } from './MarkView';
-import { PdfPageView, type PdfPageViewHandle } from './PdfPageView';
 import { ReaderLoadProblem, ReaderNotice, ReaderNoticeAction } from './ReaderLoadProblem';
 import { ReaderSheets } from './ReaderSheets';
 import { ReaderToolBar, toolBarHeight } from './ReaderToolBar';
 import { ReaderTopChrome, ROW_HEIGHT as TOP_BAR_ROW_HEIGHT } from './ReaderTopChrome';
-import { SelectTextSheet } from './SelectTextSheet';
 import { SheetView } from './SheetView';
 import { PageSurface, type PageSurfaceHandle } from './surface/PageSurface';
 import type { SurfaceFindStatus } from './surface/useSurfaceFind';
 import { TxtView } from './TxtView';
-import { useAnnotationPdfSync } from './useAnnotationPdfSync';
 import { useConvertToPdf } from './useConvertToPdf';
 import { useConvertToWord } from './useConvertToWord';
 import { useEditFile } from './useEditFile';
 import { useEditPages } from './useEditPages';
 import { useFillForm } from './useFillForm';
-import { useMarkFlash } from './useMarkFlash';
 import { usePageOcr } from './usePageOcr';
 import { useReaderChrome } from './useReaderChrome';
 import { useReaderDocument, type ReaderOpenSubject } from './useReaderDocument';
@@ -55,7 +48,6 @@ import { useReaderOrientation } from './useReaderOrientation';
 import { useReaderOverflowActions } from './useReaderOverflowActions';
 import { useReaderSheets } from './useReaderSheets';
 import { useReaderSigning } from './useReaderSigning';
-import React from 'react';
 
 // §12 D2: the Reader on one file, laid out for studying. Top: Back, title, page "12 / 40", Find,
 // Bookmark, More. Bottom: the study tool bar (readerTools). Tap the page to hide both bars.
@@ -64,6 +56,8 @@ import React from 'react';
 // useReaderDocument, Find in useReaderFind, the bars in useReaderChrome, what is open over the
 // page in useReaderSheets, the More items in useReaderOverflowActions, Sign in useReaderSigning;
 // this component wires them to the viewers and the bars.
+// §18 W17/W18: PDFs and scans are read on the page surface (surface/PageSurface), which is also
+// where Find, Select text, Mark and Sign happen; the other formats have their own views.
 export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject) {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -77,36 +71,20 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   // The library document on screen; a file from outside has none.
   const doc = external ? undefined : openDoc;
 
-  const pdfRef = useRef<PdfPageViewHandle>(null);
-  // §18 W10: the page surface (behind `reader_surface`) counts library pages from 0; the rest of
-  // the Reader, like pdf-jsi, counts PDF pages from 1. The two differ on a scan with a cover or
+  // §18 W10: the page surface counts library pages from 0; the rest of the Reader (the saved
+  // position, "Go to page") counts PDF pages from 1. The two differ on a scan with a cover or
   // 2-in-1 sheets (documents/pageMap): everything here converts at this edge.
   const surfaceRef = useRef<PageSurfaceHandle>(null);
-  const surfaceOn = useReaderSurfaceEnabled();
-  const engine = readerEngine({ format: external?.format ?? openDoc?.format, nativeVersion: pdfNativeVersion(), surface: surfaceOn });
-  const onSurface = engine === 'surface';
   // A scan's surface pages are its library pages; an imported PDF's and an outside file's are
   // the PDF's own.
   const mapped = !!doc && !isPdfLevel(doc);
   const mappedDoc = useRef(doc);
   mappedDoc.current = mapped ? doc : undefined;
-  const docRef = useRef(doc);
-  docRef.current = doc;
-  const goToPage = useCallback(
-    (page: number) => {
-      if (!onSurface) pdfRef.current?.goToPage(page);
-      else surfaceRef.current?.goToIndex(mappedDoc.current ? libraryIdxFor(mappedDoc.current, page) : page - 1);
-    },
-    [onSurface]
-  );
+  const goToPage = useCallback((page: number) => {
+    surfaceRef.current?.goToIndex(mappedDoc.current ? libraryIdxFor(mappedDoc.current, page) : page - 1);
+  }, []);
   // A library page, exactly: on a 2-in-1 sheet the PDF page alone can't say left or right.
-  const goToIdx = useCallback(
-    (idx: number) => {
-      if (onSurface) surfaceRef.current?.goToIndex(idx);
-      else pdfRef.current?.goToPage(docRef.current ? pdfPageFor(docRef.current, idx).page : idx + 1);
-    },
-    [onSurface]
-  );
+  const goToIdx = useCallback((idx: number) => surfaceRef.current?.goToIndex(idx), []);
   // The library page the surface is on (it shows a 2-in-1 document as single pages).
   const [surfaceIdx, setSurfaceIdx] = useState<number | null>(null);
   // §18 W11: the PDF's contents, as the surface read them, and a page's text for a screen reader.
@@ -120,9 +98,6 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     title,
     pdfId,
     fileMissing,
-    backfilling,
-    previewFailed,
-    retryPreview,
     pageCount,
     activeIndex,
     password,
@@ -139,9 +114,11 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     submitPassword,
   } = useReaderDocument({ doc: openDoc, external });
   usePageOcr(doc);
+  // The page surface shows this file (a PDF or a scan); else the format's own view does.
+  const onSurface = isPageRaster;
   // §18 W12: the page surface searches the query itself (PageSurface's useSurfaceFind) and says
-  // what it found; pdf-jsi's search is the other engine's.
-  const find = useReaderFind({ pdfUri: onSurface ? undefined : pdfUri, pdfId, pageCount, goToPage });
+  // what it found; the other viewers count their own matches.
+  const find = useReaderFind();
   const [surfaceFind, setSurfaceFind] = useState<SurfaceFindStatus | null>(null);
   const findCount = useMemo(
     () => (onSurface ? { current: surfaceFind?.current ?? 0, total: surfaceFind?.total ?? 0, scanning: surfaceFind?.scanning ?? false } : { total: find.matchCount }),
@@ -157,15 +134,18 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   const onScreen = useScreenRole() === 'active';
   // §18 W10: the bars stay while Find, a sheet or a tool needs them.
   const chrome = useReaderChrome(reading.keepAwake && onScreen, find.open || chromeLocked(sheets.state));
-  // §18 W11 (A13): the surface may be read sideways. Not the tools that still open the old
-  // overlays (Mark, Sign until W15 / W16): the screen turns upright for those. §18 W13: Select
-  // text is on the surface itself.
+  // §18 W11 (A13): the surface may be read sideways. Mark and Sign turn the screen upright (their
+  // bars want its width). §18 W13: Select text is on the surface itself, and since W15 / W16 so
+  // are Mark and placing a signature: modes of the same pages, not views over them.
   const surfaceSelecting = onSurface && tool?.kind === 'selectText';
+  const surfaceMarking = onSurface && tool?.kind === 'mark';
+  const surfaceSigning = onSurface && tool?.kind === 'signPlace';
   const leave = useReaderOrientation(onSurface && onScreen && (!tool || surfaceSelecting));
-  // The surface's Select tool is not a Modal: Back leaves it (a sheet over it goes first).
-  useBackHandler(closeTool, surfaceSelecting && readerBackTarget(sheets.state, find.open) === 'tool');
+  // The surface's tools are not Modals: Back leaves them (a sheet over one goes first).
+  const backIsTools = readerBackTarget(sheets.state, find.open) === 'tool';
+  useBackHandler(closeTool, (surfaceSelecting || surfaceMarking) && backIsTools);
   const back = useCallback(() => leave(pop), [leave, pop]);
-  const { onPage: onChromePage, toggle: toggleChrome, show: showChrome } = chrome;
+  const { toggle: toggleChrome, show: showChrome } = chrome;
   // §18 W2: a tap on the page hides the bars, but not while Find is open: its field is in the top
   // bar, and the tap is usually aimed at a match. A search result can open Find on a Reader kept
   // mounted with its bars hidden, so opening it shows them.
@@ -223,8 +203,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     else if (doc) void startForm({ doc });
   }, [doc, external, startForm]);
 
-  // §7 R3: the page editor; a saved edit rewrites document.pdf, so the viewer reloads it, §18 W5:
-  // on the page that was being read, wherever the edit moved it.
+  // §7 R3: the page editor; a saved edit rewrites document.pdf, so the surface is mounted again
+  // for it, §18 W5: on the page that was being read, wherever the edit moved it.
   const onPagesEdited = useCallback(
     (before: LibraryDocument, after: LibraryDocument) => reload((page) => pdfPageAfterEdit(before, after, page)),
     [reload]
@@ -232,16 +212,11 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   const editPages = useEditPages(doc, onPagesEdited);
   // §14 Q7: Academic options for this document; Back (or Apply) returns here.
   const openCoverOptions = useOpenCoverOptions();
-  const signing = useReaderSigning({ doc: doc && canSign(doc) ? doc : undefined, pdfPage: activeIndex + 1, sheets });
 
-  // §12 D3: the library page Mark mode opened on, or null; §5 T3: the one open in "Select text".
-  const markIdx = tool?.kind === 'mark' ? tool.idx : null;
-  // §18 W13: on the page surface, selecting happens on the pages; the sheet is the other engine's.
-  const selectTextIdx = !onSurface && tool?.kind === 'selectText' ? tool.idx : null;
   // §12 D10: whether Mark mode's Text tool is open on this document (checked without asking when
   // Mark mode opens, so a remembered Text tool comes back; else unlocked through the gate).
   const [textUnlocked, setTextUnlocked] = useState(false);
-  const markOpen = markIdx !== null;
+  const markOpen = tool?.kind === 'mark';
   useEffect(() => {
     if (!markOpen || !doc) {
       setTextUnlocked(false);
@@ -257,15 +232,6 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
       cancelled = true;
     };
   }, [markOpen, doc, isTextUnlocked]);
-  // §12 D3: marks reach document.pdf in the background; the viewer then reloads on the page being
-  // read. §18 W13: not the surface on a scan, which shows the page images and never opened the
-  // PDF: there is nothing to load again.
-  const keepView = onSurface && mapped;
-  const syncAnnotations = useAnnotationPdfSync(
-    useCallback(() => {
-      if (!keepView) reload();
-    }, [reload, keepView])
-  );
   // The library page on screen (on a 2-up sheet, its left page).
   const sheetIdx = doc ? libraryIdxFor(doc, activeIndex + 1) : 0;
   const currentIdx = onSurface && mapped && surfaceIdx !== null ? Math.min(surfaceIdx, Math.max(0, doc.pages.length - 1)) : sheetIdx;
@@ -275,28 +241,41 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     const label = pageLabel(doc, activeIndex + 1, pageCount);
     return onSurface && mapped && label.library ? { ...label, first: currentIdx + 1, last: currentIdx + 1 } : label;
   }, [doc, activeIndex, pageCount, onSurface, mapped, currentIdx]);
-  const markFlash = useMarkFlash(pdfId);
+  // §12 D10: Mark mode's Text tool and its gate, for whichever Mark mode is open.
+  const markText = useMemo(
+    () => (doc ? { unlocked: isPro || textUnlocked, pro: !isPro, onUnlock: () => unlockText(doc, () => setTextUnlocked(true)) } : undefined),
+    [doc, isPro, textUnlocked, unlockText]
+  );
   // §12 D4: a mark picked in the Notes panel flashes on its page. §18 W12: the surface draws the
-  // mark's own geometry; pdf-jsi can only be asked to find the mark's first words in the PDF.
+  // mark's own geometry.
   const annotations = state.library.annotations;
   const docId = doc?.id;
   const docMarks = useMemo(() => (docId ? annotations.filter((a) => a.documentId === docId) : NO_MARKS), [annotations, docId]);
-  const onMarked = useCallback(() => {
-    if (docId) syncAnnotations(docId);
-  }, [docId, syncAnnotations]);
-  const { flash: flashByText } = markFlash;
+  // §18 W17: until an older build's marks are out of an imported PDF's file (cleanBases), its
+  // pages are drawn without the file's annotations, or those marks would show under their rows.
+  // Once the file is clean the surface is mounted again for it, on the page being read.
+  const plainPages = useBasePending(docId) && !mapped;
+  const wasPlain = useRef(plainPages);
+  useEffect(() => {
+    if (wasPlain.current && !plainPages) reload();
+    wasPlain.current = plainPages;
+  }, [plainPages, reload]);
+  // §18 W16: Sign. The page is the one being read, and the signature is a row.
+  const signing = useReaderSigning({ doc: doc && canSign(doc) ? doc : undefined, idx: currentIdx, sheets });
+  useBackHandler(signing.onCancel, surfaceSigning && backIsTools);
+  // A signature that was erased keeps its PNG while the erasing can be undone: tidied when the
+  // Reader lets go of the document.
+  const store = useAppStore();
+  useEffect(() => {
+    if (!onSurface || !docId) return;
+    return () => pruneSignatureFiles(docId, store.getState().library.annotations);
+  }, [onSurface, docId, store]);
   const flashNote = useCallback(
     (entry: NoteEntry) => {
-      if (!doc) return;
-      if (onSurface) {
-        const mark = annotations.find((a) => a.id === entry.id);
-        if (mark) surfaceRef.current?.flash(entry.pageIdx, flashRects(mark));
-        return;
-      }
-      const query = flashQuery(entry);
-      if (query) void flashByText(pdfPageFor(doc, entry.pageIdx).page, query);
+      const mark = annotations.find((a) => a.id === entry.id);
+      if (mark) surfaceRef.current?.flash(entry.pageIdx, flashRects(mark));
     },
-    [doc, onSurface, annotations, flashByText]
+    [annotations]
   );
   // §5 T5: the bookmark on the page on screen.
   const currentBookmark = doc ? state.library.bookmarks.find((b) => b.documentId === doc.id && b.pageId === doc.pages[currentIdx]?.id) : undefined;
@@ -312,11 +291,11 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     });
   };
 
-  // A page search result: once the PDF has loaded, jump to that library page's PDF page and
-  // highlight the query there. (The viewer already opened on it, useReaderDocument's first page;
-  // the jump is for a Reader that was open.) §18 W5: only the Reader on screen takes the target.
-  // §18 W12: the surface starts Find from that library page (a 2-in-1 sheet's PDF page can't
-  // name it) and searches on through the document.
+  // A page search result: once the pages are known, jump to that library page and find the query
+  // from there. (The viewer already opened on it, useReaderDocument's first page; the jump is for
+  // a Reader that was open.) §18 W5: only the Reader on screen takes the target. §18 W12: Find
+  // starts from that library page (a 2-in-1 sheet's PDF page can't name it) and searches on
+  // through the document.
   const target = onScreen ? state.reader.target : null;
   const { openOnPage } = find;
   useEffect(() => {
@@ -324,17 +303,9 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     dispatch({ type: 'reader/SET_TARGET', target: null });
     const idx = doc.pages.findIndex((p) => p.id === target.pageId);
     if (idx < 0) return;
-    openOnPage(onSurface ? idx : pdfPageFor(doc, idx).page, target.query);
+    openOnPage(idx, target.query);
     goToIdx(idx);
-  }, [target, doc, pageCount, dispatch, openOnPage, goToIdx, onSurface]);
-
-  const onPageChanged = useCallback(
-    (page: number, count: number) => {
-      handlePageChanged(page, count);
-      onChromePage(page);
-    },
-    [handlePageChanged, onChromePage]
-  );
+  }, [target, doc, pageCount, dispatch, openOnPage, goToIdx]);
 
   // §18 W10: the surface's pages → the PDF pages useReaderDocument counts and saves (`lastPage`).
   const surfaceCount = useRef(0);
@@ -390,6 +361,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     doc,
     external,
     pdfUri,
+    annotations: docMarks,
     title,
     isPageRaster,
     pageCount,
@@ -416,29 +388,20 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     );
   }
 
-  if (doc && isPageRaster && !pdfUri && previewFailed) {
-    return (
-      <ReaderNotice body={t('reader.previewFailed')} centered>
-        <ReaderNoticeAction label={t('reader.retry')} onPress={retryPreview} />
-        <ReaderNoticeAction label={t('common.back')} muted onPress={back} />
-      </ReaderNotice>
-    );
-  }
-
-  if (doc && isPageRaster && !pdfUri) return <ReaderNotice body={backfilling ? t('reader.preparingPreview') : t('reader.loading')} />;
-
   if (doc && !isPageRaster && !nativeUri) return <ReaderNotice body={t('reader.loading')} />;
 
-  const pdfOptions = pdfViewOptions(reading);
+  const surfaceTooled = surfaceMarking || surfaceSigning;
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.bg }]}>
       {onSurface ? (
         <PageSurface
-          key={`${pdfUri}:${reloadKey}`}
+          // Mounted again for each reload (useReaderDocument): a rewritten file, a password to try.
+          key={`${pdfUri ?? pdfId}:${reloadKey}`}
           ref={surfaceRef}
           subject={subject!}
-          pdfUri={pdfUri!}
+          pdfUri={pdfUri}
+          plainPages={plainPages}
           owner={pdfId}
           password={password}
           reading={reading}
@@ -458,26 +421,13 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
           selecting={surfaceSelecting}
           onSelectDone={closeTool}
           marks={docMarks}
-          onMarked={onMarked}
-          onError={handlePdfError}
-        />
-      ) : isPageRaster ? (
-        <PdfPageView
-          key={`${pdfUri}:${reloadKey}`}
-          ref={pdfRef}
-          uri={pdfUri!}
-          pdfId={pdfId}
-          password={password}
-          night={night}
-          nightAlpha={NIGHT_OVERLAY_ALPHA[reading.nightStrength]}
-          enablePaging={pdfOptions.enablePaging}
-          fitPolicy={pdfOptions.fitPolicy}
-          spacing={pdfOptions.spacing}
-          highlightRects={markFlash.rects ?? find.highlightRects}
-          initialPage={initialPage}
-          onLoad={handleLoad}
-          onPageChanged={onPageChanged}
-          onTap={onViewerTap}
+          marking={surfaceMarking}
+          markText={markText}
+          onMarkDone={closeTool}
+          signing={signing.request}
+          onSignPlaced={signing.onPlaced}
+          onSignCancel={signing.onCancel}
+          onSignRedraw={signing.onRedraw}
           onError={handlePdfError}
         />
       ) : format === 'CSV' || format === 'XLSX' || format === 'XLS' ? (
@@ -525,31 +475,34 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         onBack={back}
       />
 
-      <ReaderTopChrome
-        visible={chrome.progress}
-        onHeight={chrome.onTopHeight}
-        name={title}
-        onBack={() => back()}
-        onOverflow={() => openSheet({ kind: 'more' })}
-        page={shownPage}
-        onJump={isPageRaster ? () => openSheet({ kind: 'jump' }) : undefined}
-        onFind={format && canFindInDoc(format) ? find.toggle : undefined}
-        findOpen={find.open}
-        findQuery={find.query}
-        onChangeFindQuery={find.changeQuery}
-        findCount={findCount}
-        onFindStep={onSurface ? findStep : undefined}
-        subtitle={submittedSummary(docSubmissions, formatShortDate)}
-        onSubtitlePress={() => openSheet({ kind: 'submissions' })}
-        bookmarked={canBookmark ? !!currentBookmark : undefined}
-        onBookmark={() => {
-          if (currentBookmark) dispatch({ type: 'library/REMOVE_BOOKMARK', id: currentBookmark.id });
-          else addBookmark();
-        }}
-        onBookmarkLongPress={() => openSheet({ kind: 'label' })}
-      />
+      {/* §18 W15/W16: Mark and Sign on the surface bring their own bars, in the same places. */}
+      {surfaceTooled ? null : (
+        <ReaderTopChrome
+          visible={chrome.progress}
+          onHeight={chrome.onTopHeight}
+          name={title}
+          onBack={() => back()}
+          onOverflow={() => openSheet({ kind: 'more' })}
+          page={shownPage}
+          onJump={isPageRaster ? () => openSheet({ kind: 'jump' }) : undefined}
+          onFind={format && canFindInDoc(format) ? find.toggle : undefined}
+          findOpen={find.open}
+          findQuery={find.query}
+          onChangeFindQuery={find.changeQuery}
+          findCount={findCount}
+          onFindStep={onSurface ? findStep : undefined}
+          subtitle={submittedSummary(docSubmissions, formatShortDate)}
+          onSubtitlePress={() => openSheet({ kind: 'submissions' })}
+          bookmarked={canBookmark ? !!currentBookmark : undefined}
+          onBookmark={() => {
+            if (currentBookmark) dispatch({ type: 'library/REMOVE_BOOKMARK', id: currentBookmark.id });
+            else addBookmark();
+          }}
+          onBookmarkLongPress={() => openSheet({ kind: 'label' })}
+        />
+      )}
 
-      {bookmarkHint.visible ? (
+      {bookmarkHint.visible && !surfaceTooled ? (
         <Hint
           text={t('shared.hint.readerBookmark')}
           onDismiss={bookmarkHint.dismiss}
@@ -560,7 +513,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         />
       ) : null}
 
-      <ReaderToolBar visible={chrome.progress} onHeight={chrome.onBottomHeight} tools={tools} onPress={handleTool} />
+      {surfaceTooled ? null : <ReaderToolBar visible={chrome.progress} onHeight={chrome.onBottomHeight} tools={tools} onPress={handleTool} />}
 
       <ReaderSheets
         sheets={sheets}
@@ -570,7 +523,6 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         shownPage={shownPage}
         goToPage={goToPage}
         goToIdx={goToIdx}
-        nightPages={onSurface}
         outline={onSurface ? outline : NO_OUTLINE}
         pageText={pageText}
         flashNote={flashNote}
@@ -581,34 +533,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         addBookmark={addBookmark}
       />
 
-      {doc && selectTextIdx !== null ? (
-        <SelectTextSheet
-          visible
-          doc={doc}
-          pageIdx={selectTextIdx}
-          onClose={(marked) => {
-            closeTool();
-            if (marked) syncAnnotations(doc.id);
-          }}
-        />
-      ) : null}
-
       {editPages.overlays}
-
-      {doc && markIdx !== null ? (
-        <MarkView
-          doc={doc}
-          startIdx={markIdx}
-          onClose={({ lastIdx, changed }) => {
-            closeTool();
-            // Back in the native viewer on the page last marked (§5 T1 pageMap: a 2-in-1 sheet
-            // holds two library pages).
-            goToIdx(lastIdx);
-            if (changed) syncAnnotations(doc.id);
-          }}
-          textTool={{ unlocked: isPro || textUnlocked, pro: !isPro, onUnlock: () => unlockText(doc, () => setTextUnlocked(true)) }}
-        />
-      ) : null}
 
       {convert.element}
       {word.element}

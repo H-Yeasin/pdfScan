@@ -23,7 +23,7 @@ export function StorageScreen() {
   const { back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'library');
-  const { files, courses, annotations } = state.library;
+  const { files, courses } = state.library;
   const openDocument = useOpenDocument();
   const sessionActive = state.capture.pages.length > 0;
   const [report, setReport] = useState<StorageReport | null>(null);
@@ -60,7 +60,7 @@ export function StorageScreen() {
       if (!doc || compressingId) return;
       setCompressingId(id);
       try {
-        const msg = await compressDocuments([doc], annotations, dispatch);
+        const msg = await compressDocuments([doc], dispatch);
         dispatch({ type: 'ui/SHOW_SNACK', msg });
       } catch (error) {
         console.warn('StorageScreen: compress failed', error);
@@ -69,7 +69,7 @@ export function StorageScreen() {
         setCompressingId(null);
       }
     },
-    [files, annotations, compressingId, dispatch, t]
+    [files, compressingId, dispatch, t]
   );
 
   const courseRows = useMemo(

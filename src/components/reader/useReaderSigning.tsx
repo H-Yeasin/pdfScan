@@ -1,41 +1,43 @@
-import { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
 import { SignatureCaptureModal } from '../shared/SignatureCaptureModal';
 import { SignatureModal } from '../shared/SignatureModal';
-import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
-import { usePageImage } from '../shared/usePageImage';
 import { cleanTemporaryCache } from '../../services/persistence/libraryFiles';
-import { applySignedPage, applySignatureToDocument } from '../../services/persistence/libraryOperations';
+import { applySignedPage } from '../../services/persistence/libraryOperations';
 import { saveSignatureForReuse } from '../../services/signature/savedSignatureStorage';
-import { signTargets, type SignaturePlacement } from '../../services/signature/signaturePlacement';
+import { createSignatureRow } from '../../services/signature/signatureRows';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import type { LibraryDocument } from '../../types/models';
+import type { PlacedSignature, SurfaceSignRequest } from './surface/PageSurface';
 import type { ReaderSheets } from './useReaderSheets';
 
 type Options = {
   // The document, when it can be signed (formatCapabilities.canSign); else undefined.
   doc: LibraryDocument | undefined;
-  // The PDF page on screen (1-based).
-  pdfPage: number;
+  // The library page being read (0-based): the page surface shows one at a time, also where the
+  // PDF has two on a sheet, so that is the page that gets signed.
+  idx: number;
   sheets: ReaderSheets;
 };
 
-// The Reader's Sign: which page, drawing the signature, placing it, writing it. §18 W1: the
-// library page being signed is chosen when signing starts and carried in the sheet or tool that
-// is open (readerSheets `idx`). Everything in the flow uses it (the page shown for placing, the
-// page written, the snack), never the PDF page on screen: after a cover or on a 2-in-1 sheet the
-// two numbers differ. Render `overlays` once.
-export function useReaderSigning({ doc, pdfPage, sheets }: Options) {
+// The Reader's Sign: drawing the signature, placing it, keeping it. §18 W1: the library page
+// being signed is chosen when signing starts and carried in the sheet or tool that is open
+// (readerSheets `idx`); everything in the flow uses it. Render `overlays` once.
+// §18 W16 (A10): a PDF-format document is signed on the page being read (`request`, for
+// PageSurface): the signature becomes an annotation row with its own copy of the PNG
+// (signature/signatureRows), drawn live and written into whatever leaves the app. Neither
+// document.pdf nor a page's master is touched. A JPG-format document still gets it flattened into
+// the page (§18 W17, kept: its export is the page image, where a row has nowhere to go).
+export function useReaderSigning({ doc, idx: readingIdx, sheets }: Options) {
   const { t } = useT();
   const dispatch = useAppDispatch();
-  const state = useAppSlices('library', 'signature');
+  const state = useAppSlices('signature');
   const { sheet, tool, open, close, openTool, closeTool } = sheets;
   const [captured, setCaptured] = useState<{ uri: string; aspectRatio: number } | null>(null);
   const savedSignature = state.signature.saved;
 
-  // Starts signing library page `idx`: a PDF-format document gets the signature drawn onto its
-  // PDF page (capture, then place); a JPG one has it flattened into the page's master.
+  // Starts signing library page `idx`: on a PDF-format document the signature is captured, then
+  // placed on the page; a JPG one has it flattened into the page's master.
   const startOn = useCallback(
     (idx: number) => {
       if (!doc) return;
@@ -52,18 +54,8 @@ export function useReaderSigning({ doc, pdfPage, sheets }: Options) {
   );
 
   const start = useCallback(() => {
-    if (!doc) return;
-    // The library pages on the PDF page on screen. A 2-in-1 sheet shows two: ask which one.
-    const targets = signTargets(doc, pdfPage);
-    if (targets.length > 1) {
-      Alert.alert(t('reader.signWhichPage'), undefined, [
-        { text: t('common.cancel'), style: 'cancel' },
-        ...targets.map((idx) => ({ text: t('reader.signPage', { page: idx + 1 }), onPress: () => startOn(idx) })),
-      ]);
-    } else if (targets.length === 1) {
-      startOn(targets[0]);
-    }
-  }, [doc, pdfPage, startOn, t]);
+    if (doc?.pages[readingIdx]) startOn(readingIdx);
+  }, [doc, readingIdx, startOn]);
 
   const flattenIdx = tool?.kind === 'signFlatten' ? tool.idx : null;
   const placeIdx = tool?.kind === 'signPlace' ? tool.idx : null;
@@ -72,17 +64,12 @@ export function useReaderSigning({ doc, pdfPage, sheets }: Options) {
   const handleFlattened = useCallback(
     async (flattenedUri: string) => {
       if (!doc || flattenIdx === null) return;
-      const updated = await applySignedPage(
-        doc,
-        flattenIdx,
-        flattenedUri,
-        state.library.annotations.filter((a) => a.documentId === doc.id)
-      );
+      const updated = await applySignedPage(doc, flattenIdx, flattenedUri);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
       closeTool();
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.signedPage', { page: flattenIdx + 1 }) });
     },
-    [doc, flattenIdx, dispatch, state.library.annotations, closeTool, t]
+    [doc, flattenIdx, dispatch, closeTool, t]
   );
 
   const handleCaptured = useCallback(
@@ -109,19 +96,28 @@ export function useReaderSigning({ doc, pdfPage, sheets }: Options) {
     setCaptured(null);
   }, [closeTool]);
 
-  // The page the signature is placed on: its master, or for an imported PDF the page rendered now.
-  const signPage = usePageImage(doc, placeIdx ?? 0, placeIdx !== null);
-
-  const handlePlaced = useCallback(
-    async (placement: SignaturePlacement) => {
-      if (!doc || placeIdx === null || !captured || !signPage) return;
-      const updated = await applySignatureToDocument(doc, placeIdx, captured.uri, placement, signPage);
-      dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: updated });
-      closeTool();
-      setCaptured(null);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.added') });
+  // §18 W16: what the surface is asked to place, and its answer.
+  const request = useMemo<SurfaceSignRequest | null>(
+    () => (placeIdx !== null && captured ? { uri: captured.uri, aspectRatio: captured.aspectRatio, idx: placeIdx } : null),
+    [placeIdx, captured]
+  );
+  const handleSurfacePlaced = useCallback(
+    (idx: number, placed: PlacedSignature) => {
+      if (!doc || !captured) return;
+      try {
+        const row = createSignatureRow(doc, idx, captured.uri, placed);
+        if (!row) return;
+        dispatch({ type: 'library/ADD_ANNOTATION', annotation: row });
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.placed', { page: idx + 1 }) });
+      } catch (error) {
+        console.warn('useReaderSigning: could not keep the signature', error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('shared.signature.failed') });
+      } finally {
+        closeTool();
+        setCaptured(null);
+      }
     },
-    [doc, placeIdx, captured, signPage, dispatch, closeTool, t]
+    [doc, captured, dispatch, closeTool, t]
   );
 
   const flattenPage = doc && flattenIdx !== null ? doc.pages[flattenIdx] : undefined;
@@ -139,21 +135,8 @@ export function useReaderSigning({ doc, pdfPage, sheets }: Options) {
       ) : null}
 
       {captureIdx !== null ? <SignatureCaptureModal visible onCancel={() => close('signCapture')} onCapture={handleCaptured} /> : null}
-
-      {placeIdx !== null && captured && signPage ? (
-        <SignaturePlacementOverlay
-          pageUri={signPage.uri}
-          pageNaturalWidth={signPage.width}
-          pageNaturalHeight={signPage.height}
-          signatureUri={captured.uri}
-          signatureAspectRatio={captured.aspectRatio}
-          onCancel={handlePlacementCancel}
-          onConfirm={handlePlaced}
-          onRedraw={handleRedraw}
-        />
-      ) : null}
     </>
   );
 
-  return { start, overlays };
+  return { start, overlays, request, onPlaced: handleSurfacePlaced, onCancel: handlePlacementCancel, onRedraw: handleRedraw };
 }

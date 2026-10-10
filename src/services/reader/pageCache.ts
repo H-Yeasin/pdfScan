@@ -44,8 +44,10 @@ export function fileStamp(uri: string): string {
   return hashKey(`${uri}|${size ?? ''}|${modified ?? ''}`);
 }
 
-export function pageCacheName(owner: string, pdfUri?: string): string {
-  return ownerPrefix(owner) + (pdfUri ? fileStamp(pdfUri) : SCAN_STAMP);
+// `variant`: the same file drawn another way (§18 W17: 'plain', without the file's annotations).
+// Its renders must never be taken for the usual ones, so they get a folder of their own.
+export function pageCacheName(owner: string, pdfUri?: string, variant = ''): string {
+  return ownerPrefix(owner) + (pdfUri ? fileStamp(pdfUri) : SCAN_STAMP) + (variant ? `-${variant}` : '');
 }
 
 export type PageCache = {
@@ -72,8 +74,8 @@ function folders(): Directory[] {
 // The folder for a document as it is now: created, marked as just used, and the same document's
 // folders for older states of its file deleted. Pass the PDF's uri for everything read through a
 // pdfium session; leave it out for a scan.
-export function openPageCache(owner: string, pdfUri?: string, now: number = Date.now()): PageCache {
-  const name = pageCacheName(owner, pdfUri);
+export function openPageCache(owner: string, pdfUri?: string, now: number = Date.now(), variant = ''): PageCache {
+  const name = pageCacheName(owner, pdfUri, variant);
   const dir = new Directory(rootDir(), name);
   quietly(() => {
     if (!dir.exists) dir.create({ intermediates: true });

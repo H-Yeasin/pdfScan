@@ -393,11 +393,11 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W11 Links, contents, landscape, TalkBack (done; checked on a phone 2026-10-10)
 - [x] W12 Find on the surface ("3 of 27") (done in code 2026-10-10; device check open)
 - [x] W13 In-page text selection (done in code 2026-10-10; device check open)
-- [ ] W14 Exports carry the marks
-- [ ] W15 Mark mode on the surface
-- [ ] W16 Signatures as rows on the surface
-- [ ] W17 The surface becomes the reader (bake-ins removed)
-- [ ] W18 Remove react-native-pdf-jsi (new dev build)
+- [x] W14 Exports carry the marks (done in code 2026-10-10; device check open)
+- [x] W15 Mark mode on the surface (done in code 2026-10-10; device check open)
+- [x] W16 Signatures as rows on the surface (done in code 2026-10-10; device check open)
+- [x] W17 The surface becomes the reader (bake-ins removed) (done in code 2026-10-10; device check open)
+- [x] W18 Remove react-native-pdf-jsi (done in code 2026-10-10; **needs `npx expo prebuild --clean` and a new dev build**; device check open)
 - [ ] W19 Viewer contract, parse cache, positions
 - [ ] W20 TXT
 - [ ] W21 Sheets

@@ -125,7 +125,7 @@ so scanned documents never touch a server.
 | Document capture | `react-native-document-scanner-plugin`, `expo-camera`, `expo-image-picker` |
 | Image processing | `@shopify/react-native-skia`, `expo-image-manipulator`, `react-native-view-shot` |
 | OCR | `rn-mlkit-ocr` (Google ML Kit, on-device) |
-| PDF engine | `pdf-lib` (build/sign; OCR text via a bundled glyphless font), `react-native-pdf-jsi` (native render), `expo-print` |
+| PDF engine | `pdf-lib` (build/sign; OCR text via a bundled glyphless font), `modules/pdf-native` (pdfium / PDFKit: the Reader's pages), `expo-print` |
 | Office previews | `mammoth` (DOCX → HTML in a locked-down `react-native-webview`), SheetJS `xlsx` (XLS/XLSX), `papaparse` (CSV) |
 | State | Custom reducer/context store (`AppStateContext` + slice reducers) — no Redux dependency |
 | Persistence | `expo-sqlite`, `@react-native-async-storage/async-storage`, `expo-file-system` |

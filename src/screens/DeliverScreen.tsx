@@ -336,11 +336,7 @@ export function DeliverScreen() {
         // §7 R3: the scanned pages join the end of the saved document; this new one was only the
         // way to build them, and goes again.
         if (appendTarget) {
-          const appended = await appendDocuments(
-            appendTarget,
-            [doc],
-            state.library.annotations.filter((a) => a.documentId === appendTarget.id)
-          );
+          const appended = await appendDocuments(appendTarget, [doc]);
           deleteDocumentFiles(documentId);
           dispatch({ type: 'library/UPDATE_FILE', id: appendTarget.id, patch: appended });
           dispatch({ type: 'capture/CLEAR_PAGES' });

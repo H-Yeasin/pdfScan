@@ -7,8 +7,10 @@ import { buildPdfFromPages } from '../../pdf/pdfService';
 import { pdfRectFor } from '../../documents/pageMap';
 import { compressDocument } from '../../persistence/libraryOperations';
 import type { Annotation, LibraryDocument, LibraryPage, PageOcr } from '../../../types/models';
+import { annotatedPdfFor } from '../exportPdf';
 import { markLine } from '../marks';
-import { NM_PREFIX, removeOurAnnotations, updatePdfAnnotations, writeAnnotations } from '../pdfAnnotations';
+import { updatePdfAnnotations } from '../../../test/bakeAnnotations';
+import { NM_PREFIX, removeOurAnnotations, writeAnnotations } from '../pdfAnnotations';
 import { snapHighlight, wordRects } from '../snap';
 import { readingOrderTokens } from '../../study/textSelection';
 
@@ -225,12 +227,15 @@ describe('PDF annotations', () => {
     near([Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)], [100, 200, 300, 220]);
   });
 
-  it('Compress keeps the annotations', async () => {
+  // §18 W17: a rebuild writes no marks into document.pdf; the copy that leaves the app has them.
+  it('Compress leaves the file clean and the exported copy keeps the annotations', async () => {
     const doc = libraryDoc('doc_compress');
     const built = await buildPdfFromPages(doc.id, doc.pages.map((p) => ({ uri: p.fileUri, width: p.width, height: p.height })), 'as-is');
     const highlight = annotation({ kind: 'highlight', documentId: doc.id, data: { rects: [{ left: 100, top: 100, width: 180, height: 30 }] } });
-    const compressed = await compressDocument({ ...doc, pdfUri: built.uri }, 2, [highlight]);
-    expect((await annotationsIn(compressed.pdfUri!)).map((a) => [a.page, a.subtype])).toEqual([[2, 'Highlight']]);
+    const compressed = await compressDocument({ ...doc, pdfUri: built.uri }, 2);
+    expect(await annotationsIn(compressed.pdfUri!)).toEqual([]);
+    const exported = await annotatedPdfFor(compressed, [highlight]);
+    expect((await annotationsIn(exported!)).map((a) => [a.page, a.subtype])).toEqual([[2, 'Highlight']]);
   });
 });
 

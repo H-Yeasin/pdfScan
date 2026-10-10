@@ -1,4 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { settleOurAnnotations } from '../annotations/exportPdf';
+import { fromStoredPath } from '../persistence/libraryFiles';
 import type { PersistedSettings } from '../persistence/settingsStorage';
 import { getDb, withWriteLock } from '../persistence/dbService';
 import { ensureNotificationPermission, scheduleReminders } from '../submit/deadlines';
@@ -250,11 +252,53 @@ export async function applyRestore(
     if (incoming.exists) incoming.delete();
   }
 
+  await settleRestoredPdfs(backup.manifest, plan, options.signal);
   const remindersScheduled = await rescheduleDeadlines(plan).catch((error) => {
     console.warn('restore: rescheduling reminders failed', error);
     return 0;
   });
   return { plan, remindersScheduled, signatureRestored };
+}
+
+// §18 W14 (A9): a backup's readable PDF has the document's marks and signatures written in, and
+// it is the file that comes back as `document.pdf`.
+//  - A "PDFs only" backup brings no rows: the marks stay in the file, as its own annotations
+//    (released, or the first Mark session there would remove them as "ours").
+//  - A full restore brings the rows too, so the file gives ours up (§18 W17: `document.pdf` never
+//    holds them). The Reader draws an imported PDF with its annotations on, where they would show
+//    twice; and a document whose rows are all deleted later goes out as its file, unread.
+// One file at a time, after the library is back in place; best-effort (a file pdf-lib can't
+// open keeps what it has).
+export function restoredPdfsToSettle(
+  manifest: Pick<Manifest, 'restorable' | 'annotated'>,
+  plan: Pick<ImportPlan, 'tables' | 'documents'>
+): { path: string; how: 'remove' | 'release' }[] {
+  const out: { path: string; how: 'remove' | 'release' }[] = [];
+  if (manifest.restorable === 'pdfs') {
+    // The manifest names the documents as the backup had them; the plan says which id each got
+    // here. A backup made before the list existed names none.
+    const annotated = new Set(manifest.annotated ?? []);
+    const carriers = new Set(plan.documents.filter((d) => d.action !== 'skip' && annotated.has(d.sourceId)).map((d) => d.targetId));
+    for (const doc of plan.tables.documents) {
+      if (carriers.has(String(doc.id)) && typeof doc.pdf_path === 'string' && doc.pdf_path) out.push({ path: doc.pdf_path, how: 'release' });
+    }
+    return out;
+  }
+  const marked = new Set(plan.tables.annotations.map((row) => String(row.document_id)));
+  for (const doc of plan.tables.documents) {
+    if (typeof doc.pdf_path === 'string' && doc.pdf_path && marked.has(String(doc.id))) out.push({ path: doc.pdf_path, how: 'remove' });
+  }
+  return out;
+}
+
+async function settleRestoredPdfs(manifest: Manifest, plan: ImportPlan, signal?: AbortSignal): Promise<void> {
+  for (const { path, how } of restoredPdfsToSettle(manifest, plan)) {
+    // The library is already restored: a cancel now only leaves the rest as they came.
+    if (signal?.aborted) return;
+    const uri = fromStoredPath(path);
+    if (!uri) continue;
+    await settleOurAnnotations(uri, how).catch((error) => console.warn('restore: could not settle the marks in', path, error));
+  }
 }
 
 // Reminders live in the phone's OS, not in the backup: open deadlines that came in and are still

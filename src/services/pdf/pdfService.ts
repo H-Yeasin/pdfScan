@@ -477,9 +477,10 @@ export type BuildPdfOptions = {
   dest?: File;
   // Called after each source page is drawn (1-based), for progress text.
   onPage?: (done: number, total: number) => void;
-  // Last changes before the file is written, e.g. annotations/pdfAnnotations.writeAnnotations
-  // (§5 T4). A hook rather than an import, so this module doesn't depend on the page map.
-  beforeSave?: (pdfDoc: PDFDocument) => void;
+  // Last changes before the file is written, e.g. annotations/pdfAnnotations.writeMarks
+  // (§5 T4). A hook rather than an import, so this module doesn't depend on the page map. It is
+  // waited for (§18 W16: a signature's image is read from disk).
+  beforeSave?: (pdfDoc: PDFDocument) => unknown;
 };
 
 export async function buildPdfFromPages(
@@ -528,7 +529,7 @@ export async function buildPdfFromPages(
     await buildStandardContentPages(pdfDoc, pages, encoding, academicConfig, text, ocrFont, pageDims, options.onPage);
   }
 
-  options.beforeSave?.(pdfDoc);
+  await options.beforeSave?.(pdfDoc);
   const pdfBytes = await pdfDoc.save();
 
   const dest = options.dest ?? new File(getDocumentDir(documentId), 'document.pdf');
@@ -603,8 +604,11 @@ export async function applySignatureToPdf(
 // reader). Every OTHER path that produces a LibraryDocument (DeliverScreen, mergeDocuments,
 // splitDocument, compressDocument, applySignedPage) already always sets pdfUri now, so this only
 // ever fires for a genuinely pre-existing AsyncStorage record — a no-op for anything saved after
-// that change shipped.
-export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDocument> {
+// that change shipped. §18 W17: the Reader shows a scan from its page images and no longer asks
+// for this; it runs when the PDF is needed to leave the app (annotations/exportPdf).
+type PdfLessDoc = Pick<LibraryDocument, 'id' | 'pages' | 'format' | 'sizeBytes'> & Partial<Pick<LibraryDocument, 'pdfUri' | 'pdfLayout' | 'pdfPageSize'>>;
+
+export async function ensureDocumentPdf<T extends PdfLessDoc>(doc: T): Promise<T> {
   if (doc.pdfUri) return doc;
   const result = await buildPdfFromPages(
     doc.id,
@@ -618,9 +622,10 @@ export async function ensureDocumentPdf(doc: LibraryDocument): Promise<LibraryDo
 // document changes in the store (a bookmark, the last page), and two builds of the same
 // document.pdf would write over each other. A second call while the first is running gets the
 // same promise; once it settles (either way) the next call starts fresh, so Retry really retries.
-const ensuring = new Map<string, Promise<LibraryDocument>>();
-export function ensureDocumentPdfOnce(doc: LibraryDocument): Promise<LibraryDocument> {
-  const running = ensuring.get(doc.id);
+const ensuring = new Map<string, Promise<PdfLessDoc>>();
+export function ensureDocumentPdfOnce<T extends PdfLessDoc>(doc: T): Promise<T> {
+  // The same document: whoever asked first gets its fields back, which is all a caller reads.
+  const running = ensuring.get(doc.id) as Promise<T> | undefined;
   if (running) return running;
   const build = ensureDocumentPdf(doc).finally(() => ensuring.delete(doc.id));
   ensuring.set(doc.id, build);

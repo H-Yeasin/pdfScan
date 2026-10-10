@@ -336,7 +336,9 @@ export type Deadline = {
 // into document.pdf as a real PDF annotation by every build (annotations/pdfAnnotations.ts).
 // §12 D3 added underline and strike: the same word rects as a highlight, drawn as a line.
 // §12 D10: 'text', a typed text box (Pro).
-export type AnnotationKind = 'highlight' | 'underline' | 'strike' | 'ink' | 'note' | 'text';
+// §18 W16: 'signature', the student's signature placed on a page. A row like any mark: drawn live
+// by the Reader, written into the copies that leave the app, never into the page's master.
+export type AnnotationKind = 'highlight' | 'underline' | 'strike' | 'ink' | 'note' | 'text' | 'signature';
 export type AnnotationData =
   // Highlighter, underline, strike: one rect per line it covers, snapped to word boxes (or one
   // free rect).
@@ -346,8 +348,14 @@ export type AnnotationData =
   // Note: where its icon sits.
   | { x: number; y: number }
   // §12 D10 text box: its box (the text's top-left corner and how far it reaches) and the font
-  // size, both in master pixels. The text is `text`, one line per '\n'.
-  | { box: OcrBounding; size: number };
+  // size, both in master pixels. The text is `text`, one line per '\n'. §18 W15: `turn` as for a
+  // signature below (a box typed on a page shown turned reads upright there).
+  | { box: OcrBounding; size: number; turn?: PageRotation }
+  // §18 W16 signature: its box, and the name of its PNG in the document's folder
+  // (`sig_<id>.png`, a copy of the signature as it was when placed: services/signature/signatureRows.ts).
+  // `turn`: how far the image is turned inside the box (clockwise), so that a signature placed on
+  // a page shown turned reads upright there; the box is the turned image's (marks.turnedQuad).
+  | { box: OcrBounding; file: string; turn?: PageRotation };
 export type Annotation = {
   id: string;
   documentId: string;

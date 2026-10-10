@@ -187,11 +187,6 @@ export const en = {
       filterLabSubtitle: 'Compare every filter and tune its constants',
       readerLab: 'Reader Lab',
       readerLabSubtitle: 'Time PDF pages and tiles, check passwords, links and rotation',
-      // §18 W10: tries the page surface without the console's `reader_surface`.
-      readerSurface: 'Page surface in the Reader',
-      readerSurfaceOn: 'On until the app restarts. PDFs and scans open on the new surface.',
-      readerSurfaceOff: 'Off. PDFs and scans open in the old viewer.',
-      readerSurfaceUnavailable: 'Needs a dev build with pdf-native version 2.',
       // §16 G5: the render-count overlay (src/utils/renderCounts.ts).
       renderCounts: 'Render counts',
       renderCountsOn: 'Showing. Tap a count to reset; tap here to hide.',
@@ -293,6 +288,11 @@ export const en = {
       placeBottomRight: 'Place in bottom right',
       added: 'Signature added — visible in exported PDF',
       signedPage: 'Signed · page {page}',
+      // §18 W16: placing on the page itself (the page surface), where it shows at once.
+      bottomRight: 'Bottom right',
+      placeHere: 'Place',
+      placed: 'Signature added · page {page}',
+      failed: "Couldn't add the signature. Try again.",
     },
     crash: { title: 'Something went wrong.', body: 'Your documents are safe.', restart: 'Restart' },
     // §8 B1: the low-space guard before a scan or a save.
@@ -580,11 +580,7 @@ export const en = {
       spacingSmall: 'Small',
       spacingLarge: 'Large',
       night: 'Night mode',
-      nightStrength: 'Night dimming',
-      strengthLow: 'Low',
-      strengthMedium: 'Medium',
-      strengthHigh: 'High',
-      // §18 W10: the page surface redraws the pages; the strength is how dark the paper is.
+      // §18 W10: the page surface redraws the pages; this is how dark the paper is.
       nightPaper: 'Night page',
       paperLow: 'Soft',
       paperMedium: 'Dark',
@@ -695,17 +691,10 @@ export const en = {
     copiedAll: 'Copied the text of every page',
     shareTxt: 'Share .txt',
     // §18 W1: a 2-in-1 sheet shows two pages; Sign asks which one.
-    signWhichPage: 'Sign which page?',
-    signPage: 'Page {page}',
     deleteTitle: 'Delete document?',
     deleteBody: '"{name}" and its files will be permanently removed. This can\'t be undone.',
     delete: 'Delete',
     notFound: 'Document not found.',
-    preparingPreview: 'Preparing preview…',
-    // §18 W3: the preview couldn't be built (ensureDocumentPdfOnce failed).
-    previewFailed: "Couldn't prepare the preview.",
-    retry: 'Retry',
-    passwordTitle: "Couldn't open this PDF. It may be password protected.",
     passwordNeeded: 'This PDF needs a password.',
     password: 'Password',
     unlock: 'Unlock',
@@ -795,10 +784,7 @@ export const en = {
     docUnsupported: "Old .doc files aren't supported. Open it in Google Docs and export it as PDF.",
     notUtf8: 'This file may not be UTF-8 — some characters may not display correctly.',
     select: {
-      title: 'Select text · p. {page}',
-      noText: 'No text found on this page. Run OCR again?',
       runOcr: 'Run OCR',
-      hint: 'Drag across the words to select them. Two fingers zoom.',
       selectAll: 'Select all',
       share: 'Share',
       copy: 'Copy',
@@ -816,7 +802,6 @@ export const en = {
     },
     // §12 D3: Mark mode (replaced T4's Annotate sheet).
     mark: {
-      saveFailed: "Saved, but couldn't update the PDF file",
       undo: 'Undo',
       redo: 'Redo',
       pageOf: 'p. {page} / {total}',

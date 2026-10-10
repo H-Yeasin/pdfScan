@@ -1,5 +1,5 @@
 // §7 R4: where the Reader opens a document, and the "go to page" box. Pages are PDF pages,
-// 1-based, as the viewer counts them.
+// 1-based, as the Reader counts them.
 import type { ScreenRole } from '../../navigation/screenRole';
 import type { LibraryDocument } from '../../types/models';
 import { libraryIdxFor, pdfPageCount, pdfPageFor } from './pageMap';
@@ -61,14 +61,14 @@ export function parseJumpInput(text: string, pageCount: number): number | null {
   return page >= 1 && page <= pageCount ? page : null;
 }
 
-// What the viewer's load error means. Both pdf-jsi platforms report a missing or wrong password
-// as "Password required or incorrect password." (android PdfView.onError, ios RNPDFPdfView);
-// anything else (a damaged file, "Load pdf failed") can't be fixed with a password.
-// 'unknown': no message to go by - the prompt is offered, as before R4.
-export type PdfLoadProblem = 'password' | 'damaged' | 'unknown';
+// §18 W18: why the page surface couldn't open a PDF, as its pdfium session says it
+// (surface/usePdfSession.sessionErrorCode): the file wants a password (none given, or the wrong
+// one), or it can't be read at all.
+export type NativePdfErrorCode = 'password' | 'failed';
 
-export function classifyPdfError(message: string | undefined): PdfLoadProblem {
-  const text = (message ?? '').trim();
-  if (!text || text === '{}') return 'unknown';
-  return /password/i.test(text) ? 'password' : 'damaged';
+// What that means for the Reader. 'damaged': no password can help - "Can't open this file".
+export type PdfLoadProblem = 'password' | 'damaged';
+
+export function classifyNativePdfError(code: NativePdfErrorCode | undefined): PdfLoadProblem {
+  return code === 'password' ? 'password' : 'damaged';
 }

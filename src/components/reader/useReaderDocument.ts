@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { File } from 'expo-file-system';
 import { useScreenRole } from '../../navigation/screenRole';
-import { classifyPdfError, heldSubject, openingPage } from '../../services/documents/readerPosition';
-import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
+import { classifyNativePdfError, heldSubject, openingPage, type NativePdfErrorCode } from '../../services/documents/readerPosition';
+import { isPageRasterFormat, isPdfLevel } from '../../services/documents/formatCapabilities';
 import { pdfPageFor } from '../../services/documents/pageMap';
-import { ensureDocumentPdfOnce } from '../../services/pdf/pdfService';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import type { ExternalFileDocument, LibraryDocument } from '../../types/models';
 
@@ -13,7 +12,7 @@ const LAST_PAGE_SAVE_MS = 800;
 
 // §7 R4: how the last load failed. 'password': the prompt says a password is needed (and, after
 // a try, that it didn't work); 'damaged': no password can help - "Can't open this file".
-export type LoadProblem = 'password' | 'wrongPassword' | 'unknown' | 'damaged' | null;
+export type LoadProblem = 'password' | 'wrongPassword' | 'damaged' | null;
 
 // What the Reader has open: a library document, or a file from outside.
 export type ReaderOpenSubject = { doc: LibraryDocument | undefined; external: ExternalFileDocument | null };
@@ -22,9 +21,10 @@ export type ReaderOpenSubject = { doc: LibraryDocument | undefined; external: Ex
 export function readerFiles({ doc, external }: ReaderOpenSubject) {
   const format = external?.format ?? doc?.format;
   const isPageRaster = format ? isPageRasterFormat(format) : false;
-  // pdfUri is reserved for the PdfPageView path (PDF/JPG - both are ultimately rendered from a
-  // compiled PDF, see buildPdfFromPages). nativeUri is for every other format's own viewer, reading
-  // straight from the copied source file instead of a PDF conversion that doesn't exist for them.
+  // pdfUri is for the page surface's formats (PDF/JPG): an imported PDF or an outside file is
+  // read from it; a scan is read from its page images, and its `document.pdf` is only what leaves
+  // the app (§18 W17: it may not exist yet). nativeUri is for every other format's own viewer,
+  // reading straight from the copied source file.
   const pdfUri = isPageRaster ? (external?.uri ?? doc?.pdfUri) : undefined;
   const nativeUri = !isPageRaster ? (external?.uri ?? doc?.contentUri) : undefined;
   const title = external?.name ?? doc?.name ?? '';
@@ -36,8 +36,7 @@ export function readerFiles({ doc, external }: ReaderOpenSubject) {
 // one that is hidden or sliding away keeps the document it had (readerPosition.heldSubject).
 // `inert`: this instance has never been on screen, so it has no document and draws nothing.
 // §18 W6: `viewKey` names the file on screen. ReaderScreen keys ReaderDocumentView on it, so
-// another file (or the same document once its PDF exists) starts with fresh viewer state:
-// position, password, Find, sheets, tools.
+// another file starts with fresh viewer state: position, password, Find, sheets, tools.
 export function useReaderSubject() {
   const state = useAppSlices('library', 'reader');
   const role = useScreenRole();
@@ -62,23 +61,19 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
 
   // §18 W5: the page a viewer opening this file starts on, so it never shows page 1 first: the
   // search hit or bookmark being opened, else the saved page. Read when a viewer mounts
-  // (PdfPageView keeps its first `initialPage`), so it may change freely afterwards.
+  // (PageSurface keeps its first `initialIndex`), so it may change freely afterwards.
   const target = live && doc && !external ? state.reader.target : null;
   const targetIdx = target && doc ? doc.pages.findIndex((p) => p.id === target.pageId) : -1;
   const firstPage = openingPage(doc && !external ? doc.lastPage : undefined, doc && targetIdx >= 0 ? pdfPageFor(doc, targetIdx).page : null);
 
   const [pageCount, setPageCount] = useState(0);
   const [activeIndex, setActiveIndex] = useState((firstPage ?? 1) - 1);
-  const [backfilling, setBackfilling] = useState(false);
-  const [previewFailed, setPreviewFailed] = useState(false);
-  const [previewAttempt, setPreviewAttempt] = useState(0);
-  const retryPreview = useCallback(() => setPreviewAttempt((n) => n + 1), []);
   const [password, setPassword] = useState<string | undefined>(undefined);
   const [passwordDraft, setPasswordDraft] = useState('');
   const [needsPassword, setNeedsPassword] = useState(false);
   const [loadProblem, setLoadProblem] = useState<LoadProblem>(null);
-  // The viewer is mounted again for each reload of the file (document.pdf rewritten by Edit pages
-  // or Mark mode, a password to try). §18 W5: every reload says which page it opens on.
+  // The viewer is mounted again for each reload of the file (document.pdf rewritten by Edit
+  // pages, a password to try). §18 W5: every reload says which page it opens on.
   const [reloaded, setReloaded] = useState<{ key: number; page: number | undefined } | null>(null);
   const reloadKey = reloaded?.key ?? 0;
   const initialPage = reloaded ? reloaded.page : firstPage;
@@ -101,9 +96,11 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
 
   // §8 B1: the file to show was deleted outside the app (or a restore didn't bring it back). Said
   // plainly here, rather than left to the viewer to fail on. Re-checked when the integrity check
-  // changes the document's flag.
+  // changes the document's flag. §18 W17: a scan with no PDF yet is not missing anything (it is
+  // read from its page images); an imported PDF without its file is.
   const fileMissing = useMemo(() => {
-    if (!doc || external || !contentKey) return false;
+    if (!doc || external) return false;
+    if (!contentKey) return isPageRaster && isPdfLevel(doc);
     try {
       return !new File(contentKey).exists;
     } catch {
@@ -111,41 +108,6 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentKey, doc?.missingFiles, external]);
-
-  // Backfills document.pdf for a library doc saved before every doc always got one. A no-op for
-  // anything saved after that change shipped (doc.pdfUri is already set), and for any non-raster
-  // format (DOCX/XLSX/CSV/TXT), which never gets a pdfUri at all - ensureDocumentPdf assumes a
-  // pages[] of real raster images to compile, which those formats don't have.
-  // §18 W3: a build that fails (a master is gone, the disk is full) ends in `previewFailed` with a
-  // Retry, instead of "Preparing preview…" for ever. Keyed on the document's id, not the document:
-  // this effect must not start again each time the store hands over a new object for the same
-  // document (ensureDocumentPdfOnce also shares a build that is already running).
-  const needsPdf = !!doc && !external && !doc.pdfUri && isPageRaster;
-  const backfillId = needsPdf ? doc.id : undefined;
-  const latestDoc = useRef(doc);
-  latestDoc.current = doc;
-  useEffect(() => {
-    const target = latestDoc.current;
-    if (!backfillId || !target) return;
-    let cancelled = false;
-    setBackfilling(true);
-    setPreviewFailed(false);
-    ensureDocumentPdfOnce(target)
-      .then((updated) => {
-        if (cancelled) return;
-        dispatch({ type: 'library/UPDATE_FILE', id: updated.id, patch: updated });
-        setBackfilling(false);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.warn('useReaderDocument: could not prepare the preview', backfillId, error);
-        setBackfilling(false);
-        setPreviewFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [backfillId, previewAttempt, dispatch]);
 
   // Saves the page on screen (debounced: flicking through pages writes once), and at once when
   // the Reader leaves the screen, shows another document or unmounts. §18 W5: only the Reader on
@@ -183,19 +145,16 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
     setPageCount(count);
   }, []);
 
-  // §7 R4: pdf-jsi says when a password is missing or wrong (readerPosition.classifyPdfError);
-  // any other failure is a file no password will open. With no message to go by, the prompt is
-  // offered as before, and a failure after a password was tried is taken as a damaged file.
+  // §7 R4, §18 W18: the page surface's session says when a password is missing or wrong
+  // (readerPosition.classifyNativePdfError); any other failure is a file no password will open.
   const handlePdfError = useCallback(
-    (message: string) => {
-      const kind = classifyPdfError(message);
-      const tried = password !== undefined;
-      if (kind === 'damaged' || (kind === 'unknown' && tried)) {
+    (code: NativePdfErrorCode) => {
+      if (classifyNativePdfError(code) === 'damaged') {
         setNeedsPassword(false);
         setLoadProblem('damaged');
         return;
       }
-      setLoadProblem(kind === 'password' ? (tried ? 'wrongPassword' : 'password') : 'unknown');
+      setLoadProblem(password !== undefined ? 'wrongPassword' : 'password');
       setNeedsPassword(true);
     },
     [password]
@@ -216,9 +175,6 @@ export function useReaderDocument({ doc, external }: ReaderOpenSubject) {
     pdfId,
     contentKey,
     fileMissing,
-    backfilling,
-    previewFailed,
-    retryPreview,
     pageCount,
     activeIndex,
     password,
