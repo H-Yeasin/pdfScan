@@ -1,0 +1,625 @@
+{
+  "bootstrap/AppNavigator.tsx": {
+    "alert": 1
+  },
+  "bootstrap/ErrorBoundary.tsx": {
+    "fontSize": 3,
+    "hexColor": 5,
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "pressable": 1
+  },
+  "components/backup/AutoBackupChip.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1
+  },
+  "components/backup/BackupSheet.tsx": {
+    "fontSize": 5,
+    "borderRadius": 1,
+    "fontWeight": 4,
+    "pressable": 5,
+    "modal": 1
+  },
+  "components/backup/RestoreHost.tsx": {
+    "fontSize": 5,
+    "borderRadius": 1,
+    "fontWeight": 4,
+    "alert": 1,
+    "pressable": 2,
+    "modal": 1
+  },
+  "components/bookmarks/BookmarkList.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/brand/SplashIntro.tsx": {
+    "pressable": 1
+  },
+  "components/capture/CaptureControls.tsx": {
+    "fontSize": 1,
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "pressable": 3
+  },
+  "components/capture/CaptureModePicker.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/courses/CourseBadge.tsx": {
+    "fontWeight": 1
+  },
+  "components/courses/CourseChips.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 2
+  },
+  "components/courses/CourseEditorSheet.tsx": {
+    "fontSize": 4,
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "pressable": 9
+  },
+  "components/courses/CourseFilterChips.tsx": {
+    "fontSize": 1,
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/courses/CourseList.tsx": {
+    "fontSize": 7,
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "alert": 2,
+    "pressable": 6
+  },
+  "components/courses/CourseSetupForm.tsx": {
+    "fontSize": 4,
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "pressable": 1
+  },
+  "components/courses/CourseSheet.tsx": {
+    "fontSize": 6,
+    "fontWeight": 3,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/courses/DocTypeChips.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/courses/SemesterSwitcher.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1,
+    "alert": 1,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/courses/SortUnsortedSheet.tsx": {
+    "fontSize": 6,
+    "borderRadius": 1,
+    "fontWeight": 5,
+    "pressable": 5,
+    "modal": 1
+  },
+  "components/courses/TimetableEditor.tsx": {
+    "fontSize": 8,
+    "fontWeight": 5,
+    "pressable": 6
+  },
+  "components/deadlines/DeadlineEditorSheet.tsx": {
+    "fontSize": 7,
+    "fontWeight": 5,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/deadlines/DeadlineList.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 2
+  },
+  "components/deliver/CoverThumbnail.tsx": {
+    "hexColor": 2,
+    "borderRadius": 1,
+    "fontWeight": 1
+  },
+  "components/deliver/FolderPickerModal.tsx": {
+    "fontSize": 4,
+    "fontWeight": 3,
+    "pressable": 6,
+    "modal": 1
+  },
+  "components/deliver/MoreOptionsPanel.tsx": {
+    "fontSize": 4,
+    "fontWeight": 2,
+    "pressable": 2
+  },
+  "components/deliver/ProfilePromptSheet.tsx": {
+    "fontSize": 4,
+    "fontWeight": 3,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/deliver/QualitySlider.tsx": {
+    "fontSize": 1,
+    "borderRadius": 2
+  },
+  "components/deliver/SizeTargetRow.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/deliver/StickyActions.tsx": {
+    "fontSize": 5,
+    "fontWeight": 2,
+    "pressable": 3
+  },
+  "components/library/FileRow.tsx": {
+    "fontSize": 3,
+    "hexColor": 1,
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "alert": 1,
+    "pressable": 3
+  },
+  "components/library/LibraryTabs.tsx": {
+    "fontSize": 1,
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/library/PageResults.tsx": {
+    "fontSize": 4,
+    "fontWeight": 4,
+    "pressable": 3
+  },
+  "components/library/SearchBar.tsx": {
+    "fontSize": 1
+  },
+  "components/library/SelectAllButton.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/library/SelectionBar.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/library/SkeletonRows.tsx": {
+    "borderRadius": 1
+  },
+  "components/library/useDocumentListActions.tsx": {
+    "alert": 1
+  },
+  "components/onboarding/StudentCard.tsx": {
+    "fontSize": 8,
+    "hexColor": 1,
+    "borderRadius": 3,
+    "fontWeight": 5
+  },
+  "components/pro/FeatureList.tsx": {
+    "fontSize": 1,
+    "borderRadius": 1
+  },
+  "components/pro/ProBadge.tsx": {
+    "fontSize": 1
+  },
+  "components/pro/ProTaskResumeHost.tsx": {
+    "alert": 1
+  },
+  "components/pro/ProTaskSheet.tsx": {
+    "fontSize": 4,
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "pressable": 5,
+    "modal": 1
+  },
+  "components/pro/useProTask.tsx": {
+    "fontSize": 1
+  },
+  "components/reader/CellDetailSheet.tsx": {
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/reader/CsvGrid.tsx": {
+    "fontSize": 6,
+    "borderRadius": 1,
+    "fontWeight": 4,
+    "alert": 1,
+    "pressable": 5,
+    "modal": 1
+  },
+  "components/reader/DocumentPickerModal.tsx": {
+    "pressable": 2,
+    "modal": 1
+  },
+  "components/reader/DocxEditor.tsx": {
+    "pressable": 1
+  },
+  "components/reader/EditPagesModal.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 6,
+    "modal": 1
+  },
+  "components/reader/FileEditor.tsx": {
+    "fontSize": 5,
+    "fontWeight": 3,
+    "alert": 4,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/reader/FindBar.tsx": {
+    "fontSize": 2,
+    "pressable": 3
+  },
+  "components/reader/FormFillSheet.tsx": {
+    "fontSize": 8,
+    "fontWeight": 3,
+    "alert": 1,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/reader/NotesSheet.tsx": {
+    "fontSize": 6,
+    "borderRadius": 2,
+    "fontWeight": 5,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/reader/OutlineList.tsx": {
+    "pressable": 1
+  },
+  "components/reader/OverflowSheet.tsx": {
+    "fontSize": 1,
+    "borderRadius": 1,
+    "pressable": 2,
+    "modal": 1
+  },
+  "components/reader/PageScrubberSheet.tsx": {
+    "fontSize": 1,
+    "hexColor": 1,
+    "borderRadius": 2,
+    "fontWeight": 2,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/reader/PageTextSheet.tsx": {
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "pressable": 2,
+    "modal": 1
+  },
+  "components/reader/ReaderDocumentView.tsx": {
+    "alert": 1
+  },
+  "components/reader/ReaderLoadProblem.tsx": {
+    "fontSize": 1,
+    "borderRadius": 2,
+    "fontWeight": 2,
+    "pressable": 4
+  },
+  "components/reader/ReaderToolBar.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/reader/ReaderTopChrome.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 6
+  },
+  "components/reader/ReadingSettingsSheet.tsx": {
+    "fontSize": 4,
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "pressable": 2,
+    "modal": 1
+  },
+  "components/reader/SheetView.tsx": {
+    "fontSize": 1,
+    "fontWeight": 2,
+    "pressable": 4
+  },
+  "components/reader/TxtView.tsx": {
+    "fontSize": 2,
+    "pressable": 1
+  },
+  "components/reader/surface/FastScroller.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1
+  },
+  "components/reader/surface/MarkToolbar.tsx": {
+    "fontSize": 5,
+    "borderRadius": 1,
+    "fontWeight": 4,
+    "pressable": 6
+  },
+  "components/reader/surface/PagePill.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1
+  },
+  "components/reader/surface/SelectionMenu.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1,
+    "pressable": 3
+  },
+  "components/reader/surface/SignBar.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1,
+    "pressable": 2
+  },
+  "components/reader/useConvertToPdf.tsx": {
+    "fontSize": 1,
+    "alert": 1
+  },
+  "components/reader/useConvertToWord.tsx": {
+    "alert": 1
+  },
+  "components/reader/useEditFile.tsx": {
+    "alert": 1
+  },
+  "components/reader/useFillForm.tsx": {
+    "alert": 2
+  },
+  "components/review/AdjustPanel.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/review/AdjustSlider.tsx": {
+    "fontSize": 2,
+    "borderRadius": 2,
+    "fontWeight": 1
+  },
+  "components/review/ContextBar.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/review/CropOverlay.tsx": {
+    "fontSize": 4,
+    "hexColor": 4,
+    "fontWeight": 3,
+    "pressable": 5,
+    "modal": 1
+  },
+  "components/review/FilterOptionsPanel.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/review/FilterStrip.tsx": {
+    "fontSize": 1,
+    "fontWeight": 2,
+    "pressable": 1
+  },
+  "components/review/GridPagesModal.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/review/PagePeekCarousel.tsx": {
+    "borderRadius": 1
+  },
+  "components/review/PreviewControls.tsx": {
+    "hexColor": 2,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/review/ProcessingProgress.tsx": {
+    "fontSize": 2,
+    "borderRadius": 1,
+    "fontWeight": 2,
+    "pressable": 1
+  },
+  "components/review/ThumbnailStrip.tsx": {
+    "fontSize": 3,
+    "hexColor": 3,
+    "borderRadius": 4,
+    "fontWeight": 2,
+    "pressable": 3
+  },
+  "components/security/AppLockGate.tsx": {
+    "fontSize": 2,
+    "borderRadius": 1,
+    "pressable": 1
+  },
+  "components/settings/AccentPicker.tsx": {
+    "fontSize": 2,
+    "borderRadius": 2,
+    "pressable": 1
+  },
+  "components/settings/AppLockSection.tsx": {
+    "fontSize": 2
+  },
+  "components/settings/LanguageRow.tsx": {
+    "fontSize": 3,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/settings/NameTemplateSection.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 2
+  },
+  "components/settings/ProfileSection.tsx": {
+    "fontSize": 4,
+    "fontWeight": 2,
+    "pressable": 2
+  },
+  "components/settings/SettingRow.tsx": {
+    "fontSize": 3,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/shared/EmptyState.tsx": {
+    "fontSize": 4,
+    "fontWeight": 2,
+    "pressable": 2
+  },
+  "components/shared/Hint.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/shared/PageGrid.tsx": {
+    "fontSize": 1,
+    "hexColor": 3,
+    "borderRadius": 3,
+    "fontWeight": 1,
+    "pressable": 2
+  },
+  "components/shared/SegmentedControl.tsx": {
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/shared/SignatureCaptureModal.tsx": {
+    "fontSize": 3,
+    "hexColor": 1,
+    "fontWeight": 2,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/shared/SignatureModal.tsx": {
+    "fontSize": 3,
+    "hexColor": 1,
+    "fontWeight": 2,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/shared/SignaturePad.tsx": {
+    "hexColor": 6
+  },
+  "components/shared/SignaturePlacementOverlay.tsx": {
+    "fontSize": 3,
+    "hexColor": 2,
+    "fontWeight": 2,
+    "pressable": 4,
+    "modal": 1
+  },
+  "components/shared/Snackbar.tsx": {
+    "fontSize": 2,
+    "hexColor": 2,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "components/shared/TabBar.tsx": {
+    "pressable": 1
+  },
+  "components/shared/TextPromptModal.tsx": {
+    "fontSize": 4,
+    "fontWeight": 3,
+    "pressable": 2,
+    "modal": 1
+  },
+  "components/study/PagePickerModal.tsx": {
+    "fontSize": 4,
+    "fontWeight": 4,
+    "pressable": 3,
+    "modal": 1
+  },
+  "components/submit/SubmissionList.tsx": {
+    "fontSize": 3,
+    "fontWeight": 2,
+    "pressable": 2
+  },
+  "components/submit/SubmissionsSheet.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1,
+    "modal": 1
+  },
+  "components/submit/SubmittedFilterChips.tsx": {
+    "fontSize": 1,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "screens/AcademicOptionsScreen.tsx": {
+    "fontSize": 9,
+    "fontWeight": 6,
+    "alert": 1,
+    "pressable": 5
+  },
+  "screens/BackupScreen.tsx": {
+    "fontSize": 2,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "screens/CaptureScreen.tsx": {
+    "fontSize": 5,
+    "hexColor": 2,
+    "fontWeight": 3,
+    "pressable": 2
+  },
+  "screens/CourseScreen.tsx": {
+    "fontSize": 7,
+    "borderRadius": 3,
+    "fontWeight": 5,
+    "pressable": 13
+  },
+  "screens/DeliverScreen.tsx": {
+    "fontSize": 15,
+    "borderRadius": 2,
+    "fontWeight": 6,
+    "pressable": 4
+  },
+  "screens/ExamPackScreen.tsx": {
+    "fontSize": 6,
+    "fontWeight": 3,
+    "pressable": 7
+  },
+  "screens/HomeScreen.tsx": {
+    "fontSize": 10,
+    "fontWeight": 7,
+    "alert": 1,
+    "pressable": 10
+  },
+  "screens/LibraryScreen.tsx": {
+    "fontSize": 2,
+    "borderRadius": 1,
+    "fontWeight": 1,
+    "pressable": 5
+  },
+  "screens/ManageFoldersScreen.tsx": {
+    "pressable": 1
+  },
+  "screens/OnboardingScreen.tsx": {
+    "fontSize": 8,
+    "borderRadius": 2,
+    "fontWeight": 4,
+    "pressable": 2
+  },
+  "screens/ProScreen.tsx": {
+    "fontSize": 9,
+    "fontWeight": 4,
+    "pressable": 2
+  },
+  "screens/ReviewScreen.tsx": {
+    "fontSize": 11,
+    "borderRadius": 5,
+    "fontWeight": 9,
+    "pressable": 12
+  },
+  "screens/SettingsScreen.tsx": {
+    "fontSize": 5,
+    "borderRadius": 3,
+    "fontWeight": 1,
+    "pressable": 1
+  },
+  "screens/StorageScreen.tsx": {
+    "fontSize": 7,
+    "borderRadius": 4,
+    "fontWeight": 3,
+    "pressable": 4
+  }
+}

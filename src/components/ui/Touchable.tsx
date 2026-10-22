@@ -9,7 +9,7 @@ import { rippleColor } from './kitColors';
 // what a redesigned screen uses instead of a bare Pressable. One press feel everywhere: the Android
 // ripple in a token colour and a scale to 0.97 (none under reduced motion), plus an optional haptic
 // tick. accessibilityRole is required, so TalkBack always says what the thing is
-// (src/__tests__/a11yLabels.test.ts scans `<Touchable` too). Anything drawn smaller than 48 dp gets
+// (src/__tests__/a11yLabels.test.ts checks Touchables too). Anything drawn smaller than 48 dp gets
 // the rest as hitSlop, measured, so callers never compute it.
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);

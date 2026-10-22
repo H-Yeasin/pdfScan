@@ -10,26 +10,8 @@ import { slopFor } from '../Touchable';
 import { largeTitleHeight, visibleActions } from '../ScreenHeader';
 import { onDanger } from '../kitColors';
 
-// §17 U2: the kit renders with the states and names TalkBack reads. Reanimated needs its native
-// module, so the few hooks the kit uses are faked here: a shared value is a plain object and an
-// animated style is computed once.
-jest.mock('react-native-reanimated', () => {
-  const { View: RNView, Pressable, ScrollView } = jest.requireActual('react-native');
-  return {
-    __esModule: true,
-    default: { View: RNView, ScrollView, createAnimatedComponent: (c: unknown) => (c === Pressable ? Pressable : c) },
-    useSharedValue: (v: unknown) => ({ value: v }),
-    useAnimatedStyle: (style: () => object) => style(),
-    useAnimatedScrollHandler: () => () => {},
-    withSpring: (v: unknown) => v,
-    withTiming: (v: unknown) => v,
-    withRepeat: (v: unknown) => v,
-    cancelAnimation: () => {},
-    interpolate: () => 0,
-    Extrapolation: { CLAMP: 'clamp' },
-    Easing: { inOut: () => () => 0, quad: () => 0 },
-  };
-});
+// §17 U2: the kit renders with the states and names TalkBack reads. Reanimated is the shared
+// mock (src/test/mocks/reanimated.ts): an animated style is computed once.
 jest.mock('@expo/vector-icons', () => ({ Ionicons: (props: { name: string }) => `icon:${props.name}` }));
 
 const metrics = { frame: { x: 0, y: 0, width: 360, height: 780 }, insets: { top: 24, left: 0, right: 0, bottom: 0 } };

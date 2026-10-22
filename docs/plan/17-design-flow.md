@@ -397,7 +397,11 @@ As built (2026-10-22):
   is the app's; Android has no per-screen font scale, so the 1.3 check uses the phone's font size
   (the header shows the scale). Screenshot: not taken yet (needs the phone).
 - Ratchet: `src/__tests__/designSystem.test.ts` + `designSystem.baseline.json` (comments stripped;
-  `DESIGN_BASELINE=update` rewrites it). `a11yLabels.test.ts` now also scans `<Touchable`.
+  `DESIGN_BASELINE=update` rewrites it). Baseline: 119 files, `fontSize` 336, `fontWeight` 209,
+  `pressable` 283, `borderRadius` 66, `hexColor` 36, `modal` 30, `alert` 22.
+  `a11yLabels.test.ts` now also scans `<Touchable`.
+- Jest: a shared Reanimated mock, `src/test/mocks/reanimated.ts` (mapped in `jest.config.js`), since
+  every screen on the kit imports Reanimated; a test that needs more still mocks it itself.
 - Tests: `components/ui/__tests__/kit.test.tsx` (Text family/colour/caps, slop, Button busy/disabled and
   every look's contrast under every accent, IconButton, ListItem checkbox/switch, chips, TextField,
   ProgressBar, ScreenHeader).

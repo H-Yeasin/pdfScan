@@ -23,6 +23,7 @@ module.exports = {
     '^react-native-google-mobile-ads$': '<rootDir>/src/test/mocks/googleMobileAds.ts',
     '^expo-localization$': '<rootDir>/src/test/mocks/expoLocalization.ts',
     '^@shopify/react-native-skia$': '<rootDir>/src/test/mocks/skia.ts',
+    '^react-native-reanimated$': '<rootDir>/src/test/mocks/reanimated.ts',
     '^react-native-document-scanner-plugin$': '<rootDir>/src/test/mocks/documentScanner.ts',
     '/modules/pdf-native$': '<rootDir>/src/test/mocks/pdfNative.ts',
     '^@react-native-async-storage/async-storage$':
