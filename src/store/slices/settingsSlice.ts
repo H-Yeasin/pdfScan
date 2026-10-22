@@ -35,6 +35,9 @@ export type SettingsState = {
   // §10 M1: opt-in usage counts (M8's allow-listed Firebase Analytics events). Off by default,
   // like crash reports.
   usageStatsEnabled: boolean;
+  // §17 U9 (was Deliver's per-save "Also save a copy to device"): every saved scan is also copied to
+  // androidExportFolderUri. Android only; off by default.
+  copyScansToFolder: boolean;
   // Google's document scanner failed in a way that means it can't run on this phone (no or
   // outdated Play services); scans go straight to the basic camera fallback (scannerFallback.ts).
   scannerUnavailable: boolean;
@@ -107,6 +110,7 @@ export const initialSettingsState: SettingsState = {
   personalizedAdsEnabled: true,
   usageStatsEnabled: false,
   scannerUnavailable: false,
+  copyScansToFolder: false,
   lastOpened: null,
   recentOpened: [],
   profile: EMPTY_PROFILE,
@@ -155,6 +159,7 @@ export type SettingsAction =
   | { type: 'settings/SET_CRASH_REPORTS'; enabled: boolean }
   | { type: 'settings/SET_PERSONALIZED_ADS'; enabled: boolean }
   | { type: 'settings/SET_USAGE_STATS'; enabled: boolean }
+  | { type: 'settings/SET_COPY_SCANS'; enabled: boolean }
   | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
   | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
   | { type: 'settings/LOAD_RECENT_OPENED'; recent: LastOpened[] }
@@ -227,6 +232,8 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, personalizedAdsEnabled: action.enabled };
     case 'settings/SET_USAGE_STATS':
       return { ...state, usageStatsEnabled: action.enabled };
+    case 'settings/SET_COPY_SCANS':
+      return state.copyScansToFolder === action.enabled ? state : { ...state, copyScansToFolder: action.enabled };
     case 'settings/SET_SCANNER_UNAVAILABLE':
       return { ...state, scannerUnavailable: action.unavailable };
     case 'settings/SET_LAST_OPENED':

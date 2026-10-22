@@ -12,7 +12,8 @@ const SRC = join(__dirname, '../..');
 const EXEMPT_DIRS = ['dev'];
 
 // Literals that aren't language: the app's name, example values in a fixed format.
-const ALLOWED = new Set(['PDF Scan', 'PHY 101', 'PDF', 'JPG', 'A4', 'DOCX', 'XLSX', 'CSV', 'TXT', 'OCR']);
+// 'chevron' and 'more' are ListItem's `trailing` kinds (§17 U10's rows), not words.
+const ALLOWED = new Set(['PDF Scan', 'PHY 101', 'PDF', 'JPG', 'A4', 'DOCX', 'XLSX', 'CSV', 'TXT', 'OCR', 'chevron', 'more']);
 
 const PATTERNS: RegExp[] = [
   // JSX text: after a tag's closing '>' (never '=>' or a spaced comparison), up to a closing tag.

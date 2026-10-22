@@ -1,10 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, PixelRatio, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { AdjustPanel } from '../components/review/AdjustPanel';
 import { useLiveAdjust } from '../components/review/useLiveAdjust';
-import { ContextBar } from '../components/review/ContextBar';
+import { ReviewToolbar, type ReviewToolId } from '../components/review/ReviewToolbar';
+import { SuggestionChip } from '../components/review/SuggestionChip';
 import { CropOverlay } from '../components/review/CropOverlay';
 import { FilteredPreview } from '../components/review/FilteredPreview';
 import { FilterStrip } from '../components/review/FilterStrip';
@@ -14,14 +13,19 @@ import { PagePeekCarousel } from '../components/review/PagePeekCarousel';
 import { PreviewControls } from '../components/review/PreviewControls';
 import { ProcessingProgress } from '../components/review/ProcessingProgress';
 import { ThumbnailStrip } from '../components/review/ThumbnailStrip';
+import { askDiscardScan } from '../components/capture/askDiscardScan';
 import { SignatureCaptureModal } from '../components/shared/SignatureCaptureModal';
 import { SignaturePlacementOverlay } from '../components/shared/SignaturePlacementOverlay';
+import { Button, Menu, ScreenHeader, Text, Touchable, type MenuSection } from '../components/ui';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { useBackHandler } from '../navigation/useBackHandler';
 import { DEFAULT_ADJUST, isDefaultAdjust } from '../services/enhance/adjust';
+import { CAPTURE_MODES, getCaptureModeSpec } from '../services/capture/captureModes';
 import { masterGeometryKey } from '../services/capture/geometryKey';
-import { recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
+import { composeIdCardPages, recomposeIdCard, scanIdCardSide } from '../services/capture/idCardPages';
+import { splitSpreadPage } from '../services/capture/ingestBatch';
+import { reapplyMode } from '../services/capture/reapplyMode';
 import { cancelProcessing } from '../services/capture/processingSession';
 import { compositeHalfPages } from '../services/enhance/compositeHalfPages';
 import { getFilter } from '../services/enhance/filters/registry';
@@ -33,14 +37,16 @@ import type { PictureOverlay } from '../services/enhance/useFilteredPicture';
 import { runOcr } from '../services/ocr/ocrService';
 import { cleanTemporaryCache } from '../services/persistence/libraryFiles';
 import { drawAcademicStamp, hasContentPageStamp } from '../services/pdf/academicRasterService';
+import { reviewSuggestion, type Suggestion } from '../services/review/suggestion';
 import { applySignatureToPage } from '../services/signature/signatureCompositeService';
 import { saveSignatureForReuse } from '../services/signature/savedSignatureStorage';
-import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
+import { useAppDispatch, useAppSlices, useAppStore } from '../store/AppStateContext';
+import { defaultEnhanceFor } from '../store/slices/settingsSlice';
 import { useScanOcrScript } from '../store/useScanOcrScript';
-import { fontFamily, radii, spacing, typeScale, useTheme } from '../theme';
+import { ICONS, radii, spacing, useTheme, type IoniconName } from '../theme';
 import { createId } from '../utils/id';
 import { useResolvedAcademicConfig } from '../store/useDeliverContext';
-import type { AdjustValues, EnhanceMode, FilterOptions, IdCardSize, SessionPage, SourceImage } from '../types/models';
+import type { AdjustValues, CaptureMode, EnhanceMode, FilterOptions, IdCardSize, SessionPage, SourceImage } from '../types/models';
 import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/shared/Hint';
 import { useHint } from '../components/shared/useHint';
@@ -48,6 +54,17 @@ import { useGalleryImport } from '../store/useGalleryImport';
 import { useReducedMotion } from '../theme/useReducedMotion';
 
 const OCR_SPARSE_THRESHOLD = 6;
+
+type MoreId =
+  | 'retake'
+  | 'sign'
+  | 'searchable'
+  | 'deletePage'
+  | 'addPages'
+  | 'reorder'
+  | 'applyToAll'
+  | 'swapSides'
+  | 'retakeBack';
 
 type MergeCropState = {
   ids: [string, string];
@@ -58,8 +75,9 @@ type MergeCropState = {
 export function ReviewScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go } = useRouter();
+  const { go, back } = useRouter();
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const state = useAppSlices('capture', 'review', 'signature');
   // §6 L1: re-OCR and ID card sides use the filing course's script, like the original scan.
   const ocrScript = useScanOcrScript();
@@ -78,9 +96,18 @@ export function ReviewScreen() {
   // "Apply to all pages" right where the change was made. Cleared on page change or apply.
   const [offerApplyAll, setOfferApplyAll] = useState(false);
   const [comparing, setComparing] = useState(false);
-  const [adjustOpen, setAdjustOpen] = useState(false);
+  // §17 U9: the panel over the toolbar. The filter strip is open to start with (it's what most
+  // pages need); Adjust takes its place while open.
+  const [panel, setPanel] = useState<'filter' | 'adjust' | null>('filter');
+  const adjustOpen = panel === 'adjust';
   // §9 O1: Android back closes the Adjust panel before leaving Review.
-  useBackHandler(() => setAdjustOpen(false), adjustOpen);
+  useBackHandler(() => setPanel('filter'), adjustOpen);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [modeOpen, setModeOpen] = useState(false);
+  // The mode being re-applied (Book split, ID card compose): nothing else changes the pages meanwhile.
+  const [modeBusy, setModeBusy] = useState<CaptureMode | null>(null);
+  // Suggestions closed with ×, by suggestionKey (per page; the crop check for the session).
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
   const [mergeCrop, setMergeCrop] = useState<MergeCropState>(null);
 
   const selectedPage = pages[sel] ?? pages[0];
@@ -88,6 +115,8 @@ export function ReviewScreen() {
   const coverConfig = academicConfig?.coverPage;
   const currentAdjust = selectedPage?.adjust ?? DEFAULT_ADJUST;
   const adjustable = selectedPage ? getFilter(selectedPage.enhance).adjustable : true;
+  // A filter with nothing to adjust (picked while Adjust was open) shows the filter strip instead.
+  const shownPanel = panel === 'adjust' && !adjustable ? 'filter' : panel;
 
   // §16 G7: the slider values under the finger, as shared values. The sliders write them and the
   // preview draws from them on the UI thread, so this screen doesn't render while one is dragged;
@@ -249,6 +278,8 @@ export function ReviewScreen() {
     dispatch({ type: 'capture/ROTATE_PAGE', id: selectedPage.id });
   }, [dispatch, selectedPage]);
 
+  // "Make text searchable" (More): the page is read again, for when the automatic reading found
+  // little (a faint page, then B&W).
   const handleOcr = useCallback(async () => {
     if (!selectedPage || ocrRunning) return;
     dispatch({ type: 'review/SET_OCR_RUNNING', running: true });
@@ -281,15 +312,70 @@ export function ReviewScreen() {
     dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
   }, [dispatch, selectedPage]);
 
-  const handleContextBarPress = useCallback(
-    (id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'sign') => {
+  const handleAddPages = useCallback(() => {
+    dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+    dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
+  }, [dispatch]);
+
+  // §17 U9: the × asks before the unsaved scan goes, as Android Back does, then returns to the tab
+  // the scan was started on.
+  const handleClose = useCallback(() => {
+    const count = store.getState().capture.pages.length;
+    if (count === 0) {
+      dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
+      back();
+      return;
+    }
+    askDiscardScan(dispatch, count, back);
+  }, [dispatch, store, back]);
+
+  // §17 U9: the mode after scanning. The session is made again as if scanned in `to`
+  // (services/capture/reapplyMode.ts), as one undo step that also puts the mode back.
+  const handleModeChange = useCallback(
+    async (to: CaptureMode) => {
+      const { capture, settings } = store.getState();
+      if (to === capture.mode || modeBusy || scanProcessing) return;
+      const from = capture.mode;
+      const before = capture.pages;
+      const label = t(getCaptureModeSpec(to).labelKey);
+      setModeBusy(to);
+      try {
+        const pagesNext = await reapplyMode(
+          { pages: before, from, to, fromEnhance: defaultEnhanceFor(settings, from), toEnhance: defaultEnhanceFor(settings, to), script: ocrScript },
+          { splitSpreadPage, composeIdCardPages: (run, script) => composeIdCardPages(run, script, { keepThumbs: true }), createId }
+        );
+        // Something else changed the pages meanwhile (a page still coming in, a delete): this
+        // result was made from the old ones, so it isn't applied.
+        if (store.getState().capture.pages !== before) throw new Error('pages changed while switching mode');
+        dispatch({ type: 'capture/APPLY_MODE', mode: to, pages: pagesNext });
+        dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: to });
+        dispatch({ type: 'review/SELECT_PAGE', index: Math.min(store.getState().review.sel, Math.max(0, pagesNext.length - 1)) });
+        dispatch({
+          type: 'ui/SHOW_SNACK',
+          msg: t('review.modeSheet.applied', { mode: label }),
+          action: t('review.undo'),
+          onAction: () => dispatch({ type: 'review/UNDO' }),
+        });
+      } catch (error) {
+        console.warn('ReviewScreen: mode switch failed', error);
+        dispatch({ type: 'ui/SHOW_SNACK', msg: t('review.modeSheet.failed') });
+      } finally {
+        setModeBusy(null);
+      }
+    },
+    [dispatch, store, modeBusy, scanProcessing, ocrScript, t]
+  );
+
+  const handleToolPress = useCallback(
+    (id: ReviewToolId) => {
       if (id === 'crop') setCropTarget(selectedPage?.id ?? null);
       else if (id === 'rotate') handleRotate();
-      else if (id === 'retake') handleRetake();
-      else if (id === 'ocr') handleOcr();
-      else if (id === 'sign') handleSignPress();
+      else if (id === 'filter') setPanel((open) => (open === 'filter' ? null : 'filter'));
+      else if (id === 'adjust') setPanel((open) => (open === 'adjust' ? 'filter' : 'adjust'));
+      else if (id === 'mode') setModeOpen(true);
+      else setMoreOpen(true);
     },
-    [selectedPage, handleRotate, handleOcr, handleRetake, handleSignPress]
+    [selectedPage, handleRotate]
   );
 
   const handleCropConfirm = useCallback(
@@ -311,7 +397,7 @@ export function ReviewScreen() {
   // §9 O3: "Swipe to try filters", once, when nothing covers the strip.
   const filterHint = useHint(
     'reviewFilters',
-    !!selectedPage && !adjustOpen && !cropTarget && !gridOpen && signStep === null && !mergeCrop && !checkingCrops
+    !!selectedPage && shownPanel === 'filter' && !cropTarget && !gridOpen && signStep === null && !mergeCrop && !checkingCrops && !moreOpen && !modeOpen
   );
   const importFromGallery = useGalleryImport();
   useEffect(() => {
@@ -423,8 +509,6 @@ export function ReviewScreen() {
     [selectedPage, capturedSignature, dispatch, sel]
   );
 
-  const showErrHint = !!selectedPage?.err && selectedPage.enhance !== 'bw';
-
   // ID card mode: recompose the page (real size or large) from its kept card images.
   const [idCardBusy, setIdCardBusy] = useState(false);
   const updateIdCard = useCallback(
@@ -488,90 +572,175 @@ export function ReviewScreen() {
     dispatch({ type: 'ui/SHOW_SNACK', msg: t('review.spreadRestored') });
   }, [dispatch, pages, selectedPage]);
 
+  // §17 U9: one suggestion at a time, the most important (services/review/suggestion.ts).
+  const suggestion = reviewSuggestion({
+    page: selectedPage,
+    mode: state.capture.mode,
+    cropCheckCount: cropCheckPages.length,
+    processing: scanProcessing,
+    dismissed,
+  });
+  const dismissSuggestion = useCallback((key: string) => {
+    setDismissed((prev) => new Set(prev).add(key));
+  }, []);
+
+  const handleMoreSelect = useCallback(
+    (id: MoreId) => {
+      if (!selectedPage) return;
+      switch (id) {
+        case 'retake':
+          return handleRetake();
+        case 'sign':
+          return handleSignPress();
+        case 'searchable':
+          return void handleOcr();
+        case 'deletePage':
+          return handleDeletePage(selectedPage.id);
+        case 'addPages':
+          return handleAddPages();
+        case 'reorder':
+          return setGridOpen(true);
+        case 'applyToAll':
+          return handleApplyToAll();
+        case 'swapSides':
+          return handleSwapIdSides();
+        case 'retakeBack':
+          return handleRetakeIdBack();
+      }
+    },
+    [selectedPage, handleRetake, handleSignPress, handleOcr, handleDeletePage, handleAddPages, handleApplyToAll, handleSwapIdSides, handleRetakeIdBack]
+  );
+
+  const moreSections = useMemo((): MenuSection<MoreId>[] => {
+    const card = selectedPage?.idCard;
+    return [
+      {
+        items: [
+          { id: 'retake', label: t('review.more.retake'), icon: ICONS.camera },
+          { id: 'sign', label: t('review.more.sign'), icon: ICONS.sign },
+          { id: 'searchable', label: t('review.more.searchable'), hint: t('review.more.searchableHint'), icon: ICONS.searchable, disabled: ocrRunning },
+          { id: 'deletePage', label: t('review.more.deletePage'), icon: ICONS.delete, destructive: true },
+        ],
+      },
+      {
+        items: [
+          { id: 'addPages', label: t('review.more.addPages'), icon: ICONS.addPage },
+          ...(multiPage
+            ? [
+                { id: 'reorder' as const, label: t('review.more.reorder'), icon: ICONS.reorder },
+                { id: 'applyToAll' as const, label: t('review.more.applyToAll'), icon: ICONS.applyToAll },
+              ]
+            : []),
+        ],
+      },
+      {
+        title: card ? t('review.more.idCard') : undefined,
+        items: card
+          ? [
+              ...(card.back ? [{ id: 'swapSides' as const, label: t('review.swapSides'), icon: ICONS.swapSides, disabled: idCardBusy }] : []),
+              { id: 'retakeBack', label: card.back ? t('review.retakeBack') : t('review.addBack'), icon: ICONS.retakeBack, disabled: idCardBusy },
+            ]
+          : [],
+      },
+    ];
+  }, [t, selectedPage?.idCard, ocrRunning, multiPage, idCardBusy]);
+
+  const modeSections = useMemo(
+    (): MenuSection<CaptureMode>[] => [
+      {
+        items: CAPTURE_MODES.map((spec) => ({
+          id: spec.id,
+          label: t(spec.labelKey),
+          hint: t(spec.hintKey),
+          icon: spec.icon,
+          badge: spec.id === state.capture.mode ? { label: t('review.modeSheet.current'), tone: 'accent' as const } : undefined,
+        })),
+      },
+    ],
+    [t, state.capture.mode]
+  );
+
   if (!selectedPage) {
     return (
       <View style={[styles.empty, { backgroundColor: tokens.bg }]}>
         {scanProcessing ? (
           <>
             <ActivityIndicator color={tokens.accent} size="large" />
-            <Text style={{ color: tokens.muted, marginTop: spacing.md }}>
+            <Text color="muted" style={styles.emptyLine}>
               {progress ? t('review.processingPage', { current: Math.min(progress.done + 1, progress.total), total: progress.total }) : t('capture.processingPages')}
             </Text>
-            {progress ? (
-              <Pressable onPress={cancelProcessing} hitSlop={8} style={{ marginTop: spacing.md }} accessibilityRole="button">
-                <Text style={{ color: tokens.accentInk, fontWeight: '600' }}>{t('common.cancel')}</Text>
-              </Pressable>
-            ) : null}
+            {progress ? <Button label={t('common.cancel')} variant="ghost" size="md" onPress={cancelProcessing} style={styles.emptyLine} /> : null}
           </>
         ) : (
-          <>
-            <EmptyState
-              title={t('review.empty')}
-              body={t('review.emptyBody')}
-              action={{
-                label: t('review.startCapture'),
-                onPress: () => {
-                  dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
-                  dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
-                },
-              }}
-              secondaryAction={{ label: t('capture.gallery'), onPress: () => void importFromGallery() }}
-            />
-          </>
+          <EmptyState
+            title={t('review.empty')}
+            body={t('review.emptyBody')}
+            action={{ label: t('review.startCapture'), onPress: handleAddPages }}
+            secondaryAction={{ label: t('capture.gallery'), onPress: () => void importFromGallery() }}
+          />
         )}
       </View>
     );
   }
 
+  const suggestionView = suggestion ? renderSuggestion(suggestion) : null;
+  function renderSuggestion(s: Suggestion) {
+    const page = selectedPage!;
+    const dismiss = () => dismissSuggestion(s.key);
+    const chip = (icon: IoniconName, message: string, action?: { label: string; onPress: () => void; disabled?: boolean }) => (
+      <SuggestionChip key={s.key} icon={icon} message={message} action={action} onDismiss={dismiss} />
+    );
+    switch (s.kind) {
+      case 'cropCheck':
+        return chip(ICONS.crop, t('review.cropCheck', { count: cropCheckPages.length }), {
+          label: t('review.checkCrops', { count: cropCheckPages.length }),
+          onPress: () => setCheckingCrops(true),
+        });
+      case 'lowContrast':
+        return chip(ICONS.enhance, t('review.suggest.lowContrast', { page: sel + 1 }), {
+          label: t('review.suggest.useBw'),
+          onPress: () => handleEnhanceChange('bw'),
+        });
+      case 'bookSpread':
+        return chip(ICONS.split, t('review.suggest.book'), {
+          label: t('review.suggest.split'),
+          onPress: () => void handleModeChange('book'),
+          disabled: !!modeBusy || scanProcessing,
+        });
+      case 'splitFrom':
+        return chip(ICONS.split, t('review.splitFrom'), { label: t('review.undoSplit'), onPress: handleUndoSplit });
+      case 'idCard': {
+        const large = page.idCard?.size === 'large';
+        return chip(
+          ICONS.cardSize,
+          idCardBusy ? t('review.idCardUpdating') : large ? t('review.idCardInfoLarge') : t('review.idCardInfo'),
+          { label: large ? t('review.idCardMakeReal') : t('review.idCardMakeLarge'), onPress: handleToggleIdSize, disabled: idCardBusy }
+        );
+      }
+    }
+  }
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
-      <View style={styles.header}>
-        {/* No on-screen Back (U9 redesigns this header). Android's back returns to the tab the scan
-            was started on, asking first while there are pages (§17 U5, navigation/backHandling.ts). */}
-        <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
-          {t('review.title')}
-        </Text>
-        <View style={styles.headerRight}>
-          <Pressable accessibilityRole="button"
-            style={styles.historyButton}
-            onPress={() => dispatch({ type: 'review/UNDO' })}
-            disabled={!canUndo}
-            hitSlop={4}
-            accessibilityLabel={t('review.undo')}
-          >
-            <Ionicons name="arrow-undo-outline" size={20} color={canUndo ? tokens.ink : tokens.edge} />
-          </Pressable>
-          <Pressable accessibilityRole="button"
-            style={styles.historyButton}
-            onPress={() => dispatch({ type: 'review/REDO' })}
-            disabled={!canRedo}
-            hitSlop={4}
-            accessibilityLabel={t('review.redo')}
-          >
-            <Ionicons name="arrow-redo-outline" size={20} color={canRedo ? tokens.ink : tokens.edge} />
-          </Pressable>
-          {multiPage && (
-            <Pressable
-              style={[styles.gridToggle, { borderColor: tokens.edge }]}
-              onPress={() => setGridOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel={t('review.grid.title')}
-            >
-              <Ionicons name="grid-outline" size={18} color={tokens.ink} />
-            </Pressable>
-          )}
-          <Pressable accessibilityRole="button" style={[styles.nextButton, { backgroundColor: tokens.accent }]} onPress={() => go('deliver')}>
-            <Text style={[styles.nextLabel, { color: tokens.onAccent }]}>{t('review.next')}</Text>
-            <Ionicons name="chevron-forward" size={18} color={tokens.onAccent} />
-          </Pressable>
-        </View>
-      </View>
+    <View style={[styles.container, { backgroundColor: tokens.bg }]}>
+      {/* §17 U9: × asks before the scan goes; Android Back does the same (navigation/backHandling.ts). */}
+      <ScreenHeader
+        title={t('review.title')}
+        subtitle={t('review.pageOf', { current: sel + 1, total: pages.length })}
+        back={handleClose}
+        backIcon={ICONS.close}
+        backLabel={t('review.close')}
+        actions={[
+          { icon: ICONS.undo, label: t('review.undo'), onPress: () => dispatch({ type: 'review/UNDO' }), disabled: !canUndo || !!modeBusy },
+          { icon: ICONS.redo, label: t('review.redo'), onPress: () => dispatch({ type: 'review/REDO' }), disabled: !canRedo || !!modeBusy },
+        ]}
+        trailing={<Button label={t('review.next')} size="md" onPress={() => go('deliver')} disabled={!!modeBusy} style={styles.next} testID="review-next" />}
+      />
 
       {progress ? (
         <ProcessingProgress done={progress.done} total={progress.total} onCancel={cancelProcessing} />
       ) : null}
 
-      <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: showRibbon ? 1 : 0 }]}>
+      <View style={[styles.ribbonTrack, { backgroundColor: tokens.edge, opacity: showRibbon || modeBusy ? 1 : 0 }]}>
         <Animated.View
           style={[
             styles.ribbonFill,
@@ -592,10 +761,7 @@ export function ReviewScreen() {
         selectedIndex={sel}
         onSelect={(index) => dispatch({ type: 'review/SELECT_PAGE', index })}
         onReorder={handleReorder}
-        onAddMore={() => {
-          dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
-          dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
-        }}
+        onAddMore={handleAddPages}
         onDelete={handleDeletePage}
         cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.mode === 'imported_image' ? coverConfig.importedUri : undefined } : null}
         onPressCover={() => go('academicOptions')}
@@ -628,11 +794,13 @@ export function ReviewScreen() {
           </View>
         )}
         {/* §16 G7: the page is here before its text is; over the preview, so nothing moves when it goes. */}
-        {selectedPage.ocrPending && (
+        {selectedPage.ocrPending || modeBusy ? (
           <View style={[styles.readingChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]} pointerEvents="none">
-            <Text style={[styles.readingLabel, { color: tokens.muted }]}>{t('review.readingText')}</Text>
+            <Text variant="caption" color="muted">
+              {modeBusy ? t('review.modeSheet.applying', { mode: t(getCaptureModeSpec(modeBusy).labelKey) }) : t('review.readingText')}
+            </Text>
           </View>
-        )}
+        ) : null}
         <PreviewControls
           showCompare={showCompare}
           comparing={comparing}
@@ -641,101 +809,35 @@ export function ReviewScreen() {
         />
       </View>
 
-      {cropCheckPages.length > 0 && !scanProcessing && (
-        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
-            {t('review.cropCheck', { count: cropCheckPages.length })}
-          </Text>
-          <Pressable onPress={() => setCheckingCrops(true)} hitSlop={8} accessibilityRole="button">
-            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
-              {t('review.checkCrops', { count: cropCheckPages.length })}
-            </Text>
-          </Pressable>
-        </View>
-      )}
+      {suggestionView}
 
-      {selectedPage.idCard && (
-        <View style={[styles.splitChip, styles.chipWrap, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>
-            {idCardBusy
-              ? t('review.idCardUpdating')
-              : selectedPage.idCard.size === 'large'
-                ? t('review.idCardInfoLarge')
-                : t('review.idCardInfo')}
-          </Text>
-          <Pressable onPress={handleToggleIdSize} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
-            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
-              {selectedPage.idCard.size === 'large' ? t('review.idCardMakeReal') : t('review.idCardMakeLarge')}
-            </Text>
-          </Pressable>
-          {selectedPage.idCard.back && (
-            <Pressable onPress={handleSwapIdSides} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
-              <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('review.swapSides')}</Text>
-            </Pressable>
+      {shownPanel ? (
+        <View style={styles.enhanceWrap}>
+          {offerApplyAll ? (
+            <Touchable accessibilityRole="button" style={[styles.applyAllButton, { backgroundColor: tokens.accentSoft }]} onPress={handleApplyToAll}>
+              <Text variant="caption" weight="semibold" color="accentInk" chrome>
+                {t('review.applyToAll')}
+              </Text>
+            </Touchable>
+          ) : null}
+          {shownPanel === 'adjust' ? (
+            <AdjustPanel value={currentAdjust} live={liveAdjust} onCommit={handleAdjustCommit} />
+          ) : (
+            <>
+              {filterHint.visible ? (
+                <Hint text={t('shared.hint.reviewFilters')} onDismiss={filterHint.dismiss} arrow="down" style={styles.filterHint} />
+              ) : null}
+              <FilterStrip page={selectedPage} value={selectedPage.enhance} onChange={handleEnhanceChange} />
+              <FilterOptionsPanel mode={selectedPage.enhance} value={selectedPage.filterOptions} onChange={handleFilterOptionsChange} />
+            </>
           )}
-          <Pressable onPress={handleRetakeIdBack} disabled={idCardBusy} hitSlop={8} accessibilityRole="button">
-            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>
-              {selectedPage.idCard.back ? t('review.retakeBack') : t('review.addBack')}
-            </Text>
-          </Pressable>
         </View>
-      )}
+      ) : null}
 
-      {selectedPage.splitFrom && (
-        <View style={[styles.splitChip, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={{ color: tokens.muted, fontSize: 13, flex: 1 }}>{t('review.splitFrom')}</Text>
-          <Pressable onPress={handleUndoSplit} hitSlop={8} accessibilityRole="button">
-            <Text style={{ color: tokens.accentInk, fontSize: 13, fontWeight: '600' }}>{t('review.undoSplit')}</Text>
-          </Pressable>
-        </View>
-      )}
+      <ReviewToolbar onPress={handleToolPress} open={shownPanel} adjustable={adjustable} busy={!!modeBusy} />
 
-      {showErrHint && (
-        <View style={[styles.errHint, { backgroundColor: `${tokens.danger}1A` }]}>
-          <Text style={{ color: tokens.danger, fontSize: 13, fontWeight: '500' }}>
-            {t('review.lowContrast', { page: sel + 1 })}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.enhanceWrap}>
-        {(offerApplyAll || adjustable) && (
-          <View style={styles.enhanceHeaderRow}>
-            {offerApplyAll && (
-              <Pressable accessibilityRole="button"
-                style={[styles.applyAllButton, { backgroundColor: tokens.accentSoft }]}
-                onPress={handleApplyToAll}
-                hitSlop={4}
-              >
-                <Ionicons name="copy-outline" size={15} color={tokens.accentInk} />
-                <Text style={[styles.headerToggleLabel, { color: tokens.accentInk }]}>{t('review.applyToAll')}</Text>
-              </Pressable>
-            )}
-            {adjustable && (
-              <Pressable accessibilityRole="button" style={styles.headerToggle} onPress={() => setAdjustOpen((v) => !v)} hitSlop={4}>
-                <Ionicons name="options-outline" size={18} color={adjustOpen ? tokens.accent : tokens.muted} />
-                <Text style={[styles.headerToggleLabel, { color: adjustOpen ? tokens.accentInk : tokens.muted }]}>
-                  {t('review.adjust')}
-                </Text>
-              </Pressable>
-            )}
-          </View>
-        )}
-        {adjustOpen && adjustable && (
-          <AdjustPanel value={currentAdjust} live={liveAdjust} onCommit={handleAdjustCommit} />
-        )}
-        {filterHint.visible ? (
-          <Hint text={t('shared.hint.reviewFilters')} onDismiss={filterHint.dismiss} arrow="down" style={styles.filterHint} />
-        ) : null}
-        <FilterStrip page={selectedPage} value={selectedPage.enhance} onChange={handleEnhanceChange} />
-        <FilterOptionsPanel
-          mode={selectedPage.enhance}
-          value={selectedPage.filterOptions}
-          onChange={handleFilterOptionsChange}
-        />
-      </View>
-
-      <ContextBar onPress={handleContextBarPress} ocrRunning={ocrRunning} />
+      <Menu visible={moreOpen} onClose={() => setMoreOpen(false)} onSelect={handleMoreSelect} sections={moreSections} title={t('review.more.title')} />
+      <Menu visible={modeOpen} onClose={() => setModeOpen(false)} onSelect={(mode) => void handleModeChange(mode)} sections={modeSections} title={t('review.modeSheet.title')} />
 
       {cropTarget && selectedPage && (
         <CropOverlay
@@ -798,7 +900,7 @@ export function ReviewScreen() {
           onRedraw={handleRedraw}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -811,48 +913,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyLine: {
+    marginTop: spacing.md,
+  },
   filterHint: {
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  // In the row (not absolutely centred) so it can never sit under undo/redo/grid/Next.
-  title: {
-    flex: 1,
-    paddingHorizontal: spacing.sm,
-    fontFamily: fontFamily.heading,
-    fontSize: typeScale.title.fontSize,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  gridToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 44,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
-  },
-  nextLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+  next: {
+    marginLeft: spacing.xs,
+    marginRight: spacing.sm,
   },
   ribbonTrack: {
     height: 3,
@@ -867,7 +937,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginHorizontal: spacing.xl,
     marginVertical: spacing.sm,
-    borderRadius: 10,
+    borderRadius: radii.thumb,
     overflow: 'hidden',
   },
   previewLoading: {
@@ -888,59 +958,16 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  readingLabel: { ...typeScale.caption },
-  // Room for three actions (size, swap, retake) on a narrow phone.
-  chipWrap: { flexWrap: 'wrap', rowGap: spacing.xs },
-  splitChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  errHint: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    borderRadius: 16,
-  },
   enhanceWrap: {
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  enhanceHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: spacing.md,
     marginBottom: spacing.sm,
   },
-  historyButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   applyAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
     paddingHorizontal: spacing.md,
     height: 30,
     borderRadius: radii.full,
-    marginRight: 'auto',
-  },
-  headerToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  headerToggleLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    marginBottom: spacing.sm,
   },
 });

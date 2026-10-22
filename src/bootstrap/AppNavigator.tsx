@@ -1,7 +1,7 @@
 import { t } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { BootEffects } from './BootEffects';
-import { Alert, BackHandler, StyleSheet, View } from 'react-native';
+import { BackHandler, StyleSheet, View } from 'react-native';
 import { useRouter } from '../navigation/router';
 import { resolveBack, type BackContext } from '../navigation/backHandling';
 import { activeStack } from '../navigation/navStack';
@@ -19,7 +19,7 @@ import { ExportHost } from '../components/backup/ExportHost';
 import { ProTaskResumeHost } from '../components/pro/ProTaskResumeHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
 import { ScanLauncher } from '../components/capture/ScanLauncher';
-import { cancelProcessing } from '../services/capture/processingSession';
+import { askDiscardScan } from '../components/capture/askDiscardScan';
 import { useAppDispatch, useAppSelector, useAppStore } from '../store/AppStateContext';
 import { useAppFonts, useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
@@ -33,6 +33,7 @@ const SCREENS: ScreenMap = lazyScreens({
   course: () => (require('../screens/CourseScreen') as typeof import('../screens/CourseScreen')).CourseScreen,
   review: () => (require('../screens/ReviewScreen') as typeof import('../screens/ReviewScreen')).ReviewScreen,
   deliver: () => (require('../screens/DeliverScreen') as typeof import('../screens/DeliverScreen')).DeliverScreen,
+  done: () => (require('../screens/DoneScreen') as typeof import('../screens/DoneScreen')).DoneScreen,
   library: () => (require('../screens/LibraryScreen') as typeof import('../screens/LibraryScreen')).LibraryScreen,
   reader: () => (require('../screens/ReaderScreen') as typeof import('../screens/ReaderScreen')).ReaderScreen,
   settings: () => (require('../screens/SettingsScreen') as typeof import('../screens/SettingsScreen')).SettingsScreen,
@@ -161,24 +162,8 @@ export function AppNavigator() {
           go(step.to, 'back');
           return true;
         case 'confirmDiscard':
-          Alert.alert(t('shared.discardScan.title', { count: step.count }), t('shared.discardScan.body'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-              text: t('shared.discardScan.discard'),
-              style: 'destructive',
-              onPress: () => {
-                // A batch still coming in stops first, so no page lands in the emptied session.
-                cancelProcessing();
-                (require('../services/capture/ingestBatch') as typeof import('../services/capture/ingestBatch')).stopReadingText();
-                dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
-                dispatch({ type: 'capture/CLEAR_PAGES' });
-                dispatch({ type: 'review/RESET' });
-                // §17 U5: from Review, back to the tab the scan was started on.
-                if (step.then === 'pop') back();
-                else BackHandler.exitApp();
-              },
-            },
-          ]);
+          // §17 U5: from Review, back to the tab the scan was started on.
+          askDiscardScan(dispatch, step.count, () => (step.then === 'pop' ? back() : BackHandler.exitApp()));
           return true;
         case 'exit':
           // Android's default: the app goes to the background.

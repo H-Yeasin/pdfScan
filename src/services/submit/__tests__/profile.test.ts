@@ -1,4 +1,4 @@
-import { EMPTY_PROFILE, isProfileComplete, normalizeProfile } from '../profile';
+import { EMPTY_PROFILE, isProfileComplete, normalizeProfile, profileInitials } from '../profile';
 
 describe('isProfileComplete', () => {
   it('needs a name and a roll number', () => {
@@ -30,5 +30,18 @@ describe('normalizeProfile', () => {
       section: 'B',
       institution: '',
     });
+  });
+});
+
+describe('profileInitials', () => {
+  it('takes the first and last words', () => {
+    expect(profileInitials('Rahim Uddin')).toBe('RU');
+    expect(profileInitials('  md abdur  rahim ')).toBe('MR');
+    expect(profileInitials('Rahim')).toBe('R');
+  });
+
+  it("is '' without a name", () => {
+    expect(profileInitials('')).toBe('');
+    expect(profileInitials('   ')).toBe('');
   });
 });

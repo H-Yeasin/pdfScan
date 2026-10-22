@@ -14,6 +14,9 @@ import { Touchable } from './Touchable';
 // shows a checkbox in front of everything, so a selected row is visible without relying on a tint,
 // and TalkBack says "checkbox, checked". A row with a switch is the switch (role "switch"), so one
 // tap anywhere on it toggles.
+//
+// §17 U10: a row of a one-of-many choice passes `radioSelected` (a boolean): its role is "radio",
+// and the chosen row carries a checkmark at the end.
 
 // The leading icon's soft circle.
 export const ICON_WELL = 36;
@@ -30,6 +33,7 @@ export type ListItemProps = {
   switchValue?: boolean;
   onValueChange?: (value: boolean) => void;
   selected?: boolean;
+  radioSelected?: boolean;
   onPress?: () => void;
   onLongPress?: () => void;
   // When `trailing` is 'more': the ⋯ opens a menu on its own, apart from the row's onPress.
@@ -54,6 +58,7 @@ export function ListItem({
   switchValue,
   onValueChange,
   selected,
+  radioSelected,
   onPress,
   onLongPress,
   onMore,
@@ -70,11 +75,12 @@ export function ListItem({
   const { t } = useT();
   const selecting = selected !== undefined;
   const isSwitch = switchValue !== undefined;
+  const isRadio = radioSelected !== undefined;
   const ink = danger ? tokens.danger : tokens.ink;
 
   const press = isSwitch && !onPress ? () => onValueChange?.(!switchValue) : onPress;
-  const role = selecting ? 'checkbox' : isSwitch ? 'switch' : press ? 'button' : 'text';
-  const checked = selecting ? selected : isSwitch ? switchValue : undefined;
+  const role = selecting ? 'checkbox' : isSwitch ? 'switch' : isRadio ? 'radio' : press ? 'button' : 'text';
+  const checked = selecting ? selected : isSwitch ? switchValue : isRadio ? radioSelected : undefined;
 
   const body = (
     <>
@@ -118,6 +124,8 @@ export function ListItem({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
+      ) : isRadio ? (
+        <Ionicons name="checkmark" size={ICON_SIZE.row} color={radioSelected ? tokens.accent : 'transparent'} />
       ) : trailing === 'chevron' ? (
         <Ionicons name="chevron-forward" size={ICON_SIZE.row} color={tokens.muted} />
       ) : trailing === 'more' ? (

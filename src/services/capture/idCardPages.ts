@@ -25,8 +25,9 @@ export async function composeIdCardPage(
 // ID card mode post-processing for a batch: every two scanned pages become one composed page
 // (front, back); an odd last page becomes a front-only card. The per-card session pages are
 // dropped - their masters live on as `idCard.front/back`, only their thumbnails are deleted. If
-// composing fails, that pair is kept as plain pages rather than lost.
-export async function composeIdCardPages(pages: SessionPage[], script: OcrScript): Promise<SessionPage[]> {
+// composing fails, that pair is kept as plain pages rather than lost. `keepThumbs`: Review's mode
+// switch (§17 U9) can be undone, and the undone pages still show those thumbnails.
+export async function composeIdCardPages(pages: SessionPage[], script: OcrScript, options: { keepThumbs?: boolean } = {}): Promise<SessionPage[]> {
   const result: SessionPage[] = [];
   for (let i = 0; i < pages.length; i += 2) {
     const front = pages[i];
@@ -38,7 +39,7 @@ export async function composeIdCardPages(pages: SessionPage[], script: OcrScript
         script,
         front.enhance
       );
-      cleanTemporaryCache([front, back].flatMap((p) => (p?.thumbUri ? [p.thumbUri] : [])));
+      if (!options.keepThumbs) cleanTemporaryCache([front, back].flatMap((p) => (p?.thumbUri ? [p.thumbUri] : [])));
       result.push(card);
     } catch (error) {
       console.warn('composeIdCardPages: compose failed, keeping the scans as separate pages', error);

@@ -5,6 +5,7 @@ import {
   formatBytes,
   formatDate,
   getLocale,
+  hasLanguageChoice,
   isUiLanguage,
   registerCatalog,
   setUiLanguage,
@@ -136,5 +137,17 @@ describe('Intl formatter cache', () => {
     expect(formatDate(new Date(2026, 9, 3), { month: 'short', day: 'numeric' })).toBe('Oct 3');
     expect(built).not.toHaveBeenCalled();
     built.mockRestore();
+  });
+});
+
+// §17 U10: Me's language rows.
+describe('hasLanguageChoice', () => {
+  it('hides the language rows while English is the only catalog', () => {
+    expect(hasLanguageChoice()).toBe(false);
+    expect(hasLanguageChoice(['en'])).toBe(false);
+  });
+
+  it('shows them once a second language is added', () => {
+    expect(hasLanguageChoice(['en', 'bn'])).toBe(true);
   });
 });

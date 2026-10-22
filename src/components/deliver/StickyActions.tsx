@@ -1,52 +1,54 @@
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { radii, spacing, useTheme } from '../../theme';
+import { StyleSheet, View } from 'react-native';
 import { useT } from '../../i18n/useT';
+import { ICONS, spacing, useTheme } from '../../theme';
 import { BottomBar } from '../shared/BottomBar';
+import { Button, Text } from '../ui';
 
 type StickyActionsProps = {
   saving: boolean;
-  // Shown under the Save button while saving (e.g. "Preparing page 3 of 10…").
+  // Shown under the buttons while saving (e.g. "Preparing page 3 of 10…").
   progress?: string | null;
-  // §4 S6: save, build the teacher's copy and open the share sheet, in one tap.
-  onSubmit: () => void;
   onSave: () => void;
-  onSaveShare: () => void;
+  // §17 U9: opens the Submit sheet (the teacher's copy, §4 S6); Submit there saves and shares.
+  // Undefined: no Submit (pages going to the end of a saved document).
+  onSubmit?: () => void;
+  // What Submit will make, for this course ("Under 2 MB · Page numbers").
+  submitSummary?: string;
 };
 
-export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare }: StickyActionsProps) {
+// §17 U9: Save (the screen's one primary action) and Submit… beside it. "Save & Share" went: Done
+// offers Share right after the save.
+export function StickyActions({ saving, progress, onSave, onSubmit, submitSummary }: StickyActionsProps) {
   const { tokens } = useTheme();
   const { t } = useT();
 
   return (
     <BottomBar backgroundColor={tokens.bg}>
       <View style={styles.container}>
-        <Pressable accessibilityRole="button"
-          style={[styles.primary, { backgroundColor: tokens.accent, opacity: saving ? 0.7 : 1 }]}
-          onPress={onSubmit}
-          disabled={saving}
-          accessibilityLabel={t('deliver.actions.submitA11y')}
-        >
-          {saving ? <ActivityIndicator color={tokens.onAccent} /> : <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('deliver.actions.submit')}</Text>}
-        </Pressable>
+        <View style={styles.row}>
+          {onSubmit ? (
+            <Button
+              label={t('deliver.actions.submitMore')}
+              variant="tonal"
+              icon={ICONS.submit}
+              onPress={onSubmit}
+              disabled={saving}
+              accessibilityHint={submitSummary}
+              style={styles.flex}
+              testID="save-submit"
+            />
+          ) : null}
+          <Button label={t('deliver.actions.save')} icon={ICONS.save} onPress={onSave} loading={saving} style={styles.flex} testID="save-save" />
+        </View>
         {saving && progress ? (
-          <Text style={[styles.progress, { color: tokens.muted }]} accessibilityLiveRegion="polite">
+          <Text variant="caption" color="muted" align="center" accessibilityLiveRegion="polite">
             {progress}
           </Text>
-        ) : null}
-        <View style={styles.secondaryRow}>
-          <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSave} disabled={saving}>
-            <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.save')}</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" style={styles.ghost} onPress={onSaveShare} disabled={saving}>
-            <Text style={[styles.ghostLabel, { color: tokens.accentInk }]}>{t('deliver.actions.saveShare')}</Text>
-          </Pressable>
-        </View>
-        {Platform.OS === 'ios' && (
-          <Text style={[styles.shareHint, { color: tokens.muted }]}>
-            {t('deliver.actions.shareHintIos')}
+        ) : (
+          <Text variant="caption" color="muted" align="center" numberOfLines={1}>
+            {t('deliver.actions.footnote')}
           </Text>
         )}
-        <Text style={[styles.footnote, { color: tokens.muted }]}>{t('deliver.actions.footnote')}</Text>
       </View>
     </BottomBar>
   );
@@ -55,51 +57,13 @@ export function StickyActions({ saving, progress, onSubmit, onSave, onSaveShare 
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.md,
     paddingTop: spacing.md,
+    gap: spacing.sm,
   },
-  primary: {
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryLabel: {
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  progress: {
-    textAlign: 'center',
-    fontSize: 13,
-    marginTop: spacing.sm,
-  },
-  secondaryRow: {
+  row: {
     flexDirection: 'row',
+    gap: spacing.sm,
   },
-  ghost: {
-    flex: 1,
-    minHeight: 46,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ghostLabel: {
-    textAlign: 'center',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  shareHint: {
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  footnote: {
-    textAlign: 'center',
-    fontSize: 12.5,
-    marginTop: 2,
-  },
+  flex: { flex: 1 },
 });

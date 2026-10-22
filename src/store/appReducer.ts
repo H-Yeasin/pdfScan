@@ -37,12 +37,12 @@ export type AppAction =
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   if (action.type === 'review/UNDO' || action.type === 'review/REDO') {
-    const result = (action.type === 'review/UNDO' ? undo : redo)(state.capture.pages, state.review.history);
+    const result = (action.type === 'review/UNDO' ? undo : redo)(state.capture.pages, state.review.history, state.capture.mode);
     if (!result) return state;
     const sel = Math.min(state.review.sel, Math.max(0, result.pages.length - 1));
     return {
       ...state,
-      capture: { ...state.capture, pages: result.pages },
+      capture: { ...state.capture, pages: result.pages, mode: result.mode ?? state.capture.mode },
       review: { ...state.review, sel, history: result.history },
     };
   }
@@ -50,8 +50,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   const next = slicesReducer(state, action);
   if (action.type === 'capture/CLEAR_PAGES') return { ...next, review: { ...next.review, history: emptyHistory } };
   // Recorded against the pages as they were BEFORE the action, and only if it changed them.
-  const entry = next.capture.pages !== state.capture.pages ? historyEntryFor(state.capture.pages, action) : null;
-  if (!entry || !changedAnything(entry, next.capture.pages)) return next;
+  const touched = next.capture.pages !== state.capture.pages || next.capture.mode !== state.capture.mode;
+  const entry = touched ? historyEntryFor(state.capture.pages, action, state.capture.mode) : null;
+  if (!entry || !changedAnything(entry, next.capture.pages, next.capture.mode)) return next;
   return { ...next, review: { ...next.review, history: pushEntry(next.review.history, entry) } };
 }
 

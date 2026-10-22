@@ -35,6 +35,9 @@ export const initialCaptureState: CaptureState = {
 
 export type CaptureAction =
   | { type: 'capture/SET_MODE'; mode: CaptureMode }
+  // §17 U9: Review's Mode sheet. The session re-made for `mode` (services/capture/reapplyMode.ts)
+  // replaces the pages and the mode in one undo step (pageHistory).
+  | { type: 'capture/APPLY_MODE'; mode: CaptureMode; pages: SessionPage[] }
   | { type: 'capture/REQUEST_SCANNER'; requested: boolean }
   | { type: 'capture/REMOVE_PAGE'; id: string }
   | { type: 'capture/SET_RETAKE_TARGET'; id: string | null }
@@ -83,6 +86,8 @@ export function captureReducer(state: CaptureState, action: CaptureAction): Capt
   switch (action.type) {
     case 'capture/SET_MODE':
       return { ...state, mode: action.mode };
+    case 'capture/APPLY_MODE':
+      return state.mode === action.mode && state.pages === action.pages ? state : { ...state, mode: action.mode, pages: action.pages };
     case 'capture/SET_RETAKE_TARGET':
       return { ...state, retakeTargetId: action.id };
     case 'capture/REMOVE_PAGE':

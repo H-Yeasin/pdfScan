@@ -920,7 +920,8 @@ As built (2026-10-22):
   gate), `runPageTool` quiet in `components/library/__tests__/pageTools.test.ts`.
 
 ## U9 · Scan → Save → Done *(L)*
-Status: planned. JS only. Split point: (a) Review; (b) Save, the Submit sheet, Done and the pipeline move.
+Status: done in code (2026-10-22), both halves, ahead of U3–U4. JS only. Device check (Verification 9) open; never
+run on a phone. Split point: (a) Review; (b) Save, the Submit sheet, Done and the pipeline move.
 
 Goal: from scanner to saved file is clear and short, and the student always knows what happened.
 
@@ -969,8 +970,64 @@ spreads → 4 pages; undo restores 2); the suggestion priority; `hardcodedString
 
 Device check: Verification 9.
 
+As built (2026-10-22):
+- **Review** (`screens/ReviewScreen.tsx`, the kit): `ScreenHeader` with a × (`backIcon`/`backLabel`, new) that asks
+  before the scan goes (`components/capture/askDiscardScan.ts`, shared with Android Back in `AppNavigator`), "Page
+  2 of 5", Undo/Redo, and a `trailing` Next button (`ScreenHeader` took `trailing` for a text button). One
+  bottom bar, `components/review/ReviewToolbar.tsx`: Crop · Rotate · Filter · Adjust · Mode · More (`ContextBar`
+  is deleted). Filter and Adjust are panels over the bar, one at a time; the filter strip is open to start with.
+  More is a `Menu`: Retake, Sign, "Make text searchable" (was OCR), Delete this page; Add pages, Reorder
+  (`GridPagesModal`), Apply this look to all; and an "ID card" section (Swap sides, Retake/Add back).
+- **One suggestion chip** (`components/review/SuggestionChip.tsx`) over the bar, picked by the pure
+  `services/review/suggestion.ts` (`reviewSuggestion`, order `SUGGESTION_ORDER`): crops to check → a faint page
+  ("Use B&W") → a landscape page in Notes/Document ("Looks like a book. Split pages?" → switches to Book) →
+  "Undo split" → the ID card's print size. × closes it for that page (`suggestionKey`), kept for the session.
+- **Mode after scanning:** the Mode sheet (a `Menu` of the five modes) runs `services/capture/reapplyMode.ts`:
+  takes the old post-processing back (`undoPostProcess`: both halves of a spread → the spread; an ID card →
+  its front and back), moves pages still on the old mode's default filter to the new one's (a picked filter
+  stays), then runs the new one through `ingestBatch.splitSpreadPage` (out of `ingestOne`, shared) or
+  `composeIdCardPages(…, { keepThumbs: true })`. New files only. `capture/APPLY_MODE` sets the pages and the
+  mode as one undo step: a `'pages'` history entry now carries `mode`, and `undo`/`redo` put it back
+  (`pageHistory`, `appReducer`); `historyUris` also keeps a spread's and an ID card's images for the session
+  sweep. The doc type follows by itself (`deliver.docType` null), and the mode becomes `lastCaptureMode`. A
+  result made from pages that changed meanwhile is dropped ("Couldn't switch the mode").
+- **Save** (`screens/DeliverScreen.tsx`, id `deliver`, title "Save"): `PagePreviewStrip` (tap → that page in
+  Review), the name, Course and Type as kit `Chip`s (course → `FolderPickerModal`, type → a `Menu`; the
+  suggestion row `CourseChips` is deleted), Format, and "Size: Small · Medium · Original"
+  (`services/deliver/sizeChoice.ts`: quality 2 / 3 / 5) with "About {size}". `StickyActions` is Save + Submit…
+  (Save & Share went: Done has Share). Gone: "Margin: Small", the "More options" panel (`MoreOptionsPanel`,
+  `deliver.more`, `deliver.exportCopy` and their actions) and `QualitySlider`. The device-folder copy is now a
+  Me setting, `settings.copyScansToFolder` ("Copy every saved scan here", under Export when a folder is set).
+- **Behaviour change:** the course preset's size limit now applies to the teacher's copy only (Submit); a
+  Save is built at the size picked on the screen (it used to be fitted to the limit too, with the size row
+  hidden). The Size row says "Submit fits it under {size}" when there is a limit. `saveScan` keeps its
+  `sizeLimit` option (tested) for a later caller.
+- **`SubmitSheet`** (`components/deliver/SubmitSheet.tsx`, on `Sheet`): cover/footer/border → Academic options,
+  size target, the course's file-name template (U10's presets not yet), page layout, page size, include marks,
+  "Remember for {course}"; Submit saves, then shares (the profile prompt as before).
+- **`services/deliver/saveScan.ts`:** `saveScan(options, deps, onProgress)` → `{ doc, oversize }`, the old
+  `handleSaveInternal` loop with every file/Skia/OCR/pdf-lib call in `deps` (`loadSaveScanDeps()` requires the
+  real ones). New: a failure deletes the document's folder and the renders made for it and leaves the session's
+  files (it used to leave a half-written folder); the session's files are swept only after the document is
+  complete (`sessionUris`).
+- **Done** (`screens/DoneScreen.tsx`, screen `done`): a tick on `successSoft` (U4's `SuccessBurst` takes its
+  place), "Saved to {course}" (or "… and shared"), the notice (`deliver.done`, set by `deliver/SET_DONE`: the
+  device copy, a submission that didn't fit), the file's card, Open · Share · Submit (not after a submission) ·
+  Scan more (same course) · Done. `navStack`: `done` is in `SCAN_FLOW`, and going to it cuts the active stack
+  below Review, so Back or Done returns to where the scan was started; opening the file leaves Done behind. The
+  Undo / deadline snack still follows a save; after Undo, Done says the scan is gone.
+- Ratchet: the Alert behind Back's discard moved from `AppNavigator.tsx` into `askDiscardScan.ts` (a `.ts`, so
+  the ratchet doesn't count it; still one Alert until U3's Dialog).
+- Tests: `services/capture/__tests__/reapplyMode.test.ts` (Book split on 2 spreads → 4 pages, Undo → 2 and the
+  mode; ID card both ways; the filter rule), `services/review/__tests__/suggestion.test.ts`,
+  `services/deliver/__tests__/saveScan.test.ts` (order, one page at a time, scan-time OCR kept per
+  `geometryKey`, the export render, the academic copies, size limit, the sweep, failures leave nothing),
+  `screens/__tests__/DoneScreen.test.tsx`, `navigation/__tests__/navStack.test.ts` (Done).
+- Device check: Verification 9; never run on a phone.
+
 ## U10 · Me (Settings) *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-22), ahead of U3–U4. JS only. Device check (Verification 10) open; never run on a
+phone.
 
 Goal: Settings is short, grouped and friendly; the student's own card comes first.
 
@@ -1001,6 +1058,50 @@ Tests: presets produce the expected names (`naming.test.ts`); the language rows'
 `a11yLabels`, `hardcodedStrings`.
 
 Device check: Verification 10.
+
+As built (2026-10-22):
+- **Me** (`screens/SettingsScreen.tsx`, rebuilt on the kit): a large `ScreenHeader` "Me" over an
+  `Animated.ScrollView` (no SafeAreaView any more, so its `safeArea.test.ts` allowlist entry went), then
+  `ProfileCard`, Home's `ProPassCard` (shared, not copied), then the groups, each a
+  `components/settings/SettingsGroup.tsx` (an overline, one `Card` of `ListItem`s with `Divider`s between them
+  and a missing row leaving no divider; an optional footnote under the card). What needs more than a switch
+  opens a sheet over the tab; one `sheet` state, one open at a time.
+- **Groups**, in order: Scanning (Default scan mode = `settings.lastCaptureMode`; Filters; Recognition language;
+  Basic camera mode only while `scannerUnavailable`), **Courses** (Manage courses, Class times: not in the plan's
+  list, kept because nothing else reaches Class times), Reading (one row → the Reader's own
+  `ReadingSettingsSheet` with the page options), Files & backup (Backup, Storage, File names, and on Android
+  the export folder and "Copy every saved scan here"), Privacy & security (App lock, Crash reports, Usage
+  stats, Personalised ads; the ads note is the footnote), Appearance (Theme → a sheet, the accent swatches
+  inline), Language (hidden, see below), Help (WhatsApp, Email, Show the introduction), About (`BrandMark` +
+  version), Developer under `__DEV__` (now also the pseudo-locale switch, which used to be a language row).
+- **One-of-many choices** (scan mode, recognition script, theme, languages) are `components/settings/ChoiceSheet.tsx`:
+  radio rows on `Sheet`. `ListItem` took `radioSelected` (role "radio", a tick on the chosen row) for it;
+  a `Menu` can't show the current item. Planned scripts are listed disabled with "Coming soon".
+- **Filters per mode:** `components/settings/ScanFiltersSheet.tsx`, a row of `FilterChip`s per capture mode,
+  writing `settings/SET_DEFAULT_ENHANCE` (what Review's "Apply to all" sets). Ids from `filterIds`, not the
+  registry (it would bring the shaders with Me).
+- **Profile:** `ProfileCard` (initials on the accent from `submit/profile.profileInitials`, name, "roll ·
+  institution"; "Add your details" when empty) → `ProfileSheet` (the four fields, the logo through `AppImage`
+  with kit buttons). `ProfileSection.tsx` and `LanguageRow.tsx` are deleted; `SettingRow` stays for Backup,
+  Storage and Onboarding until U11.
+- **File names:** `components/settings/FileNamesSheet.tsx`: `submit/naming.NAME_PRESETS` with `namePresetFor`
+  (anything else is "custom"). Five presets, not four: the existing default `{roll}_{name}_{course}_{type}{n}`
+  ("Roll + name + course + type") comes first, since it is what a fresh install has and `suggestName`'s fallback
+  hangs off it; then the plan's four. Each shows its live example through `suggestName` (so the default shows
+  the fallback while the profile has no name or roll). Custom… opens `NameTemplateSection` (now just the editor
+  on the kit: field, token `Chip`s, example); the old "Reset to default" link went, the first preset is that.
+- **Language rows:** `i18n.hasLanguageChoice()` (more than one catalog); with English alone Me shows no language
+  group. Theme icons are inline (they are values, not actions); Me's row icons are new `ICONS` entries
+  (`recognition`, `language`, `fileNames`, `storage`, `exportFolder`, `hideInRecents`, `crashReports`,
+  `usageStats`, `ads`, `theme`, `whatsapp`, `email`, `intro`, `developer`).
+- Copy: `settings.title` is "Me"; the organisation section is "Courses", privacy "Privacy & security"; strings
+  nothing reads any more were removed (`settings.export.section`, `folderSubtitle`, `scanner.section`,
+  `storage.section`, `backup.screen.section`, `help.intro`, `help.whatsapp`/`email`, `fileNames.reset`).
+  `common.done` is new. `hardcodedStrings.test.ts` allows ListItem's `trailing` kinds `'chevron'`/`'more'`.
+- Tests: `naming.test.ts` (presets give the promised names, `namePresetFor`), `profile.test.ts`
+  (`profileInitials`), `i18n.test.ts` (`hasLanguageChoice`), `screens/__tests__/SettingsScreen.test.tsx` (the
+  card, no language rows, presets and Custom…, the default mode). Ratchet: Me and the settings components are at
+  zero hand-rolled styles, except `AccentPicker`, which keeps its own for now.
 
 ## U11 · Course, Exam pack, Pro and Onboarding *(M)*
 Status: planned. JS only. Needs U4.

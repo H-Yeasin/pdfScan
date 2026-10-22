@@ -14,7 +14,6 @@ export type DeliverState = {
   // §4 size target: the PDF is built to fit under this many bytes (services/submit/sizeTarget.ts)
   // and the quality slider is hidden. null = "Original", the slider decides.
   sizeLimitBytes: number | null;
-  more: boolean;
   // Course the saved document is filed under; null means Unsorted. Only used once the student has
   // chosen (coursePicked): until then the course is automatic, the top suggestion
   // (store/useFilingCourse).
@@ -24,8 +23,6 @@ export type DeliverState = {
   // The type the saved document gets. null = the capture mode's default (docTypes.defaultDocTypeFor),
   // so switching mode mid-session still changes it until the student picks one.
   docType: DocType | null;
-  // Android-only: also write a copy to the user's chosen device folder via SAF.
-  exportCopy: boolean;
   // Premium academic PDF export options (cover page, border, header/footer). No UI sets this yet;
   // it's plumbed through so buildPdfFromPages can receive it once that UI exists.
   academicConfig: AcademicConfig | null;
@@ -53,7 +50,14 @@ export type DeliverState = {
   // then edits the target's own `config` and never touches `academicConfig` above. Kept here, not
   // in the screen, so a detour to Pro (a locked cover template) doesn't lose the edits.
   coverTarget: CoverTarget | null;
+  // §17 U9: the scan just saved, for the Done screen. Set after the save's RESET; the next
+  // session's RESET clears it.
+  done: SavedScan | null;
 };
+
+// `submitted`: Submit (not Save) made it, so Done doesn't offer Submit again. `notice`: what else
+// there is to say (the size limit couldn't be met, the device copy failed).
+export type SavedScan = { docId: string; submitted: boolean; notice?: string };
 
 // `config` undefined: not edited yet, the screen starts from the document's course preset.
 export type CoverTarget = { docId: string; from: ScreenName; config?: AcademicConfig | null };
@@ -64,17 +68,16 @@ export const initialDeliverState: DeliverState = {
   format: 'PDF',
   quality: 3,
   sizeLimitBytes: null,
-  more: false,
   courseId: null,
   coursePicked: false,
   docType: null,
-  exportCopy: false,
   academicConfig: null,
   layoutMode: 'standard',
   pageSize: defaultPageSize(),
   rememberPreset: true,
   appendTo: null,
   coverTarget: null,
+  done: null,
 };
 
 export type DeliverAction =
@@ -85,12 +88,10 @@ export type DeliverAction =
   | { type: 'deliver/SET_FORMAT'; format: DocFormat }
   | { type: 'deliver/SET_QUALITY'; quality: number }
   | { type: 'deliver/SET_SIZE_LIMIT'; bytes: number | null }
-  | { type: 'deliver/TOGGLE_MORE' }
   | { type: 'deliver/SET_COURSE'; courseId: string | null }
   // Back to the automatic (suggested) course.
   | { type: 'deliver/AUTO_COURSE' }
   | { type: 'deliver/SET_DOC_TYPE'; docType: DocType | null }
-  | { type: 'deliver/TOGGLE_EXPORT_COPY' }
   | { type: 'deliver/SET_ACADEMIC_CONFIG'; config: AcademicConfig | null }
   | { type: 'deliver/SET_LAYOUT_MODE'; layoutMode: LayoutMode }
   | { type: 'deliver/SET_PAGE_SIZE'; pageSize: PageSizeId }
@@ -102,6 +103,7 @@ export type DeliverAction =
   | { type: 'deliver/SET_APPEND_TARGET'; documentId: string | null }
   | { type: 'deliver/SET_COVER_TARGET'; target: CoverTarget | null }
   | { type: 'deliver/SET_COVER_TARGET_CONFIG'; config: AcademicConfig | null }
+  | { type: 'deliver/SET_DONE'; done: SavedScan | null }
   | { type: 'deliver/RESET' };
 
 export function deliverReducer(state: DeliverState, action: DeliverAction): DeliverState {
@@ -116,16 +118,12 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
       return { ...state, quality: action.quality };
     case 'deliver/SET_SIZE_LIMIT':
       return { ...state, sizeLimitBytes: action.bytes };
-    case 'deliver/TOGGLE_MORE':
-      return { ...state, more: !state.more };
     case 'deliver/SET_COURSE':
       return { ...state, courseId: action.courseId, coursePicked: true };
     case 'deliver/AUTO_COURSE':
       return { ...state, courseId: null, coursePicked: false };
     case 'deliver/SET_DOC_TYPE':
       return { ...state, docType: action.docType };
-    case 'deliver/TOGGLE_EXPORT_COPY':
-      return { ...state, exportCopy: !state.exportCopy };
     case 'deliver/SET_ACADEMIC_CONFIG':
       return { ...state, academicConfig: action.config };
     case 'deliver/SET_LAYOUT_MODE':
@@ -170,6 +168,8 @@ export function deliverReducer(state: DeliverState, action: DeliverAction): Deli
     case 'deliver/SET_COVER_TARGET_CONFIG':
       return state.coverTarget ? { ...state, coverTarget: { ...state.coverTarget, config: action.config } } : state;
     // A new scan session; a cover being set up for a library document isn't part of it.
+    case 'deliver/SET_DONE':
+      return state.done === action.done ? state : { ...state, done: action.done };
     case 'deliver/RESET':
       return { ...initialDeliverState, coverTarget: state.coverTarget };
     default:

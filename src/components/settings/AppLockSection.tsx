@@ -1,21 +1,21 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useT } from '../../i18n/useT';
 import { useIsPro } from '../../services/pro/entitlement';
 import { canUseProFeature } from '../../services/pro/proFeatures';
 import { LOCK_AFTER_OPTIONS, type LockAfter } from '../../services/security/appLock';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { authenticate, hasDeviceLock } from '../../store/useAppLock';
-import { spacing, useTheme } from '../../theme';
+import { ICONS, spacing } from '../../theme';
+import { ProBadge } from '../pro/ProBadge';
 import { useOfferPro } from '../pro/useOfferPro';
 import { SegmentedControl } from '../shared/SegmentedControl';
-import { SettingRow } from './SettingRow';
+import { Divider, ICON_WELL, ListItem, Text } from '../ui';
 
-// §10 M4: Settings → Privacy's app lock rows. Turning the lock on needs Pro and a screen lock on
+// §10 M4: Me → Privacy & security's app lock rows (§17 U10: on the kit, inside the group's card). Turning the lock on needs Pro and a screen lock on
 // the phone, and is confirmed with the phone's unlock (so nobody locks themselves out by
 // accident). Turning it off is always allowed, after the same confirmation: the lock stays on
 // after Pro ends until then (lapse rule 'keepUntilOff').
 export function AppLockSection() {
-  const { tokens } = useTheme();
   const { t } = useT();
   const dispatch = useAppDispatch();
   const { appLock } = useAppSlices('settings').settings;
@@ -40,50 +40,63 @@ export function AppLockSection() {
   };
 
   return (
-    <>
-      <SettingRow
+    <View>
+      <ListItem
+        icon={ICONS.lock}
         title={t('settings.appLock.title')}
         subtitle={appLock.enabled && !isPro ? t('settings.appLock.keptAfterPro') : t('settings.appLock.subtitle')}
-        proBadge={!isPro && !appLock.enabled}
-        toggle={{ value: appLock.enabled, onChange: (enabled) => void setEnabled(enabled) }}
+        switchValue={appLock.enabled}
+        onValueChange={(enabled) => void setEnabled(enabled)}
       />
+      {!isPro && !appLock.enabled ? (
+        <View style={styles.badge}>
+          <ProBadge />
+        </View>
+      ) : null}
       {appLock.enabled && (
         <>
+          <Divider inset="icon" />
           <View style={styles.after}>
-            <Text style={[styles.label, { color: tokens.ink }]}>{t('settings.appLock.lockAfter')}</Text>
+            <Text variant="bodyStrong">{t('settings.appLock.lockAfter')}</Text>
             <SegmentedControl<LockAfter>
               segments={afterSegments}
               value={appLock.after}
               onChange={(after) => dispatch({ type: 'settings/SET_APP_LOCK', appLock: { after } })}
             />
-            <Text style={[styles.footnote, { color: tokens.muted }]}>{t('settings.appLock.lockAfterHint')}</Text>
+            <Text variant="caption" color="muted">
+              {t('settings.appLock.lockAfterHint')}
+            </Text>
           </View>
           {Platform.OS === 'android' && (
-            <SettingRow
-              title={t('settings.appLock.hideInRecents')}
-              subtitle={t('settings.appLock.hideInRecentsSubtitle')}
-              toggle={{
-                value: appLock.hideInRecents,
-                onChange: (hideInRecents) => dispatch({ type: 'settings/SET_APP_LOCK', appLock: { hideInRecents } }),
-              }}
-            />
+            <>
+              <Divider inset="icon" />
+              <ListItem
+                icon={ICONS.hideInRecents}
+                title={t('settings.appLock.hideInRecents')}
+                subtitle={t('settings.appLock.hideInRecentsSubtitle')}
+                switchValue={appLock.hideInRecents}
+                onValueChange={(hideInRecents) => dispatch({ type: 'settings/SET_APP_LOCK', appLock: { hideInRecents } })}
+              />
+            </>
           )}
         </>
       )}
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // The ProBadge sits under the title, lined up with the row's text.
+  badge: {
+    flexDirection: 'row',
+    paddingLeft: spacing.lg + ICON_WELL + spacing.md,
+    marginTop: -spacing.xs,
+    paddingBottom: spacing.sm,
+  },
   after: {
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  label: {
-    fontSize: 15,
-  },
-  footnote: {
-    fontSize: 12.5,
-    lineHeight: 17,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.lg,
+    paddingLeft: spacing.lg + ICON_WELL + spacing.md,
   },
 });

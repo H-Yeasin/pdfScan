@@ -55,6 +55,13 @@ export type ActionId =
   | 'adjust'
   | 'undo'
   | 'redo'
+  // §17 U9: Review's toolbar and More
+  | 'scanMode'
+  | 'searchable'
+  | 'applyToAll'
+  | 'swapSides'
+  | 'retakeBack'
+  | 'cardSize'
   // Read
   | 'find'
   | 'mark'
@@ -77,6 +84,21 @@ export type ActionId =
   | 'editCourse'
   | 'deadline'
   | 'timetable'
+  // §17 U10: Me's rows
+  | 'recognition'
+  | 'language'
+  | 'fileNames'
+  | 'storage'
+  | 'exportFolder'
+  | 'hideInRecents'
+  | 'crashReports'
+  | 'usageStats'
+  | 'ads'
+  | 'theme'
+  | 'whatsapp'
+  | 'email'
+  | 'intro'
+  | 'developer'
   // App
   | 'settings'
   | 'pro'
@@ -136,6 +158,12 @@ export const ICONS: Record<ActionId, IoniconName> = {
   adjust: 'options-outline',
   undo: 'arrow-undo-outline',
   redo: 'arrow-redo-outline',
+  scanMode: 'apps-outline',
+  searchable: 'search-circle-outline',
+  applyToAll: 'color-fill-outline',
+  swapSides: 'swap-horizontal-outline',
+  retakeBack: 'camera-reverse-outline',
+  cardSize: 'expand-outline',
 
   find: 'search-outline',
   mark: 'brush-outline',
@@ -158,6 +186,21 @@ export const ICONS: Record<ActionId, IoniconName> = {
   editCourse: 'settings-outline',
   deadline: 'alarm-outline',
   timetable: 'calendar-outline',
+
+  recognition: 'scan-circle-outline',
+  language: 'language-outline',
+  fileNames: 'document-attach-outline',
+  storage: 'server-outline',
+  exportFolder: 'folder-outline',
+  hideInRecents: 'eye-off-outline',
+  crashReports: 'bug-outline',
+  usageStats: 'stats-chart-outline',
+  ads: 'megaphone-outline',
+  theme: 'contrast-outline',
+  whatsapp: 'logo-whatsapp',
+  email: 'mail-outline',
+  intro: 'sparkles-outline',
+  developer: 'code-slash-outline',
 
   settings: 'cog-outline',
   pro: 'diamond-outline',

@@ -362,8 +362,8 @@ away: Home · Files · [Scan] · Tools · Me.
 - [x] U6 Home (done in code 2026-10-22; device check open)
 - [x] U7 Files: folders, filters, sort, grid, row menus, Rename, checkboxes, safe merge/split, import (done in code 2026-10-22; device check open)
 - [x] U8 Tools hub: every tool in one grid, pick → options → run → result, recently used (done in code 2026-10-22; device check open)
-- [ ] U9 Review → Save → Done (mode after scanning, Submit sheet, `saveScan.ts`)
-- [ ] U10 Me (Settings)
+- [x] U9 Review → Save → Done (mode after scanning, Submit sheet, `saveScan.ts`) (done in code 2026-10-22; device check open)
+- [x] U10 Me (Settings) (done in code 2026-10-22; device check open)
 - [ ] U11 Course, Exam pack, Pro, Onboarding
 - [ ] U12 Copy pass (UK spelling, sentence case, no jargon)
 - [ ] U13 Motion and feedback

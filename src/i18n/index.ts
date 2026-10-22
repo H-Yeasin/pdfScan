@@ -16,6 +16,13 @@ export type CatalogId = keyof typeof CATALOGS;
 // The languages Settings offers (taken once, so a test's registerCatalog doesn't add to it).
 export const CATALOG_IDS = Object.keys(CATALOGS) as CatalogId[];
 
+// §17 U10: Me shows the app and document language rows only when there is a choice to make. The
+// document language offers the same catalogs, so one count decides both; a second catalog in
+// CATALOGS brings the rows back by itself.
+export function hasLanguageChoice(ids: readonly string[] = CATALOG_IDS): boolean {
+  return ids.length > 1;
+}
+
 // What Settings stores: follow the phone, a catalog, or (developer builds) the pseudo-locale.
 export const PSEUDO_LOCALE = 'en-XA';
 export type UiLanguage = 'system' | CatalogId | typeof PSEUDO_LOCALE;

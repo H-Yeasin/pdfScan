@@ -170,4 +170,23 @@ describe('resolveGo: what router.go(to, dir) does', () => {
     const nav = go(go(initialNav('tools'), 'review').state, 'pro').state;
     expect(screens(nav)).toEqual(['tools', 'review', 'pro']);
   });
+
+  // §17 U9: Scan → Save → Done.
+  it('Done takes the place of Review and Save, so Back returns to where the scan started', () => {
+    const fromCourse = go(go(go(initialNav('home'), 'course').state, 'review').state, 'deliver').state;
+    const done = go(fromCourse, 'done').state;
+    expect(screens(done)).toEqual(['home', 'course', 'done']);
+    expect(screens(pop(done))).toEqual(['home', 'course']);
+  });
+
+  it('opening the saved file from Done leaves Done behind', () => {
+    const done = go(go(go(initialNav('library'), 'review').state, 'deliver').state, 'done').state;
+    expect(screens(go(done, 'reader').state)).toEqual(['library', 'reader']);
+  });
+
+  it('a scan started on another tab takes a finished Done off this one', () => {
+    const done = go(go(go(initialNav('library'), 'review').state, 'deliver').state, 'done').state;
+    const other = go(switchTab(done, 'home'), 'review').state;
+    expect(other.stacks.library.map((e) => e.screen)).toEqual(['library']);
+  });
 });

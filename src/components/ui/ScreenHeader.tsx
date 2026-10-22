@@ -53,7 +53,12 @@ export type ScreenHeaderProps = {
   title: string;
   subtitle?: string;
   back?: () => void;
+  // §17 U9: a flow's first screen closes instead (Review's ×, which asks first).
+  backIcon?: IoniconName;
+  backLabel?: string;
   actions?: HeaderAction[];
+  // After the actions: a screen's one text button ("Next"), which an icon can't say.
+  trailing?: ReactNode;
   onMore?: () => void;
   moreLabel?: string;
   large?: boolean;
@@ -97,7 +102,7 @@ export function useScreenHeader(options: { subtitle?: boolean } = {}): ScreenHea
   );
 }
 
-export function ScreenHeader({ title, subtitle, back, actions = [], onMore, moreLabel, large = false, scroll, insetTop = true, style }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, back, backIcon, backLabel, actions = [], trailing, onMore, moreLabel, large = false, scroll, insetTop = true, style }: ScreenHeaderProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const insets = useSafeAreaInsets();
@@ -107,7 +112,7 @@ export function ScreenHeader({ title, subtitle, back, actions = [], onMore, more
 
   const bar = (barTitle: ReactNode) => (
     <View style={[styles.bar, { backgroundColor: tokens.bg }, !back && styles.barNoBack]}>
-      {back ? <IconButton icon={ICONS.back} accessibilityLabel={t('common.back')} onPress={back} /> : null}
+      {back ? <IconButton icon={backIcon ?? ICONS.back} accessibilityLabel={backLabel ?? t('common.back')} onPress={back} /> : null}
       <View style={styles.titles}>{barTitle}</View>
       {shown.length || onMore ? (
         <View style={styles.actions}>
@@ -125,6 +130,7 @@ export function ScreenHeader({ title, subtitle, back, actions = [], onMore, more
           {onMore ? <IconButton icon={ICONS.more} accessibilityLabel={moreLabel ?? t('a11y.moreActions')} onPress={onMore} /> : null}
         </View>
       ) : null}
+      {trailing}
     </View>
   );
 

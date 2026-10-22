@@ -21,6 +21,7 @@ export const en = {
     settings: 'Settings',
     back: 'Back',
     close: 'Close',
+    done: 'Done',
     active: 'Active',
     select: 'Select',
     comingSoon: 'Coming soon',
@@ -113,9 +114,17 @@ export const en = {
   },
 
   settings: {
-    title: 'Settings',
+    // §17 U10: the Me tab.
+    title: 'Me',
     profile: {
       section: 'Profile',
+      // §17 U10: Me's ProfileCard and ProfileSheet.
+      add: 'Add your details',
+      addHint: 'Your name and roll go into file names and cover pages.',
+      noName: 'Add your name',
+      noRoll: 'Add your roll and institution',
+      cardHint: 'Edits your name, roll, section, institution and logo',
+      sheetTitle: 'Your details',
       name: 'Full name',
       namePlaceholder: 'e.g. Rahim Uddin',
       roll: 'Roll / student ID',
@@ -140,14 +149,39 @@ export const en = {
       insertToken: 'Insert {token}',
       example: 'Example: {name}',
       exampleEmpty: 'Example: (empty: scans are named Scan_<date>)',
-      reset: 'Reset to {template}',
+      exampleEmptyShort: 'Scan_<date>.pdf',
+      // §17 U10: the presets (services/submit/naming.NAME_PRESETS), each shown with a live example.
+      presets: {
+        default: 'Roll + name + course + type',
+        courseTypeDate: 'Course + type + date',
+        courseDate: 'Course + date',
+        typeDate: 'Type + date',
+        rollCourseDate: 'Your roll + course + date',
+      },
+      custom: 'Custom…',
+      customHint: 'Build your own from name, roll, course, date and more',
       footnote:
-        'Used to name new scans in Deliver. Without a name and roll in your profile, the default becomes {fallback}. Empty parts are left out.',
+        'Used to name new scans when you save them. Without a name and roll in your details, the first choice gives {fallback} instead. Empty parts are left out.',
       sampleCourse: 'Physics',
       sampleTitle: "Ohm's law",
     },
     appearance: 'Appearance',
-    theme: { system: 'System', light: 'Light', dark: 'Dark' },
+    theme: { label: 'Theme', system: 'System', light: 'Light', dark: 'Dark' },
+    // §17 U10: Me's groups.
+    scanning: {
+      section: 'Scanning',
+      defaultMode: 'Default scan mode',
+      filters: 'Filters',
+      filtersSubtitle: 'The filter each scan mode starts with',
+      filtersHint: 'New pages start with this filter. You can still change it for each page in Review.',
+    },
+    reading: {
+      section: 'Reading',
+      row: 'Reading',
+    },
+    files: {
+      section: 'Files & backup',
+    },
     // §10 M4: theme accents (Pro).
     accent: {
       label: 'Accent colour',
@@ -171,6 +205,7 @@ export const en = {
       keptAfterPro: 'Your lock stays on after Pro ends, until you turn it off.',
     },
     language: {
+      group: 'Language',
       section: 'App language',
       system: 'Phone language ({name})',
       pseudo: 'Pseudo-locale (developer)',
@@ -192,7 +227,7 @@ export const en = {
         'Recognition runs fully on-device and makes your scans searchable. Pick the script your documents are written in; a course can use its own (edit the course). Devanagari also covers Sanskrit.',
     },
     organization: {
-      section: 'Organization',
+      section: 'Courses',
       manageCourses: 'Manage courses',
       manageCoursesSubtitle: 'Create, rename, and organize your courses',
       classTimes: 'Class times',
@@ -200,14 +235,13 @@ export const en = {
       classCount: { one: '{count} class', other: '{count} classes' },
     },
     export: {
-      section: 'Export',
       folder: 'Default export folder',
-      folderSubtitle: 'Copy exported files here automatically',
-      folderHint: 'Turn on "Also save a copy" in Deliver to write exports here too.',
+      // §17 U9: what Deliver's "Also save a copy to device" became.
+      copyScans: 'Copy every saved scan here',
+      copyScansSubtitle: 'Each scan you save also goes to {folder}.',
       noFolder: 'No folder selected',
     },
     scanner: {
-      section: 'Scanner',
       basicMode: 'Basic camera mode',
       basicModeSubtitle:
         "Google's scanner wasn't available on this phone. Tap to try it again (e.g. after updating Google Play services).",
@@ -252,7 +286,6 @@ export const en = {
     },
     // §8 B1: Settings → Storage.
     storage: {
-      section: 'Storage',
       row: 'Storage',
       rowSubtitle: 'Space used per course, temporary files, biggest documents',
       title: 'Storage',
@@ -275,7 +308,7 @@ export const en = {
       androidBackupNote: "Android's own backup only covers small libraries (up to 25 MB). Use Back up to keep everything.",
     },
     privacy: {
-      section: 'Privacy',
+      section: 'Privacy & security',
       crashReports: 'Send anonymous crash reports',
       crashReportsSubtitle: 'Never includes your documents, names or scanned text.',
       // §10 M1: the two lines that explain ads, then their toggles.
@@ -289,9 +322,6 @@ export const en = {
     // §10 M7: support only. Never say the contact sells or unlocks Pro (Play Payments policy).
     help: {
       section: 'Help & feedback',
-      intro: 'Questions, problems or ideas? Message us.',
-      whatsapp: 'WhatsApp: {number}',
-      email: 'Email: {address}',
       note: 'The message starts with the app version and phone model, so we can help faster. Nothing else is sent.',
       openFailed: "Couldn't open {app}. Is it installed?",
       appVersion: 'PDF Scan {version}',
@@ -299,6 +329,7 @@ export const en = {
       emailSubject: 'PDF Scan {version}: question or feedback',
       whatsappApp: 'WhatsApp',
       emailApp: 'an email app',
+      emailTitle: 'Email',
     },
     about: {
       showIntro: 'Show the introduction again',
@@ -538,7 +569,36 @@ export const en = {
     adjust: 'Adjust',
     compare: 'Compare',
     cover: 'Cover',
-    actions: { crop: 'Crop', rotate: 'Rotate', retake: 'Retake', ocr: 'OCR', sign: 'Sign' },
+    // §17 U9: the header, the one toolbar, its More menu, the Mode sheet and the suggestion chip.
+    pageOf: 'Page {current} of {total}',
+    close: 'Close',
+    toolbar: { crop: 'Crop', rotate: 'Rotate', filter: 'Filter', adjust: 'Adjust', mode: 'Mode', more: 'More' },
+    more: {
+      title: 'More',
+      retake: 'Retake this page',
+      addPages: 'Add pages',
+      deletePage: 'Delete this page',
+      reorder: 'Reorder pages',
+      applyToAll: 'Apply this look to all pages',
+      searchable: 'Make text searchable',
+      searchableHint: 'Read this page again',
+      sign: 'Sign this page',
+      idCard: 'ID card',
+    },
+    modeSheet: {
+      title: 'Scan mode',
+      current: 'Now',
+      applying: 'Switching to {mode}…',
+      applied: 'Now in {mode} mode',
+      failed: "Couldn't switch the mode. Nothing changed.",
+    },
+    suggest: {
+      dismiss: 'Dismiss',
+      lowContrast: 'Page {page} is hard to read. Try black and white?',
+      useBw: 'Use B&W',
+      book: 'Looks like a book. Split pages?',
+      split: 'Split',
+    },
     adjustPanel: { brightness: 'Brightness', contrast: 'Contrast', saturation: 'Saturation', reset: 'Reset' },
     filters: {
       original: 'Original',
@@ -1255,7 +1315,16 @@ export const en = {
   },
 
   deliver: {
-    title: 'Deliver',
+    // §17 U9: the screen is "Save" (its id stays `deliver`).
+    title: 'Save',
+    pagesLabel: 'Pages',
+    pageA11y: 'Page {page}. Opens it in Review.',
+    courseChip: 'Course: {course}',
+    typeChip: 'Type: {type}',
+    sizeLabel: 'Size',
+    sizeChoice: { small: 'Small', medium: 'Medium', original: 'Original' },
+    sizeAbout: 'About {size}',
+    sizeLimited: 'Submit fits it under {size}',
     nameLabel: 'Name',
     namePlaceholder: 'Untitled scan',
     nameFromTemplate: 'From your naming template in Settings.',
@@ -1305,20 +1374,29 @@ export const en = {
     },
     actions: {
       submit: 'Submit',
+      submitMore: 'Submit…',
       submitA11y: 'Submit: save, then share the named file',
       save: 'Save',
-      saveShare: 'Save & Share',
-      shareHintIos: 'Share also lets you save to Files, iCloud Drive, or another app.',
       footnote: 'No watermark. No account. Nothing leaves your phone.',
     },
-    more: {
-      title: 'More options',
-      margin: 'Margin',
-      marginSmall: 'Small',
-      exportCopy: 'Also save a copy to device',
-      exportCopyTo: 'Copies the export to {folder}.',
-      exportCopySetup: 'Set up a default export folder in Settings first.',
-      setUp: 'Set up →',
+    // §17 U9: everything about the teacher's copy, out of the Save screen.
+    submitSheet: {
+      title: 'Submit',
+      titleCourse: 'Submit to {course}',
+      hint: 'Saves the scan, then shares a copy named and sized for your teacher.',
+      fileName: 'File name',
+    },
+    // §17 U9: after Save or Submit.
+    done: {
+      title: 'Saved',
+      savedTo: 'Saved to {course}',
+      submitted: 'Saved to {course} and shared',
+      open: 'Open',
+      share: 'Share',
+      submit: 'Submit',
+      scanMore: 'Scan more',
+      done: 'Done',
+      gone: 'This scan is no longer in Files.',
     },
     picker: {
       title: 'Course',
@@ -1586,7 +1664,6 @@ export const en = {
     emptyBody: "Scans get filed under a course, so each subject's notes and handouts stay together.",
     addSeveral: 'Add several',
     showArchived: 'Show archived ({count})',
-    more: 'More…',
     newCourse: 'New course',
     editCourse: 'Edit course',
     addCourse: 'Add course',
@@ -1709,7 +1786,6 @@ export const en = {
       documents: 'Export…',
     },
     screen: {
-      section: 'Backup',
       row: 'Backup',
       rowSubtitle: 'Keep a copy of your library off this phone',
       backUpEverything: 'Back up everything',

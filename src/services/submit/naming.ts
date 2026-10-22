@@ -1,4 +1,4 @@
-import { tDoc } from '../../i18n';
+import { tDoc, type TKey } from '../../i18n';
 import { sanitizeFileName } from '../../utils/sanitize';
 import type { Course, DocType, StudentProfile } from '../../types/models';
 import { isProfileComplete } from './profile';
@@ -8,6 +8,25 @@ export const DEFAULT_NAME_TEMPLATE = '{roll}_{name}_{course}_{type}{n}';
 // Used instead of the default while the profile has no name or roll, so a fresh install still
 // gets a useful name (`CSE101_HW3_2026-10-02`) rather than one built around two gaps.
 export const FALLBACK_NAME_TEMPLATE = '{course}_{type}{n}_{date}';
+
+// §17 U10: the choices Me → File names offers, each with a live example. The default comes first,
+// since it is what a fresh install uses; the rest are the patterns teachers ask for most. Anything
+// else the student types is "Custom" (namePresetFor).
+export type NamePresetId = 'default' | 'courseTypeDate' | 'courseDate' | 'typeDate' | 'rollCourseDate';
+export type NamePreset = { id: NamePresetId; template: string; labelKey: TKey };
+
+export const NAME_PRESETS: readonly NamePreset[] = [
+  { id: 'default', template: DEFAULT_NAME_TEMPLATE, labelKey: 'settings.fileNames.presets.default' },
+  { id: 'courseTypeDate', template: FALLBACK_NAME_TEMPLATE, labelKey: 'settings.fileNames.presets.courseTypeDate' },
+  { id: 'courseDate', template: '{course}_{date}', labelKey: 'settings.fileNames.presets.courseDate' },
+  { id: 'typeDate', template: '{type}{n}_{date}', labelKey: 'settings.fileNames.presets.typeDate' },
+  { id: 'rollCourseDate', template: '{roll}_{course}_{date}', labelKey: 'settings.fileNames.presets.rollCourseDate' },
+];
+
+// The preset a template is, or 'custom'. Surrounding spaces don't make a preset custom.
+export function namePresetFor(template: string): NamePresetId | 'custom' {
+  return NAME_PRESETS.find((p) => p.template === template.trim())?.id ?? 'custom';
+}
 
 export const NAME_TOKENS = ['name', 'first', 'roll', 'section', 'course', 'type', 'n', 'date', 'title'] as const;
 export type NameToken = (typeof NAME_TOKENS)[number];

@@ -40,6 +40,7 @@ export function useSettingsPersistence() {
         // Personalised ads default to on (missing = never turned off); usage counts to off.
         dispatch({ type: 'settings/SET_PERSONALIZED_ADS', enabled: settings.personalizedAdsEnabled !== false });
         dispatch({ type: 'settings/SET_USAGE_STATS', enabled: settings.usageStatsEnabled === true });
+        dispatch({ type: 'settings/SET_COPY_SCANS', enabled: settings.copyScansToFolder === true });
         dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: settings.scannerUnavailable === true });
         // The list first: SET_LAST_OPENED puts the last one at its front (settings saved before
         // §17 U6 have only that one).
@@ -111,6 +112,7 @@ export function useSettingsPersistence() {
       crashReportsEnabled: state.settings.crashReportsEnabled,
       personalizedAdsEnabled: state.settings.personalizedAdsEnabled,
       usageStatsEnabled: state.settings.usageStatsEnabled,
+      copyScansToFolder: state.settings.copyScansToFolder,
       scannerUnavailable: state.settings.scannerUnavailable,
       lastCaptureMode: state.settings.lastCaptureMode,
       lastOpened: state.settings.lastOpened,
@@ -150,6 +152,7 @@ export function useSettingsPersistence() {
     state.settings.crashReportsEnabled,
     state.settings.personalizedAdsEnabled,
     state.settings.usageStatsEnabled,
+    state.settings.copyScansToFolder,
     state.settings.scannerUnavailable,
     state.settings.lastCaptureMode,
     state.settings.lastOpened,

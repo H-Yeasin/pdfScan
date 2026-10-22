@@ -21,7 +21,7 @@ type AdjustSliderProps = {
   onCommit: (value: number) => void;
 };
 
-// Modeled on the existing QualitySlider (same Pan+Tap-over-a-track pattern), but continuous
+// Modeled on the old QualitySlider (same Pan+Tap-over-a-track pattern; gone in §17 U9), but continuous
 // rather than 5-step, and fills from the center out rather than from the left edge, since -1..1
 // is a bidirectional adjustment around a neutral zero rather than a magnitude from a floor.
 export function AdjustSlider({ label, value, live, onChange, onCommit }: AdjustSliderProps) {

@@ -1,39 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Pressable, Switch, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { FolderPickerModal } from '../components/deliver/FolderPickerModal';
 import { FormatSegmented } from '../components/deliver/FormatSegmented';
-import { LayoutModeSegmented } from '../components/deliver/LayoutModeSegmented';
-import { MoreOptionsPanel } from '../components/deliver/MoreOptionsPanel';
 import { NameField } from '../components/deliver/NameField';
-import { QualitySlider } from '../components/deliver/QualitySlider';
-import { SizeTargetRow } from '../components/deliver/SizeTargetRow';
+import { PagePreviewStrip } from '../components/deliver/PagePreviewStrip';
 import { StickyActions } from '../components/deliver/StickyActions';
+import { SubmitSheet } from '../components/deliver/SubmitSheet';
 import { ProfilePromptSheet } from '../components/deliver/ProfilePromptSheet';
 import { SegmentedControl } from '../components/shared/SegmentedControl';
+import { Chip, Menu, ScreenHeader, Text, type MenuSection } from '../components/ui';
 import { formatBytes, tDoc } from '../i18n';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { summarizeAcademicConfig } from './AcademicOptionsScreen';
-import { saveImagesToLibrary } from '../services/export/imageExportService';
 import { exportCopyToDeviceFolder } from '../services/export/deviceExportService';
-import { DEFAULT_ADJUST } from '../services/enhance/adjust';
-import { renderPage } from '../services/enhance/skiaEnhance';
-import { ocrFitsPage } from '../services/capture/geometryKey';
-import { MASTER_PRESET } from '../services/capture/imageSpec';
 import { stopReadingText } from '../services/capture/ingestBatch';
-import { runOcr } from '../services/ocr/ocrService';
-import { renderCoverPageImage, stampContentPageImage } from '../services/pdf/academicRasterService';
-import { buildPdfFromPages, encodingForQuality, estimateSizeBytes } from '../services/pdf/pdfService';
-import { cleanTemporaryCache, deleteDocumentFiles } from '../services/persistence/libraryFiles';
+import { estimateSizeBytes } from '../services/pdf/pdfService';
+import { deleteDocumentFiles } from '../services/persistence/libraryFiles';
 import { appendDocuments } from '../services/persistence/libraryOperations';
-import { shareAs, shareDocument } from '../services/sharing/shareService';
+import { shareAs } from '../services/sharing/shareService';
 import { historyUris } from '../store/pageHistory';
-import { CourseChips } from '../components/courses/CourseChips';
-import { DocTypeSelector } from '../components/courses/DocTypeChips';
 import { getCaptureModeSpec } from '../services/capture/captureModes';
-import { defaultDocTypeFor, typeNumberOf } from '../services/courses/docTypes';
+import { DOC_TYPES, defaultDocTypeFor, getDocType, typeNumberOf } from '../services/courses/docTypes';
+import { loadSaveScanDeps, saveScan } from '../services/deliver/saveScan';
+import { SIZE_CHOICES, SIZE_QUALITY, sizeChoiceOf, type SizeChoice } from '../services/deliver/sizeChoice';
 import { suggestName } from '../services/submit/naming';
 import { defaultSubmitPreset, presetFromDeliver, presetsEqual, summarizePreset } from '../services/submit/preset';
 import { isProfileComplete } from '../services/submit/profile';
@@ -43,22 +33,19 @@ import { institutionLogoUri } from '../services/submit/institutionLogo';
 import { useIsPro } from '../services/pro/entitlement';
 import { logUsage } from '../services/telemetry/usage';
 import { matchDeadline } from '../services/submit/deadlines';
-import type { Submission } from '../types/models';
-import type { PageSizeId } from '../services/pdf/pageSize';
-import { buildPdfUnderLimit, formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
+import type { DocType, Submission } from '../types/models';
+import { formatLimit, tooLargeMessage } from '../services/submit/sizeTarget';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
 import { useNamingContext, useResolvedAcademicConfig } from '../store/useDeliverContext';
 import { useFilingCourse } from '../store/useFilingCourse';
 import { useSpaceGuard } from '../store/useSpaceGuard';
 import { BYTES_PER_SAVED_PAGE } from '../services/storage/usage';
 import { resolveOcrScript } from '../services/scripts/registry';
-import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
-import type { LibraryDocument, LibraryPage, PageLayout, PageOcr } from '../types/models';
+import { ICONS, radii, spacing, useTheme } from '../theme';
 import { createId } from '../utils/id';
 import { hapticSuccess, hapticWarning } from '../services/feedback/haptics';
 
-
-type SaveMode = 'save' | 'share' | 'submit';
+type SaveMode = 'save' | 'submit';
 
 function defaultName(): string {
   const now = new Date();
@@ -66,40 +53,28 @@ function defaultName(): string {
   return tDoc('document.scanName', { date: iso });
 }
 
-// One page on its way into the library: its rendered master (+ optional stamped display copy).
-// Lighter than SessionPage since a rasterized cover page has no rotation/enhance of its own.
-type LibraryInputPage = {
-  id: string;
-  masterUri: string;
-  displayUri?: string;
-  keepSource?: boolean;
-  width: number;
-  height: number;
-  ocr?: PageOcr;
-  ocrFailed?: boolean;
-  layout?: PageLayout;
-};
-
+// §17 U9: the "Save" step of Scan → Save → Done (its screen id stays `deliver`). What is saved
+// (the pages, a tap away from Review), its name, course and type, format and size; Save, or
+// Submit… for the teacher's copy (SubmitSheet). The work is services/deliver/saveScan.ts; this
+// collects the options, shows the progress and goes to Done.
 export function DeliverScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go, switchTab } = useRouter();
+  const { go } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'deliver', 'library', 'review', 'settings');
   const { pages } = state.capture;
-  const { name, nameEdited, format, quality, sizeLimitBytes, more, exportCopy, layoutMode, pageSize } = state.deliver;
+  const { name, nameEdited, format, quality, sizeLimitBytes, layoutMode, pageSize } = state.deliver;
   // The academic options as they will be drawn: cover defaults and header/footer tokens filled in.
   const academicConfig = useResolvedAcademicConfig();
   const namingContext = useNamingContext();
-  // The size target is for the PDF; a JPG export saves each page as its own image.
-  const sizeLimit = format === 'PDF' ? sizeLimitBytes : null;
   // The picked course, or the top suggestion (timetable, last used, ...) until the student picks.
-  const { courseId, suggestions, automatic } = useFilingCourse();
+  const { courseId, automatic } = useFilingCourse();
   const { beforeSave } = useSpaceGuard();
   // Every saved document gets a type: the student's pick, or the capture mode's default.
   const docType = state.deliver.docType ?? defaultDocTypeFor(getCaptureModeSpec(state.capture.mode));
   const { courses } = state.library;
-  const { androidExportFolderUri, androidExportFolderLabel, profile, profilePrompted, institutionLogo } = state.settings;
+  const { androidExportFolderUri, androidExportFolderLabel, copyScansToFolder, profile, profilePrompted, institutionLogo } = state.settings;
   const isPro = useIsPro();
   const { presetCourseId, rememberPreset } = state.deliver;
   // §7 R3: the saved document these pages are being added to, if any.
@@ -112,7 +87,8 @@ export function DeliverScreen() {
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
   const [profilePromptOpen, setProfilePromptOpen] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
 
@@ -170,6 +146,7 @@ export function DeliverScreen() {
   }, [name, nameEdited, suggestedName, pages.length, dispatch]);
 
   const sizeEstimate = useMemo(() => estimateSizeBytes(pages, quality), [pages, quality]);
+  const sizeChoice = sizeChoiceOf(quality);
 
   const handleSaveInternal = useCallback(
     async (requestedMode: SaveMode) => {
@@ -179,175 +156,43 @@ export function DeliverScreen() {
       // §7 R3: pages going to the end of a saved document are plain pages - no cover, stamps,
       // 2-in-1 layout or size target (the document is rebuilt with its own pages) - and aren't
       // submitted on their own.
-      const mode: SaveMode = appendTarget && requestedMode === 'submit' ? 'save' : requestedMode;
+      const mode: SaveMode = appendTarget ? 'save' : requestedMode;
       const academic = appendTarget ? null : academicConfig;
-      const layout = appendTarget ? 'standard' : layoutMode;
-      const shareAfter = mode === 'share';
       setSaving(true);
       // §16 G7: pages a scan is still reading are read here instead, one job at a time.
       stopReadingText();
       try {
-        const documentId = createId('doc');
-        // Submit fits the separate submission file to the limit, so the library copy is built at
-        // the library quality instead of being fitted twice.
-        const librarySizeLimit = mode === 'submit' || appendTarget ? null : sizeLimit;
-        // With a size target the level isn't known until every master exists, so the loop renders
-        // masters only and buildPdfUnderLimit encodes the PDF's pages itself.
-        const encoding = librarySizeLimit !== null ? 'as-is' : encodingForQuality(quality);
-        const total = pages.length;
-        const transientUris = new Set<string>();
-
-        // One page at a time (never Promise.all): each page is rendered from its session master in
-        // a single Skia pass (rotation + filter + resize + one JPEG encode) - once at master spec
-        // for the library, and once more at the export preset only if that differs. The text is
-        // the one read at scan time when it still fits the page, else OCR of the final master, so
-        // the PDF's text layer always lines up with what was saved, whatever was rotated or
-        // cropped in Review.
-        const contentPages: (LibraryInputPage & { exportUri: string })[] = [];
-        for (let i = 0; i < total; i++) {
-          const page = pages[i];
-          setProgress(t('deliver.progress.preparing', { current: i + 1, total }));
-          const edits = {
-            rotation: page.rotation,
-            enhance: page.enhance,
-            adjust: page.adjust ?? DEFAULT_ADJUST,
-            stats: page.stats,
-            filterOptions: page.filterOptions,
-          };
-          const master = await renderPage(page.uri, edits, MASTER_PRESET);
-          const exported = encoding === 'as-is' ? master : await renderPage(page.uri, edits, encoding);
-          if (exported !== master) transientUris.add(exported.uri);
-          // §16 G7: the text read at scan time still describes this page when nothing but its
-          // look changed since (same image, unturned, same script: geometryKey.ts) and the saved
-          // master has the same pixels across, so its word boxes land where they did. Anything
-          // else - a turn, a text read for another script, no text yet - is read from the master.
-          const keepText = ocrFitsPage(page, ocrScript) && master.width === page.width && master.height === page.height;
-          const ocr = keepText ? page.ocr : await runOcr(master.uri, ocrScript);
-          contentPages.push({
-            id: page.id,
-            masterUri: master.uri,
-            exportUri: exported.uri,
-            width: master.width,
-            height: master.height,
-            ocr,
-            ocrFailed: ocr === undefined,
-            layout: page.layout,
-          });
-        }
-
-        // ReaderScreen shows each LibraryPage's own image, not the compiled PDF, so an academic
-        // border/header-footer also needs to exist as pixels - on a separate display copy, so the
-        // master stays clean for later rebuilds. The PDF itself gets the crisp vector version.
-        let coverPage: LibraryInputPage | null = null;
-        if (format === 'PDF' && academic) {
-          if (academic.enableBorder || academic.headerText || academic.footerText) {
-            for (let i = 0; i < contentPages.length; i++) {
-              setProgress(t('deliver.progress.stamping', { current: i + 1, total }));
-              const stamped = await stampContentPageImage(contentPages[i].masterUri, academic, i + 1, total);
-              contentPages[i].displayUri = stamped.uri;
-            }
-          }
-          if (academic.coverPage) {
-            const rendered = await renderCoverPageImage(academic.coverPage, pageSize);
-            if (rendered) {
-              coverPage = {
-                id: createId('page'),
-                masterUri: rendered.uri,
-                width: rendered.width,
-                height: rendered.height,
-                // An imported cover is the user's own picked file - copy it, don't move it.
-                keepSource: academic.coverPage.mode === 'imported_image' && rendered.uri === academic.coverPage.importedUri,
-              };
-            }
-          }
-        }
-
-        // Always build a document.pdf, regardless of the chosen export `format` - the unified
-        // reader renders every library doc through the real PDF engine, so a JPG-format doc needs
-        // a real PDF behind it too. Pages are already encoded for export, so they go in as-is.
-        const pdfPages = contentPages.map((p) => ({ uri: p.exportUri, width: p.width, height: p.height, ocr: p.ocr, layout: p.layout }));
-        let pdfResult: { uri: string; sizeBytes: number };
-        let sizeWarning: string | null = null;
-        if (librarySizeLimit !== null) {
-          setProgress(t('deliver.progress.fitting', { size: formatLimit(librarySizeLimit) }));
-          const sized = await buildPdfUnderLimit(documentId, pdfPages, librarySizeLimit, academic ?? undefined, layout, pageSize);
-          if (!sized.fits) sizeWarning = tooLargeMessage(sized, librarySizeLimit);
-          pdfResult = sized;
-        } else {
-          setProgress(t('deliver.progress.building'));
-          pdfResult = await buildPdfFromPages(documentId, pdfPages, 'as-is', academic ?? undefined, layout, pageSize);
-        }
-        const pdfUri: string = pdfResult.uri;
-
-        const libraryInputPages: LibraryInputPage[] = coverPage ? [coverPage, ...contentPages] : contentPages;
-        const savedImages = await saveImagesToLibrary(
-          documentId,
-          libraryInputPages.map((p) => ({ masterUri: p.masterUri, displayUri: p.displayUri, keepSource: p.keepSource }))
-        );
-        const sizeBytes = format === 'PDF' ? pdfResult.sizeBytes : savedImages.sizeBytes;
-
-        // The session's own masters/thumbnails and any export-only renders are now superseded by
-        // the library copies.
-        pages.forEach((page) => {
-          transientUris.add(page.uri);
-          if (page.thumbUri) transientUris.add(page.thumbUri);
-          // A Book-mode half keeps its original spread around for "Undo split".
-          // An ID card page keeps its scanned card images for swap/retake.
-          if (page.idCard) {
-            transientUris.add(page.idCard.front.uri);
-            if (page.idCard.back) transientUris.add(page.idCard.back.uri);
-          }
-          if (page.splitFrom) {
-            transientUris.add(page.splitFrom.uri);
-            if (page.splitFrom.thumbUri) transientUris.add(page.splitFrom.thumbUri);
-          }
-        });
-        // Images only Review's undo history still points at (pre-crop/sign versions, merged
-        // halves) were kept alive for undo; the session ends here, so they go too.
-        historyUris(state.review.history).forEach((uri) => transientUris.add(uri));
-        cleanTemporaryCache(Array.from(transientUris));
-
-        const libraryPages: LibraryPage[] = libraryInputPages.map((page, i) => ({
-          id: page.id,
-          ...savedImages.pages[i],
-          width: page.width,
-          height: page.height,
-          ocr: page.ocr,
-          ocrFailed: page.ocrFailed || undefined,
-          layout: page.layout,
-        }));
-
         // The suggestion from this render, not `name`: right after the profile sheet the name in
         // state may still be the one suggested before the profile was filled in.
         const finalName = (nameEdited ? name.trim() : suggestedName) || suggestedName;
-
-        const doc: LibraryDocument = {
-          id: documentId,
-          name: finalName,
-          format,
-          mode: state.capture.mode,
-          pages: libraryPages,
-          pdfUri,
-          sizeBytes,
-          createdAt: Date.now(),
-          star: false,
-          tag: finalName.slice(0, 4).toUpperCase(),
-          locked: false,
-          courseId: courseId ?? undefined,
-          docType,
-          // Only set when a cover page actually made it into libraryPages[0] - mirrors
-          // coverPage's own condition, not just whether academicConfig exists.
-          coverKind: coverPage ? academic?.coverPage?.mode : undefined,
-          // §5 T1: how document.pdf was laid out, for mapping library pages onto it.
-          pdfLayout: layout === '2_in_1' ? '2_in_1' : 'standard',
-          pdfPageSize: pageSize,
-        };
+        const { doc, oversize } = await saveScan(
+          {
+            documentId: createId('doc'),
+            pages,
+            name: finalName,
+            format,
+            mode: state.capture.mode,
+            courseId,
+            docType,
+            quality,
+            // §17 U9: the size target is the teacher's copy's (Submit fits that file to it); a saved
+            // scan is built at the size picked here.
+            sizeLimit: null,
+            academic,
+            layout: appendTarget ? 'standard' : layoutMode,
+            pageSize,
+            ocrScript,
+            historyUris: historyUris(state.review.history),
+          },
+          loadSaveScanDeps(),
+          setProgress
+        );
 
         // §7 R3: the scanned pages join the end of the saved document; this new one was only the
         // way to build them, and goes again.
         if (appendTarget) {
           const appended = await appendDocuments(appendTarget, [doc]);
-          deleteDocumentFiles(documentId);
+          deleteDocumentFiles(doc.id);
           dispatch({ type: 'library/UPDATE_FILE', id: appendTarget.id, patch: appended });
           dispatch({ type: 'capture/CLEAR_PAGES' });
           dispatch({ type: 'review/RESET' });
@@ -365,7 +210,7 @@ export function DeliverScreen() {
         // document is already saved, so a failure here only loses the submission.
         let submission: SubmitResult | null = null;
         let record: Submission | null = null;
-        let submitFailed = false;
+        let notice: string | undefined = oversize ? tooLargeMessage(oversize, sizeLimitBytes ?? 0) : undefined;
         if (mode === 'submit') {
           try {
             const stored = state.deliver.academicConfig;
@@ -388,41 +233,32 @@ export function DeliverScreen() {
             record = submissionRecord(doc, submission, currentPreset, typeNumber);
             dispatch({ type: 'library/ADD_SUBMISSION', submission: record });
             logUsage('document_submitted');
+            notice = submission.fits
+              ? t('deliver.snack.submitting', { file: submission.fileName, size: formatLimit(submission.sizeBytes) })
+              : tooLargeMessage(submission, currentPreset.sizeLimitBytes ?? 0);
           } catch (error) {
             console.warn('DeliverScreen: submission build failed', error);
-            submitFailed = true;
+            notice = t('deliver.snack.submitFailed', { course: courseName });
           }
         }
+
+        // The device-folder copy (Me → Export, §17 U9) runs after the in-app save has succeeded and
+        // never blocks or replaces it: a SAF failure here only says so.
+        if (Platform.OS === 'android' && copyScansToFolder && androidExportFolderUri) {
+          const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
+          if (!notice) {
+            notice =
+              result.failed === 0
+                ? t('deliver.snack.copied', { course: courseName, folder: androidExportFolderLabel ?? t('deliver.snack.deviceFolder') })
+                : t('deliver.snack.copyFailed', { course: courseName });
+          }
+        }
+
         dispatch({ type: 'capture/CLEAR_PAGES' });
         dispatch({ type: 'review/RESET' });
         dispatch({ type: 'deliver/RESET' });
-        // Land where the new document is: its course page, or the Library for an unsorted one.
-        if (doc.courseId) {
-          dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id: doc.courseId });
-          go('course');
-        } else {
-          go('library');
-        }
-
-        // The device-folder copy runs after the in-app save has already succeeded and never
-        // blocks or replaces it — a SAF failure here must not affect the primary save/undo flow.
-        let snackMsg = shareAfter ? t('deliver.snack.savedSharing') : t('deliver.snack.saved', { course: courseName });
-        // Saved all the same; the student decides whether to drop pages or pick a bigger limit.
-        if (sizeWarning) snackMsg = sizeWarning;
-        if (submission) {
-          snackMsg = submission.fits
-            ? t('deliver.snack.submitting', { file: submission.fileName, size: formatLimit(submission.sizeBytes) })
-            : tooLargeMessage(submission, currentPreset.sizeLimitBytes ?? 0);
-        } else if (submitFailed) {
-          snackMsg = t('deliver.snack.submitFailed', { course: courseName });
-        }
-        if (mode === 'save' && Platform.OS === 'android' && exportCopy && androidExportFolderUri) {
-          const result = await exportCopyToDeviceFolder(androidExportFolderUri, doc);
-          if (!sizeWarning) snackMsg =
-            result.failed === 0
-              ? t('deliver.snack.copied', { course: courseName, folder: androidExportFolderLabel ?? t('deliver.snack.deviceFolder') })
-              : t('deliver.snack.copyFailed', { course: courseName });
-        }
+        dispatch({ type: 'deliver/SET_DONE', done: { docId: doc.id, submitted: !!submission, notice } });
+        go('done');
 
         // §4 S8: a submission that answers an open deadline offers to settle it, instead of Undo.
         const deadline = record ? matchDeadline(doc, state.library.deadlines) : undefined;
@@ -430,24 +266,23 @@ export function DeliverScreen() {
           const submissionId = record.id;
           dispatch({
             type: 'ui/SHOW_SNACK',
-            msg: t('deliver.snack.markDone', { message: snackMsg, title: deadline.title }),
+            msg: t('deliver.snack.markDone', { message: t('deliver.done.title'), title: deadline.title }),
             action: t('deliver.snack.done'),
             onAction: () => dispatch({ type: 'library/UPDATE_DEADLINE', id: deadline.id, patch: { doneSubmissionId: submissionId } }),
           });
         } else {
           dispatch({
             type: 'ui/SHOW_SNACK',
-            msg: snackMsg,
+            msg: t('deliver.snack.saved', { course: courseName }),
             action: t('deliver.snack.undo'),
             onAction: () => {
-              dispatch({ type: 'library/REMOVE_FILES', ids: [documentId] });
-              deleteDocumentFiles(documentId);
+              dispatch({ type: 'library/REMOVE_FILES', ids: [doc.id] });
+              deleteDocumentFiles(doc.id);
             },
           });
         }
 
         hapticSuccess();
-        if (shareAfter) await shareDocument(doc);
         if (submission) await shareAs(submission.uri, submission.fileName, 'application/pdf');
       } catch (error) {
         console.warn('DeliverScreen: save failed', error);
@@ -463,7 +298,7 @@ export function DeliverScreen() {
       pages,
       saving,
       quality,
-      sizeLimit,
+      sizeLimitBytes,
       format,
       name,
       nameEdited,
@@ -476,13 +311,12 @@ export function DeliverScreen() {
       state.deliver.academicConfig,
       state.library.files,
       state.library.deadlines,
-      state.library.annotations,
       state.review.history,
       courseId,
       courseName,
       docType,
       ocrScript,
-      exportCopy,
+      copyScansToFolder,
       academicConfig,
       layoutMode,
       pageSize,
@@ -492,11 +326,13 @@ export function DeliverScreen() {
       beforeSave,
       dispatch,
       go,
+      t,
     ]
   );
 
   // The first Submit without a name and roll asks for them once (or Skip), then carries on.
   const handleSubmit = useCallback(() => {
+    setSubmitOpen(false);
     if (!isProfileComplete(profile) && !profilePrompted) {
       setProfilePromptOpen(true);
       return;
@@ -511,203 +347,142 @@ export function DeliverScreen() {
     handleSaveInternal('submit');
   }, [pendingSubmit, handleSaveInternal]);
 
+  const typeSections = useMemo(
+    (): MenuSection<DocType>[] => [
+      {
+        items: DOC_TYPES.map((spec) => ({
+          id: spec.id,
+          label: t(spec.labelKey),
+          icon: spec.icon,
+          badge: spec.id === docType ? { label: t('review.modeSheet.current'), tone: 'accent' as const } : undefined,
+        })),
+      },
+    ],
+    [t, docType]
+  );
+
+  const sizeSegments = useMemo(() => SIZE_CHOICES.map((id) => ({ id, label: t(`deliver.sizeChoice.${id}`) })), [t]);
+  const typeLabel = t(getDocType(docType).labelKey);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={() => go('review', 'back')}>
-          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-          <Text style={[styles.headerButtonLabel, { color: tokens.ink }]}>{t('common.back')}</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>{t('deliver.title')}</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: tokens.bg }]}>
+      <ScreenHeader
+        title={t('deliver.title')}
+        subtitle={t('library.pages', { count: pages.length })}
+        back={() => go('review', 'back')}
+      />
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {appendTarget ? (
           <View style={[styles.appendBanner, { backgroundColor: tokens.surface2 }]}>
-            <Ionicons name="add-circle-outline" size={18} color={tokens.accentInk} />
-            <Text style={{ color: tokens.ink, flex: 1 }}>{t('reader.edit.appendingTo', { name: appendTarget.name })}</Text>
+            <Text>{t('reader.edit.appendingTo', { name: appendTarget.name })}</Text>
           </View>
         ) : null}
+
+        <PagePreviewStrip
+          pages={pages}
+          onPressPage={(index) => {
+            dispatch({ type: 'review/SELECT_PAGE', index });
+            go('review', 'back');
+          }}
+        />
+
         <NameField
           value={name}
           onChange={(value) => dispatch({ type: 'deliver/SET_NAME', name: value })}
           helperText={nameEdited ? undefined : t('deliver.nameFromTemplate')}
         />
 
-        <View>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.format')}</Text>
+        {appendTarget ? null : (
+          <View style={styles.group}>
+            <View style={styles.chips}>
+              <Chip
+                label={courseName}
+                icon={ICONS.course}
+                onPress={() => setFolderPickerOpen(true)}
+                accessibilityLabel={t('deliver.courseChip', { course: courseName })}
+                testID="save-course"
+              />
+              <Chip
+                label={typeLabel}
+                icon={getDocType(docType).icon}
+                onPress={() => setTypeMenuOpen(true)}
+                accessibilityLabel={t('deliver.typeChip', { type: typeLabel })}
+                testID="save-type"
+              />
+            </View>
+            {courseId !== null && automatic ? (
+              <Text variant="caption" color="muted">
+                {t('deliver.suggested')}
+              </Text>
+            ) : null}
+          </View>
+        )}
+
+        <View style={styles.group}>
+          <Text variant="label">{t('deliver.format')}</Text>
           <FormatSegmented value={format} onChange={(value) => dispatch({ type: 'deliver/SET_FORMAT', format: value })} />
         </View>
 
-        {sizeLimit === null ? (
-          <View>
-            <View style={styles.qualityHeader}>
-              <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.quality')}</Text>
-              <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>≈ {formatBytes(sizeEstimate)}</Text>
-            </View>
-            <QualitySlider value={quality} onChange={(value) => dispatch({ type: 'deliver/SET_QUALITY', quality: value })} />
-          </View>
-        ) : null}
-
-        <MoreOptionsPanel
-          open={more}
-          onToggleOpen={() => dispatch({ type: 'deliver/TOGGLE_MORE' })}
-          exportCopy={
-            Platform.OS === 'android'
-              ? {
-                  enabled: exportCopy,
-                  onToggle: () => dispatch({ type: 'deliver/TOGGLE_EXPORT_COPY' }),
-                  folderLabel: androidExportFolderLabel,
-                  // §17 U5: Me is a tab; switching keeps this scan on its own tab's stack.
-                  onSetup: () => switchTab('settings'),
-                }
-              : undefined
-          }
-        />
-
-        <View style={styles.typeSection}>
-          <View style={styles.qualityHeader}>
-            <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.course')}</Text>
-            <Text style={{ color: tokens.muted, fontSize: 13 }}>
-              {courseId === null ? t('common.unsorted') : automatic ? t('deliver.suggested') : ''}
+        <View style={styles.group}>
+          <View style={styles.labelRow}>
+            <Text variant="label">{t('deliver.sizeLabel')}</Text>
+            <Text variant="caption" color="accentInk">
+              {t('deliver.sizeAbout', { size: formatBytes(sizeEstimate) })}
             </Text>
           </View>
-          {suggestions.length > 0 ? (
-            <CourseChips
-              courses={courses}
-              suggestions={suggestions}
-              selectedId={courseId}
-              onSelect={(id) => dispatch({ type: 'deliver/SET_COURSE', courseId: id })}
-              onMore={() => setFolderPickerOpen(true)}
-            />
-          ) : (
-            <Pressable accessibilityRole="button"
-              style={[styles.saveToRow, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}
-              onPress={() => setFolderPickerOpen(true)}
-            >
-              <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.saveTo')}</Text>
-              <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>{courseName}</Text>
-            </Pressable>
-          )}
-        </View>
-
-        <View style={styles.typeSection}>
-          <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.type')}</Text>
-          <DocTypeSelector value={docType} onChange={(type) => dispatch({ type: 'deliver/SET_DOC_TYPE', docType: type })} />
-        </View>
-
-        <View style={[styles.optionsCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Pressable
-            style={styles.optionsHeader}
-            onPress={() => setOptionsOpen((open) => !open)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: optionsOpen }}
-          >
-            <View style={styles.optionsHeaderText}>
-              <Text style={[styles.sectionLabelInline, { color: tokens.ink }]}>{t('deliver.submission')}</Text>
-              <Text style={{ color: tokens.muted, fontSize: 13 }} numberOfLines={2}>
-                {summarizePreset(currentPreset)}
-              </Text>
-            </View>
-            <Ionicons name={optionsOpen ? 'chevron-up' : 'chevron-down'} size={18} color={tokens.muted} />
-          </Pressable>
-
-          {optionsOpen && (
-            <View style={styles.optionsBody}>
-              <View>
-                <View style={styles.qualityHeader}>
-                  <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.fileSize')}</Text>
-                  {sizeLimitBytes !== null ? (
-                    <Text style={[styles.sizeEstimate, { color: tokens.accentInk }]}>{t('deliver.willBeAtMost', { size: formatLimit(sizeLimitBytes) })}</Text>
-                  ) : null}
-                </View>
-                <SizeTargetRow value={sizeLimitBytes} onChange={(bytes) => dispatch({ type: 'deliver/SET_SIZE_LIMIT', bytes })} />
-              </View>
-
-              <View>
-                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.pageLayout')}</Text>
-                <LayoutModeSegmented
-                  value={layoutMode}
-                  onChange={(value) => dispatch({ type: 'deliver/SET_LAYOUT_MODE', layoutMode: value })}
-                />
-                <Text style={[styles.helperText, { color: tokens.muted }]}>
-                  {layoutMode === '2_in_1'
-                    ? t('deliver.layoutHintTwoUp')
-                    : t('deliver.layoutHintStandard')}
-                </Text>
-              </View>
-
-              <View>
-                <Text style={[styles.sectionLabel, { color: tokens.ink }]}>{t('deliver.pageSize')}</Text>
-                <SegmentedControl
-                  segments={[
-                    { id: 'A4' as PageSizeId, label: 'A4' },
-                    { id: 'Letter' as PageSizeId, label: t('deliver.paperLetter') },
-                  ]}
-                  value={pageSize}
-                  onChange={(value) => dispatch({ type: 'deliver/SET_PAGE_SIZE', pageSize: value })}
-                />
-              </View>
-
-              <Pressable accessibilityRole="button"
-                style={[styles.saveToRow, { backgroundColor: tokens.bg, borderColor: tokens.edge }]}
-                onPress={() => go('academicOptions')}
-              >
-                <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.academicRow')}</Text>
-                <Text style={{ color: tokens.accentInk, fontSize: 14, fontWeight: '600' }}>
-                  {summarizeAcademicConfig(academicConfig)}
-                </Text>
-              </Pressable>
-
-              <View style={styles.rememberRow}>
-                <View style={styles.optionsHeaderText}>
-                  <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.includeAnnotations')}</Text>
-                  <Text style={{ color: tokens.muted, fontSize: 12.5 }}>
-                    {t('deliver.includeAnnotationsHint')}
-                  </Text>
-                </View>
-                <Switch
-                  value={!!state.deliver.includeAnnotations}
-                  onValueChange={(include) => dispatch({ type: 'deliver/SET_INCLUDE_ANNOTATIONS', include })}
-                  trackColor={{ true: tokens.accent, false: tokens.surface2 }}
-                />
-              </View>
-
-              {course ? (
-                <>
-                  <NameField
-                    label={t('deliver.courseTemplate', { course: course.code || course.name })}
-                    value={state.deliver.nameTemplate ?? ''}
-                    onChange={(value) => dispatch({ type: 'deliver/SET_NAME_TEMPLATE', template: value })}
-                    placeholder={state.settings.nameTemplate}
-                    helperText={t('deliver.courseTemplateHint')}
-                  />
-                  <View style={styles.rememberRow}>
-                    <View style={styles.optionsHeaderText}>
-                      <Text style={{ color: tokens.ink, fontSize: 15 }}>{t('deliver.remember', { course: course.code || course.name })}</Text>
-                      <Text style={{ color: tokens.muted, fontSize: 12.5 }}>
-                        {t('deliver.rememberHint')}
-                      </Text>
-                    </View>
-                    <Switch
-                      value={rememberPreset}
-                      onValueChange={(remember) => dispatch({ type: 'deliver/SET_REMEMBER_PRESET', remember })}
-                      trackColor={{ true: tokens.accent, false: tokens.surface2 }}
-                    />
-                  </View>
-                </>
-              ) : null}
-            </View>
-          )}
+          <SegmentedControl<SizeChoice>
+            segments={sizeSegments}
+            value={sizeChoice}
+            onChange={(choice) => dispatch({ type: 'deliver/SET_QUALITY', quality: SIZE_QUALITY[choice] })}
+          />
+          {sizeLimitBytes !== null && !appendTarget ? (
+            <Text variant="caption" color="muted">
+              {t('deliver.sizeLimited', { size: formatLimit(sizeLimitBytes) })}
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
 
       <StickyActions
         saving={saving}
         progress={progress}
-        onSubmit={handleSubmit}
         onSave={() => handleSaveInternal('save')}
-        onSaveShare={() => handleSaveInternal('share')}
+        onSubmit={appendTarget ? undefined : () => setSubmitOpen(true)}
+        submitSummary={summarizePreset(currentPreset)}
+      />
+
+      <SubmitSheet
+        visible={submitOpen}
+        onClose={() => setSubmitOpen(false)}
+        onSubmit={handleSubmit}
+        course={course}
+        academicSummary={summarizeAcademicConfig(academicConfig)}
+        onAcademic={() => {
+          setSubmitOpen(false);
+          go('academicOptions');
+        }}
+        sizeLimitBytes={sizeLimitBytes}
+        onSizeLimit={(bytes) => dispatch({ type: 'deliver/SET_SIZE_LIMIT', bytes })}
+        nameTemplate={state.deliver.nameTemplate ?? ''}
+        defaultTemplate={state.settings.nameTemplate}
+        onNameTemplate={(value) => dispatch({ type: 'deliver/SET_NAME_TEMPLATE', template: value })}
+        layoutMode={layoutMode}
+        onLayoutMode={(value) => dispatch({ type: 'deliver/SET_LAYOUT_MODE', layoutMode: value })}
+        pageSize={pageSize}
+        onPageSize={(value) => dispatch({ type: 'deliver/SET_PAGE_SIZE', pageSize: value })}
+        includeAnnotations={!!state.deliver.includeAnnotations}
+        onIncludeAnnotations={(include) => dispatch({ type: 'deliver/SET_INCLUDE_ANNOTATIONS', include })}
+        rememberPreset={rememberPreset}
+        onRememberPreset={(remember) => dispatch({ type: 'deliver/SET_REMEMBER_PRESET', remember })}
+      />
+
+      <Menu
+        visible={typeMenuOpen}
+        onClose={() => setTypeMenuOpen(false)}
+        onSelect={(type) => dispatch({ type: 'deliver/SET_DOC_TYPE', docType: type })}
+        sections={typeSections}
+        title={t('deliver.type')}
       />
 
       <ProfilePromptSheet
@@ -730,96 +505,31 @@ export function DeliverScreen() {
         onCreate={handleCreateCourse}
         onClose={() => setFolderPickerOpen(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  appendBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radii.card },
+  appendBanner: { padding: spacing.md, borderRadius: radii.card },
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  headerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    paddingHorizontal: spacing.sm,
-  },
-  headerButtonLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  title: {
-    fontFamily: fontFamily.heading,
-    fontSize: typeScale.title.fontSize,
   },
   body: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
     gap: spacing.xl,
   },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
+  group: {
+    gap: spacing.sm,
   },
-  helperText: {
-    marginTop: spacing.xs,
-    fontSize: 13,
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
-  qualityHeader: {
+  labelRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-  },
-  sizeEstimate: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  typeSection: {
-    gap: spacing.sm,
-  },
-  saveToRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  optionsCard: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  optionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  optionsHeaderText: {
-    flex: 1,
-    gap: 2,
-  },
-  sectionLabelInline: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  optionsBody: {
-    gap: spacing.lg,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
   },
 });

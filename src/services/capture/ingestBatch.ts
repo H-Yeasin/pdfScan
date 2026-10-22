@@ -65,25 +65,31 @@ export async function ingestOne(
   let page = await ingestPage(uri, script, { deleteSource: ownsInputs, enhance, ocr: false });
   if (autoCrop) page = await autoCropPage(page, script, enhance);
 
-  // An uncropped photo still shows the desk around the book; splitting that would put the gutter
-  // in the wrong place, so it waits for a manual crop as one page.
-  if (spec.postProcess !== 'splitSpread' || page.needsCropReview) return [page];
+  if (spec.postProcess !== 'splitSpread') return [page];
+  return (await splitSpreadPage(page, script, enhance)) ?? [page];
+}
 
-  const spread = page;
+// Book mode's post-processing for one page: a landscape spread becomes its left and right halves
+// (new files; the spread itself is kept as `splitFrom` for "Undo split"). null when the page stays
+// as it is: portrait, already a half, or the split failed. An uncropped photo still shows the desk
+// around the book; splitting that would put the gutter in the wrong place, so it waits for a
+// manual crop as one page. Shared by a batch and Review's mode switch (§17 U9, reapplyMode.ts).
+export async function splitSpreadPage(page: SessionPage, script: OcrScript, enhance: EnhanceMode): Promise<SessionPage[] | null> {
+  if (page.needsCropReview || page.splitFrom || page.idCard) return null;
   let halves: Awaited<ReturnType<typeof splitSpread>> = null;
   try {
-    halves = await splitSpread(spread.uri);
+    halves = await splitSpread(page.uri);
   } catch (error) {
-    console.warn('ingestOne: spread split failed, keeping the whole page', error);
+    console.warn('splitSpreadPage: spread split failed, keeping the whole page', error);
   }
-  if (!halves) return [spread];
+  if (!halves) return null;
 
   const splitFrom = {
     groupId: createId('spread'),
-    uri: spread.uri,
-    thumbUri: spread.thumbUri,
-    width: spread.width,
-    height: spread.height,
+    uri: page.uri,
+    thumbUri: page.thumbUri,
+    width: page.width,
+    height: page.height,
   };
   const pages: SessionPage[] = [];
   for (const half of halves) {

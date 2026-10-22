@@ -1,4 +1,4 @@
-import { DEFAULT_NAME_TEMPLATE, renderTemplate, suggestName, type NamingContext } from '../naming';
+import { DEFAULT_NAME_TEMPLATE, NAME_PRESETS, namePresetFor, renderTemplate, suggestName, type NamePresetId, type NamingContext } from '../naming';
 import { EMPTY_PROFILE } from '../profile';
 
 const ctx: NamingContext = {
@@ -60,5 +60,31 @@ describe('suggestName', () => {
 
   it("keeps a custom template even without a profile", () => {
     expect(suggestName('{type}{n}_{title}', { ...ctx, profile: EMPTY_PROFILE, title: 'Trees' })).toBe('HW3_Trees');
+  });
+});
+
+// §17 U10: Me → File names.
+describe('name presets', () => {
+  const template = (id: NamePresetId) => NAME_PRESETS.find((p) => p.id === id)!.template;
+
+  it('give the names their labels promise', () => {
+    const named = { ...ctx, profile: { ...ctx.profile, name: 'Rahim' } };
+    expect(renderTemplate(template('default'), named)).toBe('2021331045_Rahim_CSE101_HW3');
+    expect(renderTemplate(template('courseTypeDate'), ctx)).toBe('CSE101_HW3_2026-10-02');
+    expect(renderTemplate(template('courseDate'), ctx)).toBe('CSE101_2026-10-02');
+    expect(renderTemplate(template('typeDate'), ctx)).toBe('HW3_2026-10-02');
+    expect(renderTemplate(template('rollCourseDate'), ctx)).toBe('2021331045_CSE101_2026-10-02');
+  });
+
+  it('start with the default template, and have no two alike', () => {
+    expect(NAME_PRESETS[0].template).toBe(DEFAULT_NAME_TEMPLATE);
+    expect(new Set(NAME_PRESETS.map((p) => p.template)).size).toBe(NAME_PRESETS.length);
+  });
+
+  it('recognise a preset, and call anything else custom', () => {
+    expect(namePresetFor(DEFAULT_NAME_TEMPLATE)).toBe('default');
+    expect(namePresetFor(' {course}_{date} ')).toBe('courseDate');
+    expect(namePresetFor('{course}_{date}_{title}')).toBe('custom');
+    expect(namePresetFor('')).toBe('custom');
   });
 });

@@ -31,8 +31,8 @@ export const MAX_PUSHED = 6;
 
 // §17 U5: the scan flow. A scan is pushed on the tab it was started from, and there's only one
 // session (capture.pages), so it is on one stack at a time: opened on another tab, it leaves the
-// stack it was on (that tab goes back to the screen under Review).
-const SCAN_FLOW: ReadonlySet<ScreenName> = new Set(['review', 'deliver']);
+// stack it was on (that tab goes back to the screen under Review). §17 U9: Done ends it.
+const SCAN_FLOW: ReadonlySet<ScreenName> = new Set(['review', 'deliver', 'done']);
 
 // Library content. Opened from the scan flow, it's where a saved scan lands (its course page, or
 // the Reader for pages added to a document): the flow is over, so it leaves the stack, and Back
@@ -145,6 +145,8 @@ export type NavChange = { state: NavState; kind: 'slide' | 'fade'; dir: NavDir }
 //   a course page, the Library after a save, Home after the introduction) ends what was open on
 //   both tabs: each starts at its root. Tabs are siblings, so it cross-fades;
 // - `dir: 'back'` to a screen on the stack: back to it;
+// - Done (§17 U9): the scan is saved, so Review and Save leave the stack and Done takes their place;
+//   Back from it returns to where the scan was started;
 // - the scan flow: pushed, and taken off any other tab's stack (see SCAN_FLOW);
 // - library content: pushed, after the scan flow it ends (see CONTENT_SCREENS);
 // - anything else: pushed.
@@ -157,6 +159,7 @@ export function resolveGo(state: NavState, to: ScreenName, dir: NavDir, key: str
   if (dir === 'back' && activeStack(state).some((entry) => entry.screen === to)) {
     return { state: popTo(state, to), kind: 'slide', dir };
   }
+  if (to === 'done') return { state: push(withoutScanFlow(state, true), to, key), kind: 'slide', dir };
   if (SCAN_FLOW.has(to)) return { state: push(withoutScanFlow(state), to, key), kind: 'slide', dir };
   // Already lower down (the Reader that pages were added to): push() starts it afresh from there,
   // which drops the flow above it too.

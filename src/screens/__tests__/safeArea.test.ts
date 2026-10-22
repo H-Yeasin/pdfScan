@@ -15,10 +15,8 @@ const BOTTOM_PADDED_BY: Record<string, { renders: string; why: string }> = {
   // §16 G2: the shell's TabBar (navigation/ScreenStack) sits under the tab roots and pads by the inset.
   'HomeScreen.tsx': { renders: '<BannerSlot', why: "The banner is last; the shell's TabBar is below it." },
   'LibraryScreen.tsx': { renders: '<SelectionBar', why: "SelectionBar (a BottomBar) is last while selecting; otherwise the shell's TabBar is below." },
-  'ReviewScreen.tsx': { renders: '<ContextBar', why: 'ContextBar is a BottomBar.' },
+  'ReviewScreen.tsx': { renders: '<ReviewToolbar', why: 'ReviewToolbar is a BottomBar (§17 U9).' },
   'DeliverScreen.tsx': { renders: '<StickyActions', why: 'StickyActions is a BottomBar.' },
-  // §17 U5: the Me tab's root.
-  'SettingsScreen.tsx': { renders: '<ScrollView', why: "A tab root: the shell's TabBar is below it." },
 };
 
 function tsxFiles(dir: string): string[] {

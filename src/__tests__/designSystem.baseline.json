@@ -1,7 +1,4 @@
 {
-  "bootstrap/AppNavigator.tsx": {
-    "alert": 1
-  },
   "bootstrap/ErrorBoundary.tsx": {
     "fontSize": 3,
     "hexColor": 5,
@@ -38,11 +35,6 @@
   },
   "components/courses/CourseBadge.tsx": {
     "fontWeight": 1
-  },
-  "components/courses/CourseChips.tsx": {
-    "fontSize": 1,
-    "fontWeight": 1,
-    "pressable": 2
   },
   "components/courses/CourseEditorSheet.tsx": {
     "fontSize": 4,
@@ -112,30 +104,16 @@
     "pressable": 6,
     "modal": 1
   },
-  "components/deliver/MoreOptionsPanel.tsx": {
-    "fontSize": 4,
-    "fontWeight": 2,
-    "pressable": 2
-  },
   "components/deliver/ProfilePromptSheet.tsx": {
     "fontSize": 4,
     "fontWeight": 3,
     "pressable": 3,
     "modal": 1
   },
-  "components/deliver/QualitySlider.tsx": {
-    "fontSize": 1,
-    "borderRadius": 2
-  },
   "components/deliver/SizeTargetRow.tsx": {
     "fontSize": 2,
     "fontWeight": 1,
     "pressable": 1
-  },
-  "components/deliver/StickyActions.tsx": {
-    "fontSize": 5,
-    "fontWeight": 2,
-    "pressable": 3
   },
   "components/library/FileRow.tsx": {
     "alert": 1
@@ -335,11 +313,6 @@
     "borderRadius": 2,
     "fontWeight": 1
   },
-  "components/review/ContextBar.tsx": {
-    "fontSize": 1,
-    "fontWeight": 1,
-    "pressable": 1
-  },
   "components/review/CropOverlay.tsx": {
     "fontSize": 4,
     "hexColor": 4,
@@ -393,24 +366,6 @@
     "fontSize": 2,
     "borderRadius": 2,
     "pressable": 1
-  },
-  "components/settings/AppLockSection.tsx": {
-    "fontSize": 2
-  },
-  "components/settings/LanguageRow.tsx": {
-    "fontSize": 3,
-    "fontWeight": 1,
-    "pressable": 1
-  },
-  "components/settings/NameTemplateSection.tsx": {
-    "fontSize": 3,
-    "fontWeight": 2,
-    "pressable": 2
-  },
-  "components/settings/ProfileSection.tsx": {
-    "fontSize": 4,
-    "fontWeight": 2,
-    "pressable": 2
   },
   "components/settings/SettingRow.tsx": {
     "fontSize": 3,
@@ -508,12 +463,6 @@
     "fontWeight": 5,
     "pressable": 13
   },
-  "screens/DeliverScreen.tsx": {
-    "fontSize": 15,
-    "borderRadius": 2,
-    "fontWeight": 6,
-    "pressable": 4
-  },
   "screens/ExamPackScreen.tsx": {
     "fontSize": 6,
     "fontWeight": 3,
@@ -532,17 +481,6 @@
     "fontSize": 9,
     "fontWeight": 4,
     "pressable": 2
-  },
-  "screens/ReviewScreen.tsx": {
-    "fontSize": 11,
-    "borderRadius": 5,
-    "fontWeight": 9,
-    "pressable": 12
-  },
-  "screens/SettingsScreen.tsx": {
-    "fontSize": 5,
-    "borderRadius": 3,
-    "fontWeight": 1
   },
   "screens/StorageScreen.tsx": {
     "fontSize": 7,

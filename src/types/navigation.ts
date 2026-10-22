@@ -3,6 +3,8 @@ export type ScreenName =
   | 'course'
   | 'review'
   | 'deliver'
+  // §17 U9: after Save or Submit ("Saved to {course}", Open · Share · Submit · Scan more).
+  | 'done'
   // The Files tab (§17 U5 renamed it in the UI only).
   | 'library'
   | 'reader'

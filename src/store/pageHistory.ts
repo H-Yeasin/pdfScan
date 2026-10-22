@@ -1,5 +1,5 @@
 import type { AppAction } from './appReducer';
-import type { SessionPage } from '../types/models';
+import type { CaptureMode, SessionPage } from '../types/models';
 
 // Undo/redo for page edits in Review. Pure functions; appReducer is the only caller, because an
 // undo reads the history (review slice) and rewrites the pages (capture slice) in one step.
@@ -9,7 +9,8 @@ import type { SessionPage } from '../types/models';
 //    puts those fields back on the same page ids and leaves everything else alone, so OCR results
 //    or pages added after the edit survive the undo.
 //  - 'pages': the whole page list, for the actions that change it (merge, delete). Undo restores
-//    the list as it was.
+//    the list as it was. A mode switch (§17 U9, capture/APPLY_MODE) is one of these that also
+//    carries the capture mode, so undoing it puts the mode back with the pages.
 // Rotate only changes the `rotation` setting (F5). Crop and sign write new image files and change
 // `uri` (and drop `thumbUri`), so undoing them just points back at the previous files. Those files stay in the cache until the session ends
 // (historyUris + Deliver's cache sweep), because redo or undo may still need them.
@@ -20,7 +21,7 @@ const EDITED_FIELDS = ['enhance', 'adjust', 'filterOptions', 'rotation', 'uri', 
 type EditedField = (typeof EDITED_FIELDS)[number];
 export type PageSnapshot = { id: string } & Pick<SessionPage, EditedField>;
 
-export type HistoryEntry = { kind: 'fields'; pages: PageSnapshot[] } | { kind: 'pages'; pages: SessionPage[] };
+export type HistoryEntry = { kind: 'fields'; pages: PageSnapshot[] } | { kind: 'pages'; pages: SessionPage[]; mode?: CaptureMode };
 export type PageHistory = { past: HistoryEntry[]; future: HistoryEntry[] };
 
 export const emptyHistory: PageHistory = { past: [], future: [] };
@@ -37,8 +38,8 @@ function fieldsEntry(pages: SessionPage[], ids: string[] | 'all'): HistoryEntry 
 }
 
 // The entry to record BEFORE `action` runs against `pages`, or null if the action isn't a page
-// edit (selection, OCR results, stats, reordering, adding pages).
-export function historyEntryFor(pages: SessionPage[], action: AppAction): HistoryEntry | null {
+// edit (selection, OCR results, stats, reordering, adding pages). `mode` is the capture mode before it.
+export function historyEntryFor(pages: SessionPage[], action: AppAction, mode?: CaptureMode): HistoryEntry | null {
   switch (action.type) {
     case 'capture/SET_PAGE_ENHANCE':
     case 'capture/SET_PAGE_ADJUST':
@@ -56,6 +57,8 @@ export function historyEntryFor(pages: SessionPage[], action: AppAction): Histor
     case 'capture/REPLACE_PAGES':
     case 'capture/REMOVE_PAGE':
       return { kind: 'pages', pages };
+    case 'capture/APPLY_MODE':
+      return { kind: 'pages', pages, mode };
     default:
       return null;
   }
@@ -64,8 +67,8 @@ export function historyEntryFor(pages: SessionPage[], action: AppAction): Histor
 // True when the action left every recorded field as it was (re-picking the selected filter, or
 // "apply to all" on pages that already match), so it isn't worth an undo step. Shallow per field:
 // reducers replace an object field (adjust, filterOptions) only when it's set.
-export function changedAnything(entry: HistoryEntry, after: SessionPage[]): boolean {
-  if (entry.kind === 'pages') return entry.pages !== after;
+export function changedAnything(entry: HistoryEntry, after: SessionPage[], afterMode?: CaptureMode): boolean {
+  if (entry.kind === 'pages') return entry.pages !== after || (entry.mode !== undefined && entry.mode !== afterMode);
   const byId = new Map(after.map((p) => [p.id, p]));
   return entry.pages.some((snap) => {
     const page = byId.get(snap.id);
@@ -79,9 +82,17 @@ export function pushEntry(history: PageHistory, entry: HistoryEntry): PageHistor
 }
 
 // Applies `entry` to `pages` and returns the result plus the entry that reverses it (what the
-// other stack needs), so undo and redo are the same operation in opposite directions.
-export function applyEntry(pages: SessionPage[], entry: HistoryEntry): { pages: SessionPage[]; inverse: HistoryEntry } {
-  if (entry.kind === 'pages') return { pages: entry.pages, inverse: { kind: 'pages', pages } };
+// other stack needs), so undo and redo are the same operation in opposite directions. `mode` is the
+// capture mode now; an entry with a mode puts its own back (the result's `mode`).
+export function applyEntry(
+  pages: SessionPage[],
+  entry: HistoryEntry,
+  mode?: CaptureMode
+): { pages: SessionPage[]; inverse: HistoryEntry; mode?: CaptureMode } {
+  if (entry.kind === 'pages') {
+    if (entry.mode === undefined) return { pages: entry.pages, inverse: { kind: 'pages', pages }, mode };
+    return { pages: entry.pages, inverse: { kind: 'pages', pages, mode }, mode: entry.mode };
+  }
   const byId = new Map(entry.pages.map((snap) => [snap.id, snap]));
   const inverse: PageSnapshot[] = [];
   const next = pages.map((page) => {
@@ -93,21 +104,23 @@ export function applyEntry(pages: SessionPage[], entry: HistoryEntry): { pages: 
     if (restored.uri !== page.uri) delete restored.stats;
     return restored;
   });
-  return { pages: next, inverse: { kind: 'fields', pages: inverse } };
+  return { pages: next, inverse: { kind: 'fields', pages: inverse }, mode };
 }
 
-export function undo(pages: SessionPage[], history: PageHistory): { pages: SessionPage[]; history: PageHistory } | null {
+type Stepped = { pages: SessionPage[]; history: PageHistory; mode?: CaptureMode };
+
+export function undo(pages: SessionPage[], history: PageHistory, mode?: CaptureMode): Stepped | null {
   const entry = history.past[history.past.length - 1];
   if (!entry) return null;
-  const { pages: next, inverse } = applyEntry(pages, entry);
-  return { pages: next, history: { past: history.past.slice(0, -1), future: [...history.future, inverse] } };
+  const { pages: next, inverse, mode: nextMode } = applyEntry(pages, entry, mode);
+  return { pages: next, mode: nextMode, history: { past: history.past.slice(0, -1), future: [...history.future, inverse] } };
 }
 
-export function redo(pages: SessionPage[], history: PageHistory): { pages: SessionPage[]; history: PageHistory } | null {
+export function redo(pages: SessionPage[], history: PageHistory, mode?: CaptureMode): Stepped | null {
   const entry = history.future[history.future.length - 1];
   if (!entry) return null;
-  const { pages: next, inverse } = applyEntry(pages, entry);
-  return { pages: next, history: { past: [...history.past, inverse], future: history.future.slice(0, -1) } };
+  const { pages: next, inverse, mode: nextMode } = applyEntry(pages, entry, mode);
+  return { pages: next, mode: nextMode, history: { past: [...history.past, inverse], future: history.future.slice(0, -1) } };
 }
 
 // Every image uri a history entry could restore. These files must outlive the edit that replaced
@@ -118,6 +131,19 @@ export function historyUris(history: PageHistory): string[] {
     for (const page of entry.pages) {
       uris.add(page.uri);
       if (page.thumbUri) uris.add(page.thumbUri);
+      // A 'pages' entry from a mode switch holds whole pages: the spread a half was cut from and
+      // the card images a composed ID card page was made of are files only it may still need.
+      if (entry.kind === 'pages') {
+        const whole = page as SessionPage;
+        if (whole.splitFrom) {
+          uris.add(whole.splitFrom.uri);
+          if (whole.splitFrom.thumbUri) uris.add(whole.splitFrom.thumbUri);
+        }
+        if (whole.idCard) {
+          uris.add(whole.idCard.front.uri);
+          if (whole.idCard.back) uris.add(whole.idCard.back.uri);
+        }
+      }
     }
   }
   return Array.from(uris);

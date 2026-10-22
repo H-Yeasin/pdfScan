@@ -27,6 +27,8 @@ export type PersistedSettings = {
   // Optional: settings saved before §10 M1 don't have them.
   personalizedAdsEnabled?: boolean;
   usageStatsEnabled?: boolean;
+  // Optional: added in §17 U9.
+  copyScansToFolder?: boolean;
   lastCaptureMode?: CaptureMode;
   scannerUnavailable?: boolean;
   lastOpened?: { id: string; at: number } | null;
