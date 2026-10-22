@@ -1,44 +1,143 @@
-import { Ionicons } from '@expo/vector-icons';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fontFamily, spacing, typeScale, useTheme, touchSlop } from '../../theme';
+import { ICONS, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
 import type { LibraryDocument } from '../../types/models';
+import { formatBytes } from '../../utils/format';
+import { FileCover } from '../library/FileRow';
+import { Button, IconButton, ListItem, Text } from '../ui';
+
+// §17 U8: choosing several, for a tool (Merge needs 2 or more). `problem` is what still stops
+// Continue ("Pick at least 2"), shown under the list; null when the picked ones can go on.
+export type PickerMulti = {
+  min: number;
+  max: number;
+  confirmLabel: string;
+  problem: (count: number) => string | null;
+  onConfirm: (docs: LibraryDocument[]) => void;
+};
 
 type DocumentPickerModalProps = {
   visible: boolean;
   title: string;
   docs: LibraryDocument[];
-  onPick: (doc: LibraryDocument) => void;
+  // One document: a tap picks it. Not used when `multi` is given.
+  onPick?: (doc: LibraryDocument) => void;
+  multi?: PickerMulti;
+  // §17 U8: "Import a file" at the top, so a file from outside works too. Resolves to the new
+  // document (already in the library), which is then picked; undefined when nothing came of it.
+  onImport?: () => Promise<LibraryDocument | undefined>;
+  // Under the title: what the tool takes ("PDFs and scans").
+  hint?: string;
   onClose: () => void;
 };
 
-// A plain list of library documents to pick one from (§7 R3: "Add pages from another document").
-export function DocumentPickerModal({ visible, title, docs, onPick, onClose }: DocumentPickerModalProps) {
+// A list of library documents to pick from: one (§7 R3's "Add pages from another document") or,
+// for a Tools tab tool, several, with checkboxes (§17 U8).
+export function DocumentPickerModal({ visible, title, docs, onPick, multi, onImport, hint, onClose }: DocumentPickerModalProps) {
   const { tokens } = useTheme();
   const { t } = useT();
+  const [picked, setPicked] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  // A fresh choice every time it opens.
+  useEffect(() => {
+    if (visible) setPicked([]);
+  }, [visible]);
+
+  const byId = useMemo(() => new Map(docs.map((d) => [d.id, d])), [docs]);
+  const max = multi?.max ?? 1;
+
+  const toggle = useCallback(
+    (doc: LibraryDocument) => {
+      if (!multi) {
+        onPick?.(doc);
+        return;
+      }
+      setPicked((now) => {
+        if (now.includes(doc.id)) return now.filter((id) => id !== doc.id);
+        // One at a time: picking another replaces it, as a radio list would.
+        if (max === 1) return [doc.id];
+        return now.length >= max ? now : [...now, doc.id];
+      });
+    },
+    [multi, onPick, max]
+  );
+
+  const runImport = useCallback(async () => {
+    if (!onImport) return;
+    setImporting(true);
+    try {
+      const doc = await onImport();
+      if (!doc) return;
+      if (!multi) onPick?.(doc);
+      else setPicked((now) => (now.includes(doc.id) ? now : max === 1 ? [doc.id] : [...now, doc.id].slice(0, max)));
+    } finally {
+      setImporting(false);
+    }
+  }, [onImport, multi, onPick, max]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: LibraryDocument }) => (
+      <ListItem
+        title={item.name}
+        subtitle={`${isPageRasterFormat(item.format) ? t('library.pages', { count: item.pages.length }) : item.format} · ${formatBytes(item.sizeBytes)}`}
+        leading={<FileCover doc={item} />}
+        selected={multi ? picked.includes(item.id) : undefined}
+        onPress={() => toggle(item)}
+        testID={`picker-row-${item.id}`}
+      />
+    ),
+    [multi, picked, toggle, t]
+  );
+
+  // Picked documents in the order they were picked (Merge's order), the ones still there.
+  const pickedDocs = picked.map((id) => byId.get(id)).filter((d): d is LibraryDocument => !!d);
+  const problem = multi ? multi.problem(pickedDocs.length) : null;
+
   return (
     <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: tokens.ink, fontFamily: fontFamily.heading }]}>{title}</Text>
-          <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.closeButton} onPress={onClose} accessibilityLabel={t('common.cancel')}>
-            <Ionicons name="close" size={22} color={tokens.ink} />
-          </Pressable>
+          <View style={styles.headerText}>
+            <Text variant="title" accessibilityRole="header" numberOfLines={2}>
+              {title}
+            </Text>
+            {hint ? (
+              <Text variant="caption" color="muted">
+                {hint}
+              </Text>
+            ) : null}
+          </View>
+          <IconButton icon={ICONS.close} accessibilityLabel={t('common.cancel')} onPress={onClose} />
         </View>
-        <FlatList
+        <FlashList
           data={docs}
           keyExtractor={(doc) => doc.id}
-          ListEmptyComponent={<Text style={[styles.empty, { color: tokens.muted }]}>{t('reader.edit.noDocuments')}</Text>}
-          renderItem={({ item }) => (
-            <Pressable accessibilityRole="button" style={[styles.row, { borderBottomColor: tokens.edge }]} onPress={() => onPick(item)}>
-              <Text style={{ color: tokens.ink }} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={{ color: tokens.muted }}>{t('library.pages', { count: item.pages.length })}</Text>
-            </Pressable>
-          )}
+          extraData={picked}
+          renderItem={renderItem}
+          ListHeaderComponent={
+            onImport ? (
+              <ListItem title={t('tools.pick.importFile')} subtitle={t('tools.pick.importFileSub')} icon={ICONS.import} disabled={importing} onPress={() => void runImport()} />
+            ) : null
+          }
+          ListEmptyComponent={
+            <Text color="muted" style={styles.empty}>
+              {t(onImport ? 'tools.pick.empty' : 'reader.edit.noDocuments')}
+            </Text>
+          }
         />
+        {multi ? (
+          <View style={[styles.footer, { borderTopColor: tokens.edge }]}>
+            <Text variant="caption" color="muted" style={styles.footerNote} accessibilityLiveRegion="polite">
+              {problem ?? t('tools.pick.selected', { count: pickedDocs.length })}
+            </Text>
+            <Button label={multi.confirmLabel} disabled={!!problem} onPress={() => multi.onConfirm(pickedDocs)} testID="picker-confirm" />
+          </View>
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -49,19 +148,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.sm,
     paddingVertical: spacing.sm,
   },
-  title: { flex: 1, fontSize: typeScale.title.fontSize },
-  closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  row: {
+  headerText: { flex: 1, gap: spacing.xs },
+  empty: { padding: spacing.lg },
+  footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  empty: { padding: spacing.lg },
+  footerNote: { flex: 1 },
 });

@@ -6,6 +6,7 @@ import { PDF_TO_WORD_KIND, wordParams, wordSourceFor, type WordTarget } from '..
 import { convertToWord, type WordProgress } from '../../services/convert/toDocx';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
+import type { LibraryDocument } from '../../types/models';
 
 // §12 D6: the Reader's "Convert to Word" for scans and PDFs, through D1's gate (one rewarded ad per
 // conversion; none with a Pro pass). What's lost is said first, before the ad, so nobody watches
@@ -14,13 +15,16 @@ import { useT } from '../../i18n/useT';
 //
 // `docId` (the once grant's key): the library document, or for a PDF from outside its app-owned
 // copy's uri, like D5.
-export function useConvertToWord(opts: { preload: boolean }) {
+//
+// `onDone` (§17 U8, the Tools tab): the new DOCX goes to it, for its result sheet, instead of the snack.
+export function useConvertToWord(opts: { preload: boolean; onDone?: (doc: LibraryDocument) => void }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const gate = useProTask('convert', { preload: opts.preload });
   const { start: startTask } = gate;
   const [progress, setProgress] = useState<WordProgress | null>(null);
+  const { onDone } = opts;
 
   const run = useCallback(
     async (target: WordTarget) => {
@@ -30,6 +34,10 @@ export function useConvertToWord(opts: { preload: boolean }) {
       try {
         const doc = await convertToWord(source, setProgress);
         dispatch({ type: 'library/ADD_FILE', file: doc });
+        if (onDone) {
+          onDone(doc);
+          return;
+        }
         dispatch({
           type: 'ui/SHOW_SNACK',
           msg: t('reader.word.done'),
@@ -45,7 +53,7 @@ export function useConvertToWord(opts: { preload: boolean }) {
         setProgress(null);
       }
     },
-    [dispatch, state, t]
+    [dispatch, state, t, onDone]
   );
 
   const start = useCallback(

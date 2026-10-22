@@ -200,7 +200,6 @@
     "modal": 1
   },
   "components/reader/DocumentPickerModal.tsx": {
-    "pressable": 2,
     "modal": 1
   },
   "components/reader/DocxEditor.tsx": {

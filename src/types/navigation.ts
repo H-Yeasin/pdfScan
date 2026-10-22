@@ -8,7 +8,7 @@ export type ScreenName =
   | 'reader'
   // The Me tab since §17 U5.
   | 'settings'
-  // §17 U5: the Tools tab (a list of the existing entry points until U8).
+  // §17 U5: the Tools tab; since U8 every tool, in one grid (screens/ToolsScreen).
   | 'tools'
   | 'pro'
   | 'manageFolders'

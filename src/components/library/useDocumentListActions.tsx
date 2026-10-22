@@ -94,6 +94,9 @@ export async function runPageTool(
     annotations: readonly Annotation[];
     submissions: readonly Submission[];
     open: (doc: LibraryDocument) => void;
+    // §17 U8: the Tools tab shows the result in its own sheet, so a kept-originals run says nothing
+    // and Files' selection is left alone. Deleting the originals still offers Undo.
+    quiet?: boolean;
   }
 ): Promise<LibraryDocument[]> {
   const { dispatch } = ctx;
@@ -130,8 +133,9 @@ export async function runPageTool(
     });
   } else {
     dispatch({ type: 'library/ADD_FILES', files: made.docs, annotations: made.annotations });
-    dispatch({ type: 'ui/SHOW_SNACK', msg, action: t('library.open'), onAction: () => ctx.open(first) });
+    if (!ctx.quiet) dispatch({ type: 'ui/SHOW_SNACK', msg, action: t('library.open'), onAction: () => ctx.open(first) });
   }
+  if (ctx.quiet) return made.docs;
   // The result, selected and scrolled to, so the next step (share it, move it) is one tap away.
   dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
   dispatch({ type: 'libraryUi/REVEAL', id: first.id, select: kind === 'merge' });
@@ -471,5 +475,5 @@ export function useDocumentListActions() {
     </>
   );
 
-  return { selectedDocs, handlePressRow, handleLongPress, handleMore, handleSelectionTool, overlays };
+  return { selectedDocs, handlePressRow, handleLongPress, handleMore, handleSelectionTool, runTool, overlays };
 }

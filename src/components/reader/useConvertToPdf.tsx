@@ -7,6 +7,7 @@ import { PreviewTooLargeError } from '../../services/documents/sheetService';
 import { useAppDispatch } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import { radii, spacing, useTheme } from '../../theme';
+import type { LibraryDocument } from '../../types/models';
 
 // Formats whose PDF keeps the content but not the layout (mammoth's HTML has no page setup,
 // headers or fonts; a sheet keeps its values, not its styles, merged cells or charts). The plan's
@@ -19,12 +20,15 @@ const LOSSY: ReadonlySet<string> = new Set(['DOCX', 'XLSX', 'XLS']);
 //
 // `docId`: the library document, or for a file from outside its app-owned copy's uri (what the
 // once grant is tied to, so a failed conversion can be retried without another ad).
-export function useConvertToPdf(opts: { preload: boolean }) {
+//
+// `onDone` (§17 U8, the Tools tab): the new PDF goes to it, for its result sheet, instead of the snack.
+export function useConvertToPdf(opts: { preload: boolean; onDone?: (doc: LibraryDocument) => void }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
   const gate = useProTask('convert', { preload: opts.preload });
   const { start: startTask } = gate;
   const [converting, setConverting] = useState(false);
+  const { onDone } = opts;
 
   const run = useCallback(
     async (source: ConvertSource) => {
@@ -32,6 +36,10 @@ export function useConvertToPdf(opts: { preload: boolean }) {
       try {
         const doc = await convertToPdf(source);
         dispatch({ type: 'library/ADD_FILE', file: doc });
+        if (onDone) {
+          onDone(doc);
+          return;
+        }
         dispatch({
           type: 'ui/SHOW_SNACK',
           msg: t('reader.convert.done'),
@@ -47,7 +55,7 @@ export function useConvertToPdf(opts: { preload: boolean }) {
         setConverting(false);
       }
     },
-    [dispatch, t]
+    [dispatch, t, onDone]
   );
 
   const begin = useCallback(

@@ -817,7 +817,8 @@ As built (2026-10-22):
   `hardcodedStrings` and `bootImports`.
 
 ## U8 · The Tools hub *(L)*
-Status: planned. JS only. Split point: (a) the hub + the pick → run → result flow for Organise and
+Status: done in code (2026-10-22), both halves. JS only. Device check (Verification 8) open; never run on a
+phone. Split point: (a) the hub + the pick → run → result flow for Organise and
 Share; (b) Convert, Sign & fill, Study + recent tools.
 
 Goal: every tool the app has is two taps away, each with the same simple flow.
@@ -864,6 +865,59 @@ Tests: `toolRegistry` (every tool has a label, icon and section; ids unique; `ac
 goes through `useProTask`); `hardcodedStrings`, `a11yLabels`.
 
 Device check: Verification 8.
+
+As built (2026-10-22):
+- `services/tools/toolRegistry.ts` (pure): `TOOLS`, one `ToolDef` per tool in the plan's six sections
+  (`TOOL_SECTIONS`: scan, organise, convert, signFill, study, share): `labelKey`, `descKey`, `icon` (from
+  `ICONS`), `kind`, `accepts`, `min`/`max`, `fits` (formatCapabilities: `canUsePageTools`, `canSign`,
+  `canSubmit`, `canAddCover`, `hasPageMasters`…), `pro` (the `ProTaskFeature`, or null), `options`.
+  `pickableDocs` (accepted format, not archived, `fits`), `pickProblem` ("Pick at least 2"), `toolBadge`
+  (Pro tools: none with a pass, "Free today" with `pro_tasks_free`, **hidden** with ads off and tasks not
+  free since no ad could unlock them, else a Pro badge). The plan's `run` is not in the registry: a runner
+  needs hooks (the Pro gate, the signing overlays), so the runners are a `Record<ToolId, Runner>` in
+  `components/tools/useToolRunners.tsx`, and a new id doesn't compile without one.
+- The ids live in `services/tools/recentTools.ts` (`TOOL_IDS`, `pushRecentTool`, `normalizeRecentTools`),
+  which imports nothing: the settings slice keeps "Recently used" (`settings.recentTools`, the last 4,
+  `settings/USE_TOOL`, `LOAD_RECENT_TOOLS`, saved with the settings) and is on the boot path, where
+  `formatCapabilities` (pdfNative) must not be pulled in.
+- `kind` decides the flow (`services/tools/toolFlow.ts`, a pure reducer: `open`, `picked`, `setOptions`,
+  `back`, `confirm`, `done`, `failed`, `showResult`, `cancel`):
+  - `launch` (Scan, Import photos, Import file, Search everything → Files with search focused, Back up →
+    the Backup screen): runs at once, nothing to pick.
+  - `run` (Merge, Split, Compress): Pick → Options → a progress `Sheet` → `ToolResultSheet`. Options: Merge
+    and Split "Keep the originals" (on by default; off goes through `runPageTool`'s Undo window), Split
+    "every page" (the service has no ranges: not built), Compress a 3-rung ladder (Smallest, Balanced,
+    Sharper = export quality 1–3; `compressDocuments(docs, dispatch, quality)` took a `quality`). No Cancel:
+    none of the three services can stop half-way, and a run can't be cancelled or replaced in the reducer.
+  - `handoff` (Edit pages → `useEditPages`' editor over the Tools tab; Add cover → Academic options; Sign →
+    Files' signing overlays via `useDocumentListActions().runTool`, now returned; Exam pack → every page of
+    the picked documents into the tray, then `examPack`; Extract text and Print → the share / print
+    dialogs; Submit → `useSubmitDocument`; Export as zip → `useBackupExport().exportScope`): Pick, then the
+    tool's own flow.
+  - `gated` (To PDF, To Word, Fill a form): Pick, then the Reader's hooks (`useConvertToPdf`,
+    `useConvertToWord`, `useFillForm`) and so `useProTask`'s gate. They took an `onDone` / `onSaved`: with
+    it the new document goes to the result sheet instead of the snack (or, for a form, instead of the
+    Reader switching to it). A result that comes back after the gate (`showResult`) never opens over a tool
+    started meanwhile.
+- `DocumentPickerModal` is on the kit (header, `ListItem` rows with `FileCover`, FlashList): one pick per tap
+  as before, or `multi` (checkboxes in pick order, `min`/`max`, a live "Pick at least 2" / "2 picked" note
+  and a Continue that stays disabled), and `onImport`: "Import a file" at the top through
+  `useImportFile({ silent: true })` (which now returns the new document); an imported file the tool
+  can't use stays in Files with a snack saying so. Its two hand-rolled Pressables went (baseline lowered).
+- `runPageTool` took `quiet`: a kept-originals run from Tools shows no snack and leaves Files' selection
+  alone (the result sheet says it); deleting the originals still offers Undo.
+- `ToolsScreen`: a large `ScreenHeader` "Tools", "Recently used" (4 across) when there is any, then each
+  section as a 3-column grid of `ToolTile`s (icon on an `accentSoft` circle, the label, a Pro or "Free
+  today" `Badge`; the description is the TalkBack hint). Storage and Manage courses left the Tools tab;
+  both are in Me.
+- `ToolResultSheet`: a tick on `successSoft` (U4's `SuccessBurst` takes its place), "Done" or "{n} files
+  made", the message (Compress's) or "Saved in Files", the first document's card, Done · Share · Open.
+- Known gaps: Edit pages' "Extract to a new document" snack from Tools sets the Reader's document but its
+  Open doesn't navigate (it was written for the Reader); signing from Tools clears Files' selection, as
+  Files' own Sign does.
+- Tests: `services/tools/__tests__/{toolRegistry,toolFlow}.test.ts`, `screens/__tests__/ToolsScreen.test.tsx`
+  (Merge through pick → options → run → result; Pro tools hidden with ads off; To Word goes through the
+  gate), `runPageTool` quiet in `components/library/__tests__/pageTools.test.ts`.
 
 ## U9 · Scan → Save → Done *(L)*
 Status: planned. JS only. Split point: (a) Review; (b) Save, the Submit sheet, Done and the pipeline move.

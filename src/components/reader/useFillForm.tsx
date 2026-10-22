@@ -25,7 +25,10 @@ function grantIdOf(target: FormTarget): string {
 // document for `edit_unlock_minutes`). The form is read **before** the gate, so nobody watches an
 // ad for a PDF with nothing to fill in. The filled form is a new library document; the Reader
 // switches to it, and the session goes with it. Render `element` once.
-export function useFillForm(opts: { preload: boolean }) {
+//
+// `onSaved` (§17 U8, the Tools tab): the filled copy goes to it, for its result sheet, instead of
+// the Reader switching to it.
+export function useFillForm(opts: { preload: boolean; onSaved?: (copy: LibraryDocument) => void }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
   // Read when the copy is made (the document's marks go into it), not subscribed to.
@@ -34,6 +37,7 @@ export function useFillForm(opts: { preload: boolean }) {
   const { start: startTask } = gate;
   const [checking, setChecking] = useState(false);
   const [open, setOpen] = useState<{ target: FormTarget; form: FormFillRequest } | null>(null);
+  const { onSaved } = opts;
 
   const start = useCallback(
     async (target: FormTarget) => {
@@ -70,9 +74,13 @@ export function useFillForm(opts: { preload: boolean }) {
         const copy = await saveFilledForm(open.target, values, saveOpts, store.getState().library.annotations);
         dispatch({ type: 'library/ADD_FILE', file: copy });
         await carryProTaskGrant('pdfForms', grantIdOf(open.target), copy.id);
+        setOpen(null);
+        if (onSaved) {
+          onSaved(copy);
+          return true;
+        }
         dispatch({ type: 'reader/SET_READER_ID', id: copy.id });
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.form.saved') });
-        setOpen(null);
         return true;
       } catch (e) {
         console.warn('useFillForm: saving failed', e);
@@ -81,7 +89,7 @@ export function useFillForm(opts: { preload: boolean }) {
         return false;
       }
     },
-    [open, dispatch, t, store]
+    [open, dispatch, t, store, onSaved]
   );
 
   // Mark mode's Text tool on `doc`: `onUnlocked` runs once the gate lets it through (straight

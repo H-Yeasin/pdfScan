@@ -115,3 +115,21 @@ describe('runPageTool, deleting the originals', () => {
     expect(dispatch.mock.calls.map(([x]) => x)).toEqual([{ type: 'ui/SHOW_SNACK', msg: 'Too late to undo: the originals are gone' }]);
   });
 });
+
+// §17 U8: the Tools tab shows the result in its own sheet and leaves Files' selection alone.
+describe('runPageTool, quiet (the Tools tab)', () => {
+  it('says nothing and touches no selection when keeping the originals', async () => {
+    const { dispatch, ctx, snacks } = setup();
+    const made = await runPageTool('merge', [a, b], false, { ...ctx, quiet: true });
+    expect(made).toEqual([mockMerged]);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'library/ADD_FILES', files: [mockMerged], annotations: [mockCopiedMark] });
+    expect(snacks()).toEqual([]);
+    expect(dispatch.mock.calls.some(([x]) => String(x.type).startsWith('libraryUi/'))).toBe(false);
+  });
+
+  it('still offers Undo when the originals go', async () => {
+    const { ctx, snacks } = setup();
+    await runPageTool('merge', [a, b], true, { ...ctx, quiet: true });
+    expect(snacks()[0].action).toBe('Undo');
+  });
+});

@@ -68,6 +68,8 @@ export type PersistedSettings = {
   reading?: unknown;
   // Optional: added in §17 U7 (read by normalizeFilesView).
   filesView?: unknown;
+  // Optional: added in §17 U8 (read by normalizeRecentTools).
+  recentTools?: unknown;
 };
 
 async function readSettings(): Promise<PersistedSettings | null> {

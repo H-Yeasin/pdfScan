@@ -18,12 +18,13 @@ export function libraryOps(): typeof import('../../services/persistence/libraryO
 // selection bar, the Reader's More and Settings → Storage's biggest documents (§8 B1). An imported
 // PDF can only get smaller by becoming images; the message says when that happened, and when it
 // wouldn't have helped.
-export async function compressDocuments(docs: readonly LibraryDocument[], dispatch: Dispatch<AppAction>): Promise<string> {
+// `quality`: Deliver's 1-5 export ladder (2 by default; §17 U8's Tools offers 1-3).
+export async function compressDocuments(docs: readonly LibraryDocument[], dispatch: Dispatch<AppAction>, quality = 2): Promise<string> {
   let rasterized = 0;
   let notSmaller = 0;
   for (const doc of docs) {
     if (isPdfLevel(doc)) {
-      const result = await libraryOps().compressImportedPdf(doc);
+      const result = await libraryOps().compressImportedPdf(doc, quality);
       if (result.smaller) {
         rasterized += 1;
         dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: result.doc });
@@ -31,7 +32,7 @@ export async function compressDocuments(docs: readonly LibraryDocument[], dispat
         notSmaller += 1;
       }
     } else {
-      const compressed = await libraryOps().compressDocument(doc);
+      const compressed = await libraryOps().compressDocument(doc, quality);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
     }
   }

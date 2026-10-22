@@ -9,6 +9,7 @@ import type { AutoBackupFrequency } from '../../services/backup/schedule';
 import { DEFAULT_APP_LOCK, type AppLockSettings } from '../../services/security/appLock';
 import { DEFAULT_READING, type ReadingSettings } from '../../services/documents/readingSettings';
 import { DEFAULT_FILES_VIEW, type FilesView } from '../../services/library/filesView';
+import { pushRecentTool, type ToolId } from '../../services/tools/recentTools';
 
 export type SettingsState = {
   // False until persisted settings have been read, so behaviour that depends on them (like
@@ -90,6 +91,8 @@ export type SettingsState = {
   reading: ReadingSettings;
   // §17 U7: Files' order and list or grid (services/library/filesView).
   filesView: FilesView;
+  // §17 U8: the Tools tab's "Recently used", newest first (toolRegistry.pushRecentTool keeps four).
+  recentTools: ToolId[];
 };
 
 export const initialSettingsState: SettingsState = {
@@ -127,6 +130,7 @@ export const initialSettingsState: SettingsState = {
   appSessions: 0,
   reading: DEFAULT_READING,
   filesView: DEFAULT_FILES_VIEW,
+  recentTools: [],
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -154,6 +158,8 @@ export type SettingsAction =
   | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
   | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
   | { type: 'settings/LOAD_RECENT_OPENED'; recent: LastOpened[] }
+  | { type: 'settings/USE_TOOL'; id: ToolId }
+  | { type: 'settings/LOAD_RECENT_TOOLS'; recent: ToolId[] }
   // A partial patch, so each profile field can be edited on its own.
   | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> }
   | { type: 'settings/SET_NAME_TEMPLATE'; template: string }
@@ -231,6 +237,12 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       };
     case 'settings/LOAD_RECENT_OPENED':
       return { ...state, recentOpened: action.recent };
+    case 'settings/USE_TOOL': {
+      const recentTools = pushRecentTool(state.recentTools, action.id);
+      return recentTools === state.recentTools ? state : { ...state, recentTools };
+    }
+    case 'settings/LOAD_RECENT_TOOLS':
+      return { ...state, recentTools: action.recent };
     case 'settings/SET_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.profile } };
     case 'settings/SET_UNSORTED_PROMPT_DONE':

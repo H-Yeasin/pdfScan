@@ -10,6 +10,7 @@ import { isAccentId, useTheme } from '../theme';
 import { normalizeAppLock } from '../services/security/appLock';
 import { normalizeReading } from '../services/documents/readingSettings';
 import { normalizeFilesView } from '../services/library/filesView';
+import { normalizeRecentTools } from '../services/tools/recentTools';
 
 export function useSettingsPersistence() {
   const dispatch = useAppDispatch();
@@ -26,6 +27,7 @@ export function useSettingsPersistence() {
         dispatch({ type: 'settings/SET_APP_LOCK', appLock: normalizeAppLock(settings.appLock) });
         dispatch({ type: 'settings/SET_READING', reading: normalizeReading(settings.reading) });
         dispatch({ type: 'settings/SET_FILES_VIEW', view: normalizeFilesView(settings.filesView) });
+        dispatch({ type: 'settings/LOAD_RECENT_TOOLS', recent: normalizeRecentTools(settings.recentTools) });
         dispatch({ type: 'settings/SET_FIRST_RUN', firstRun: settings.firstRun });
         dispatch({ type: 'settings/SET_OCR_SCRIPT', script: settings.ocrScript });
         dispatch({
@@ -134,6 +136,7 @@ export function useSettingsPersistence() {
       appSessions: state.settings.appSessions,
       reading: state.settings.reading,
       filesView: state.settings.filesView,
+      recentTools: state.settings.recentTools,
     });
   }, [
     loaded,
@@ -172,6 +175,7 @@ export function useSettingsPersistence() {
     state.settings.appSessions,
     state.settings.reading,
     state.settings.filesView,
+    state.settings.recentTools,
   ]);
 
   // The i18n layer follows the setting; screens re-render through useT.
