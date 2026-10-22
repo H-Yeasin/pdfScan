@@ -366,11 +366,7 @@ away: Home · Files · [Scan] · Tools · Me.
 - [x] U10 Me (Settings) (done in code 2026-10-22; device check open)
 - [x] U11 Course, Exam pack, Pro, Onboarding (done in code 2026-10-22; device check open)
 - [x] U12 Copy pass (UK spelling, sentence case, no jargon) (done in code 2026-10-22; device check open)
-<<<<<<< HEAD
 - [x] U13 Motion and feedback (done in code 2026-10-22; device check open)
-=======
-- [ ] U13 Motion and feedback
->>>>>>> cdf4e51af426899ebf6ab775e6bb3ccc9e081ca4
 - [ ] U14 Usability check with students
 
 **Done when:** students in the U14 walkthrough meet the tap-count targets without help (scan → saved ≤ 3,

@@ -94,7 +94,6 @@ export function SubmitSheet(props: SubmitSheetProps) {
         <Text variant="label">{t('deliver.pageLayout')}</Text>
         <LayoutModeSegmented value={props.layoutMode} onChange={props.onLayoutMode} />
         {props.layoutMode === '2_in_1' ? (
-<<<<<<< HEAD
           <Animated.View entering={appear} exiting={disappear}>
             <Text variant="caption" color="muted">
               {t('deliver.layoutHintTwoUp')}
@@ -102,13 +101,6 @@ export function SubmitSheet(props: SubmitSheetProps) {
           </Animated.View>
         ) : null}
       </Animated.View>
-=======
-          <Text variant="caption" color="muted">
-            {t('deliver.layoutHintTwoUp')}
-          </Text>
-        ) : null}
-      </View>
->>>>>>> cdf4e51af426899ebf6ab775e6bb3ccc9e081ca4
 
       <Animated.View layout={settle} style={styles.group}>
         <Text variant="label">{t('deliver.pageSize')}</Text>
