@@ -55,8 +55,8 @@ describe('OnboardingScreen', () => {
     press(root, 'Skip');
     expect(probe.app.state.settings.profile.name).toBe('Nusrat');
     expect(probe.app.state.settings.onboardingDone).toBe(true);
-    // No courses: Capture, where the first scan starts.
-    expect(probe.router.screen).toBe('capture');
+    // §17 U5: Home even with no courses.
+    expect(probe.router.screen).toBe('home');
   });
 
   it('Start saves the courses typed and goes Home', () => {

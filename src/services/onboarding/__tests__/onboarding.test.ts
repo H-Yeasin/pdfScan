@@ -1,5 +1,5 @@
 import { savableQuickSetup } from '../../courses/courseSetup';
-import { afterOnboarding, exampleFileName, initialsOf, onboardingDecision, studentCard } from '../onboarding';
+import { exampleFileName, initialsOf, onboardingDecision, studentCard } from '../onboarding';
 import type { Course } from '../../../types/models';
 
 describe('onboardingDecision', () => {
@@ -17,11 +17,6 @@ describe('onboardingDecision', () => {
 
   it("doesn't take a library that failed to load for an empty one", () => {
     expect(onboardingDecision({ ...fresh, libraryLoaded: false })).toBe('none');
-  });
-
-  it('starts on Home with a course, else Capture', () => {
-    expect(afterOnboarding(true)).toBe('home');
-    expect(afterOnboarding(false)).toBe('capture');
   });
 });
 

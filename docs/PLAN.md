@@ -358,7 +358,7 @@ away: Home · Files · [Scan] · Tools · Me.
 - [x] U2 UI kit (`components/ui/`) + the ratchet test against hand-rolled styles (done in code 2026-10-22; device check open)
 - [ ] U3 Sheet, Dialog / `useConfirm`, Menu (every `Alert` and `Modal` migrated)
 - [ ] U4 Illustrations and brand moments
-- [ ] U5 The new shell: 4 tabs + the centre Scan button (Capture removed; Home always the start)
+- [x] U5 The new shell: 4 tabs + the centre Scan button (Capture removed; Home always the start) (done in code 2026-10-22; device check open)
 - [ ] U6 Home
 - [ ] U7 Files: folders, filters, sort, grid, row menus, Rename, checkboxes, safe merge/split, import
 - [ ] U8 Tools hub
@@ -402,7 +402,7 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 - [x] W20 TXT (done in code 2026-10-10; device check open)
 - [x] W21 Sheets (done in code 2026-10-10; device check open)
 - [x] W22 DOCX (done in code 2026-10-10; device check open)
-- [ ] W23 Grouped More sheet + Rename, Move, Star (needs §17 U3)
+- [x] W23 Grouped More sheet + Rename, Move, Star (done in code 2026-10-22, before §17 U3: it built U3's `Menu`; device check open)
 
 **Done when:** on a mid-range phone a 300-page textbook opens sharp in ≤ 1.2 s cold, flings with ≤ 5%
 janky frames, resumes on the right page with no jump, and zoom and position survive Find, selection,

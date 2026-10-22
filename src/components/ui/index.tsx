@@ -15,6 +15,8 @@ export { IconButton, ICON_BUTTON_SIZE } from './IconButton';
 export type { IconButtonProps, IconButtonVariant } from './IconButton';
 export { ICON_WELL, ListItem } from './ListItem';
 export type { ListItemProps } from './ListItem';
+export { Menu, MENU_ROW_HEIGHT } from './Menu';
+export type { MenuItem, MenuProps, MenuSection } from './Menu';
 export { clampProgress, ProgressBar } from './ProgressBar';
 export type { ProgressBarProps } from './ProgressBar';
 export { HEADER_BAR_HEIGHT, ScreenHeader, useScreenHeader } from './ScreenHeader';

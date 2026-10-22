@@ -276,10 +276,10 @@ export function ReviewScreen() {
 
   const handleRetake = useCallback(() => {
     if (!selectedPage) return;
+    // §17 U5: the scanner opens over Review (ScanLauncher), which stays where it is.
     dispatch({ type: 'capture/SET_RETAKE_TARGET', id: selectedPage.id });
     dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
-    go('capture', 'back');
-  }, [dispatch, selectedPage, go]);
+  }, [dispatch, selectedPage]);
 
   const handleContextBarPress = useCallback(
     (id: 'crop' | 'rotate' | 'retake' | 'ocr' | 'sign') => {
@@ -513,7 +513,6 @@ export function ReviewScreen() {
                 onPress: () => {
                   dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
                   dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
-                  go('capture');
                 },
               }}
               secondaryAction={{ label: t('capture.gallery'), onPress: () => void importFromGallery() }}
@@ -527,9 +526,8 @@ export function ReviewScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        {/* No on-screen Back: it only reached the in-app Capture screen, never the native scanner
-            (a finished activity that can only be relaunched, which "+" already does). Android's
-            back still returns to Capture with the session kept (navigation/backHandling.ts). */}
+        {/* No on-screen Back (U9 redesigns this header). Android's back returns to the tab the scan
+            was started on, asking first while there are pages (§17 U5, navigation/backHandling.ts). */}
         <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
           {t('review.title')}
         </Text>
@@ -597,7 +595,6 @@ export function ReviewScreen() {
         onAddMore={() => {
           dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
           dispatch({ type: 'capture/REQUEST_SCANNER', requested: true });
-          go('capture');
         }}
         onDelete={handleDeletePage}
         cover={coverConfig ? { mode: coverConfig.mode, importedUri: coverConfig.mode === 'imported_image' ? coverConfig.importedUri : undefined } : null}

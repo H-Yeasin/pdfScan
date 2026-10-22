@@ -409,6 +409,9 @@ As built (2026-10-22):
 ## U3 · Sheets, dialogs and menus *(L)*
 Status: planned. JS only. Split point: (a) `Sheet`, `Dialog`/`useConfirm`, `Menu` + all 26 `Alert.alert`
 replaced; (b) the 29 Modals moved onto `Sheet`.
+Note (2026-10-22): §18 W23 built `components/ui/Menu.tsx` already (the props below, plus `below` for a
+hint), in its own Modal; U3 moves it onto `Sheet` and keeps the props. `useDocumentActions` exists too
+(`components/library/useDocumentActions.ts`, for U7).
 
 Goal: every sheet, dialog and menu looks and behaves the same, and no Android button is ever dropped.
 
@@ -480,7 +483,7 @@ actions with roles; `hardcodedStrings` stays green.
 Device check: Verification 4.
 
 ## U5 · The new shell: 4 tabs + the centre Scan button *(L)*
-Status: planned. JS only. Needs §16 G2.
+Status: done in code (2026-10-22). JS only. Device check (Verification 5) open; never run on a phone.
 
 Goal: the five-slot tab bar (Home, Files, Scan, Tools, Me) is always there on the tab roots; one tap scans.
 
@@ -526,6 +529,57 @@ calls `startScan` with the chosen mode; `a11yLabels` (each tab has `accessibilit
 is a `button` with a label); `safeArea.test.ts`.
 
 Device check: Verification 5.
+
+As built (2026-10-22):
+- Tabs: `navStack.TABS` is `['home', 'library', 'tools', 'settings']` (ids kept: `library` is Files,
+  `settings` is Me). `'capture'` is gone from `ScreenName`; `'tools'` is new. Scan isn't a tab.
+- `TabBar`: four `Touchable` tabs (`accessibilityRole="tab"`, `testID` `tab-<id>`), the icons from
+  `ICONS` (U1 chose `construct-outline` for Tools and `folder-open-outline` for Files, not the plan's
+  `grid-outline`/`folder-outline`) with the filled glyph on an `accentSoft` pill when active. The Scan
+  button is a 64 dp accent circle (`testID` `tab-scan`, a `button` with a label, a hint, and a
+  "Choose a mode" accessibility action for the long-press). It rises inside the bar's own box: the
+  bar's fill starts at the circle's middle and the strip beside it lets touches through, because
+  Android gives no touch to a child drawn outside its parent (a negative margin would leave the top
+  half dead). The bar reports its full height (`useReportBottomBar`).
+- The scanner launch moved out of CaptureScreen into `components/capture/ScanLauncher.tsx`, mounted
+  once by AppNavigator inside the app lock: it consumes `capture.scannerRequested` (waits for
+  settings), clears `firstRun`, and `require`s `scannerPipeline` on the first scan (off the boot path).
+  Every "scan now" (tab bar, mode sheet, a course's Scan, Review's Retake / Add more / Start, the
+  Reader's Add pages) just dispatches; no `go('capture')` is left. A cancelled scan stays where it was.
+- `startScan(state, dispatch, courseId, { launch, appendTo?, mode? })`: a new session starts in `mode`,
+  else `settings.lastCaptureMode` (it now takes `settings` too); a session in progress keeps its mode.
+- `ScanModeSheet` is on `components/ui/Menu` (U3 moves Menu onto Sheet), so it adds no Modal: "Scan as"
+  (the five `CAPTURE_MODES` as two-line rows: `MenuItem.hint` is new; the last mode has a "Last used"
+  badge), then "Or bring in": Import photos (`useGalleryImport`) and Import a file
+  (`store/useImportFile.ts`: the picker, a zip to the restore flow, else `promoteExternalToLibrary` →
+  Files → the Reader, like an "Open with"; U7 puts it in Files too). Rows, not the plan's big tiles.
+- `useGalleryImport` reads the session, mode and course from the store when it runs
+  (`filingCourseNow`, `scanOcrScriptNow`), so the tab bar holding it doesn't re-render on scan changes.
+- Navigation: a scan is pushed on the tab it started from; `review`/`deliver` are on one stack only
+  (opening Review on another tab cuts them off the old one); library content (`course`, `reader`,
+  `examPack`) opened from the scan flow drops the finished flow, so Back from the saved scan's course
+  page goes where the scan began. Back from Review with pages → `confirmDiscard` with `then: 'pop'`
+  (AppNavigator stops the batch and the text reading, clears the session, pops); without pages it pops.
+  `rootScreen()` and `chooseStartScreen()` always give Home (Onboarding for a new user);
+  `onboarding.afterOnboarding` is gone (Onboarding goes Home). `BackContext.hasCourses` is gone.
+- Me: `SettingsScreen` lost its Back button and its bottom edge (allowlisted in `safeArea.test.ts`).
+  Deliver's "set up a folder" uses `switchTab('settings')`, so the scan stays on its tab. The gear
+  icons on Home and Files are gone; Home's big Scan pill went too (the tab bar's Scan replaces it),
+  and the one-time Scan hint moved to the tab bar with a "Choose a mode" action (`Hint` `action`).
+- `ToolsScreen`: a `ScreenHeader` + `ListItem`s: Scan pages, Import photos, Import a file; "Merge,
+  split, compress or sign" (opens Files, where the selection bar has them); Backup, Storage, Manage
+  courses. U8 replaces it.
+- Deleted: `CaptureScreen`, `CaptureControls`, `CaptureModePicker`, `theme/captureChrome.ts`, the
+  unused `capture.*` strings. New strings: `shared.tabs.{home,files,scan,scanHint,tools,me}`,
+  `capture.modeSheet.*`, `tools.*`.
+- Tests: `components/capture/__tests__/scanShell.test.tsx` (tab roles and labels, tab switching, a
+  tap scans at once in the last mode, waits for settings, the long-press sheet remembers and scans in
+  the chosen mode), `navStack` (tabs, a scan on every tab, one session on one stack, landing on the
+  course page, detours), `backHandling` (Review asks then pops on every tab, every root goes Home),
+  `startScreen`, `startScan` (mode), `bootImports`, `safeArea`, `ScreenStack`, the Home and hint tests
+  (the hint is on the tab bar). The ratchet's baseline went down (Capture's files, Home, Files, Me).
+- Not done here: the plan's `a11yLabels` addition is covered by `scanShell.test.tsx` instead (the
+  static scan can't tell a tab from a button); `hints.ts` needed no change.
 
 ## U6 · Home *(M)*
 Status: planned. JS only.

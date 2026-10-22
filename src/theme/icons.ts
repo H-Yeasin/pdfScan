@@ -29,6 +29,8 @@ export type ActionId =
   | 'filter'
   | 'move'
   | 'rename'
+  | 'star'
+  | 'docType'
   | 'duplicate'
   | 'delete'
   | 'select'
@@ -59,6 +61,8 @@ export type ActionId =
   // Share and keep
   | 'share'
   | 'save'
+  | 'print'
+  | 'addToLibrary'
   | 'submit'
   | 'examPack'
   | 'backup'
@@ -100,6 +104,8 @@ export const ICONS: Record<ActionId, IoniconName> = {
   filter: 'funnel-outline',
   move: 'return-up-forward-outline',
   rename: 'text-outline',
+  star: 'star-outline',
+  docType: 'pricetag-outline',
   duplicate: 'copy-outline',
   delete: 'trash-outline',
   select: 'checkmark-circle-outline',
@@ -130,6 +136,8 @@ export const ICONS: Record<ActionId, IoniconName> = {
 
   share: 'share-social-outline',
   save: 'save-outline',
+  print: 'print-outline',
+  addToLibrary: 'library-outline',
   submit: 'paper-plane-outline',
   examPack: 'school-outline',
   backup: 'cloud-upload-outline',

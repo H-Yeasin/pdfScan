@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
+import { Touchable } from '../ui';
 
 type HintProps = {
   text: string;
@@ -10,6 +11,8 @@ type HintProps = {
   arrow?: 'up' | 'down' | 'none';
   // Where the arrow sits along the callout's edge.
   arrowAlign?: 'left' | 'center' | 'right';
+  // A second button before "Got it" (§17 U5: the Scan hint's "Choose a mode"). It closes the hint too.
+  action?: { label: string; onPress: () => void };
   style?: StyleProp<ViewStyle>;
 };
 
@@ -17,7 +20,7 @@ const ARROW = 8;
 
 // §9 O3: a one-time hint's callout (shown through useHint). The caller positions it next to its
 // anchor. Announced politely to screen readers; "Got it" closes it.
-export function Hint({ text, onDismiss, arrow = 'none', arrowAlign = 'center', style }: HintProps) {
+export function Hint({ text, onDismiss, arrow = 'none', arrowAlign = 'center', action, style }: HintProps) {
   const { tokens } = useTheme();
   const { t } = useT();
   const arrowStyle = [
@@ -31,6 +34,18 @@ export function Hint({ text, onDismiss, arrow = 'none', arrowAlign = 'center', s
     <View style={[styles.callout, { backgroundColor: tokens.ink }, style]} accessibilityLiveRegion="polite" accessibilityRole="alert">
       {arrow !== 'none' ? <View style={arrowStyle} /> : null}
       <Text style={[styles.text, { color: tokens.bg }]}>{text}</Text>
+      {action ? (
+        <Touchable
+          onPress={() => {
+            onDismiss();
+            action.onPress();
+          }}
+          ripple="onFill"
+          accessibilityRole="button"
+        >
+          <Text style={[styles.gotIt, { color: tokens.bg }]}>{action.label}</Text>
+        </Touchable>
+      ) : null}
       <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button">
         <Text style={[styles.gotIt, { color: tokens.bg }]}>{t('shared.hint.gotIt')}</Text>
       </Pressable>

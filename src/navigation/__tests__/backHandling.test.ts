@@ -6,7 +6,6 @@ const base: BackContext = {
   screen: 'home',
   tab: 'home',
   canPop: false,
-  hasCourses: true,
   selMode: false,
   searchOpen: false,
   sessionPageCount: 0,
@@ -57,32 +56,34 @@ describe('resolveBack order', () => {
     const back = (nav: NavState) => topEntry(pressBack(nav).nav).screen;
     expect(back(walk(home, 'course', 'reader'))).toBe('course');
     expect(back(walk(initialNav('library'), 'reader'))).toBe('library');
-    expect(back(walk(home, 'settings', 'manageFolders'))).toBe('settings');
+    expect(back(walk(initialNav('settings'), 'manageFolders'))).toBe('settings');
+    expect(back(walk(initialNav('tools'), 'backup'))).toBe('tools');
     // §10 M6: Pro is a plain push, so Back returns to the screen it was opened from.
-    expect(back(walk(initialNav('capture'), 'review', 'academicOptions', 'pro'))).toBe('academicOptions');
+    expect(back(walk(home, 'review', 'academicOptions', 'pro'))).toBe('academicOptions');
     expect(back(walk(home, 'course', 'examPack'))).toBe('course');
   });
 
-  it('Settings opened from Capture goes back to Capture', () => {
-    const { nav } = pressBack(walk(initialNav('capture'), 'settings'));
-    expect(nav.tab).toBe('capture');
-    expect(activeStack(nav).map((e) => e.screen)).toEqual(['capture']);
+  it('§17 U5: Me is a tab: its root goes Home, like the other tabs', () => {
+    const { nav } = pressBack(initialNav('settings'));
+    expect(nav.tab).toBe('home');
+    expect(activeStack(nav).map((e) => e.screen)).toEqual(['home']);
   });
 
   it('Storage opened by the low-space guard goes back to the screen that opened it', () => {
     // useSpaceGuard, from a document in the Library: no Settings in between.
     const nav = walk(initialNav('library'), 'reader', 'storage');
     expect(topEntry(pressBack(nav).nav).screen).toBe('reader');
-    // From Settings → Storage, it's Settings.
-    expect(topEntry(pressBack(walk(home, 'settings', 'storage')).nav).screen).toBe('settings');
+    // From Me → Storage, it's Me.
+    expect(topEntry(pressBack(walk(initialNav('settings'), 'storage')).nav).screen).toBe('settings');
   });
 
   it('keeps the scan flow’s fixed steps back', () => {
     const to = (patch: Partial<BackContext>) => {
-      const step = resolveBack(ctx({ canPop: true, tab: 'capture', ...patch }));
+      const step = resolveBack(ctx({ canPop: true, tab: 'home', ...patch }));
       return step.kind === 'go' ? step.to : step.kind;
     };
-    expect(to({ screen: 'review' })).toBe('capture');
+    // §17 U5: Review pops to the tab the scan was started on (asking first, below).
+    expect(to({ screen: 'review' })).toBe('pop');
     expect(to({ screen: 'deliver' })).toBe('review');
     // The scan session's Academic options: back to wherever they were opened (Review or Deliver).
     expect(to({ screen: 'academicOptions' })).toBe('pop');
@@ -92,9 +93,8 @@ describe('resolveBack order', () => {
   });
 
   it('does the screen’s Back clean-up on the way out', () => {
-    expect(resolveBack(ctx({ screen: 'review', tab: 'capture', canPop: true, retakeTargetId: 'p1' }))).toEqual({
-      kind: 'go',
-      to: 'capture',
+    expect(resolveBack(ctx({ screen: 'review', tab: 'home', canPop: true, retakeTargetId: 'p1' }))).toEqual({
+      kind: 'pop',
       actions: [{ type: 'capture/SET_RETAKE_TARGET', id: null }],
     });
     expect(resolveBack(ctx({ screen: 'course', canPop: true, highlightDeadlineId: 'd1' }))).toEqual({
@@ -103,11 +103,11 @@ describe('resolveBack order', () => {
     });
   });
 
-  it('on a root: to the start tab from another tab, out of the app from the start tab', () => {
+  it('on a root: to Home from another tab, out of the app from Home', () => {
     expect(resolveBack(ctx({ screen: 'home' }))).toEqual({ kind: 'exit' });
-    expect(resolveBack(ctx({ screen: 'capture', tab: 'capture', hasCourses: false }))).toEqual({ kind: 'exit' });
-    expect(resolveBack(ctx({ screen: 'library', tab: 'library', hasCourses: false }))).toEqual({ kind: 'go', to: 'capture', actions: [] });
-    expect(resolveBack(ctx({ screen: 'home', hasCourses: false }))).toEqual({ kind: 'go', to: 'capture', actions: [] });
+    for (const tab of ['library', 'tools', 'settings'] as const) {
+      expect(resolveBack(ctx({ screen: tab, tab }))).toEqual({ kind: 'go', to: 'home', actions: [] });
+    }
     // Applied: the Library tab's root goes to Home's.
     const { nav } = pressBack(initialNav('library'));
     expect(nav.tab).toBe('home');
@@ -115,19 +115,28 @@ describe('resolveBack order', () => {
   });
 
   it('asks before exiting with an unsaved scan', () => {
-    expect(resolveBack(ctx({ screen: 'capture', tab: 'capture', hasCourses: false, sessionPageCount: 8 }))).toEqual({
-      kind: 'confirmDiscard',
-      count: 8,
-    });
-    // Leaving Capture for Home keeps the pages, so no question there.
-    expect(resolveBack(ctx({ screen: 'capture', tab: 'capture', sessionPageCount: 8 })).kind).toBe('go');
+    expect(resolveBack(ctx({ screen: 'home', sessionPageCount: 8 }))).toEqual({ kind: 'confirmDiscard', count: 8, then: 'exit' });
+    // Another tab's root goes Home first, the pages kept.
+    expect(resolveBack(ctx({ screen: 'tools', tab: 'tools', sessionPageCount: 8 })).kind).toBe('go');
+  });
+
+  it('§17 U5: Back from Review asks before the scan goes, then returns to the tab it was started on', () => {
+    for (const tab of ['home', 'library', 'tools', 'settings'] as const) {
+      const nav = walk(initialNav(tab), 'review');
+      const { step } = pressBack(nav, { sessionPageCount: 3 });
+      expect(step).toEqual({ kind: 'confirmDiscard', count: 3, then: 'pop' });
+      // What AppNavigator does on "Discard": pop.
+      expect(topEntry(pop(nav)).screen).toBe(tab);
+    }
+    // An empty Review (a cancelled import) just pops.
+    expect(pressBack(walk(home, 'review')).step).toEqual({ kind: 'pop', actions: [] });
   });
 
   it('§9 O2: the introduction exits on first run and returns to Settings when opened from there', () => {
     // First run: the boot screen, alone on its stack.
-    const firstRun = replace(initialNav('capture'), 'onboarding', 'intro');
+    const firstRun = replace(initialNav('home'), 'onboarding', 'intro');
     expect(pressBack(firstRun).step).toEqual({ kind: 'exit' });
-    expect(topEntry(pressBack(walk(home, 'settings', 'onboarding')).nav).screen).toBe('settings');
+    expect(topEntry(pressBack(walk(initialNav('settings'), 'onboarding')).nav).screen).toBe('settings');
   });
 });
 
@@ -139,7 +148,7 @@ describe('§14 Q7 cover target', () => {
       actions: [{ type: 'deliver/SET_COVER_TARGET', target: null }],
     });
     // The scan session's options: nothing to clear.
-    expect(resolveBack(ctx({ screen: 'academicOptions', tab: 'capture', canPop: true }))).toEqual({ kind: 'pop', actions: [] });
+    expect(resolveBack(ctx({ screen: 'academicOptions', tab: 'home', canPop: true }))).toEqual({ kind: 'pop', actions: [] });
   });
 
   it('returns to the list it was started from, past a Pro detour', () => {

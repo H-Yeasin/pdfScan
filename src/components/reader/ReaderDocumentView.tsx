@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOpenCoverOptions } from '../library/useCoverTarget';
+import { useDocumentActions } from '../library/useDocumentActions';
 import { Hint } from '../shared/Hint';
 import { useHint } from '../shared/useHint';
 import { useT } from '../../i18n/useT';
@@ -13,7 +14,7 @@ import { useBackHandler } from '../../navigation/useBackHandler';
 import { canFindInDoc, canSign, isPageRasterFormat, isPdfLevel } from '../../services/documents/formatCapabilities';
 import { libraryIdxFor, pdfPageCount, pdfPageFor } from '../../services/documents/pageMap';
 import { pageLabel, pagePosition, pdfPageAfterEdit } from '../../services/documents/readerPosition';
-import { readerMoreItems, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../../services/documents/readerTools';
+import { readerMoreSections, readerProTasks, readerTools, type ReaderSubject, type ReaderToolId } from '../../services/documents/readerTools';
 import { useIsPro } from '../../services/pro/entitlement';
 import type { OutlineEntry } from '../../services/reader/outline';
 import { chromeLocked, readerBackTarget } from '../../services/reader/readerSheets';
@@ -183,7 +184,9 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
   );
   const night = reading.night;
   const tools = useMemo(() => (subject ? readerTools(subject, { proTasks, isPro }) : []), [subject, proTasks, isPro]);
-  const moreItems = useMemo(() => (subject ? readerMoreItems(subject, { proTasks }) : []), [subject, proTasks]);
+  // §18 W23: Convert, Edit and Fill in form are the tool bar's Convert/Edit, not More's.
+  const moreSections = useMemo(() => (subject ? readerMoreSections(subject) : []), [subject]);
+  const documentActions = useDocumentActions();
   // §12 D5/D6: Office → PDF and scan/PDF → Word, each through D1's gate; an ad is loaded ahead
   // while a file one of them applies to is open (only by that one: a file has one of the two).
   const toWord = !!format && isPageRasterFormat(format);
@@ -405,10 +408,7 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
     sign: signing.start,
     editPages: editPages.open,
     openCoverOptions,
-    convertToPdf,
-    convertToWord,
-    editFile,
-    fillForm,
+    documentActions,
   });
 
   if (fileMissing) {
@@ -538,7 +538,8 @@ export function ReaderDocumentView({ doc: openDoc, external }: ReaderOpenSubject
         outline={onSurface ? outline : NO_OUTLINE}
         pageText={pageText}
         flashNote={flashNote}
-        moreItems={moreItems}
+        moreSections={moreSections}
+        documentActions={documentActions}
         onSelectMore={onSelectMore}
         submissions={docSubmissions}
         currentBookmark={currentBookmark}

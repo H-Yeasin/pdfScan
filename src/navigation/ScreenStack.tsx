@@ -3,10 +3,9 @@ import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { TabBar } from '../components/shared/TabBar';
 import { useAppSelector } from '../store/AppStateContext';
 import { useTheme } from '../theme';
-import { captureChromeStatic } from '../theme/captureChrome';
 import { useReducedMotion } from '../theme/useReducedMotion';
 import type { ScreenName } from '../types/navigation';
-import { activeStack, isRootEntry, isTabRoot, rootEntry, TABS, topEntry, type TabId } from './navStack';
+import { activeStack, isRootEntry, rootEntry, TABS, topEntry, type TabId } from './navStack';
 import { useRenderCount } from '../utils/renderCounts';
 import { useRouter } from './router';
 import { ScreenRoleContext, type ScreenRole } from './screenRole';
@@ -32,9 +31,9 @@ import { FADE_DURATION_MS, RESTING_STYLE, runSlide, SLIDE_DURATION_MS, transitio
 // them until shown again.
 
 // §9 O6: on a tablet, content stays at a readable width, centred, instead of stretching across the
-// screen. The camera, Review's page editor and the Reader use the whole screen.
+// screen. Review's page editor and the Reader use the whole screen.
 const CONTENT_MAX_WIDTH = 720;
-const FULL_BLEED: ReadonlySet<ScreenName> = new Set(['capture', 'review', 'reader']);
+const FULL_BLEED: ReadonlySet<ScreenName> = new Set(['review', 'reader']);
 
 export type ScreenMap = Record<ScreenName, ComponentType>;
 
@@ -122,10 +121,6 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
   const pushed = activeStack(nav).filter((entry) => !isRootEntry(entry));
   if (leaving && !leavingIsRoot && !pushed.some((entry) => entry.key === leaving.key)) pushed.push(leaving);
 
-  // The tab whose root the shell shows: Capture's chrome is dark whatever the theme, under its
-  // translucent tab bar too.
-  const shellTab = !topIsRoot && leaving && isTabRoot(leaving.screen) ? leaving.screen : nav.tab;
-
   return (
     <View style={styles.stage}>
       <ScreenRoleContext.Provider value={shellRole}>
@@ -133,7 +128,7 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
           pointerEvents={shellRole === 'active' ? 'auto' : 'none'}
           style={[styles.layer, RESTING_STYLE, motion.shell, shellRole === 'hidden' ? styles.hidden : null]}
         >
-          <View style={[styles.shell, { backgroundColor: shellTab === 'capture' ? captureChromeStatic.base : tokens.bg }]}>
+          <View style={[styles.shell, { backgroundColor: tokens.bg }]}>
             <View style={styles.roots}>
               {TABS.filter((tab) => visited.includes(tab)).map((tab) => {
                 const { key } = rootEntry(tab);

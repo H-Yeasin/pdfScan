@@ -4,7 +4,6 @@ export { BRAND, rgba, SPLASH_IMAGE_DP, SPLASH_TILE_DP, SPLASH_TILE_FRACTION, TIL
 export type { BrandGradient } from './brand';
 export { ThemeProvider, useTheme } from './ThemeProvider';
 export type { ThemePref } from './ThemeProvider';
-export { captureChromeStatic, useCaptureChrome } from './captureChrome';
 export { spacing, radii, touchSlop, MIN_TOUCH } from './spacing';
 export { CHROME_MAX_FONT_SCALE, fontFamily, typeScale, useAppFonts } from './typography';
 export type { TypeVariant } from './typography';

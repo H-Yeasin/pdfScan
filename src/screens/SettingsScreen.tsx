@@ -1,6 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
-import { Linking, Platform, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TimetableEditor } from '../components/courses/TimetableEditor';
@@ -17,7 +16,7 @@ import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { deriveFolderLabel } from '../services/export/deviceExportService';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { fontFamily, spacing, typeScale, useTheme, type ThemePref, touchSlop } from '../theme';
+import { fontFamily, spacing, typeScale, useTheme, type ThemePref } from '../theme';
 import { PLANNED_SCRIPTS, READY_SCRIPTS } from '../services/scripts/registry';
 import { grantPass, setEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
 import { passEndLabel } from '../components/pro/passEndLabel';
@@ -37,7 +36,7 @@ export function SettingsScreen() {
     { id: 'dark', label: t('settings.theme.dark') },
   ];
   const [timetableOpen, setTimetableOpen] = useState(false);
-  const { go, back } = useRouter();
+  const { go } = useRouter();
   const renderCountsOn = useRenderCountsShown();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
@@ -87,11 +86,10 @@ export function SettingsScreen() {
   }, [dispatch, t]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
+    // §17 U5: the Me tab's root: no Back (Android's goes to Home), and the shell's TabBar pads the
+    // bottom. U10 redesigns the rest.
+    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.headerButton} onPress={back} accessibilityLabel={t('common.back')}>
-          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-        </Pressable>
         <Text style={[styles.title, { color: tokens.ink }]}>{t('settings.title')}</Text>
       </View>
 
@@ -358,15 +356,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   title: {
     fontFamily: fontFamily.heading,

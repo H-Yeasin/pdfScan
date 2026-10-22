@@ -45,7 +45,7 @@ type RouterContextValue = RouterState & {
 const RouterContext = createContext<RouterContextValue | null>(null);
 
 const INITIAL_STATE: RouterState = {
-  nav: initialNav('capture'),
+  nav: initialNav('home'),
   transition: { kind: 'none', dir: 'fwd', from: null },
   navTick: 0,
 };

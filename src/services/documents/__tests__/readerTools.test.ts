@@ -1,10 +1,12 @@
 import { makeDoc } from '../../../test/fixtures';
 import type { ProTaskFeature } from '../../pro/proTask';
-import { readerMoreItems, readerProTasks, readerTools } from '../readerTools';
+import { readerMoreItemIds, readerMoreSections, readerProTasks, readerTools, type ReaderSubject } from '../readerTools';
 import { DEFAULT_READING, normalizeReading } from '../readingSettings';
 
 const allLive = () => true;
 const ids = (tools: { id: string }[]) => tools.map((t) => t.id);
+const readerMoreItems = (subject: ReaderSubject) => readerMoreItemIds(readerMoreSections(subject));
+const bySection = (subject: ReaderSubject) => Object.fromEntries(readerMoreSections(subject).map((s) => [s.id, s.items]));
 
 describe('§12 D2 reader tool bar', () => {
   const scan = makeDoc({ pages: [makeDoc().pages[0], { ...makeDoc().pages[0], id: 'p2' }] });
@@ -74,82 +76,93 @@ describe('§12 D2 reader tool bar', () => {
     expect(readerProTasks({ doc: imported }, allLive, { officeToPdf: true, pdfToWord: false })).toEqual(['pdfForms']);
   });
 
-  it('lists Fill in form in More for a PDF once `pdfForms` is live (§12 D10)', () => {
-    expect(readerMoreItems({ external: { format: 'PDF' } }, { proTasks: ['convert', 'pdfForms'] })).toContain('fillForm');
-    expect(readerMoreItems({ doc: imported }, { proTasks: readerProTasks({ doc: imported }) })).toContain('fillForm');
-    expect(readerMoreItems({ doc: scan }, { proTasks: readerProTasks({ doc: scan }) })).not.toContain('fillForm');
-  });
-
-  it('lists Convert to PDF in More for office files once `convert` is live', () => {
-    expect(readerMoreItems({ doc: docx }, { proTasks: ['convert'] })).toContain('convertToPdf');
-    expect(readerMoreItems({ external: { format: 'CSV' } }, { proTasks: ['convert'] })).toContain('convertToPdf');
-    expect(readerMoreItems({ doc: docx })).not.toContain('convertToPdf');
-    expect(readerMoreItems({ doc: scan }, { proTasks: ['convert'] })).not.toContain('convertToPdf');
-  });
-
-  it('lists Convert to Word in More for scans and PDFs once `convert` is live', () => {
-    // §12 D6.
-    expect(readerMoreItems({ doc: scan }, { proTasks: ['convert'] })).toContain('convertToWord');
-    expect(readerMoreItems({ external: { format: 'PDF' } }, { proTasks: ['convert'] })).toContain('convertToWord');
-    expect(readerMoreItems({ doc: scan })).not.toContain('convertToWord');
-    expect(readerMoreItems({ doc: docx }, { proTasks: ['convert'] })).not.toContain('convertToWord');
-  });
 });
 
-describe('§12 D7 Edit in More', () => {
-  it('lists Edit once `editFiles` is one of the file\'s Pro tasks', () => {
-    const txt = makeDoc({ format: 'TXT' });
-    expect(readerMoreItems({ doc: txt }, { proTasks: ['convert', 'editFiles'] })).toEqual([
-      'share',
-      'convertToPdf',
-      'editFile',
-      'print',
-      'readingSettings',
-      'changeType',
-      'delete',
-    ]);
-    expect(readerMoreItems({ external: { format: 'CSV' } }, { proTasks: ['editFiles'] })).toContain('editFile');
-    expect(readerMoreItems({ doc: txt }, { proTasks: ['convert'] })).not.toContain('editFile');
-  });
-});
+describe('§18 W23 the More sheet, in sections', () => {
+  const scan = makeDoc({ pages: [makeDoc().pages[0], { ...makeDoc().pages[0], id: 'p2' }] });
+  const jpg = makeDoc({ format: 'JPG', pages: scan.pages });
+  const imported = makeDoc({ sourceKind: 'imported_pdf', pages: [{ id: 'p', fileUri: '', width: 850, height: 1100 }] });
+  const password = { ...imported, indexState: 'encrypted' as const };
+  const office = makeDoc({ format: 'DOCX', pages: [] });
+  const subjects: Record<string, ReaderSubject> = {
+    scan: { doc: scan },
+    jpg: { doc: jpg },
+    imported: { doc: imported },
+    password: { doc: password },
+    externalPdf: { external: { format: 'PDF' } },
+    externalOffice: { external: { format: 'XLSX' } },
+    office: { doc: office },
+  };
+  // The bottom tool bar's (Convert/Edit, Fill form), the top bar's and Notes' (bookmarks) and the
+  // selection's (copy a page's text).
+  const elsewhere = ['convertToPdf', 'convertToWord', 'editFile', 'fillForm', 'bookmarks', 'copyText', 'export'];
 
-describe('§12 D2 More sheet', () => {
-  it('moves sharing and managing a scan into More, with Delete last', () => {
-    expect(readerMoreItems({ doc: makeDoc() })).toEqual([
-      'submit',
-      'share',
-      'export',
-      'print',
-      'sign',
-      'editPages',
-      'addCover',
-      'bookmarks',
-      'copyText',
-      'extractText',
-      'readingSettings',
-      'changeType',
-      'delete',
-    ]);
+  it.each(Object.keys(subjects))('lists nothing twice, nothing from the bars, Delete last: %s', (name) => {
+    const subject = subjects[name];
+    const items = readerMoreItems(subject);
+    expect(new Set(items).size).toBe(items.length);
+    const tools = ids(readerTools(subject, { proTasks: readerProTasks(subject), isPro: false }));
+    for (const id of items) {
+      expect(tools).not.toContain(id);
+      expect(elsewhere).not.toContain(id);
+    }
+    if (subject.doc) expect(items[items.length - 1]).toBe('delete');
+    else expect(items).not.toContain('delete');
+    // Sections keep their order, and none is empty.
+    const order = ['share', 'organise', 'study', 'document'];
+    const sections = readerMoreSections(subject);
+    expect(sections.map((s) => order.indexOf(s.id))).toEqual([...sections.map((s) => order.indexOf(s.id))].sort());
+    expect(sections.every((s) => s.items.length > 0)).toBe(true);
+  });
+
+  it('groups a scan', () => {
+    expect(bySection({ doc: scan })).toEqual({
+      share: ['submit', 'share', 'print'],
+      organise: ['rename', 'move', 'star', 'changeType', 'editPages', 'addCover', 'split', 'compress'],
+      study: ['saveText'],
+      document: ['sign', 'readingSettings', 'delete'],
+    });
+    // One page: nothing to split.
+    expect(readerMoreItems({ doc: makeDoc() })).not.toContain('split');
+  });
+
+  it('shares a JPG-format document as a PDF or as its images', () => {
+    expect(bySection({ doc: jpg }).share).toEqual(['submit', 'shareAsPdf', 'shareImages', 'print']);
+    expect(readerMoreItems({ doc: scan })).not.toContain('shareImages');
+  });
+
+  it('gives a password-protected PDF no page tools', () => {
+    expect(bySection({ doc: password })).toEqual({
+      share: ['share', 'print'],
+      organise: ['rename', 'move', 'star', 'changeType'],
+      document: ['readingSettings', 'delete'],
+    });
+  });
+
+  it('offers Add to Library and nothing to organise for a file from outside', () => {
+    expect(bySection({ external: { format: 'PDF' } })).toEqual({
+      share: ['share', 'print'],
+      organise: ['addToLibrary'],
+      document: ['readingSettings'],
+    });
+  });
+
+  it('has no page tools for an office file', () => {
+    expect(bySection({ doc: office })).toEqual({
+      share: ['share', 'print'],
+      organise: ['rename', 'move', 'star', 'changeType'],
+      document: ['readingSettings', 'delete'],
+    });
   });
 
   it('offers Add cover page on a library PDF, Change cover page once it has one (§14 Q7)', () => {
     expect(readerMoreItems({ doc: makeDoc({ coverKind: 'template' }) })).toContain('changeCover');
     expect(readerMoreItems({ doc: makeDoc({ coverKind: 'template' }) })).not.toContain('addCover');
-    const imported = makeDoc({ sourceKind: 'imported_pdf', pages: [{ id: 'p', fileUri: '', width: 850, height: 1100 }] });
     expect(readerMoreItems({ doc: imported })).toContain('addCover');
     const covers = (items: string[]) => items.filter((id) => id === 'addCover' || id === 'changeCover');
-    expect(covers(readerMoreItems({ doc: { ...imported, indexState: 'encrypted' } }))).toEqual([]);
-    expect(covers(readerMoreItems({ doc: makeDoc({ format: 'DOCX', pages: [] }) }))).toEqual([]);
+    expect(covers(readerMoreItems({ doc: password }))).toEqual([]);
+    expect(covers(readerMoreItems({ doc: office }))).toEqual([]);
     expect(covers(readerMoreItems({ external: { format: 'PDF' } }))).toEqual([]);
-  });
-
-  it('offers Add to Library, not Delete, for a file from outside', () => {
-    expect(readerMoreItems({ external: { format: 'PDF' } })).toEqual(['addToLibrary', 'share', 'export', 'print', 'readingSettings']);
-    expect(readerMoreItems({ external: { format: 'DOCX' } })).toEqual(['addToLibrary', 'share', 'print', 'readingSettings']);
-  });
-
-  it('has no page tools for an office file', () => {
-    expect(readerMoreItems({ doc: makeDoc({ format: 'XLSX', pages: [] }) })).toEqual(['share', 'print', 'readingSettings', 'changeType', 'delete']);
   });
 });
 

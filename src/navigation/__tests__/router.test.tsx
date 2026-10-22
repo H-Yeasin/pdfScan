@@ -44,11 +44,11 @@ describe('router (§16 G2)', () => {
   it('records each change of top screen for the transition', () => {
     const router = mount();
     act(() => router().replace('home'));
-    act(() => router().go('settings'));
+    act(() => router().go('storage'));
     expect(router().transition).toMatchObject({ kind: 'slide', dir: 'fwd', from: { screen: 'home' } });
     const tick = router().navTick;
     act(() => router().back());
-    expect(router().transition).toMatchObject({ kind: 'slide', dir: 'back', from: { screen: 'settings' } });
+    expect(router().transition).toMatchObject({ kind: 'slide', dir: 'back', from: { screen: 'storage' } });
     expect(router().navTick).toBe(tick + 1);
     act(() => router().switchTab('library'));
     expect(router().transition).toMatchObject({ kind: 'fade', from: { screen: 'home' } });

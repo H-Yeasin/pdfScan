@@ -9,12 +9,12 @@ import { DEFAULT_APP_LOCK, type AppLockSettings } from '../../services/security/
 import { DEFAULT_READING, type ReadingSettings } from '../../services/documents/readingSettings';
 
 export type SettingsState = {
-  // False until persisted settings have been read, so first-run-dependent behaviour (like the
-  // Capture screen's requested scanner launch) doesn't act on defaults.
+  // False until persisted settings have been read, so behaviour that depends on them (like
+  // ScanLauncher's mode for a requested scan) doesn't act on defaults.
   loaded: boolean;
-  // True until the user has picked a capture mode or started a scan once.
+  // True until the first scan (ScanLauncher clears it). Nothing waits on it since §17 U5.
   firstRun: boolean;
-  // Restored into capture.mode when the Capture screen opens.
+  // The mode a new scan starts in (startScan), set from the Scan mode sheet (§17 U5).
   lastCaptureMode: CaptureMode;
   ocrScript: OcrScript;
   // Android-only: persisted SAF tree URI for "also save a copy to device" exports.

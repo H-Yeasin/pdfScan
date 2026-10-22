@@ -1,8 +1,9 @@
 import { Alert } from 'react-native';
 import { makeDoc } from '../../../test/fixtures';
-import { readerMoreItems, type ReaderMoreItemId } from '../../../services/documents/readerTools';
+import { readerMoreItemIds, readerMoreSections, type ReaderMoreItemId } from '../../../services/documents/readerTools';
 import { promoteExternalToLibrary } from '../../../services/persistence/libraryOperations';
 import { deleteDocumentFiles } from '../../../services/persistence/libraryFiles';
+import { shareDocumentImages } from '../../../services/sharing/shareService';
 import type { ExternalFileDocument } from '../../../types/models';
 import { readerOverflowActions, type ReaderOverflowContext } from '../useReaderOverflowActions';
 
@@ -13,30 +14,32 @@ jest.mock('../../../services/sharing/shareService', () => ({
   printFileUri: jest.fn(),
   shareAs: jest.fn(),
   shareDocument: jest.fn(),
+  shareDocumentImages: jest.fn(),
   shareFileName: jest.fn(),
   shareFileUri: jest.fn(),
 }));
+jest.mock('../../../services/study/textExport', () => ({ writeDocumentText: jest.fn(() => 'file:///cache/text.txt') }));
 
 // Every More item. A Record, so this list fails to compile when an id is added or removed.
 const ALL_ITEMS: Record<ReaderMoreItemId, true> = {
-  addToLibrary: true,
   submit: true,
   share: true,
-  export: true,
-  convertToPdf: true,
-  convertToWord: true,
-  editFile: true,
-  fillForm: true,
+  shareAsPdf: true,
+  shareImages: true,
   print: true,
-  sign: true,
+  addToLibrary: true,
+  rename: true,
+  move: true,
+  star: true,
+  changeType: true,
   editPages: true,
   addCover: true,
   changeCover: true,
-  bookmarks: true,
-  copyText: true,
-  extractText: true,
+  split: true,
+  compress: true,
+  saveText: true,
+  sign: true,
   readingSettings: true,
-  changeType: true,
   delete: true,
 };
 
@@ -60,10 +63,7 @@ function context(overrides: Partial<ReaderOverflowContext> = {}): ReaderOverflow
     sign: jest.fn(),
     editPages: jest.fn(),
     openCoverOptions: jest.fn(),
-    convertToPdf: jest.fn(),
-    convertToWord: jest.fn(),
-    editFile: jest.fn(),
-    fillForm: jest.fn(),
+    documentActions: { rename: jest.fn(), move: jest.fn(), toggleStar: jest.fn(), split: jest.fn(), compress: jest.fn() },
     ...overrides,
   };
 }
@@ -74,7 +74,7 @@ describe('§18 W6 the More sheet handlers', () => {
     expect(Object.keys(actions).sort()).toEqual(Object.keys(ALL_ITEMS).sort());
     for (const id of Object.keys(ALL_ITEMS) as ReaderMoreItemId[]) expect(typeof actions[id]).toBe('function');
     // And so for everything a scan or an outside file lists.
-    for (const id of [...readerMoreItems({ doc: makeDoc() }), ...readerMoreItems({ external: { format: 'PDF' } })]) {
+    for (const id of [...readerMoreItemIds(readerMoreSections({ doc: makeDoc() })), ...readerMoreItemIds(readerMoreSections({ external: { format: 'PDF' } }))]) {
       expect(actions[id]).toBeDefined();
     }
   });
@@ -83,16 +83,17 @@ describe('§18 W6 the More sheet handlers', () => {
     const ctx = context();
     const actions = readerOverflowActions(ctx);
     void actions.readingSettings();
-    void actions.bookmarks();
     void actions.changeType();
-    expect((ctx.openSheet as jest.Mock).mock.calls).toEqual([[{ kind: 'reading' }], [{ kind: 'bookmarks' }], [{ kind: 'type' }]]);
+    void actions.rename();
+    void actions.move();
+    expect((ctx.openSheet as jest.Mock).mock.calls).toEqual([[{ kind: 'reading' }], [{ kind: 'type' }], [{ kind: 'rename' }], [{ kind: 'move' }]]);
   });
 
   it('hands the Reader flows their own starters', () => {
     const ctx = context();
     const actions = readerOverflowActions(ctx);
-    for (const id of ['sign', 'editPages', 'convertToPdf', 'convertToWord', 'editFile', 'fillForm'] as const) void actions[id]();
-    for (const fn of [ctx.sign, ctx.editPages, ctx.convertToPdf, ctx.convertToWord, ctx.editFile, ctx.fillForm]) expect(fn).toHaveBeenCalledTimes(1);
+    for (const id of ['sign', 'editPages'] as const) void actions[id]();
+    for (const fn of [ctx.sign, ctx.editPages]) expect(fn).toHaveBeenCalledTimes(1);
     void actions.addCover();
     void actions.changeCover();
     expect(ctx.openCoverOptions).toHaveBeenCalledTimes(2);
@@ -103,10 +104,11 @@ describe('§18 W6 the More sheet handlers', () => {
     const ctx = context({ doc: undefined, external });
     const actions = readerOverflowActions(ctx);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
-    for (const id of ['changeType', 'submit', 'addCover', 'copyText', 'extractText', 'delete'] as const) await actions[id]();
+    for (const id of ['changeType', 'submit', 'addCover', 'rename', 'move', 'star', 'split', 'compress', 'saveText', 'shareImages', 'delete'] as const) await actions[id]();
     expect(ctx.openSheet).not.toHaveBeenCalled();
     expect(ctx.submit).not.toHaveBeenCalled();
     expect(ctx.openCoverOptions).not.toHaveBeenCalled();
+    for (const fn of Object.values(ctx.documentActions)) expect(fn).not.toHaveBeenCalled();
     expect(ctx.dispatch).not.toHaveBeenCalled();
     expect(alert).not.toHaveBeenCalled();
     alert.mockRestore();
@@ -133,5 +135,23 @@ describe('§18 W6 the More sheet handlers', () => {
     expect(deleteDocumentFiles).toHaveBeenCalledWith(ctx.doc!.id);
     expect(ctx.back).toHaveBeenCalledTimes(1);
     alert.mockRestore();
+  });
+
+  it('stars, splits and compresses through the shared document actions (§18 W23)', async () => {
+    const ctx = context();
+    const actions = readerOverflowActions(ctx);
+    await actions.star();
+    await actions.split();
+    await actions.compress();
+    expect(ctx.documentActions.toggleStar).toHaveBeenCalledWith(ctx.doc);
+    // Split leaves the Reader: the document is replaced by its pages.
+    expect(ctx.documentActions.split).toHaveBeenCalledWith(ctx.doc, ctx.annotations, ctx.back);
+    expect(ctx.documentActions.compress).toHaveBeenCalledWith(ctx.doc);
+  });
+
+  it('shares every page of a JPG-format document (§18 W23)', async () => {
+    const ctx = context({ doc: makeDoc({ format: 'JPG' }) });
+    await readerOverflowActions(ctx).shareImages();
+    expect(shareDocumentImages).toHaveBeenCalledWith(ctx.doc);
   });
 });

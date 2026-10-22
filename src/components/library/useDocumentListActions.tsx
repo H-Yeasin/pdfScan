@@ -9,10 +9,11 @@ import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
 import type { SelectionToolId } from './SelectionBar';
 import { useBackupExport } from '../backup/useBackupExport';
 import { useOpenCoverOptions } from './useCoverTarget';
+import { compressDocuments, libraryOps, useDocumentActions } from './useDocumentActions';
 import { useRouter } from '../../navigation/router';
 import { saveSignatureForReuse } from '../../services/signature/savedSignatureStorage';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../../services/persistence/libraryFiles';
-import { canSign, isPasswordProtected, isPdfLevel } from '../../services/documents/formatCapabilities';
+import { canSign, isPasswordProtected } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import { usePageImage } from '../shared/usePageImage';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
@@ -23,12 +24,6 @@ import type { AppAction } from '../../store/appReducer';
 import type { LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
 import { hapticSelection } from '../../services/feedback/haptics';
-
-// §16 G3: libraryOperations (and pdf-lib with it) loads with the first merge, split, compress or
-// signature, not with Home and the Library, which use this hook from their first frame.
-function libraryOps(): typeof import('../../services/persistence/libraryOperations') {
-  return require('../../services/persistence/libraryOperations') as typeof import('../../services/persistence/libraryOperations');
-}
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
 export function useOpenDocument() {
@@ -42,29 +37,6 @@ export function useOpenDocument() {
     },
     [dispatch, go]
   );
-}
-
-// Compresses each document, one at a time, and returns the message to show. Shared by the
-// selection bar and Settings → Storage's biggest documents (§8 B1). An imported PDF can only get
-// smaller by becoming images; the message says when that happened, and when it wouldn't have helped.
-export async function compressDocuments(docs: readonly LibraryDocument[], dispatch: Dispatch<AppAction>): Promise<string> {
-  let rasterized = 0;
-  let notSmaller = 0;
-  for (const doc of docs) {
-    if (isPdfLevel(doc)) {
-      const result = await libraryOps().compressImportedPdf(doc);
-      if (result.smaller) {
-        rasterized += 1;
-        dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: result.doc });
-      } else {
-        notSmaller += 1;
-      }
-    } else {
-      const compressed = await libraryOps().compressDocument(doc);
-      dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
-    }
-  }
-  return rasterized ? t('library.compressedAsImages') : notSmaller ? t('library.alreadySmall') : t('library.compressed');
 }
 
 // §14 Q5: asks, then removes the documents. The dispatch comes first so the list updates at once (and
@@ -119,6 +91,7 @@ export function useDocumentListActions() {
   const submit = useSubmitDocument();
   const { exportScope, overlay: backupOverlay } = useBackupExport();
   const openCoverOptions = useOpenCoverOptions();
+  const documentActions = useDocumentActions();
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.has(f.id)), [files, selection]);
 
@@ -330,18 +303,14 @@ export function useDocumentListActions() {
         onClose={() => setTypePickerOpen(false)}
       />
 
-      {/* "Move" (K6): files a whole selection under one course, or Unsorted. Only the course id
-          changes, never the files, so it's one quick write however many are moved. */}
+      {/* "Move" (K6): a whole selection under one course, or Unsorted (useDocumentActions). */}
       <FolderPickerModal
         visible={movePickerOpen}
         courses={state.library.courses}
         selectedCourseId={sharedCourseId}
         onSelect={(courseId) => {
-          const ids = selectedDocs.map((d) => d.id);
-          dispatch({ type: 'library/ASSIGN_COURSE', ids, courseId });
+          documentActions.move(selectedDocs, courseId);
           dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
-          const name = courseId ? state.library.courses.find((c) => c.id === courseId)?.name : t('common.unsorted');
-          dispatch({ type: 'ui/SHOW_SNACK', msg: t('library.moved', { count: ids.length, name: name ?? t('library.movedFallback') }) });
         }}
         onCreate={(name) => {
           const id = createId('course');

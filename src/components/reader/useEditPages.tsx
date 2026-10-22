@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { EditPagesModal } from './EditPagesModal';
 import { DocumentPickerModal } from './DocumentPickerModal';
-import { useRouter } from '../../navigation/router';
 import { startScan } from '../../services/courses/startScan';
 import { canUsePageTools } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
@@ -17,8 +16,7 @@ import { t } from '../../i18n';
 // the page being read, §18 W5). Render `overlays` once.
 export function useEditPages(doc: LibraryDocument | undefined, onChanged: (before: LibraryDocument, after: LibraryDocument) => void) {
   const dispatch = useAppDispatch();
-  const state = useAppSlices('capture', 'library');
-  const { go } = useRouter();
+  const state = useAppSlices('capture', 'library', 'settings');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -93,9 +91,9 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: (befor
       return;
     }
     setOpen(false);
+    // The scanner opens over the Reader; Review is pushed on top of it when the pages land.
     startScan(state, dispatch, doc.courseId ?? null, { launch: true, appendTo: doc.id });
-    go('capture');
-  }, [doc, state, dispatch, go]);
+  }, [doc, state, dispatch]);
 
   const handlePick = useCallback(
     (source: LibraryDocument) => {

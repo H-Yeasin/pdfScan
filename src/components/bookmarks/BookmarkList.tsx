@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BookmarkedPage } from '../../services/study/bookmarks';
 import { radii, spacing, useTheme } from '../../theme';
 import { useT } from '../../i18n/useT';
 import { PageThumb } from '../shared/PageThumb';
-import { EmptyState } from '../shared/EmptyState';
 
 // §5 T5: bookmarked pages as rows: the page's thumbnail, "<document> · p. 4", and its label.
 export function BookmarkList({
@@ -60,40 +58,6 @@ export function BookmarkList({
   );
 }
 
-// The Reader's list of this document's bookmarks.
-export function BookmarksSheet({
-  visible,
-  items,
-  onOpen,
-  onRemove,
-  onClose,
-}: {
-  visible: boolean;
-  items: readonly BookmarkedPage[];
-  onOpen: (item: BookmarkedPage) => void;
-  onRemove: (item: BookmarkedPage) => void;
-  onClose: () => void;
-}) {
-  const { tokens } = useTheme();
-  const { t } = useT();
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
-      <View style={[styles.sheet, { backgroundColor: tokens.bg, paddingBottom: insets.bottom + spacing.lg }]}>
-        <Text style={[styles.sheetTitle, { color: tokens.ink }]}>{t('study.bookmarks')}</Text>
-        <ScrollView contentContainerStyle={styles.sheetBody}>
-          {items.length ? (
-            <BookmarkList items={items} onOpen={onOpen} onRemove={onRemove} showDocument={false} />
-          ) : (
-            <EmptyState variant="inline" title={t('study.noBookmarksTitle')} body={t('study.noBookmarks')} />
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
   list: {
     gap: spacing.sm,
@@ -129,24 +93,5 @@ const styles = StyleSheet.create({
   },
   remove: {
     padding: spacing.xs,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,.4)',
-  },
-  sheet: {
-    maxHeight: '70%',
-    borderTopLeftRadius: radii.sheet,
-    borderTopRightRadius: radii.sheet,
-    paddingTop: spacing.lg,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  sheetBody: {
-    paddingHorizontal: spacing.lg,
   },
 });

@@ -90,9 +90,10 @@ describe('Home course hub', () => {
     expect(texts(root)).toContain('Nothing in Physics yet');
 
     press(root, 'Scan into this course');
-    expect(ctx().router.screen).toBe('capture');
+    // §17 U5: the scanner opens over the course page (ScanLauncher); Review comes when pages land.
+    expect(ctx().router.screen).toBe('course');
     expect(ctx().app.state.deliver.courseId).toBe('physics');
-    // A "scan now" button: Capture opens the scanner on arrival (the Scan tab doesn't).
+    // A "scan now" button: ScanLauncher picks the request up and opens the scanner.
     expect(ctx().app.state.capture.scannerRequested).toBe(true);
   });
 

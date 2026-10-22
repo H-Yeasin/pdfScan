@@ -4,7 +4,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { fontFamily, ThemeProvider, themeTokens, tokens, ACCENT_IDS, type ThemeName } from '../../../theme';
 import { contrastRatio, AA_TEXT } from '../../../theme/contrast';
-import { Button, buttonLook, Chip, FilterChip, IconButton, ListItem, ProgressBar, ScreenHeader, Text, TextField, type ButtonVariant } from '..';
+import { Button, buttonLook, Chip, FilterChip, IconButton, ListItem, Menu, ProgressBar, ScreenHeader, Text, TextField, type ButtonVariant } from '..';
 import { familyFor, maxScaleFor } from '../Text';
 import { slopFor } from '../Touchable';
 import { largeTitleHeight, visibleActions } from '../ScreenHeader';
@@ -238,5 +238,38 @@ describe('ScreenHeader', () => {
     expect(largeTitleHeight(1, false)).toBe(48);
     expect(largeTitleHeight(1, true)).toBeGreaterThan(largeTitleHeight(1, false));
     expect(largeTitleHeight(2, false)).toBe(largeTitleHeight(1.4, false));
+  });
+});
+
+describe('Menu', () => {
+  const sections = [
+    { title: 'Share & export', items: [{ id: 'share', label: 'Share', icon: 'share-social-outline' as const }] },
+    { title: 'Empty', items: [] },
+    {
+      title: 'Document',
+      items: [
+        { id: 'sign', label: 'Sign', icon: 'pencil-outline' as const, disabled: true },
+        { id: 'delete', label: 'Delete', icon: 'trash-outline' as const, destructive: true },
+      ],
+    },
+  ];
+
+  it('renders its sections with headers, and leaves an empty one out', () => {
+    const r = render(<Menu visible sections={sections} onClose={() => {}} onSelect={() => {}} />);
+    const headers = r.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'header').map((n) => n.props.children);
+    expect(headers).toEqual(['Share & export', 'Document']);
+  });
+
+  it('closes, then calls onSelect with the id', () => {
+    const calls: string[] = [];
+    const r = render(<Menu visible sections={sections} onClose={() => calls.push('close')} onSelect={(id) => calls.push(id)} />);
+    act(() => r.root.findAll((n) => n.props.testID === 'menu-delete' && n.props.onPress)[0].props.onPress());
+    expect(calls).toEqual(['close', 'delete']);
+  });
+
+  it('marks a disabled item for TalkBack', () => {
+    const r = render(<Menu visible sections={sections} onClose={() => {}} onSelect={() => {}} />);
+    const sign = r.root.findAll((n) => n.props.testID === 'menu-sign' && n.props.accessibilityState)[0];
+    expect(sign.props.accessibilityState).toEqual({ disabled: true });
   });
 });

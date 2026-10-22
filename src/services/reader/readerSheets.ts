@@ -6,12 +6,12 @@
 // A sheet: a panel or prompt over the page that the student answers or dismisses.
 // - 'more': the More sheet; 'reading': reading settings; 'type': the document type picker;
 // - 'jump': "Go to page"; 'pages': the thumbnails strip; 'submissions': the submission history;
-// - 'bookmarks', 'notes': their lists; 'label': the bookmark label prompt;
+// - 'notes': the Notes panel (marks and bookmarks); 'label': the bookmark label prompt;
+// - 'rename', 'move': renaming the document, filing it under a course (§18 W23);
 // - 'signCapture': drawing a signature, for library page `idx` (§18 W1);
 // - 'pageText': the text of library page `idx`, for a screen reader (§18 W11).
-// W23 adds 'rename' and 'move'.
 export type ReaderSheet =
-  | { kind: 'more' | 'reading' | 'type' | 'jump' | 'pages' | 'submissions' | 'bookmarks' | 'notes' | 'label' }
+  | { kind: 'more' | 'reading' | 'type' | 'jump' | 'pages' | 'submissions' | 'notes' | 'label' | 'rename' | 'move' }
   | { kind: 'signCapture' | 'pageText'; idx: number };
 
 export type ReaderSheetKind = ReaderSheet['kind'];

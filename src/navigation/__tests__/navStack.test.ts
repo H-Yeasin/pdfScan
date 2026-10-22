@@ -67,20 +67,25 @@ describe('navStack (§16 G2)', () => {
     expect(switchTab(nav, 'library')).toBe(nav);
   });
 
+  it('§17 U5: the tabs are Home · Files · Tools · Me', () => {
+    expect(TABS).toEqual(['home', 'library', 'tools', 'settings']);
+    expect(initialNav().tab).toBe('home');
+  });
+
   it('popTo goes back to the nearest entry of a screen', () => {
-    const nav = push(push(push(initialNav('capture'), 'review', 'v1'), 'deliver', 'd1'), 'academicOptions', 'a1');
-    expect(screens(popTo(nav, 'review'))).toEqual(['capture', 'review']);
+    const nav = push(push(push(initialNav('home'), 'review', 'v1'), 'deliver', 'd1'), 'academicOptions', 'a1');
+    expect(screens(popTo(nav, 'review'))).toEqual(['home', 'review']);
     expect(popTo(nav, 'reader')).toBe(nav);
     expect(popTo(nav, 'academicOptions')).toBe(nav);
   });
 
   it('resetTab goes back to the same root entry', () => {
-    const nav = resetTab(push(initialNav('home'), 'settings', 's1'), 'home');
+    const nav = resetTab(push(initialNav('home'), 'storage', 's1'), 'home');
     expect(activeStack(nav)).toEqual([rootEntry('home')]);
   });
 
   it(`caps each tab at ${MAX_PUSHED} pushed screens, dropping the oldest`, () => {
-    const many: ScreenName[] = ['course', 'reader', 'academicOptions', 'pro', 'settings', 'storage', 'backup', 'manageFolders'];
+    const many: ScreenName[] = ['course', 'reader', 'academicOptions', 'pro', 'onboarding', 'storage', 'backup', 'manageFolders'];
     const nav = many.reduce((n, s) => push(n, s, `p-${s}`), initialNav('home'));
     expect(activeStack(nav)).toHaveLength(MAX_PUSHED + 1);
     expect(activeStack(nav)[0]).toEqual(rootEntry('home'));
@@ -88,65 +93,81 @@ describe('navStack (§16 G2)', () => {
   });
 
   it('replace at boot: a root becomes the tab, anything else is alone on the stack', () => {
-    const atHome = replace(initialNav('capture'), 'home', 'x');
-    expect(atHome.tab).toBe('home');
-    expect(activeStack(atHome)).toEqual([rootEntry('home')]);
-    const intro = replace(initialNav('capture'), 'onboarding', 'o1');
-    expect(intro.tab).toBe('capture');
+    const atFiles = replace(initialNav('home'), 'library', 'x');
+    expect(atFiles.tab).toBe('library');
+    expect(activeStack(atFiles)).toEqual([rootEntry('library')]);
+    const intro = replace(initialNav('home'), 'onboarding', 'o1');
+    expect(intro.tab).toBe('home');
     expect(activeStack(intro)).toEqual([{ key: 'o1', screen: 'onboarding' }]);
   });
 });
 
 describe('resolveGo: what router.go(to, dir) does', () => {
   it('pushes, sliding', () => {
-    const change = go(initialNav('home'), 'settings');
+    const change = go(initialNav('home'), 'storage');
     expect(change).toMatchObject({ kind: 'slide', dir: 'fwd' });
-    expect(screens(change.state)).toEqual(['home', 'settings']);
+    expect(screens(change.state)).toEqual(['home', 'storage']);
   });
 
   it("goes back to a screen on the stack with 'back', and pushes it otherwise", () => {
-    const nav = go(go(go(initialNav('capture'), 'review').state, 'deliver').state, 'academicOptions').state;
-    expect(screens(go(nav, 'review', 'back').state)).toEqual(['capture', 'review']);
-    const pushed = go(nav, 'settings', 'back');
+    const nav = go(go(go(initialNav('home'), 'review').state, 'deliver').state, 'academicOptions').state;
+    expect(screens(go(nav, 'review', 'back').state)).toEqual(['home', 'review']);
+    const pushed = go(nav, 'pro', 'back');
     expect(pushed).toMatchObject({ kind: 'slide', dir: 'back' });
-    expect(screens(pushed.state)).toEqual(['capture', 'review', 'deliver', 'academicOptions', 'settings']);
+    expect(screens(pushed.state)).toEqual(['home', 'review', 'deliver', 'academicOptions', 'pro']);
   });
 
   it('its own tab root: back to the root', () => {
-    const nav = go(go(initialNav('capture'), 'review').state, 'capture');
+    const nav = go(go(initialNav('home'), 'review').state, 'home');
     expect(nav).toMatchObject({ kind: 'slide', dir: 'fwd' });
-    expect(activeStack(nav.state)).toEqual([rootEntry('capture')]);
+    expect(activeStack(nav.state)).toEqual([rootEntry('home')]);
   });
 
   it('another tab root: a cross-fading jump that leaves both tabs at their roots', () => {
-    // Scan from a course page.
-    const course = go(initialNav('home'), 'course').state;
-    const scan = go(course, 'capture');
-    expect(scan).toMatchObject({ kind: 'fade', state: { tab: 'capture', prevTab: 'home' } });
-    expect(screens(scan.state, 'home')).toEqual(['home']);
     // The Library after a save: the scan flow is over.
-    const saved = go(go(go(scan.state, 'review').state, 'deliver').state, 'library');
-    expect(saved.state.tab).toBe('library');
-    expect(screens(saved.state, 'capture')).toEqual(['capture']);
+    const flow = go(go(initialNav('home'), 'review').state, 'deliver').state;
+    const saved = go(flow, 'library');
+    expect(saved).toMatchObject({ kind: 'fade', state: { tab: 'library', prevTab: 'home' } });
+    expect(screens(saved.state, 'home')).toEqual(['home']);
     expect(screens(saved.state, 'library')).toEqual(['library']);
   });
 
-  it('library content from the Scan tab opens on the previous tab', () => {
-    // Home → Scan → Review → Deliver → saved into a course.
-    const flow = go(go(go(initialNav('home'), 'capture').state, 'review').state, 'deliver').state;
-    const course = go(flow, 'course');
-    expect(course).toMatchObject({ kind: 'slide', dir: 'fwd', state: { tab: 'home', prevTab: 'capture' } });
-    expect(screens(course.state)).toEqual(['home', 'course']);
-    expect(screens(course.state, 'capture')).toEqual(['capture']);
-    // Back from the course page: Home.
-    expect(screens(pop(course.state))).toEqual(['home']);
-    // Started on the Scan tab (no courses yet): the Library.
-    expect(go(initialNav('capture'), 'reader').state.tab).toBe('library');
+  it('§17 U5: a scan is pushed on the tab it was started from', () => {
+    for (const tab of TABS) {
+      const nav = go(go(initialNav(tab), 'review').state, 'deliver').state;
+      expect(nav.tab).toBe(tab);
+      expect(screens(nav)).toEqual([tab, 'review', 'deliver']);
+    }
+    // From a course page or the Reader too: Back from Review returns there.
+    expect(screens(go(go(initialNav('library'), 'reader').state, 'review').state)).toEqual(['library', 'reader', 'review']);
   });
 
-  it('settings and detours stay on the Scan tab', () => {
-    const nav = go(initialNav('capture'), 'settings').state;
-    expect(nav.tab).toBe('capture');
-    expect(screens(nav)).toEqual(['capture', 'settings']);
+  it('§17 U5: the one scan session is on one stack only', () => {
+    // A Review left open on Home (Deliver → Me to set up a folder), then a scan from Tools.
+    let nav = go(go(initialNav('home'), 'review').state, 'deliver').state;
+    nav = switchTab(switchTab(nav, 'settings'), 'tools');
+    nav = go(nav, 'review').state;
+    expect(screens(nav)).toEqual(['tools', 'review']);
+    expect(screens(nav, 'home')).toEqual(['home']);
+  });
+
+  it('a saved scan lands on its course page without the finished flow under it', () => {
+    const flow = go(go(initialNav('home'), 'review').state, 'deliver').state;
+    const course = go(flow, 'course');
+    expect(course).toMatchObject({ kind: 'slide', dir: 'fwd', state: { tab: 'home' } });
+    expect(screens(course.state)).toEqual(['home', 'course']);
+    // Back from the course page: Home.
+    expect(screens(pop(course.state))).toEqual(['home']);
+    // Scanned from that course page: a fresh course page in the old one's place.
+    const fromCourse = go(go(go(initialNav('home'), 'course').state, 'review').state, 'deliver').state;
+    expect(screens(go(fromCourse, 'course').state)).toEqual(['home', 'course']);
+    // Pages added to a document: a fresh Reader where it was.
+    const added = go(go(go(go(initialNav('library'), 'reader').state, 'review').state, 'deliver').state, 'reader');
+    expect(screens(added.state)).toEqual(['library', 'reader']);
+  });
+
+  it('detours from the scan flow stay on top of it', () => {
+    const nav = go(go(initialNav('tools'), 'review').state, 'pro').state;
+    expect(screens(nav)).toEqual(['tools', 'review', 'pro']);
   });
 });

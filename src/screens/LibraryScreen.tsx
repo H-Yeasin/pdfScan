@@ -212,9 +212,6 @@ export function LibraryScreen() {
             >
               <Ionicons name="search" size={21} color={tokens.ink} />
             </Pressable>
-            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={() => go('settings')} accessibilityRole="button" accessibilityLabel={t('common.settings')}>
-              <Ionicons name="settings-outline" size={21} color={tokens.ink} />
-            </Pressable>
           </View>
         </View>
       ) : (
@@ -265,7 +262,6 @@ export function LibraryScreen() {
             label: t('library.scanNow'),
             onPress: () => {
               startScan(store.getState(), dispatch, null, { launch: true });
-              go('capture');
             },
           }}
           secondaryAction={{ label: t('library.openFile'), onPress: handleOpenFile }}

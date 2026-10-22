@@ -285,7 +285,15 @@ export const en = {
 
   // Shared pieces: the tab bar, signatures, prompts, the crash screen.
   shared: {
-    tabs: { home: 'Home', scan: 'Scan', library: 'Library' },
+    // §17 U5: Files is the Library tab, Me the settings.
+    tabs: {
+      home: 'Home',
+      files: 'Files',
+      scan: 'Scan',
+      scanHint: 'Opens the scanner. Long-press to choose a mode.',
+      tools: 'Tools',
+      me: 'Me',
+    },
     signature: {
       hint: 'Draw your signature above',
       clear: 'Clear',
@@ -331,14 +339,19 @@ export const en = {
   },
 
   capture: {
-    savingTo: 'Saving to',
-    savingToA11y: 'Saving to {name}. Change',
-    openingScanner: 'Opening scanner…',
     processingPages: 'Processing pages…',
-    modeA11y: '{mode} mode',
     gallery: 'Import from gallery',
-    shutter: 'Scan',
-    tray: { one: 'Review {count} page', other: 'Review {count} pages' },
+    // §17 U5: the Scan button's long-press sheet.
+    modeSheet: {
+      title: 'Scan',
+      scanAs: 'Scan as',
+      last: 'Last used',
+      bringIn: 'Or bring in',
+      importPhotos: 'Import photos',
+      importFile: 'Import a file',
+      choose: 'Choose a mode',
+      imported: 'Added {name} to Files',
+    },
     modes: {
       notes: { label: 'Notes', hint: 'Lay the page flat. Pencil works too.' },
       doc: { label: 'Document', hint: 'Printed pages, handouts and forms.' },
@@ -361,6 +374,19 @@ export const en = {
       done: 'Done',
       takeAnother: 'Take another',
     },
+  },
+
+  // §17 U5: the Tools tab, a list of today's ways in until U8's hub.
+  tools: {
+    title: 'Tools',
+    section: { create: 'Scan and import', files: 'Work on files', keep: 'Keep things tidy' },
+    scan: 'Scan pages',
+    scanSub: 'Opens the scanner in the mode you used last',
+    importFileSub: 'PDF, Word, Excel, CSV or text',
+    organise: 'Merge, split, compress or sign',
+    organiseSub: 'Long-press files in Files, then pick a tool',
+    storage: 'Storage',
+    courses: 'Manage courses',
   },
 
   review: {
@@ -509,6 +535,10 @@ export const en = {
     setTypeFor: { one: 'Set type for {count} document', other: 'Set type for {count} documents' },
     moved: 'Moved {count} to {name}',
     movedFallback: 'course',
+    // §18 W23 / §17 U7.
+    renamed: 'Renamed to "{name}"',
+    starred: 'Starred',
+    unstarred: 'Removed from Starred',
     undo: 'Undo',
     openFailed: "Couldn't open that file. It may be damaged, or in a format PDF Scan can't read.",
     empty: 'No documents yet',
@@ -544,33 +574,42 @@ export const en = {
   },
 
   reader: {
+    // §18 W23: the More sheet, by section.
     actions: {
-      share: 'Share',
-      sign: 'Sign',
-      export: 'Export',
-      print: 'Print',
-      delete: 'Delete',
-      addToLibrary: 'Add to Library',
-      changeType: 'Change type',
       submit: 'Submit',
-      copyText: 'Copy page text',
-      extractText: 'Extract text (.txt)',
-      bookmarks: 'Bookmarks',
+      share: 'Share',
+      shareAsPdf: 'Share as PDF',
+      shareImages: 'Share images',
+      print: 'Print',
+      addToLibrary: 'Add to Library',
+      rename: 'Rename',
+      move: 'Move to course',
+      star: 'Star',
+      unstar: 'Unstar',
+      changeType: 'Type',
       editPages: 'Edit pages',
-      // §12 D2.
-      readingSettings: 'Reading settings',
-      // §12 D5.
-      convertToPdf: 'Convert to PDF',
-      // §12 D6.
-      convertToWord: 'Convert to Word',
-      // §12 D7.
-      editFile: 'Edit',
-      // §12 D10.
-      fillForm: 'Fill in form',
       // §14 Q7.
       addCover: 'Add cover page',
       changeCover: 'Change cover page',
+      split: 'Split into pages',
+      compress: 'Compress',
+      saveText: 'Save text as a file',
+      sign: 'Sign',
+      // §12 D2.
+      readingSettings: 'Reading settings',
+      delete: 'Delete',
+      // §12 D5/D6/D10: the tool bar's Convert/Edit.
+      convertToPdf: 'Convert to PDF',
+      convertToWord: 'Convert to Word',
+      fillForm: 'Fill in form',
     },
+    moreSections: {
+      share: 'Share & export',
+      organise: 'Organise',
+      study: 'Study',
+      document: 'Document',
+    },
+    renameTitle: 'Rename',
     // §12 D2: the bottom tool bar.
     tools: {
       mark: 'Mark',
@@ -695,13 +734,6 @@ export const en = {
       docxNumbers: 'Numbered list',
       docxUndo: 'Undo',
     },
-    noPageText: 'No text found on this page',
-    copiedPage: 'Copied the text of page {page}',
-    extractTitle: 'Extract text',
-    extractBody: "All pages' text, with a line marking each page.",
-    copy: 'Copy',
-    copiedAll: 'Copied the text of every page',
-    shareTxt: 'Share .txt',
     // §18 W1: a 2-in-1 sheet shows two pages; Sign asks which one.
     deleteTitle: 'Delete document?',
     deleteBody: '"{name}" and its files will be permanently removed. This can\'t be undone.',

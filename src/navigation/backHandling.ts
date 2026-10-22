@@ -9,15 +9,14 @@ import type { TabId } from './navStack';
 // `onRequestClose`, and inline overlays register with `useBackHandler`, both of which run before
 // the app-level handler that calls this; (2) selection or Library search is left; (3) the screen
 // goes back: since §16 G2 that's a pop to wherever it was opened from, apart from the few
-// screens below with a fixed way back; (4) on a tab's root: to the start tab (Home once a course
-// exists, otherwise Capture) from any other, and out of the app from the start tab.
+// screens below with a fixed way back; Review asks before it drops an unsaved scan (§17 U5); (4) on
+// a tab's root: to Home from any other, and out of the app from Home.
 
 export type BackContext = {
   // The screen on top, its tab, and whether there's a screen under it on that tab's stack.
   screen: ScreenName;
   tab: TabId;
   canPop: boolean;
-  hasCourses: boolean;
   selMode: boolean;
   searchOpen: boolean;
   // Pages in the unsaved scan session. They live only in memory, so leaving the app asks first.
@@ -34,24 +33,25 @@ export type BackStep =
   | { kind: 'dispatch'; actions: AppAction[] }
   | { kind: 'pop'; actions: AppAction[] }
   | { kind: 'go'; to: ScreenName; actions: AppAction[] }
-  | { kind: 'confirmDiscard'; count: number }
+  // Asks before the unsaved scan goes; then the app closes (`exit`) or Review pops (`pop`, §17 U5:
+  // with no Capture screen under it, Review is the session, and leaving it ends the session).
+  | { kind: 'confirmDiscard'; count: number; then: 'exit' | 'pop' }
   | { kind: 'exit' };
 
 // Screens that show a document list with long-press selection (useDocumentListActions).
 // `selMode` is global, so it's only "the thing on screen" on one of these.
 const SELECTION_SCREENS: ReadonlySet<ScreenName> = new Set(['home', 'library', 'course', 'storage']);
 
-export function rootScreen(hasCourses: boolean): TabId {
-  return hasCourses ? 'home' : 'capture';
+// §17 U5: Home, whether or not a course exists (the tab bar's Scan button is on every tab).
+export function rootScreen(): TabId {
+  return 'home';
 }
 
 // The screens whose way back doesn't depend on how they were reached. Kept beside the screens'
 // own Back buttons in spirit: if one changes, change it here too.
 function fixedBackTarget(ctx: BackContext): ScreenName | null {
   switch (ctx.screen) {
-    // The scan flow, step by step (Review → Capture until §17 U5 removes the Capture screen).
-    case 'review':
-      return 'capture';
+    // The scan flow, step by step. Review itself pops to where the scan was started (resolveBack).
     case 'deliver':
       return 'review';
     case 'academicOptions':
@@ -83,10 +83,13 @@ export function resolveBack(ctx: BackContext): BackStep {
 
   const fixed = fixedBackTarget(ctx);
   if (fixed) return { kind: 'go', to: fixed, actions };
+  if (ctx.screen === 'review' && ctx.sessionPageCount > 0) {
+    return { kind: 'confirmDiscard', count: ctx.sessionPageCount, then: 'pop' };
+  }
   if (ctx.canPop) return { kind: 'pop', actions };
 
   // A tab's root.
-  const start = rootScreen(ctx.hasCourses);
+  const start = rootScreen();
   if (ctx.tab !== start) return { kind: 'go', to: start, actions };
-  return ctx.sessionPageCount > 0 ? { kind: 'confirmDiscard', count: ctx.sessionPageCount } : { kind: 'exit' };
+  return ctx.sessionPageCount > 0 ? { kind: 'confirmDiscard', count: ctx.sessionPageCount, then: 'exit' } : { kind: 'exit' };
 }

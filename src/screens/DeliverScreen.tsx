@@ -83,7 +83,7 @@ type LibraryInputPage = {
 export function DeliverScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
-  const { go } = useRouter();
+  const { go, switchTab } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('capture', 'deliver', 'library', 'review', 'settings');
   const { pages } = state.capture;
@@ -558,7 +558,8 @@ export function DeliverScreen() {
                   enabled: exportCopy,
                   onToggle: () => dispatch({ type: 'deliver/TOGGLE_EXPORT_COPY' }),
                   folderLabel: androidExportFolderLabel,
-                  onSetup: () => go('settings'),
+                  // §17 U5: Me is a tab; switching keeps this scan on its own tab's stack.
+                  onSetup: () => switchTab('settings'),
                 }
               : undefined
           }

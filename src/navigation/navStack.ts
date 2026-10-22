@@ -5,9 +5,11 @@ import type { NavDir, ScreenName } from '../types/navigation';
 // the state and AppNavigator draws it: each tab's root stays mounted once visited, and the active
 // tab's pushed screens stay mounted under the top one, so Back finds them as they were left.
 
-// The bottom tabs, in the tab bar's order. A tab's root screen has the tab's name. §17 U5 changes
-// the set (Home · Files · Tools · Me); everything that needs the list reads it from here.
-export const TABS = ['home', 'capture', 'library'] as const satisfies readonly ScreenName[];
+// The bottom tabs, in the tab bar's order. A tab's root screen has the tab's name. §17 U5: Home ·
+// Files · Tools · Me ('library' is Files and 'settings' is Me in the UI). The tab bar's centre Scan
+// button isn't a tab: it opens the scanner over whichever tab is showing. Everything that needs
+// the list reads it from here.
+export const TABS = ['home', 'library', 'tools', 'settings'] as const satisfies readonly ScreenName[];
 export type TabId = (typeof TABS)[number];
 
 // One screen on a stack. The key names its mounted instance: the same key is the same instance,
@@ -19,8 +21,7 @@ export type NavState = {
   // Each tab's stack, its root first (after a boot `replace` with a screen that isn't a root, that
   // screen alone: the introduction on first run).
   stacks: Record<TabId, Entry[]>;
-  // The tab shown before this one. A course or a document opened from the Scan tab goes there
-  // (until §17 U5 removes the Scan tab).
+  // The tab shown before this one.
   prevTab: TabId;
 };
 
@@ -28,9 +29,14 @@ export type NavState = {
 // oldest is dropped, so a long trail of screens can't hold on to memory.
 export const MAX_PUSHED = 6;
 
-// Library content: opened while the Scan tab shows, these go to the tab the student browses in,
-// not on top of Capture (a saved scan lands on its course page there, and Back goes to that
-// tab's root, like before the stacks).
+// §17 U5: the scan flow. A scan is pushed on the tab it was started from, and there's only one
+// session (capture.pages), so it is on one stack at a time: opened on another tab, it leaves the
+// stack it was on (that tab goes back to the screen under Review).
+const SCAN_FLOW: ReadonlySet<ScreenName> = new Set(['review', 'deliver']);
+
+// Library content. Opened from the scan flow, it's where a saved scan lands (its course page, or
+// the Reader for pages added to a document): the flow is over, so it leaves the stack, and Back
+// from the course page goes where the scan was started, not to a finished Deliver.
 const CONTENT_SCREENS: ReadonlySet<ScreenName> = new Set(['course', 'reader', 'examPack']);
 
 export function isTabRoot(screen: ScreenName): screen is TabId {
@@ -50,7 +56,7 @@ function rootStacks(): Record<TabId, Entry[]> {
   return Object.fromEntries(TABS.map((tab) => [tab, [rootEntry(tab)]])) as Record<TabId, Entry[]>;
 }
 
-export function initialNav(tab: TabId = 'capture'): NavState {
+export function initialNav(tab: TabId = 'home'): NavState {
   return { tab, stacks: rootStacks(), prevTab: tab === 'library' ? 'home' : 'library' };
 }
 
@@ -119,6 +125,19 @@ export function replace(state: NavState, screen: ScreenName, key: string): NavSt
   return { ...state, stacks: { ...rootStacks(), [state.tab]: [{ key, screen }] } };
 }
 
+// Every tab's stack (but the active one's, unless `active`) cut back to below its first scan-flow
+// screen.
+function withoutScanFlow(state: NavState, active = false): NavState {
+  let next = state;
+  for (const tab of TABS) {
+    if (tab === state.tab && !active) continue;
+    const stack = state.stacks[tab];
+    const at = stack.findIndex((entry) => SCAN_FLOW.has(entry.screen));
+    if (at > 0) next = withStack(next, tab, stack.slice(0, at));
+  }
+  return next;
+}
+
 export type NavChange = { state: NavState; kind: 'slide' | 'fade'; dir: NavDir };
 
 // What the router's `go(to, dir)` does, so the many go() calls keep their meaning:
@@ -126,8 +145,8 @@ export type NavChange = { state: NavState; kind: 'slide' | 'fade'; dir: NavDir }
 //   a course page, the Library after a save, Home after the introduction) ends what was open on
 //   both tabs: each starts at its root. Tabs are siblings, so it cross-fades;
 // - `dir: 'back'` to a screen on the stack: back to it;
-// - library content from the Scan tab: onto the previous tab (see CONTENT_SCREENS); the Scan tab
-//   starts at Capture again;
+// - the scan flow: pushed, and taken off any other tab's stack (see SCAN_FLOW);
+// - library content: pushed, after the scan flow it ends (see CONTENT_SCREENS);
 // - anything else: pushed.
 export function resolveGo(state: NavState, to: ScreenName, dir: NavDir, key: string): NavChange {
   if (isTabRoot(to)) {
@@ -138,10 +157,11 @@ export function resolveGo(state: NavState, to: ScreenName, dir: NavDir, key: str
   if (dir === 'back' && activeStack(state).some((entry) => entry.screen === to)) {
     return { state: popTo(state, to), kind: 'slide', dir };
   }
-  if (state.tab === 'capture' && CONTENT_SCREENS.has(to)) {
-    const tab = state.prevTab === 'capture' ? 'library' : state.prevTab;
-    const moved = { tab, stacks: { ...state.stacks, capture: [rootEntry('capture')] }, prevTab: state.tab };
-    return { state: push(moved, to, key), kind: 'slide', dir };
+  if (SCAN_FLOW.has(to)) return { state: push(withoutScanFlow(state), to, key), kind: 'slide', dir };
+  // Already lower down (the Reader that pages were added to): push() starts it afresh from there,
+  // which drops the flow above it too.
+  if (CONTENT_SCREENS.has(to) && !activeStack(state).some((entry) => entry.screen === to)) {
+    return { state: push(withoutScanFlow(state, true), to, key), kind: 'slide', dir };
   }
   return { state: push(state, to, key), kind: 'slide', dir };
 }

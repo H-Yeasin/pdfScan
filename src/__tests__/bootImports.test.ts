@@ -149,14 +149,8 @@ function lazyScreenFiles(): Map<string, string> {
 }
 
 const screenFiles = lazyScreenFiles();
-// Every screen chooseStartScreen can pick: Home, Capture (no course yet), Onboarding (new user).
-const startScreens = [
-  ...new Set([
-    chooseStartScreen({ hasActiveCourse: true }),
-    chooseStartScreen({ hasActiveCourse: false }),
-    chooseStartScreen({ hasActiveCourse: false, showOnboarding: true }),
-  ]),
-];
+// Every screen chooseStartScreen can pick: Home, Onboarding (new user).
+const startScreens = [...new Set([chooseStartScreen(), chooseStartScreen({ showOnboarding: true })])];
 
 describe('staticImports', () => {
   it('counts what loads with the file', () => {
@@ -203,7 +197,7 @@ describe('boot imports (§16 G3)', () => {
   });
 
   it('knows the file of every start screen', () => {
-    expect([...startScreens].sort()).toEqual(['capture', 'home', 'onboarding']);
+    expect([...startScreens].sort()).toEqual(['home', 'onboarding']);
     for (const screen of startScreens) expect(screenFiles.get(screen)).toMatch(/^src\/screens\/\w+Screen\.tsx$/);
   });
 

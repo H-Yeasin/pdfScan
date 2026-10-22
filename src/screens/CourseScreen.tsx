@@ -135,8 +135,8 @@ export function CourseScreen() {
   };
 
   const handleScan = () => {
+    // §17 U5: the scanner opens over this page (ScanLauncher); Review comes when the pages land.
     startScan(store.getState(), dispatch, course?.id ?? null, { launch: true });
-    go('capture');
   };
 
   const subtitle = course

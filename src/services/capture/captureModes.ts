@@ -4,13 +4,13 @@ import type { CaptureMode, EnhanceMode } from '../../types/models';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
-// Single source of truth for what each capture mode means. The mode is picked on our Capture
-// screen *before* Google's scanner opens (we can't change the scanner's own UI), so every
+// Single source of truth for what each capture mode means. The mode is picked in our Scan mode
+// sheet (§17 U5) *before* Google's scanner opens (we can't change the scanner's own UI), so every
 // mode-specific behaviour hangs off this table: scanner options, our post-processing, the
 // default filter, and the document type used for naming.
 export type CaptureModeSpec = {
   id: CaptureMode;
-  // Catalog keys (§6 L4): the mode's name, and the hint shown under it on the Capture screen.
+  // Catalog keys (§6 L4): the mode's name, and the hint shown under it in the Scan mode sheet.
   labelKey: TKey;
   icon: IoniconName;
   hintKey: TKey;

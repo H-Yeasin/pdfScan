@@ -25,20 +25,18 @@ import {
   relativeDay,
 } from '../services/courses/homeSelectors';
 import { courseColorValue } from '../services/courses/palette';
-import { startScan } from '../services/courses/startScan';
-import { useAppDispatch, useAppSelector, useAppSlices, useAppStore } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
+import { useAppDispatch, useAppSelector, useAppSlices } from '../store/AppStateContext';
+import { fontFamily, radii, spacing, useTheme } from '../theme';
 import type { Course } from '../types/models';
 import { useDayClock } from '../utils/useDayClock';
 import { formatShortDate } from '../utils/format';
 import { useBackupReminder } from '../store/useBackupReminder';
 import { EmptyState } from '../components/shared/EmptyState';
-import { Hint } from '../components/shared/Hint';
-import { useHint } from '../components/shared/useHint';
 import { useRenderCount } from '../utils/renderCounts';
 
 // The course hub (docs/PLAN.md §3): the shown semester with a switcher, "Continue" for the last
-// opened or saved document, a grid of the semester's courses, Unsorted, and a big Scan button.
+// opened or saved document, a grid of the semester's courses and Unsorted. §17 U5: Scan is the tab
+// bar's centre button (the big Scan pill here went with it).
 // All derived data comes from homeSelectors.ts.
 export function HomeScreen() {
   useRenderCount('Home');
@@ -48,7 +46,6 @@ export function HomeScreen() {
   const dispatch = useAppDispatch();
   const state = useAppSlices('library', 'settings');
   const homeSemesterId = useAppSelector((s) => s.libraryUi.homeSemesterId);
-  const store = useAppStore();
   const { files, courses, semesters } = state.library;
   const openDocument = useOpenDocument();
   // §8 B5: "Last backup: never. Back up now?"
@@ -58,8 +55,6 @@ export function HomeScreen() {
   const [quickSetup, setQuickSetup] = useState(false);
   const [editing, setEditing] = useState<{ course?: Course } | null>(null);
   const [addingDeadline, setAddingDeadline] = useState(false);
-  // §9 O3: points at Scan once (after onboarding, or on Capture if that comes first).
-  const scanHint = useHint('scan', !switcherOpen && !quickSetup && editing === null && !addingDeadline);
 
   // §16 G5: a clock that changes at midnight and when Home is shown again, not on every render,
   // so the memos below hold.
@@ -76,11 +71,6 @@ export function HomeScreen() {
   const openCourse = (id: string) => {
     dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id });
     go('course');
-  };
-
-  const handleScan = () => {
-    startScan(store.getState(), dispatch, null, { launch: true });
-    go('capture');
   };
 
   const handleCourseMenu = (course: Course) => {
@@ -121,9 +111,6 @@ export function HomeScreen() {
             {shown?.name ?? t('home.yourCourses')}
           </Text>
           {shown ? <Ionicons name="chevron-down" size={18} color={tokens.muted} /> : null}
-        </Pressable>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={() => go('settings')} accessibilityLabel={t('common.settings')}>
-          <Ionicons name="settings-outline" size={21} color={tokens.ink} />
         </Pressable>
       </View>
 
@@ -271,19 +258,6 @@ export function HomeScreen() {
 
       <DeadlineEditorSheet visible={addingDeadline} onClose={() => setAddingDeadline(false)} />
 
-      {scanHint.visible ? (
-        <Hint text={t('shared.hint.scan')} onDismiss={scanHint.dismiss} arrow="down" style={styles.scanHint} />
-      ) : null}
-      <Pressable
-        style={[styles.scanButton, { backgroundColor: tokens.accent }]}
-        onPress={handleScan}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.scan')}
-      >
-        <Ionicons name="scan" size={22} color={tokens.onAccent} />
-        <Text style={[styles.scanLabel, { color: tokens.onAccent }]}>{t('common.scan')}</Text>
-      </Pressable>
-
       {/* §10 M5: the only ad on Home, above the tab bar (the shell's, §16 G2); nothing when ads are off. */}
       <BannerSlot screen="home" />
 
@@ -321,12 +295,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.heading,
     fontSize: 26,
     flexShrink: 1,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   content: {
     padding: spacing.lg,
@@ -412,25 +380,6 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  scanHint: {
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  scanButton: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.md + 4,
-    borderRadius: radii.full,
-    elevation: 4,
-  },
-  scanLabel: {
-    fontSize: 17,
-    fontWeight: '700',
   },
   dueSoon: {
     gap: spacing.sm,

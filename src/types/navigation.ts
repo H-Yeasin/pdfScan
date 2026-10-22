@@ -1,12 +1,15 @@
 export type ScreenName =
   | 'home'
   | 'course'
-  | 'capture'
   | 'review'
   | 'deliver'
+  // The Files tab (§17 U5 renamed it in the UI only).
   | 'library'
   | 'reader'
+  // The Me tab since §17 U5.
   | 'settings'
+  // §17 U5: the Tools tab (a list of the existing entry points until U8).
+  | 'tools'
   | 'pro'
   | 'manageFolders'
   | 'academicOptions'

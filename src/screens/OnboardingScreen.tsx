@@ -22,7 +22,7 @@ import { useRouter } from '../navigation/router';
 import { useBackHandler } from '../navigation/useBackHandler';
 import { StudentCard } from '../components/onboarding/StudentCard';
 import { courseColorValue } from '../services/courses/palette';
-import { afterOnboarding, exampleFileName, studentCard } from '../services/onboarding/onboarding';
+import { exampleFileName, studentCard } from '../services/onboarding/onboarding';
 import { useAppDispatch, useAppSelector } from '../store/AppStateContext';
 import { fontFamily, radii, spacing, useTheme } from '../theme';
 
@@ -41,7 +41,6 @@ export function OnboardingScreen() {
   const dispatch = useAppDispatch();
   const profile = useAppSelector((s) => s.settings.profile);
   const crashReportsEnabled = useAppSelector((s) => s.settings.crashReportsEnabled);
-  const hasActiveCourse = useAppSelector((s) => s.library.courses.some((c) => !c.archived));
   const form = useCourseSetupForm();
   // The card the student builds across "About you" and "Your courses" (studentCard).
   const card = useMemo(
@@ -69,9 +68,10 @@ export function OnboardingScreen() {
   useBackHandler(() => goToPage(page - 1), page > 0);
 
   const finish = () => {
-    const added = form.saveValid();
+    form.saveValid();
     dispatch({ type: 'settings/SET_ONBOARDING_DONE', done: true });
-    go(afterOnboarding(hasActiveCourse || added > 0));
+    // §17 U5: Home, with or without a course; the tab bar's Scan button is there either way.
+    go('home');
   };
 
   const onScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

@@ -14,38 +14,48 @@ import {
 } from './formatCapabilities';
 
 // §12 D2: which actions the Reader shows, and where. Study actions sit in the bottom tool bar, one
-// tap away; managing the file (share, sign, export, print, submit, edit pages, type, delete) is in
-// More. Pure, so the rules per format and Pro state are tested without rendering the Reader.
+// tap away; sharing and managing the file (submit, print, rename, move, edit pages, sign, delete) is
+// in More. Pure, so the rules per format and Pro state are tested without rendering the Reader.
 
 export type ReaderToolId = 'mark' | 'selectText' | 'notes' | 'pages' | 'convertEdit';
 // `pro`: show the Pro badge (the tool runs a Pro task, and the student has no Pro pass).
 export type ReaderTool = { id: ReaderToolId; pro: boolean };
 
+// §18 W23: More's items, by section. Study tools and Convert/Edit/Fill form are in the bottom
+// tool bar, bookmarks in the top bar and Notes, copying a page's text in the selection: none of
+// them is repeated here.
 export type ReaderMoreItemId =
-  | 'addToLibrary'
+  // Share & export. §4 S6: rebuild and share the teacher's copy with the course's preset.
   | 'submit'
+  // The file itself (a PDF with its marks written in, §18 W14).
   | 'share'
-  | 'export'
-  // §12 D5: Office → PDF (Pro), also from the tool bar's Convert.
-  | 'convertToPdf'
-  // §12 D6: scan/PDF → Word (Pro), also from the tool bar's Convert.
-  | 'convertToWord'
-  // §12 D7: edit a TXT or CSV file (Pro), also from the tool bar's Convert/Edit; D8: XLSX/XLS.
-  | 'editFile'
-  // §12 D10: fill in a PDF's form (Pro), also from the tool bar's Convert/Edit.
-  | 'fillForm'
+  // A JPG-format document: the PDF made of its pages, or the page images themselves.
+  | 'shareAsPdf'
+  | 'shareImages'
   | 'print'
-  | 'sign'
+  // Organise. A file from outside: only Add to library.
+  | 'addToLibrary'
+  | 'rename'
+  | 'move'
+  // "Star" or "Unstar", by the document's state.
+  | 'star'
+  | 'changeType'
+  // §7 R3: reorder, rotate, delete, extract and add pages.
   | 'editPages'
   // §14 Q7: a cover page on a library PDF; "Change cover page" when it has one.
   | 'addCover'
   | 'changeCover'
-  | 'bookmarks'
-  | 'copyText'
-  | 'extractText'
+  | 'split'
+  | 'compress'
+  // Study: every page's text as a .txt (§5 T3).
+  | 'saveText'
+  // Document.
+  | 'sign'
   | 'readingSettings'
-  | 'changeType'
   | 'delete';
+
+export type ReaderMoreSectionId = 'share' | 'organise' | 'study' | 'document';
+export type ReaderMoreSection = { id: ReaderMoreSectionId; items: ReaderMoreItemId[] };
 
 // What the Reader has open: a library document, or a file from outside (not in the library yet).
 export type ReaderSubject = { doc: LibraryDocument; external?: undefined } | { doc?: undefined; external: { format: DocFormat } };
@@ -108,30 +118,49 @@ export function readerTools(subject: ReaderSubject, opts: { proTasks: readonly P
   return tools;
 }
 
-// `proTasks`: readerProTasks for this subject; Convert to PDF is listed when `convert` is one of
-// them on an office file, Convert to Word when it is on a scan or PDF, Edit when `editFiles` is,
-// Fill in form when `pdfForms` is.
-export function readerMoreItems(subject: ReaderSubject, opts: { proTasks?: readonly ProTaskFeature[] } = {}): ReaderMoreItemId[] {
+// §18 W23: More, in sections, in a fixed order, Delete last. A section with nothing in it for this
+// file is left out.
+export function readerMoreSections(subject: ReaderSubject): ReaderMoreSection[] {
   const { doc } = subject;
-  const raster = isPageRasterFormat(formatOf(subject));
-  const items: ReaderMoreItemId[] = [];
-  if (!doc) items.push('addToLibrary');
-  if (doc && canSubmit(doc)) items.push('submit');
-  items.push('share');
-  // Export shares the PDF; other formats have none (Share sends the file itself).
-  if (raster) items.push('export');
-  if (canConvertToPdf(formatOf(subject)) && opts.proTasks?.includes('convert')) items.push('convertToPdf');
-  if (raster && opts.proTasks?.includes('convert')) items.push('convertToWord');
-  if (opts.proTasks?.includes('editFiles')) items.push('editFile');
-  if (opts.proTasks?.includes('pdfForms')) items.push('fillForm');
-  items.push('print');
-  if (doc && canSign(doc)) items.push('sign');
-  if (doc && canUsePageTools(doc)) items.push('editPages');
-  if (doc && canAddCover(doc)) items.push(doc.coverKind ? 'changeCover' : 'addCover');
-  if (doc && raster) items.push('bookmarks');
-  if (doc && hasPageMasters(doc)) items.push('copyText', 'extractText');
-  items.push('readingSettings');
-  // Library documents only: a file from outside has no type and nothing to delete until it's added.
-  if (doc) items.push('changeType', 'delete');
-  return items;
+  const format = formatOf(subject);
+
+  const share: ReaderMoreItemId[] = [];
+  if (doc && canSubmit(doc)) share.push('submit');
+  // A scan saved as JPG has no single file: it goes out as a PDF or as its images. A PDF's
+  // Share is its PDF already (the old Export was the same file twice).
+  if (doc && format === 'JPG') share.push('shareAsPdf', 'shareImages');
+  else share.push('share');
+  share.push('print');
+
+  const organise: ReaderMoreItemId[] = [];
+  if (!doc) organise.push('addToLibrary');
+  else {
+    organise.push('rename', 'move', 'star', 'changeType');
+    if (canUsePageTools(doc)) organise.push('editPages');
+    if (canAddCover(doc)) organise.push(doc.coverKind ? 'changeCover' : 'addCover');
+    // One page has nothing to split.
+    if (canUsePageTools(doc) && doc.pages.length > 1) organise.push('split');
+    if (canUsePageTools(doc)) organise.push('compress');
+  }
+
+  const study: ReaderMoreItemId[] = [];
+  if (doc && hasPageMasters(doc)) study.push('saveText');
+
+  const document: ReaderMoreItemId[] = [];
+  if (doc && canSign(doc)) document.push('sign');
+  document.push('readingSettings');
+  // A file from outside has nothing to delete until it's added.
+  if (doc) document.push('delete');
+
+  const sections: ReaderMoreSection[] = [
+    { id: 'share', items: share },
+    { id: 'organise', items: organise },
+    { id: 'study', items: study },
+    { id: 'document', items: document },
+  ];
+  return sections.filter((s) => s.items.length > 0);
+}
+
+export function readerMoreItemIds(sections: readonly ReaderMoreSection[]): ReaderMoreItemId[] {
+  return sections.flatMap((s) => s.items);
 }

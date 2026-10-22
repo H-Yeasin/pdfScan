@@ -1872,8 +1872,47 @@ heading in the document scrolls to it; reopen restores the scroll position; the 
 (`parseCache`).
 
 ## W23 · Grouped More sheet + Rename, Move, Star and page tools *(M)*
-Status: planned. JS only. Needs §17 U3's `Menu`; shares §17 U7's `useDocumentActions` (Rename, Move, Star)
-— whichever of U7 and W23 lands first builds it.
+Status: **done in code (2026-10-22).** JS only. **Device check open** (below). Built before §17 U3: it
+brought U3's `Menu` with it (see As built). Shares §17 U7's `useDocumentActions` (Rename, Move, Star):
+W23 landed first and built it.
+
+As built:
+- **`components/ui/Menu.tsx`** (U3's `Menu`, built early): `sections: { title?, items: { id, label, icon,
+  destructive?, disabled?, badge?, below? }[] }[]`, `onSelect(id)` after `onClose()`, empty sections left
+  out. Until U3's `Sheet` exists it is its own Modal (inside `components/ui`, so the ratchet doesn't
+  count it); U3 moves it onto `Sheet` with the same props. `below` carries §9 O3's Submit hint.
+- **`readerTools.readerMoreSections(subject)`** replaces `readerMoreItems` (`readerMoreItemIds` flattens
+  it). Sections `share` · `organise` · `study` · `document`; ids `submit`, `share`, `shareAsPdf`,
+  `shareImages`, `print` · `addToLibrary`, `rename`, `move`, `star`, `changeType`, `editPages`,
+  `addCover`/`changeCover`, `split` (2+ pages), `compress` · `saveText` · `sign`, `readingSettings`,
+  `delete`. Gone from More: `export` (a PDF's Share is the same file; a JPG's is Share as PDF),
+  `bookmarks`, `copyText`, `convertToPdf`, `convertToWord`, `editFile`, `fillForm`. The proTasks option
+  is gone with them.
+- **`OverflowSheet`** is now a thin mapping onto `Menu` (labels, `ICONS`; Star reads "Unstar" on a
+  starred document). New `ICONS`: `star`, `docType`, `print`, `addToLibrary`.
+- **`components/library/useDocumentActions.ts`**: `documentActions(dispatch, courses)` (pure, tested) →
+  `rename`, `move`, `toggleStar`, `split(doc, annotations, leave?)`, `compress`; `useDocumentActions()`.
+  `compressDocuments` and `libraryOps` moved here from `useDocumentListActions` (the selection bar's
+  Move uses `move`). `services/library/rename.ts` `renamedTo` cleans with `sanitizeFileName` and refuses
+  an empty or unchanged name. Search needs nothing more: the name haystack is per document object.
+- **Reader sheets:** kinds `'rename'` (a `TextPromptModal`, until U3's `Dialog`) and `'move'`
+  (`FolderPickerModal`, with "New course"); `'bookmarks'` and the Reader's `BookmarksSheet` are gone
+  (bookmarks: the top bar and Notes).
+- **Split** leaves the Reader once the pages are made (`back`, then `REPLACE_FILES`), so it returns to
+  wherever the Reader was opened from (Files, a course, Home), with the snack. A failure stays put.
+- **Save text as a file** shares the `.txt` straight away (the old Copy-or-Share alert is gone; a page's
+  text is copied from the selection).
+- **The JPG gap (`shareService`):** `shareDocumentImages` shares one page as itself and more as one zip
+  (`<name>_1.jpg`, …; the app's own zip writer). `shareDocument` uses it for any JPG-format document
+  (Deliver's "Share after saving" too). `printDocument` prints a scan, PDF or JPG, through
+  `annotatedPdfFor` (built on the fly, with the marks), page 1 only if that fails.
+
+Not as planned, or left open:
+- Delete still asks through `Alert.alert` (U3 moves it onto `useConfirm`).
+- Moving to a course just made in the picker names it "course" in the snack (the course list in hand
+  is from before; as in the selection bar before).
+- Signing on a page is unchanged (More → Sign); `applySignatureToDocument`'s unused scan branch (W17)
+  is still there.
 
 Files: `services/documents/readerTools.ts` (`readerMoreSections` replaces `readerMoreItems`),
 `OverflowSheet.tsx` (→ `Menu` sections), `useReaderOverflowActions.ts`, `components/library/useDocumentActions.ts`,

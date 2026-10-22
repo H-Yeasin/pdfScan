@@ -1,19 +1,25 @@
 import { useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { annotatedPdfFor } from '../../services/annotations/exportPdf';
-import { libraryIdxFor } from '../../services/documents/pageMap';
 import type { ReaderMoreItemId } from '../../services/documents/readerTools';
 import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { promoteExternalToLibrary } from '../../services/persistence/libraryOperations';
 import type { ReaderSheet } from '../../services/reader/readerSheets';
-import { printDocument, printFileUri, shareAs, shareDocument, shareFileName, shareFileUri } from '../../services/sharing/shareService';
+import {
+  printDocument,
+  printFileUri,
+  shareAs,
+  shareDocument,
+  shareDocumentImages,
+  shareFileName,
+  shareFileUri,
+} from '../../services/sharing/shareService';
 import { writeDocumentText } from '../../services/study/textExport';
-import { extractDocumentText } from '../../services/study/textSelection';
 import type { AppAction } from '../../store/appReducer';
 import type { Annotation, ExternalFileDocument, LibraryDocument, ReaderPosition } from '../../types/models';
 import { MIME_BY_FORMAT } from '../../utils/docFormat';
 import type { t as translate } from '../../i18n';
+import type { DocumentActions } from '../library/useDocumentActions';
 
 // What the More sheet's items act on and through: the file on screen, and the Reader's own
 // flows (each started by a function, so this file renders nothing and knows no sheet's insides).
@@ -38,17 +44,15 @@ export type ReaderOverflowContext = {
   sign: () => void;
   editPages: () => void;
   openCoverOptions: (doc: LibraryDocument) => void;
-  convertToPdf: () => void;
-  convertToWord: () => void;
-  editFile: () => void;
-  fillForm: () => void;
+  // §18 W23: Star, Split, Compress (Rename and Move ask first, in their sheets).
+  documentActions: DocumentActions;
 };
 
 export type ReaderOverflowActions = Record<ReaderMoreItemId, () => void | Promise<void>>;
 
 // §18 W6: one handler per More item, as a table: a new `ReaderMoreItemId` doesn't compile until it
 // has one. (It was a 100-line if/else in ReaderScreen, where a missing branch did nothing.)
-// readerTools.readerMoreItems decides which items a file shows; a handler still checks what it
+// readerTools.readerMoreSections decides which items a file shows; a handler still checks what it
 // needs, since the file can change under an open sheet.
 export function readerOverflowActions(ctx: ReaderOverflowContext): ReaderOverflowActions {
   const { doc, external, pdfUri, annotations, title, dispatch, t } = ctx;
@@ -60,26 +64,27 @@ export function readerOverflowActions(ctx: ReaderOverflowContext): ReaderOverflo
       if (external) await shareFileUri(external.uri, MIME_BY_FORMAT[external.format], external.name);
       else if (doc) await shareDocument(doc, annotations);
     },
-    print: async () => {
-      if (external) await printFileUri(external.uri);
-      else if (doc) await printDocument(doc, annotations);
-    },
-    export: async () => {
+    shareAsPdf: async () => {
       // A library PDF is shared under the document's name, not as `document.pdf` (see
       // shareAs); an external file already has its own name.
       if (external && pdfUri) await shareFileUri(pdfUri, 'application/pdf', title);
       else if (doc) {
-        // §18 W14: the copy with the marks in it (a JPG-format scan's PDF too). §18 W17: a scan
-        // that never had a PDF gets one now.
+        // §18 W14: the copy with the marks in it. §18 W17: a scan that never had a PDF gets one now.
         const annotated = await annotatedPdfFor(doc, annotations);
         if (annotated) await shareAs(annotated, shareFileName(title, 'pdf'), 'application/pdf');
       }
     },
-    convertToPdf: ctx.convertToPdf,
-    convertToWord: ctx.convertToWord,
-    editFile: ctx.editFile,
-    fillForm: ctx.fillForm,
-    sign: ctx.sign,
+    // §18 W23: every page, not only the first.
+    shareImages: async () => {
+      if (doc) await shareDocumentImages(doc);
+    },
+    print: async () => {
+      if (external) await printFileUri(external.uri);
+      else if (doc) await printDocument(doc, annotations);
+    },
+    submit: async () => {
+      if (doc) await ctx.submit(doc);
+    },
     addToLibrary: async () => {
       if (!external) return;
       const promoted = await promoteExternalToLibrary(external);
@@ -91,43 +96,36 @@ export function readerOverflowActions(ctx: ReaderOverflowContext): ReaderOverflo
       dispatch({ type: 'reader/SET_READER_ID', id: promoted.id });
       dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.addedToLibrary') });
     },
+    rename: () => {
+      if (doc) ctx.openSheet({ kind: 'rename' });
+    },
+    move: () => {
+      if (doc) ctx.openSheet({ kind: 'move' });
+    },
+    star: () => {
+      if (doc) ctx.documentActions.toggleStar(doc);
+    },
     changeType: () => {
       if (doc) ctx.openSheet({ kind: 'type' });
     },
-    submit: async () => {
-      if (doc) await ctx.submit(doc);
-    },
-    bookmarks: () => ctx.openSheet({ kind: 'bookmarks' }),
     editPages: ctx.editPages,
     addCover: openCover,
     changeCover: openCover,
+    // The document becomes one per page: the Reader leaves (back to where it was opened from)
+    // once they are made.
+    split: async () => {
+      if (doc) await ctx.documentActions.split(doc, annotations, ctx.back);
+    },
+    compress: async () => {
+      if (doc) await ctx.documentActions.compress(doc);
+    },
+    // §5 T3: all pages' text, with a line marking each page, through the share sheet (Files,
+    // Drive, a notes app).
+    saveText: async () => {
+      if (doc) await shareAs(writeDocumentText(doc), shareFileName(doc.name, 'txt'), 'text/plain');
+    },
+    sign: ctx.sign,
     readingSettings: () => ctx.openSheet({ kind: 'reading' }),
-    copyText: async () => {
-      if (!doc) return;
-      // The library page on screen (on a 2-up sheet, its left page).
-      const idx = libraryIdxFor(doc, ctx.pdfPage);
-      const text = doc.pages[idx]?.ocr?.text.trim() ?? '';
-      if (!text) {
-        dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.noPageText') });
-        return;
-      }
-      await Clipboard.setStringAsync(text);
-      dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.copiedPage', { page: idx + 1 }) });
-    },
-    extractText: () => {
-      if (!doc) return;
-      Alert.alert(t('reader.extractTitle'), t('reader.extractBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('reader.copy'),
-          onPress: async () => {
-            await Clipboard.setStringAsync(extractDocumentText(doc));
-            dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.copiedAll') });
-          },
-        },
-        { text: t('reader.shareTxt'), onPress: () => shareAs(writeDocumentText(doc), shareFileName(doc.name, 'txt'), 'text/plain') },
-      ]);
-    },
     delete: () => {
       if (!doc) return;
       Alert.alert(t('reader.deleteTitle'), t('reader.deleteBody', { name: doc.name }), [

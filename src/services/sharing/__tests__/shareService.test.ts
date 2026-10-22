@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { shareAs, shareDocument, shareFileName } from '../shareService';
+import { openZip } from '../../backup/zip';
+import { shareAs, shareDocument, shareDocumentImages, shareFileName } from '../shareService';
 import type { LibraryDocument } from '../../../types/models';
 
 jest.mock('expo-print', () => ({ printAsync: jest.fn() }));
@@ -59,10 +60,21 @@ describe('shareDocument', () => {
     expect(shareAsync.mock.calls[0][0]).toMatch(/\/share\/2021331045_Rahim_CSE101_HW3\.pdf$/);
   });
 
-  it('numbers the first page of a multi-page JPG document', async () => {
-    const page = (n: number) => ({ id: `p${n}`, fileUri: libraryFile(`page_${n}.jpg`, 'jpg'), width: 1, height: 1 });
+  // §18 W23: every page, not only the first.
+  it('shares every page of a multi-page JPG document, as one zip', async () => {
+    const page = (n: number) => ({ id: `p${n}`, fileUri: libraryFile(`page_${n}.jpg`, `jpg ${n}`), width: 1, height: 1 });
     const doc = { ...base, name: 'Board notes', format: 'JPG', pages: [page(1), page(2)] };
     await shareDocument(doc as unknown as LibraryDocument);
-    expect(shareAsync.mock.calls[0][0]).toMatch(/\/share\/Board notes_1\.jpg$/);
+    const [uri, options] = shareAsync.mock.calls[0];
+    expect(uri).toMatch(/\/share\/Board notes\.zip$/);
+    expect(options).toEqual({ mimeType: 'application/zip', dialogTitle: 'Board notes.zip' });
+    const zip = openZip(new File(uri));
+    expect(zip.entries.map((e) => e.name)).toEqual(['Board notes_1.jpg', 'Board notes_2.jpg']);
+  });
+
+  it('shares a one-page JPG document as its image', async () => {
+    const doc = { ...base, name: 'Receipt', format: 'JPG', pages: [{ id: 'p1', fileUri: libraryFile('page_1.jpg', 'jpg'), width: 1, height: 1 }] };
+    await shareDocumentImages(doc as unknown as LibraryDocument);
+    expect(shareAsync.mock.calls[0][0]).toMatch(/\/share\/Receipt\.jpg$/);
   });
 });

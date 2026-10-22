@@ -35,16 +35,47 @@ export function shareFileName(name: string, extension: string, suffix = ''): str
   return `${sanitizeFileName(name) || FALLBACK_FILE_NAME}${suffix}.${extension}`;
 }
 
-// expo-sharing shares exactly one file per call. A multi-page JPG document has no single
-// combined file, so sharing it shares only its first page, with the caller responsible for
-// surfacing that as a visible note rather than silently doing something unexpected.
 // §18 W14: a PDF goes out with the document's marks and signatures written in (`annotations`:
-// the library's; annotations/exportPdf keeps the copy).
+// the library's; annotations/exportPdf keeps the copy). §18 W23: a JPG-format document goes out
+// whole, every page (shareDocumentImages), not only its first.
 export async function shareDocument(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<void> {
+  if (doc.format === 'JPG') return shareDocumentImages(doc);
   const uri = doc.format === 'PDF' ? await annotatedPdfFor(doc, annotations) : isPageRasterFormat(doc.format) ? doc.pages[0]?.fileUri : doc.contentUri;
   if (!uri) return;
-  const suffix = doc.format === 'JPG' && doc.pages.length > 1 ? '_1' : '';
-  await shareAs(uri, shareFileName(doc.name, doc.format.toLowerCase(), suffix), MIME_BY_FORMAT[doc.format]);
+  await shareAs(uri, shareFileName(doc.name, doc.format.toLowerCase()), MIME_BY_FORMAT[doc.format]);
+}
+
+// §18 W23: the page images of a JPG-format document. expo-sharing hands over one file per call, so
+// one page goes as itself and more go as one zip of them (`HW3_1.jpg`, `HW3_2.jpg`, ...). Marks
+// and signatures are rows beside the images: Share as PDF is the copy that carries them.
+export async function shareDocumentImages(doc: LibraryDocument): Promise<void> {
+  const pages = doc.pages.filter((p) => !!p.fileUri);
+  if (pages.length === 0) return;
+  if (pages.length === 1) {
+    await shareAs(pages[0].fileUri, shareFileName(doc.name, 'jpg'), 'image/jpeg');
+    return;
+  }
+  const available = await Sharing.isAvailableAsync();
+  if (!available) return;
+  const { addFileFromDisk, createZip } = require('../backup/zip') as typeof import('../backup/zip');
+  const dir = shareDir();
+  if (dir.exists) dir.delete();
+  dir.create({ intermediates: true });
+  const fileName = shareFileName(doc.name, 'zip');
+  const dest = new File(dir, fileName);
+  const writer = createZip(dest);
+  try {
+    // One page at a time (memory on mid-range phones).
+    for (let i = 0; i < pages.length; i++) {
+      await addFileFromDisk(writer, shareFileName(doc.name, 'jpg', `_${i + 1}`), new File(pages[i].fileUri));
+    }
+    writer.finish();
+  } catch (error) {
+    writer.abort();
+    if (dest.exists) dest.delete();
+    throw error;
+  }
+  await Sharing.shareAsync(dest.uri, { mimeType: 'application/zip', dialogTitle: fileName });
 }
 
 export async function shareFileUri(uri: string, mimeType: string, dialogTitle?: string): Promise<void> {
@@ -53,8 +84,10 @@ export async function shareFileUri(uri: string, mimeType: string, dialogTitle?: 
   await Sharing.shareAsync(uri, { mimeType, dialogTitle });
 }
 
+// §18 W23: a JPG-format document prints every page, through the PDF made of them (built now when
+// it has none; annotatedPdfFor), with its marks; its first page only if that can't be made.
 export async function printDocument(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<void> {
-  const pdf = doc.format === 'PDF' ? await annotatedPdfFor(doc, annotations) : undefined;
+  const pdf = isPageRasterFormat(doc.format) ? await annotatedPdfFor(doc, annotations) : undefined;
   if (pdf) {
     await Print.printAsync({ uri: pdf });
   } else if (isPageRasterFormat(doc.format) && doc.pages[0]) {

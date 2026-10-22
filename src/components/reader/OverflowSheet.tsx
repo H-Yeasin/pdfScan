@@ -1,143 +1,77 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Fragment } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radii, spacing, useTheme } from '../../theme';
+import type { ReactNode } from 'react';
+import { StyleSheet } from 'react-native';
 import { useT } from '../../i18n/useT';
+import type { ReaderMoreItemId, ReaderMoreSection } from '../../services/documents/readerTools';
+import { ICONS, spacing, type IoniconName } from '../../theme';
+import { Menu, type MenuSection } from '../ui';
 import { Hint } from '../shared/Hint';
-import type { ReaderMoreItemId } from '../../services/documents/readerTools';
 
 export type OverflowItemId = ReaderMoreItemId;
 
-const ICONS: Record<OverflowItemId, keyof typeof Ionicons.glyphMap> = {
-  addToLibrary: 'add-circle-outline',
-  // §4 S6: rebuild and share the teacher's copy with the course's preset.
-  submit: 'paper-plane-outline',
-  share: 'share-outline',
-  export: 'download-outline',
-  // §12 D5: Office → PDF (Pro).
-  convertToPdf: 'document-attach-outline',
-  // §12 D6: scan/PDF → Word (Pro).
-  convertToWord: 'document-text-outline',
-  // §12 D7: edit a TXT or CSV file (Pro).
-  editFile: 'pencil-outline',
-  // §12 D10: fill in a PDF form (Pro).
-  fillForm: 'clipboard-outline',
-  print: 'print-outline',
-  sign: 'create-outline',
-  // §7 R3: reorder, rotate, delete, extract and add pages of a saved document.
-  editPages: 'albums-outline',
-  // §14 Q7.
-  addCover: 'document-attach-outline',
-  changeCover: 'document-attach-outline',
-  // §5 T5.
-  bookmarks: 'bookmarks-outline',
-  // §5 T3: the OCR text of scanned pages.
-  copyText: 'copy-outline',
-  extractText: 'document-text-outline',
-  // §12 D2.
-  readingSettings: 'options-outline',
-  changeType: 'pricetag-outline',
-  delete: 'trash-outline',
+// Each item's icon, from theme/icons where the action has one there.
+const ITEM_ICONS: Record<OverflowItemId, IoniconName> = {
+  submit: ICONS.submit,
+  share: ICONS.share,
+  shareAsPdf: ICONS.convertToPdf,
+  shareImages: ICONS.gallery,
+  print: ICONS.print,
+  addToLibrary: ICONS.addToLibrary,
+  rename: ICONS.rename,
+  move: ICONS.move,
+  star: ICONS.star,
+  changeType: ICONS.docType,
+  editPages: ICONS.reorder,
+  addCover: ICONS.addCover,
+  changeCover: ICONS.changeCover,
+  split: ICONS.split,
+  compress: ICONS.compress,
+  saveText: ICONS.extractText,
+  sign: ICONS.sign,
+  readingSettings: ICONS.readingSettings,
+  delete: ICONS.delete,
 };
 
 type OverflowSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSelect: (id: OverflowItemId) => void;
-  // In order: services/documents/readerTools.readerMoreItems decides which apply.
-  items: OverflowItemId[];
+  // services/documents/readerTools.readerMoreSections decides which apply, and in what order.
+  sections: ReaderMoreSection[];
+  // Star reads "Unstar" on a starred document.
+  starred: boolean;
   // §9 O3: the one-time hint shown under Submit (inside this sheet, never over it).
   submitHint?: { text: string; onDismiss: () => void };
 };
 
-// §12 D2: the Reader's More sheet. Study actions are in the bottom tool bar; sharing and managing
-// the file are here, with Delete last as the one, deliberately-gated path to a destructive action.
-export function OverflowSheet({ visible, onClose, onSelect, items, submitHint }: OverflowSheetProps) {
-  const { tokens } = useTheme();
+// §12 D2, §18 W23: the Reader's More sheet, on the kit's Menu, in sections: Share & export,
+// Organise, Study, Document. Study actions are in the bottom tool bar; Delete is last, as the one,
+// deliberately-gated path to a destructive action.
+export function OverflowSheet({ visible, onClose, onSelect, sections, starred, submitHint }: OverflowSheetProps) {
   const { t } = useT();
-  const insets = useSafeAreaInsets();
 
-  return (
-    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: tokens.surface,
-              paddingBottom: insets.bottom + spacing.md,
-            },
-          ]}
-        >
-          <View style={[styles.handle, { backgroundColor: tokens.edge }]} />
-          {/* A scan has a dozen items: on a small phone they scroll. */}
-          <ScrollView style={styles.list} bounces={false}>
-            {items.map((id) => {
-              const destructive = id === 'delete';
-              return (
-                <Fragment key={id}>
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.item}
-                    onPress={() => {
-                      onClose();
-                      onSelect(id);
-                    }}
-                  >
-                    <Ionicons name={ICONS[id]} size={20} color={destructive ? tokens.danger : tokens.ink} />
-                    <Text style={[styles.itemLabel, { color: destructive ? tokens.danger : tokens.ink }]}>{t(`reader.actions.${id}`)}</Text>
-                  </Pressable>
-                  {id === 'submit' && submitHint ? (
-                    <Hint text={submitHint.text} onDismiss={submitHint.onDismiss} arrow="up" arrowAlign="left" style={styles.hint} />
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </Pressable>
-    </Modal>
-  );
+  const below = (id: OverflowItemId): ReactNode =>
+    id === 'submit' && submitHint ? (
+      <Hint text={submitHint.text} onDismiss={submitHint.onDismiss} arrow="up" arrowAlign="left" style={styles.hint} />
+    ) : undefined;
+
+  const menu: MenuSection<OverflowItemId>[] = sections.map((section) => ({
+    title: t(`reader.moreSections.${section.id}`),
+    items: section.items.map((id) => ({
+      id,
+      label: id === 'star' && starred ? t('reader.actions.unstar') : t(`reader.actions.${id}`),
+      icon: id === 'star' && starred ? 'star' : ITEM_ICONS[id],
+      destructive: id === 'delete',
+      below: below(id),
+    })),
+  }));
+
+  return <Menu visible={visible} onClose={onClose} onSelect={onSelect} sections={menu} />;
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: radii.sheet,
-    borderTopRightRadius: radii.sheet,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    maxHeight: '90%',
-  },
-  list: {
-    flexGrow: 0,
-  },
   hint: {
     marginHorizontal: spacing.md,
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
-  },
-  handle: {
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginVertical: spacing.sm,
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    height: 52,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
-  },
-  itemLabel: {
-    fontSize: 15.5,
   },
 });

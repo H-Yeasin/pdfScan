@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { BookmarksSheet } from '../bookmarks/BookmarkList';
 import { DocTypePickerModal } from '../courses/DocTypeChips';
+import { FolderPickerModal } from '../deliver/FolderPickerModal';
+import type { DocumentActions } from '../library/useDocumentActions';
 import { TextPromptModal } from '../shared/TextPromptModal';
 import { useHint } from '../shared/useHint';
 import { SubmissionsSheet } from '../submit/SubmissionsSheet';
@@ -9,15 +10,15 @@ import { useT } from '../../i18n/useT';
 import { documentNotes, formatNotesExport, notesExportLabels, type NoteEntry } from '../../services/annotations/notesPanel';
 import { docTypeOf, getDocType } from '../../services/courses/docTypes';
 import { parseJumpInput, type PageLabel } from '../../services/documents/readerPosition';
-import type { ReaderMoreItemId } from '../../services/documents/readerTools';
+import { readerMoreItemIds, type ReaderMoreItemId, type ReaderMoreSection } from '../../services/documents/readerTools';
 import type { ReadingSettings } from '../../services/documents/readingSettings';
 import type { OutlineEntry } from '../../services/reader/outline';
 import { shareAs, shareFileName } from '../../services/sharing/shareService';
-import { documentBookmarks } from '../../services/study/bookmarks';
 import { writeExportText } from '../../services/study/textExport';
 import { useShareSubmission } from '../../store/useSubmitDocument';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import type { Bookmark, LibraryDocument, Submission } from '../../types/models';
+import { createId } from '../../utils/id';
 import { NotesSheet } from './NotesSheet';
 import { OverflowSheet } from './OverflowSheet';
 import { PageScrubberSheet } from './PageScrubberSheet';
@@ -43,8 +44,10 @@ type Props = {
   pageText: (idx: number) => Promise<string>;
   // A mark picked in the Notes panel lights up on its page, once the Reader has gone there.
   flashNote: (entry: NoteEntry) => void;
-  moreItems: ReaderMoreItemId[];
+  moreSections: ReaderMoreSection[];
   onSelectMore: (id: ReaderMoreItemId) => void;
+  // §18 W23: what Rename and Move do once answered.
+  documentActions: DocumentActions;
   submissions: Submission[];
   currentBookmark: Bookmark | undefined;
   addBookmark: (label?: string) => void;
@@ -63,8 +66,9 @@ export function ReaderSheets({
   outline,
   pageText,
   flashNote,
-  moreItems,
+  moreSections,
   onSelectMore,
+  documentActions,
   submissions,
   currentBookmark,
   addBookmark,
@@ -78,14 +82,15 @@ export function ReaderSheets({
   const open = sheets.sheet?.kind;
   const textIdx = sheets.sheet?.kind === 'pageText' ? sheets.sheet.idx : null;
 
-  // §5 T5: bookmarks of this document. §12 D4: the notes panel: marks, notes and bookmarks by page.
-  const docBookmarks = useMemo(() => (doc ? documentBookmarks(state.library.bookmarks, doc) : []), [doc, state.library.bookmarks]);
+  // §12 D4: the notes panel: marks, notes and bookmarks by page (§18 W23: the bookmarks' only list
+  // in the Reader; the top bar adds and labels them).
   const docNotes = useMemo(
     () => (doc ? documentNotes(doc, state.library.annotations, state.library.bookmarks) : []),
     [doc, state.library.annotations, state.library.bookmarks]
   );
   // §9 O3: the Submit hint shows inside the More sheet, next to Submit, the first time it's there.
-  const submitHint = useHint('submit', open === 'more' && moreItems.includes('submit'));
+  const hasSubmit = useMemo(() => readerMoreItemIds(moreSections).includes('submit'), [moreSections]);
+  const submitHint = useHint('submit', open === 'more' && hasSubmit);
 
   return (
     <>
@@ -155,6 +160,35 @@ export function ReaderSheets({
         />
       ) : null}
 
+      {doc ? (
+        <TextPromptModal
+          visible={open === 'rename'}
+          title={t('reader.renameTitle')}
+          initialValue={doc.name}
+          submitLabel={t('reader.save')}
+          onCancel={() => close('rename')}
+          onSubmit={(name) => {
+            close('rename');
+            documentActions.rename(doc, name);
+          }}
+        />
+      ) : null}
+
+      {doc ? (
+        <FolderPickerModal
+          visible={open === 'move'}
+          courses={state.library.courses}
+          selectedCourseId={doc.courseId ?? null}
+          onSelect={(courseId) => documentActions.move([doc], courseId)}
+          onCreate={(name) => {
+            const id = createId('course');
+            dispatch({ type: 'library/CREATE_COURSE', id, name });
+            return id;
+          }}
+          onClose={() => close('move')}
+        />
+      ) : null}
+
       <SubmissionsSheet
         visible={open === 'submissions'}
         submissions={submissions}
@@ -169,19 +203,9 @@ export function ReaderSheets({
         visible={open === 'more'}
         onClose={() => close('more')}
         onSelect={onSelectMore}
-        items={moreItems}
+        sections={moreSections}
+        starred={!!doc?.star}
         submitHint={submitHint.visible ? { text: t('shared.hint.submit'), onDismiss: submitHint.dismiss } : undefined}
-      />
-
-      <BookmarksSheet
-        visible={open === 'bookmarks'}
-        items={docBookmarks}
-        onOpen={(item) => {
-          close('bookmarks');
-          if (doc) goToIdx(item.idx);
-        }}
-        onRemove={(item) => dispatch({ type: 'library/REMOVE_BOOKMARK', id: item.bookmark.id })}
-        onClose={() => close('bookmarks')}
       />
 
       <NotesSheet

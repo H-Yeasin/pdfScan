@@ -18,6 +18,8 @@ import { SplashIntro, SplashIntroBoundary } from '../components/brand/SplashIntr
 import { ExportHost } from '../components/backup/ExportHost';
 import { ProTaskResumeHost } from '../components/pro/ProTaskResumeHost';
 import { AutoBackupChip } from '../components/backup/AutoBackupChip';
+import { ScanLauncher } from '../components/capture/ScanLauncher';
+import { cancelProcessing } from '../services/capture/processingSession';
 import { useAppDispatch, useAppSelector, useAppStore } from '../store/AppStateContext';
 import { useAppFonts, useTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
@@ -29,12 +31,12 @@ import { StatusBar } from 'expo-status-bar';
 const SCREENS: ScreenMap = lazyScreens({
   home: () => (require('../screens/HomeScreen') as typeof import('../screens/HomeScreen')).HomeScreen,
   course: () => (require('../screens/CourseScreen') as typeof import('../screens/CourseScreen')).CourseScreen,
-  capture: () => (require('../screens/CaptureScreen') as typeof import('../screens/CaptureScreen')).CaptureScreen,
   review: () => (require('../screens/ReviewScreen') as typeof import('../screens/ReviewScreen')).ReviewScreen,
   deliver: () => (require('../screens/DeliverScreen') as typeof import('../screens/DeliverScreen')).DeliverScreen,
   library: () => (require('../screens/LibraryScreen') as typeof import('../screens/LibraryScreen')).LibraryScreen,
   reader: () => (require('../screens/ReaderScreen') as typeof import('../screens/ReaderScreen')).ReaderScreen,
   settings: () => (require('../screens/SettingsScreen') as typeof import('../screens/SettingsScreen')).SettingsScreen,
+  tools: () => (require('../screens/ToolsScreen') as typeof import('../screens/ToolsScreen')).ToolsScreen,
   pro: () => (require('../screens/ProScreen') as typeof import('../screens/ProScreen')).ProScreen,
   manageFolders: () => (require('../screens/ManageFoldersScreen') as typeof import('../screens/ManageFoldersScreen')).ManageFoldersScreen,
   academicOptions: () => (require('../screens/AcademicOptionsScreen') as typeof import('../screens/AcademicOptionsScreen')).AcademicOptionsScreen,
@@ -85,15 +87,14 @@ export function AppNavigator() {
   const libraryStatus = useAppSelector((s) => s.library.loadStatus);
   const settingsLoaded = useAppSelector((s) => s.settings.loaded);
   const appLocked = useAppSelector((s) => s.settings.appLock.enabled);
-  const hasActiveCourse = useAppSelector((s) => s.library.courses.some((c) => !c.archived));
   const processingStatus = useAppSelector((s) => s.capture.processingStatus);
   const errorMessage = useAppSelector((s) => s.capture.errorMessage);
   const prevProcessingStatus = useRef(processingStatus);
 
   // Start screen (§9 O1, `chooseStartScreen`): picked once settings, the library index and the
   // fonts are in, before the first real render, while the splash still covers the app (the native one, then the
-  // splash intro's identical overlay, §15 V5) - so Capture never flashes up on the way to Home. A failed library load falls through to Capture (with F3's
-  // load-error state on the Library); anything that already navigated (e.g. "Open with") wins.
+  // splash intro's identical overlay, §15 V5) - so Home never flashes up on the way to the
+  // introduction. Anything that already navigated (e.g. "Open with") wins.
   // If loading takes longer than SPLASH_TIMEOUT_MS the app shows anyway, and the start screen is
   // still corrected once loading finishes, as long as the user hasn't navigated yet.
   const startChosen = useRef(false);
@@ -111,14 +112,14 @@ export function AppNavigator() {
       courseCount: library.courses.length,
     });
     if (onboarding === 'markDone') dispatch({ type: 'settings/SET_ONBOARDING_DONE', done: true });
-    if (screen === 'capture' && navTick === 0) {
-      const start = chooseStartScreen({ hasActiveCourse, showOnboarding: onboarding === 'show' });
+    if (screen === 'home' && navTick === 0) {
+      const start = chooseStartScreen({ showOnboarding: onboarding === 'show' });
       if (start !== screen) replace(start);
     }
     setBooting(false);
     // Runs once, when boot is ready; the counts are read as they are at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bootReady, hasActiveCourse, screen, navTick, replace]);
+  }, [bootReady, screen, navTick, replace]);
   useEffect(() => {
     if (!booting) return;
     const id = setTimeout(() => setBooting(false), SPLASH_TIMEOUT_MS);
@@ -133,12 +134,11 @@ export function AppNavigator() {
   where.current = { screen, nav };
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      const { capture, library, libraryUi, deliver } = store.getState();
+      const { capture, libraryUi, deliver } = store.getState();
       const ctx: BackContext = {
         screen: where.current.screen,
         tab: where.current.nav.tab,
         canPop: activeStack(where.current.nav).length > 1,
-        hasCourses: library.courses.some((c) => !c.archived),
         selMode: libraryUi.selMode,
         searchOpen: libraryUi.searchOpen,
         sessionPageCount: capture.pages.length,
@@ -167,8 +167,15 @@ export function AppNavigator() {
               text: t('shared.discardScan.discard'),
               style: 'destructive',
               onPress: () => {
+                // A batch still coming in stops first, so no page lands in the emptied session.
+                cancelProcessing();
+                (require('../services/capture/ingestBatch') as typeof import('../services/capture/ingestBatch')).stopReadingText();
+                dispatch({ type: 'capture/SET_RETAKE_TARGET', id: null });
                 dispatch({ type: 'capture/CLEAR_PAGES' });
-                BackHandler.exitApp();
+                dispatch({ type: 'review/RESET' });
+                // §17 U5: from Review, back to the tab the scan was started on.
+                if (step.then === 'pop') back();
+                else BackHandler.exitApp();
               },
             },
           ]);
@@ -181,11 +188,11 @@ export function AppNavigator() {
     return () => sub.remove();
   }, [dispatch, store, go, back]);
 
-  // Lives here (always mounted) rather than on CaptureScreen/ReviewScreen: neither is always on
-  // screen (and before §16 G2 both unmounted as the user moved between tabs). Navigating to
-  // Review as soon as the raw scan lands - instead of waiting for the slow downscale/OCR loop to
-  // finish - shrinks the window where CaptureScreen sits on screen mid-pipeline, which is what let
-  // a stray remount there re-trigger runNativeScannerPipeline().
+  // Lives here (always mounted) rather than on ReviewScreen, which isn't on screen until a scan
+  // has landed. Navigating to Review as soon as the raw scan lands - instead of waiting for the
+  // slow downscale/OCR loop to finish - shows each page as it is processed. §17 U5: Review is
+  // pushed on the tab the scan was started from (the tab bar's Scan button, a course's Scan, the
+  // Reader's Add pages), and Back from it returns there.
   useEffect(() => {
     if (processingStatus === prevProcessingStatus.current) return;
     const prev = prevProcessingStatus.current;
@@ -209,7 +216,7 @@ export function AppNavigator() {
       <BootEffects afterBoot={afterBoot} />
       {booting ? null : (
         <>
-          {/* §9 O6: follows the app's theme setting, not the system's (Capture sets its own). */}
+          {/* §9 O6: follows the app's theme setting, not the system's. */}
           <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
           {/* §10 M4: with the app lock on, nothing below renders until it's unlocked. */}
           <AppLockGate>
@@ -222,6 +229,8 @@ export function AppNavigator() {
             <AutoBackupChip />
             {/* §12 D1: a Pro task whose ad was watched before the app was killed. */}
             <ProTaskResumeHost ready={afterBoot && libraryStatus === 'ready'} />
+            {/* §17 U5: opens the scanner when something asks for it (capture.scannerRequested). */}
+            <ScanLauncher />
           </AppLockGate>
         </>
       )}

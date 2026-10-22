@@ -7,6 +7,7 @@ import { ThemeProvider } from '../../../theme';
 import { CourseScreen } from '../../../screens/CourseScreen';
 import { HomeScreen } from '../../../screens/HomeScreen';
 import { EmptyState } from '../EmptyState';
+import { TabBar } from '../TabBar';
 import { en } from '../../../i18n/en';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -39,6 +40,8 @@ function mount() {
           <RouterProvider>
             <AppStateProvider>
               <Screens />
+              {/* §17 U5: the Scan hint points at the tab bar's Scan button. */}
+              <TabBar />
             </AppStateProvider>
           </RouterProvider>
         </ThemeProvider>

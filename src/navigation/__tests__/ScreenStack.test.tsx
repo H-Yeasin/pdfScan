@@ -12,6 +12,8 @@ import { FADE_DURATION_MS, SLIDE_DURATION_MS } from '../transitions';
 
 // Its async first read would land outside act(); the slides are what's tested here.
 jest.mock('../../theme/useReducedMotion', () => ({ useReducedMotion: () => false }));
+// §17 U5: the tab bar draws icons, which load their font through expo-asset.
+jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 
 // §16 G2: each screen is a mock that counts its mounts and says its role, so the test sees what
 // the layers do to real screens: nothing is mounted twice, and only the top screen is on screen.
@@ -122,34 +124,34 @@ describe('ScreenStack (§16 G2)', () => {
 
   it('keeps the screen that leaves until its slide has ended', () => {
     mount('home');
-    nav(() => router.go('settings'));
+    nav(() => router.go('storage'));
     act(() => router.back());
     // Mid-slide: Settings is still there, sliding out.
-    expect(rendered('settings')).toBe(1);
-    expect(roles.settings).toBe('outgoing');
+    expect(rendered('storage')).toBe(1);
+    expect(roles.storage).toBe('outgoing');
     expect(roles.home).toBe('active');
     act(() => {
       jest.advanceTimersByTime(SLIDE_DURATION_MS + 50);
     });
-    expect(rendered('settings')).toBe(0);
+    expect(rendered('storage')).toBe(0);
   });
 
   it('keeps every visited tab root mounted across tab switches', () => {
     mount('home');
     nav(() => router.switchTab('library'), FADE_DURATION_MS);
-    nav(() => router.switchTab('capture'), FADE_DURATION_MS);
+    nav(() => router.switchTab('tools'), FADE_DURATION_MS);
     nav(() => router.switchTab('home'), FADE_DURATION_MS);
     nav(() => router.switchTab('library'), FADE_DURATION_MS);
-    expect(mounts).toEqual({ home: 1, library: 1, capture: 1 });
+    expect(mounts).toEqual({ home: 1, library: 1, tools: 1 });
     expect(unmounts).toEqual({});
-    expect(roles).toMatchObject({ home: 'hidden', capture: 'hidden', library: 'active' });
+    expect(roles).toMatchObject({ home: 'hidden', tools: 'hidden', library: 'active' });
   });
 
   it('draws one tab bar, on the roots only', () => {
     mount('home');
-    expect(tabBars()).toBe(3);
+    expect(tabBars()).toBe(4);
     nav(() => router.switchTab('library'), FADE_DURATION_MS);
-    expect(tabBars()).toBe(3);
+    expect(tabBars()).toBe(4);
     // Under a pushed screen the shell (and its tab bar) is hidden.
     nav(() => router.go('reader'));
     const shell = root.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'tab')[0];

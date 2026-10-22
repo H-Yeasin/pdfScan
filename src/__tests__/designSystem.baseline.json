@@ -29,23 +29,11 @@
     "modal": 1
   },
   "components/bookmarks/BookmarkList.tsx": {
-    "fontSize": 3,
-    "fontWeight": 2,
-    "pressable": 3,
-    "modal": 1
+    "fontSize": 2,
+    "fontWeight": 1,
+    "pressable": 2
   },
   "components/brand/SplashIntro.tsx": {
-    "pressable": 1
-  },
-  "components/capture/CaptureControls.tsx": {
-    "fontSize": 1,
-    "borderRadius": 1,
-    "fontWeight": 1,
-    "pressable": 3
-  },
-  "components/capture/CaptureModePicker.tsx": {
-    "fontSize": 1,
-    "fontWeight": 1,
     "pressable": 1
   },
   "components/courses/CourseBadge.tsx": {
@@ -278,12 +266,6 @@
   "components/reader/OutlineList.tsx": {
     "pressable": 1
   },
-  "components/reader/OverflowSheet.tsx": {
-    "fontSize": 1,
-    "borderRadius": 1,
-    "pressable": 2,
-    "modal": 1
-  },
   "components/reader/PageScrubberSheet.tsx": {
     "fontSize": 1,
     "hexColor": 1,
@@ -513,9 +495,6 @@
     "fontWeight": 1,
     "pressable": 1
   },
-  "components/shared/TabBar.tsx": {
-    "pressable": 1
-  },
   "components/shared/TextPromptModal.tsx": {
     "fontSize": 4,
     "fontWeight": 3,
@@ -555,12 +534,6 @@
     "fontWeight": 1,
     "pressable": 1
   },
-  "screens/CaptureScreen.tsx": {
-    "fontSize": 5,
-    "hexColor": 2,
-    "fontWeight": 3,
-    "pressable": 2
-  },
   "screens/CourseScreen.tsx": {
     "fontSize": 7,
     "borderRadius": 3,
@@ -579,16 +552,16 @@
     "pressable": 7
   },
   "screens/HomeScreen.tsx": {
-    "fontSize": 10,
-    "fontWeight": 7,
+    "fontSize": 9,
+    "fontWeight": 6,
     "alert": 1,
-    "pressable": 10
+    "pressable": 8
   },
   "screens/LibraryScreen.tsx": {
     "fontSize": 2,
     "borderRadius": 1,
     "fontWeight": 1,
-    "pressable": 5
+    "pressable": 4
   },
   "screens/ManageFoldersScreen.tsx": {
     "pressable": 1
@@ -613,8 +586,7 @@
   "screens/SettingsScreen.tsx": {
     "fontSize": 5,
     "borderRadius": 3,
-    "fontWeight": 1,
-    "pressable": 1
+    "fontWeight": 1
   },
   "screens/StorageScreen.tsx": {
     "fontSize": 7,

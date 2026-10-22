@@ -16,11 +16,6 @@ export function onboardingDecision(input: {
   return input.documentCount > 0 || input.courseCount > 0 ? 'markDone' : 'show';
 }
 
-// Where "Start" (or Skip) goes: Home once there's a course, else Capture.
-export function afterOnboarding(hasActiveCourse: boolean): 'home' | 'capture' {
-  return hasActiveCourse ? 'home' : 'capture';
-}
-
 // "2021331045_Rahim_CSE101_HW1.pdf": the default naming template with what the student typed,
 // sample values where they haven't, so the point of asking is obvious from the first letter.
 export function exampleFileName(profile: Pick<StudentProfile, 'name' | 'roll'>, sample: { name: string; roll: string }): string {

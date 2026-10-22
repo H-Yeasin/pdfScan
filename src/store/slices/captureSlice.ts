@@ -18,9 +18,8 @@ export type CaptureState = {
   // When this session's first pages arrived: the time course suggestions use (K5), so a scan made
   // at the end of class still matches its timetable slot however long Review takes.
   startedAt: number | null;
-  // One-shot "open the scanner when Capture appears", set by buttons that mean "scan now" (Home's
-  // Scan, a course's Scan, Retake, Add more...). The Scan tab and app start don't set it, so just
-  // arriving on Capture never launches the camera; CaptureScreen consumes it.
+  // One-shot "open the scanner now", set by buttons that mean "scan now" (the tab bar's Scan, a
+  // course's Scan, Retake, Add more...). components/capture/ScanLauncher consumes it (§17 U5).
   scannerRequested: boolean;
 };
 

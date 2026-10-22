@@ -17,10 +17,8 @@ const BOTTOM_PADDED_BY: Record<string, { renders: string; why: string }> = {
   'LibraryScreen.tsx': { renders: '<SelectionBar', why: "SelectionBar (a BottomBar) is last while selecting; otherwise the shell's TabBar is below." },
   'ReviewScreen.tsx': { renders: '<ContextBar', why: 'ContextBar is a BottomBar.' },
   'DeliverScreen.tsx': { renders: '<StickyActions', why: 'StickyActions is a BottomBar.' },
-  'CaptureScreen.tsx': {
-    renders: '<CaptureControls',
-    why: 'The camera preview is full-bleed; the top-only SafeAreaView is an overlay for the header.',
-  },
+  // §17 U5: the Me tab's root.
+  'SettingsScreen.tsx': { renders: '<ScrollView', why: "A tab root: the shell's TabBar is below it." },
 };
 
 function tsxFiles(dir: string): string[] {
