@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useT } from '../../i18n/useT';
 import { CAPTURE_MODES } from '../../services/capture/captureModes';
 import { startScan } from '../../services/courses/startScan';
@@ -16,7 +16,7 @@ import { Menu, type MenuSection } from '../ui';
 //
 // On U3's Menu, so it becomes a Sheet with it; until then the Menu's own Modal.
 
-type ScanSheetId = CaptureMode | 'gallery' | 'file';
+export type ScanSheetId = CaptureMode | 'gallery' | 'file';
 
 export function scanModeSections(
   t: ReturnType<typeof useT>['t'],
@@ -43,29 +43,37 @@ export function scanModeSections(
   ];
 }
 
-export function ScanModeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { t } = useT();
+// What choosing a mode or a way in does, here and on Home's "Scan as" row (§17 U6).
+export function useScanChoice(): (id: ScanSheetId) => void {
   const dispatch = useAppDispatch();
   const store = useAppStore();
-  const lastMode = useAppSelector((s) => s.settings.lastCaptureMode);
   const importPhotos = useGalleryImport();
   const importFile = useImportFile();
-  const sections = useMemo(() => scanModeSections(t, lastMode), [t, lastMode]);
 
-  const onSelect = (id: ScanSheetId) => {
-    if (id === 'file') {
-      void importFile();
-      return;
-    }
-    if (id === 'gallery') {
-      // The photos go into a session like a scan's: same course rules, the last mode's filter.
-      startScan(store.getState(), dispatch, null, { launch: false });
-      void importPhotos();
-      return;
-    }
-    dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: id });
-    startScan(store.getState(), dispatch, null, { launch: true, mode: id });
-  };
+  return useCallback(
+    (id: ScanSheetId) => {
+      if (id === 'file') {
+        void importFile();
+        return;
+      }
+      if (id === 'gallery') {
+        // The photos go into a session like a scan's: same course rules, the last mode's filter.
+        startScan(store.getState(), dispatch, null, { launch: false });
+        void importPhotos();
+        return;
+      }
+      dispatch({ type: 'settings/SET_LAST_CAPTURE_MODE', mode: id });
+      startScan(store.getState(), dispatch, null, { launch: true, mode: id });
+    },
+    [dispatch, store, importPhotos, importFile]
+  );
+}
+
+export function ScanModeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { t } = useT();
+  const lastMode = useAppSelector((s) => s.settings.lastCaptureMode);
+  const onSelect = useScanChoice();
+  const sections = useMemo(() => scanModeSections(t, lastMode), [t, lastMode]);
 
   return <Menu visible={visible} onClose={onClose} onSelect={onSelect} sections={sections} title={t('capture.modeSheet.title')} />;
 }

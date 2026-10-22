@@ -16,6 +16,9 @@ export type LibraryUiState = {
   tab: LibraryTab;
   search: string;
   searchOpen: boolean;
+  // §17 U6: counts OPEN_SEARCH, so the Files search field takes the keyboard again when Home's
+  // search bar opens it while it was open already (the field is keyed on it).
+  searchFocus: number;
   // null = no active DB-backed search result; fall back to the in-memory haystack filter.
   searchResultIds: string[] | null;
   // §7 R1: the imported PDF being indexed in the background, and how far it is.
@@ -37,6 +40,7 @@ export const initialLibraryUiState: LibraryUiState = {
   tab: 'recent',
   search: '',
   searchOpen: false,
+  searchFocus: 0,
   searchResultIds: null,
   indexing: null,
   activeCourseId: null,
@@ -53,6 +57,8 @@ export type LibraryUiAction =
   | { type: 'libraryUi/SET_TAB'; tab: LibraryTab }
   | { type: 'libraryUi/SET_SEARCH'; search: string }
   | { type: 'libraryUi/TOGGLE_SEARCH_OPEN' }
+  // §17 U6, Home's search bar: Files with an empty search open and focused.
+  | { type: 'libraryUi/OPEN_SEARCH' }
   | { type: 'libraryUi/SET_SEARCH_RESULT_IDS'; ids: string[] | null }
   | { type: 'libraryUi/SET_INDEXING'; progress: IndexingProgress | null }
   | { type: 'libraryUi/SET_ACTIVE_COURSE'; id: string | null }
@@ -110,6 +116,8 @@ export function libraryUiReducer(state: LibraryUiState, action: LibraryUiAction 
         search: state.searchOpen ? state.search : '',
         searchResultIds: state.searchOpen ? state.searchResultIds : null,
       };
+    case 'libraryUi/OPEN_SEARCH':
+      return { ...state, searchOpen: true, search: '', searchResultIds: null, searchFocus: state.searchFocus + 1, selMode: false, selection: NO_SELECTION };
     case 'libraryUi/SET_SEARCH_RESULT_IDS':
       return state.searchResultIds === action.ids ? state : { ...state, searchResultIds: action.ids };
     case 'libraryUi/SET_INDEXING':

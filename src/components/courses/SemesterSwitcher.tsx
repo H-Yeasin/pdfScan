@@ -1,10 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMemo } from 'react';
+import { Alert } from 'react-native';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
-import { radii, spacing, useTheme } from '../../theme';
 import type { Semester } from '../../types/models';
 import { useT } from '../../i18n/useT';
+import { Menu, type MenuSection } from '../ui';
 
 type SemesterSwitcherProps = {
   visible: boolean;
@@ -15,20 +14,47 @@ type SemesterSwitcherProps = {
   onClose: () => void;
 };
 
-// Home's semester menu: pick which term Home shows, or archive the shown one at the end of term
-// (it and all its courses at once - library/ARCHIVE_SEMESTER; documents stay searchable).
+const ARCHIVE_ID = '__archive';
+
+export function semesterSections(
+  t: ReturnType<typeof useT>['t'],
+  active: readonly Semester[],
+  shown: Semester | null,
+  current: Semester | null
+): MenuSection[] {
+  return [
+    {
+      items: active.map((semester) => ({
+        id: semester.id,
+        label: semester.name,
+        // The shown one is ticked; the one by date says so.
+        icon: semester.id === shown?.id ? 'checkmark-circle' : 'ellipse-outline',
+        badge: semester.id === current?.id ? { label: t('courses.semesterSwitcher.current'), tone: 'accent' as const } : undefined,
+      })),
+    },
+    {
+      items: shown
+        ? [{ id: ARCHIVE_ID, label: t('courses.semesterSwitcher.archiveRow', { name: shown.name }), icon: 'archive-outline' as const, destructive: true }]
+        : [],
+    },
+  ];
+}
+
+// Home's semester menu (§17 U6: opened from the semester chip under the greeting): pick which term
+// Home shows, or archive the shown one at the end of term (it and all its courses at once -
+// library/ARCHIVE_SEMESTER; documents stay searchable). On the kit's Menu, so it becomes a Sheet with
+// U3; the archive confirm becomes U3's Dialog.
 export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterSwitcherProps) {
-  const { tokens } = useTheme();
   const { t } = useT();
-  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const state = useAppSlices('library');
-  const active = state.library.semesters.filter((s) => !s.archived);
+  const semesters = state.library.semesters;
+  const active = useMemo(() => semesters.filter((s) => !s.archived), [semesters]);
+  const sections = useMemo(() => semesterSections(t, active, shown, current), [t, active, shown, current]);
 
   const pick = (semester: Semester) => {
     // Picking the current one goes back to following the date.
     dispatch({ type: 'libraryUi/SET_HOME_SEMESTER', id: semester.id === current?.id ? null : semester.id });
-    onClose();
   };
 
   const archive = (semester: Semester) => {
@@ -59,77 +85,20 @@ export function SemesterSwitcher({ visible, shown, current, onClose }: SemesterS
                   }
                 : { type: 'ui/SHOW_SNACK', msg: archived }
             );
-            onClose();
           },
         },
       ]
     );
   };
 
-  return (
-    <Modal statusBarTranslucent navigationBarTranslucent transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable accessibilityRole="button" style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')}>
-        <Pressable accessible={false}
-          style={[
-            styles.sheet,
-            { backgroundColor: tokens.surface, borderColor: tokens.edge, paddingBottom: spacing.md + insets.bottom },
-          ]}
-        >
-          <Text style={[styles.title, { color: tokens.ink }]}>{t('courses.semesterSwitcher.title')}</Text>
-          <ScrollView style={styles.list}>
-            {active.map((semester) => (
-              <Pressable accessibilityRole="button" key={semester.id} style={styles.row} onPress={() => pick(semester)}>
-                <Text style={[styles.rowLabel, { color: tokens.ink }]} numberOfLines={1}>
-                  {semester.name}
-                  {semester.id === current?.id ? <Text style={{ color: tokens.muted }}>{t('courses.semesterSwitcher.current')}</Text> : null}
-                </Text>
-                {semester.id === shown?.id ? <Ionicons name="checkmark" size={18} color={tokens.accent} /> : null}
-              </Pressable>
-            ))}
-          </ScrollView>
-          {shown ? (
-            <Pressable style={styles.row} onPress={() => archive(shown)} accessibilityRole="button">
-              <Ionicons name="archive-outline" size={18} color={tokens.danger} />
-              <Text style={[styles.rowLabel, { color: tokens.danger }]}>{t('courses.semesterSwitcher.archiveRow', { name: shown.name })}</Text>
-            </Pressable>
-          ) : null}
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
+  const onSelect = (id: string) => {
+    if (id === ARCHIVE_ID) {
+      if (shown) archive(shown);
+      return;
+    }
+    const semester = active.find((s) => s.id === id);
+    if (semester) pick(semester);
+  };
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,.5)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: radii.sheet,
-    borderTopRightRadius: radii.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: spacing.lg,
-    gap: spacing.xs,
-    maxHeight: '70%',
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  list: {
-    flexGrow: 0,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  rowLabel: {
-    flex: 1,
-    fontSize: 15.5,
-  },
-});
+  return <Menu visible={visible} onClose={onClose} onSelect={onSelect} sections={sections} title={t('courses.semesterSwitcher.title')} />;
+}

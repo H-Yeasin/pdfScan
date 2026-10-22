@@ -48,7 +48,7 @@ export function LibraryScreen() {
   const state = useAppSlices('library', 'libraryUi');
   const store = useAppStore();
   const { loadStatus, files } = state.library;
-  const { selection, selMode, tab, search, searchOpen, searchResultIds } = state.libraryUi;
+  const { selection, selMode, tab, search, searchOpen, searchFocus, searchResultIds } = state.libraryUi;
   const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
   // Stable, so the memo'd FileRows only re-render when their own data changes (§9 O5).
   const onRowPress = useStableCallback(handlePressRow);
@@ -230,7 +230,7 @@ export function LibraryScreen() {
       )}
 
       {searchOpen && (
-        <SearchBar value={search} onChange={(value) => dispatch({ type: 'libraryUi/SET_SEARCH', search: value })} />
+        <SearchBar key={searchFocus} value={search} onChange={(value) => dispatch({ type: 'libraryUi/SET_SEARCH', search: value })} />
       )}
 
       <LibraryTabs value={tab} onChange={(value) => dispatch({ type: 'libraryUi/SET_TAB', tab: value })} />

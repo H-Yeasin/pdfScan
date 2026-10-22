@@ -30,6 +30,8 @@ export type PersistedSettings = {
   lastCaptureMode?: CaptureMode;
   scannerUnavailable?: boolean;
   lastOpened?: { id: string; at: number } | null;
+  // Optional: added in §17 U6 (read by normalizeRecentOpened).
+  recentOpened?: unknown;
   // Optional: settings saved before §4 S1 don't have it (see normalizeProfile).
   profile?: StudentProfile;
   // Optional: added in §4 S2.

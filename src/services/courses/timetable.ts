@@ -53,6 +53,34 @@ export function slotsAt(slots: readonly TimetableSlot[], at: Date): TimetableSlo
     .sort((a, b) => distance(a) - distance(b) || a.startMin - b.startMin);
 }
 
+// §17 U6: a course card's next class. `inDays` 0 is today (`now`: the class is on); 7 is the same
+// weekday next week, for a class that already ended today and has no other slot. Null without slots.
+export type NextClass = { slot: TimetableSlot; inDays: number; now: boolean };
+
+export function nextClass(slots: readonly TimetableSlot[], courseId: string, at: Date): NextClass | null {
+  const own = slots.filter((s) => s.courseId === courseId);
+  if (own.length === 0) return null;
+  const today = at.getDay();
+  const minute = at.getHours() * 60 + at.getMinutes();
+  for (let inDays = 0; inDays <= 7; inDays++) {
+    const weekday = (today + inDays) % 7;
+    const day = own
+      .filter((s) => s.weekday === weekday && (inDays > 0 || s.endMin > minute))
+      .sort((a, b) => a.startMin - b.startMin);
+    if (day[0]) return { slot: day[0], inDays, now: inDays === 0 && day[0].startMin <= minute };
+  }
+  return null;
+}
+
+// "In class now", "Today 9:30", "Tomorrow 9:30", "Mon 9:30".
+export function nextClassLabel(next: NextClass): string {
+  if (next.now) return t('home.classNow');
+  const time = formatTime(next.slot.startMin);
+  if (next.inDays === 0) return t('home.classToday', { time });
+  if (next.inDays === 1) return t('home.classTomorrow', { time });
+  return `${weekdayName(next.slot.weekday)} ${time}`;
+}
+
 // The editor's typed start/end, checked: both must be times and the class must end after it starts
 // (slots don't run past midnight).
 export function parseSlotTimes(start: string, end: string): { startMin: number; endMin: number } | { error: string } {

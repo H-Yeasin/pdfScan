@@ -2,6 +2,7 @@ import type { DocumentLanguage, UiLanguage } from '../../i18n';
 import { getCaptureModeSpec } from '../../services/capture/captureModes';
 import type { CaptureModeSpec } from '../../services/capture/captureModes';
 import { DEFAULT_NAME_TEMPLATE } from '../../services/submit/naming';
+import { pushRecentOpened, type LastOpened } from '../../services/courses/homeSelectors';
 import { EMPTY_PROFILE } from '../../services/submit/profile';
 import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../types/models';
 import type { AutoBackupFrequency } from '../../services/backup/schedule';
@@ -38,6 +39,9 @@ export type SettingsState = {
   // The library document last opened in the Reader, for Home's "Continue" card
   // (homeSelectors.continueDocument).
   lastOpened: { id: string; at: number } | null;
+  // §17 U6: the documents last opened, newest first (homeSelectors.pushRecentOpened keeps it short),
+  // for Home's Continue row. SET_LAST_OPENED adds to it.
+  recentOpened: LastOpened[];
   // Name, roll, section and institution for §4's file names, cover pages and footers.
   profile: StudentProfile;
   // How Deliver names a new document (services/submit/naming.ts). S6 adds a per-course override.
@@ -98,6 +102,7 @@ export const initialSettingsState: SettingsState = {
   usageStatsEnabled: false,
   scannerUnavailable: false,
   lastOpened: null,
+  recentOpened: [],
   profile: EMPTY_PROFILE,
   nameTemplate: DEFAULT_NAME_TEMPLATE,
   profilePrompted: false,
@@ -144,6 +149,7 @@ export type SettingsAction =
   | { type: 'settings/SET_USAGE_STATS'; enabled: boolean }
   | { type: 'settings/SET_SCANNER_UNAVAILABLE'; unavailable: boolean }
   | { type: 'settings/SET_LAST_OPENED'; lastOpened: { id: string; at: number } | null }
+  | { type: 'settings/LOAD_RECENT_OPENED'; recent: LastOpened[] }
   // A partial patch, so each profile field can be edited on its own.
   | { type: 'settings/SET_PROFILE'; profile: Partial<StudentProfile> }
   | { type: 'settings/SET_NAME_TEMPLATE'; template: string }
@@ -213,7 +219,13 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
     case 'settings/SET_SCANNER_UNAVAILABLE':
       return { ...state, scannerUnavailable: action.unavailable };
     case 'settings/SET_LAST_OPENED':
-      return { ...state, lastOpened: action.lastOpened };
+      return {
+        ...state,
+        lastOpened: action.lastOpened,
+        recentOpened: action.lastOpened ? pushRecentOpened(state.recentOpened, action.lastOpened) : state.recentOpened,
+      };
+    case 'settings/LOAD_RECENT_OPENED':
+      return { ...state, recentOpened: action.recent };
     case 'settings/SET_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.profile } };
     case 'settings/SET_UNSORTED_PROMPT_DONE':

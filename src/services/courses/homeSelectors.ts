@@ -1,5 +1,5 @@
 import { formatDate, t } from '../../i18n';
-import type { Course, LibraryDocument, Semester } from '../../types/models';
+import type { Course, LibraryDocument, Semester, StudentProfile } from '../../types/models';
 
 // Everything Home derives from the library, as pure functions of state + today, so the rules are
 // tested without rendering (and Home re-derives them cheaply with useMemo).
@@ -53,19 +53,96 @@ export function courseActivity(files: readonly LibraryDocument[]): {
 
 export type LastOpened = { id: string; at: number };
 
-// Home's "Continue" card: whichever is more recent, the last document opened in the Reader or the
-// last one saved. Null for an empty library. A last-opened document that was since deleted falls
-// back to the newest saved one.
-export function continueDocument(
-  files: readonly LibraryDocument[],
-  lastOpened: LastOpened | null
-): { doc: LibraryDocument; reason: 'opened' | 'saved' } | null {
+// How many documents settings.recentOpened keeps; Home shows CONTINUE_MAX of them.
+export const RECENT_OPENED_MAX = 10;
+export const CONTINUE_MAX = 3;
+
+// settings/SET_LAST_OPENED: the document goes to the front, once; the list stops at
+// RECENT_OPENED_MAX. A document deleted since is dropped when Home reads the list.
+export function pushRecentOpened(list: readonly LastOpened[], opened: LastOpened): LastOpened[] {
+  return [opened, ...list.filter((entry) => entry.id !== opened.id)].slice(0, RECENT_OPENED_MAX);
+}
+
+// The stored list as it is read back: entries of the right shape, one per document, newest first.
+export function normalizeRecentOpened(raw: unknown): LastOpened[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: LastOpened[] = [];
+  for (const entry of raw as unknown[]) {
+    const e = entry as Partial<LastOpened> | null;
+    if (!e || typeof e.id !== 'string' || typeof e.at !== 'number' || seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push({ id: e.id, at: e.at });
+  }
+  return out.sort((a, b) => b.at - a.at).slice(0, RECENT_OPENED_MAX);
+}
+
+export type ContinueItem = { doc: LibraryDocument; reason: 'opened' | 'saved' };
+
+// §17 U6, Home's "Continue": the documents last opened in the Reader, newest first, with the
+// newest saved document among them when it came after (a scan just saved is what a student
+// picks up next). At most CONTINUE_MAX; deleted and archived documents drop out. Empty for an
+// empty library.
+export function continueDocuments(files: readonly LibraryDocument[], recent: readonly LastOpened[], max = CONTINUE_MAX): ContinueItem[] {
+  const byId = new Map(files.map((f) => [f.id, f]));
+  const entries: (ContinueItem & { at: number })[] = [];
+  for (const { id, at } of recent) {
+    const doc = byId.get(id);
+    if (doc && !doc.archived) entries.push({ doc, reason: 'opened', at });
+  }
   let newest: LibraryDocument | null = null;
-  for (const file of files) if (!newest || file.createdAt > newest.createdAt) newest = file;
-  if (!newest) return null;
-  const opened = lastOpened ? files.find((f) => f.id === lastOpened.id) : undefined;
-  if (opened && lastOpened && lastOpened.at >= newest.createdAt) return { doc: opened, reason: 'opened' };
-  return { doc: newest, reason: 'saved' };
+  for (const file of files) if (!file.archived && (!newest || file.createdAt > newest.createdAt)) newest = file;
+  if (newest && !entries.some((e) => e.doc.id === newest.id)) entries.push({ doc: newest, reason: 'saved', at: newest.createdAt });
+  return entries
+    .sort((a, b) => b.at - a.at)
+    .slice(0, max)
+    .map(({ doc, reason }) => ({ doc, reason }));
+}
+
+// "Page 12 of 40" on a Continue card: the library page reading stopped on (1-based) and the page
+// count, for the formats read on the page surface. The saved position finds its page by id;
+// `lastPage` (a PDF page) stands in only for a standard layout, where PDF and library pages are
+// the same. Null when the document was never read, or isn't read by pages (TXT, sheets, DOCX).
+export function continueProgress(doc: Pick<LibraryDocument, 'format' | 'pages' | 'lastPosition' | 'lastPage' | 'pdfLayout'>): { page: number; count: number } | null {
+  const count = doc.pages.length;
+  if ((doc.format !== 'PDF' && doc.format !== 'JPG') || count === 0) return null;
+  const position = doc.lastPosition;
+  let index: number | undefined;
+  if (position?.kind === 'page') {
+    const byId = position.pageId ? doc.pages.findIndex((p) => p.id === position.pageId) : -1;
+    index = byId >= 0 ? byId : position.index;
+  } else if (doc.lastPage !== undefined && doc.pdfLayout !== '2_in_1') {
+    index = doc.lastPage - 1;
+  }
+  if (index === undefined) return null;
+  return { page: Math.min(Math.max(Math.floor(index), 0), count - 1) + 1, count };
+}
+
+// Home's "Recent files": the newest saved documents, archived ones left out.
+export function recentFiles(files: readonly LibraryDocument[], max = 5): LibraryDocument[] {
+  return files
+    .filter((f) => !f.archived)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, max);
+}
+
+// The greeting's name: the first word of the profile's name ("Rahim" of "Rahim Uddin"), or null
+// without one (Home then says "Hi there").
+export function greetingName(profile: Pick<StudentProfile, 'name'>): string | null {
+  const first = profile.name.trim().split(/\s+/)[0];
+  return first ? first : null;
+}
+
+export type DayPart = 'morning' | 'afternoon' | 'evening';
+
+export function dayPart(hour: number): DayPart {
+  if (hour < 5 || hour >= 17) return 'evening';
+  return hour < 12 ? 'morning' : 'afternoon';
+}
+
+// Whole minutes left on a Pro pass, rounded up (a pass with 30 s left still says "1 min").
+export function passMinutesLeft(expiresAt: number, now: number): number {
+  return Math.max(0, Math.ceil((expiresAt - now) / 60_000));
 }
 
 // "Today", "Yesterday", "3 days ago", then a short date. For the course cards' last scan.

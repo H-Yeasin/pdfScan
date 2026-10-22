@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { PSEUDO_LOCALE, isDocumentLanguage, isUiLanguage, setDocumentLanguage, setUiLanguage } from '../i18n';
 import { isCaptureMode } from '../services/capture/captureModes';
 import { loadSettings, persistSettings, sanitizeDefaultEnhance } from '../services/persistence/settingsStorage';
+import { normalizeRecentOpened } from '../services/courses/homeSelectors';
 import { normalizeProfile } from '../services/submit/profile';
 import { isAutoBackupFrequency } from '../services/backup/schedule';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
@@ -36,6 +37,9 @@ export function useSettingsPersistence() {
         dispatch({ type: 'settings/SET_PERSONALIZED_ADS', enabled: settings.personalizedAdsEnabled !== false });
         dispatch({ type: 'settings/SET_USAGE_STATS', enabled: settings.usageStatsEnabled === true });
         dispatch({ type: 'settings/SET_SCANNER_UNAVAILABLE', unavailable: settings.scannerUnavailable === true });
+        // The list first: SET_LAST_OPENED puts the last one at its front (settings saved before
+        // §17 U6 have only that one).
+        dispatch({ type: 'settings/LOAD_RECENT_OPENED', recent: normalizeRecentOpened(settings.recentOpened) });
         const opened = settings.lastOpened;
         if (opened && typeof opened.id === 'string' && typeof opened.at === 'number') {
           dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: opened });
@@ -106,6 +110,7 @@ export function useSettingsPersistence() {
       scannerUnavailable: state.settings.scannerUnavailable,
       lastCaptureMode: state.settings.lastCaptureMode,
       lastOpened: state.settings.lastOpened,
+      recentOpened: state.settings.recentOpened,
       profile: state.settings.profile,
       nameTemplate: state.settings.nameTemplate,
       profilePrompted: state.settings.profilePrompted,
@@ -142,6 +147,7 @@ export function useSettingsPersistence() {
     state.settings.scannerUnavailable,
     state.settings.lastCaptureMode,
     state.settings.lastOpened,
+    state.settings.recentOpened,
     state.settings.profile,
     state.settings.nameTemplate,
     state.settings.profilePrompted,
