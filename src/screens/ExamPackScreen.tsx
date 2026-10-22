@@ -80,7 +80,7 @@ export function ExamPackScreen() {
     }
   };
 
-  const option = (key: PackOption, title: string, subtitle: string) => (
+  const option = (key: PackOption, title: string, subtitle?: string) => (
     <ListItem
       title={title}
       subtitle={subtitle}
@@ -181,9 +181,9 @@ export function ExamPackScreen() {
         <Card padded={false} style={Platform.OS === 'android' && styles.clip}>
           {option('contents', t('study.pack.contents'), t('study.pack.contentsHint'))}
           <Divider inset="text" />
-          {option('includeAnnotations', t('study.pack.annotations'), t('study.pack.annotationsHint'))}
+          {option('includeAnnotations', t('study.pack.annotations'))}
           <Divider inset="text" />
-          {option('pageNumbers', t('study.pack.pageNumbers'), t('study.pack.pageNumbersHint'))}
+          {option('pageNumbers', t('study.pack.pageNumbers'))}
         </Card>
       </ScrollView>
 

@@ -89,9 +89,11 @@ export function SubmitSheet(props: SubmitSheetProps) {
       <View style={styles.group}>
         <Text variant="label">{t('deliver.pageLayout')}</Text>
         <LayoutModeSegmented value={props.layoutMode} onChange={props.onLayoutMode} />
-        <Text variant="caption" color="muted">
-          {props.layoutMode === '2_in_1' ? t('deliver.layoutHintTwoUp') : t('deliver.layoutHintStandard')}
-        </Text>
+        {props.layoutMode === '2_in_1' ? (
+          <Text variant="caption" color="muted">
+            {t('deliver.layoutHintTwoUp')}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.group}>

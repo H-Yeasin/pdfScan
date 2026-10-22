@@ -1195,7 +1195,7 @@ As built (2026-10-22):
   `StudentCard` and `FeatureList` are at zero hand-rolled styles.
 
 ## U12 · Copy pass *(M)*
-Status: planned. JS only. Can run any time after U2.
+Status: done in code (2026-10-22). JS only. Device check (Verification 12) open; never run on a phone.
 
 Goal: every string sounds like a friendly person, not a developer.
 
@@ -1242,6 +1242,36 @@ Changes:
 Tests: `copyStyle.test.ts`; `hardcodedStrings` (the two literals); every screen test that matches text.
 
 Device check: Verification 12.
+
+As built (2026-10-22):
+- Most of the catalog had already been rewritten screen by screen in U5–U11, so this pass was the rest: the
+  plan's table, plus every string that still named the old screens ("your Library" → Files, "in Settings" →
+  Me; about 20 of them, in the Reader's convert/edit/form messages, Save and Exam pack). `common.settings`
+  (unused) now says "Me".
+- Changes from the plan's table: "Naming template" became **"Your own pattern"**, not "File names": it is the
+  custom field inside the File names sheet, and the sheet's title already says "File names". "OCR" in the
+  Reader's selection menu became "Find text on this page"; Review's toast is "Text found. You can search this
+  now." / "Little or no text found on this page." "Building PDF…" is "Making the PDF…", "Stamping page…" is
+  "Finishing page…". "Annotations" is "highlights and notes" everywhere (Submit, Exam pack). The Academic
+  options screen is titled "Cover, footer and border".
+- Helper lines cut (and their code): Submit's "Standard (1 Page per Sheet)" (the 2-per-sheet line stays,
+  shortened), the MB footnote under the size chips (`SizeTargetRow`), the border hint (`AcademicOptionsScreen`),
+  Exam pack's two option hints (`ExamPackScreen` `option` takes an optional subtitle). Others were shortened
+  (file names, recognition, header/footer hints, Fill form's lock). The count went from 140 keys that look like
+  helpers to 135, not "about 60": U5–U11 had already cut most of the permanent footnotes, and what is left is
+  mostly TalkBack hints (`accessibilityHint`), the Mark tools' how-to lines and confirm bodies, which aren't
+  footnotes.
+- The two literals: `TextPromptModal`'s button defaults to `t('common.save')` (new key), and `CourseList`'s
+  archived tag is `courses.archivedTag`. `hardcodedStrings.test.ts` now catches both kinds: JSX text after a
+  `·` separator, and a shown prop's default value (`submitLabel = 'Save'`).
+- `copyStyle.test.ts` is a little wider than planned: a label is a key with a `label`/`title`/`button`/`action(s)`
+  segment **or** any value of 5 words or fewer with no full stop (that is how `review.startCapture` and
+  `deliver.pageLayout` are keyed); placeholders are skipped. It also fails on the old screen names (Library,
+  Settings, Deliver, Capture). Exempt: `document.*` (text in documents, a cover still says "Lab Report") and
+  `settings.developer.*`.
+- `docs/copy-style.md` is the one-page guide.
+- Kept on purpose: "Fall {year}" (the semester's name at Bangladeshi universities), the "+{count}" chip on the
+  onboarding card and "PRO" on the badge.
 
 ## U13 · Motion and feedback *(M)*
 Status: planned. JS only.

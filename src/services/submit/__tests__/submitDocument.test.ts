@@ -88,7 +88,7 @@ describe('submitDocument', () => {
     expect(texts[1]).toContain('Question one');
     expect(texts[1]).toContain('RahimUddin · 2021331045 · 1/2');
     expect(texts[2]).toContain('RahimUddin · 2021331045 · 2/2');
-    expect(progress).toEqual(['Building PDF… page 1 of 2', 'Building PDF… page 2 of 2']);
+    expect(progress).toEqual(['Making the PDF… page 1 of 2', 'Making the PDF… page 2 of 2']);
   });
 
   it("skips a saved document's own cover page", async () => {

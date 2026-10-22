@@ -43,11 +43,6 @@ export function SizeTargetRow({ value, onChange }: { value: number | null; onCha
         ))}
         <Chip label={isCustom ? t('deliver.size.customValue', { size: formatLimit(value) }) : t('deliver.size.custom')} selected={isCustom} onPress={() => setCustomOpen(true)} />
       </ScrollView>
-      {value !== null ? (
-        <Text style={[styles.hint, { color: tokens.muted }]}>
-          {t('deliver.size.mbHint')}
-        </Text>
-      ) : null}
       <TextPromptModal
         visible={customOpen}
         title={t('deliver.size.customTitle', { min: CUSTOM_MIN_MB, max: CUSTOM_MAX_MB })}
@@ -84,8 +79,5 @@ const styles = StyleSheet.create({
   chipLabel: {
     fontSize: 13.5,
     fontWeight: '600',
-  },
-  hint: {
-    fontSize: 13,
   },
 });

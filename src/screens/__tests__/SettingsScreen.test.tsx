@@ -69,9 +69,9 @@ describe('SettingsScreen (Me)', () => {
     expect(checked(root, 'name-preset-default')).toBe(true);
     act(() => pressable(root, 'name-preset-courseDate').props.onPress());
     expect(app.state.settings.nameTemplate).toBe('{course}_{date}');
-    expect(texts(root)).not.toContain('Naming template');
+    expect(texts(root)).not.toContain('Your own pattern');
     act(() => pressable(root, 'name-preset-custom').props.onPress());
-    expect(texts(root)).toContain('Naming template');
+    expect(texts(root)).toContain('Your own pattern');
     expect(checked(root, 'name-preset-custom')).toBe(true);
     expect(checked(root, 'name-preset-courseDate')).toBe(false);
     act(() => pressable(root, 'name-preset-default').props.onPress());

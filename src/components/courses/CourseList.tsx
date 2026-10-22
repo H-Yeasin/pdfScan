@@ -132,7 +132,7 @@ export function CourseList({ counts, unsortedCount, onOpenCourse }: CourseListPr
           <View style={styles.textWrap}>
             <Text style={[styles.title, { color: tokens.ink }]} numberOfLines={1}>
               {course.name}
-              {course.archived ? <Text style={{ color: tokens.muted }}>  · Archived</Text> : null}
+              {course.archived ? <Text style={{ color: tokens.muted }}>{t('courses.archivedTag')}</Text> : null}
             </Text>
             <Text style={[styles.subtitle, { color: tokens.muted }]} numberOfLines={1}>
               {subtitle(course)}

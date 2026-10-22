@@ -111,7 +111,7 @@
     "modal": 1
   },
   "components/deliver/SizeTargetRow.tsx": {
-    "fontSize": 2,
+    "fontSize": 1,
     "fontWeight": 1,
     "pressable": 1
   },

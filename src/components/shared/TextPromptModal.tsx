@@ -22,7 +22,7 @@ export function TextPromptModal({
   title,
   initialValue = '',
   placeholder,
-  submitLabel = 'Save',
+  submitLabel,
   keyboardType,
   multiline = false,
   onCancel,
@@ -66,7 +66,7 @@ export function TextPromptModal({
               onPress={() => trimmed && onSubmit(trimmed)}
               disabled={!trimmed}
             >
-              <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{submitLabel}</Text>
+              <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{submitLabel ?? t('common.save')}</Text>
             </Pressable>
           </View>
         </View>
