@@ -46,3 +46,9 @@ export function useTheme() {
   if (!ctx) throw new Error('useTheme must be used within a ThemeProvider');
   return ctx;
 }
+
+// §17 U13: the theme when there is one, null outside the provider. For the crash screen
+// (bootstrap/ErrorBoundary), which must draw even when no provider is above it.
+export function useOptionalTheme() {
+  return useContext(ThemeContext);
+}

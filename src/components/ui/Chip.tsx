@@ -99,6 +99,8 @@ export function FilterChip({ label, icon, count, selected, onPress, disabled = f
       accessibilityState={{ selected, disabled }}
       onPress={onPress}
       disabled={disabled}
+      // §17 U13: a filter ticking on or off is a selection tick (haptics.ts).
+      haptic
       scale={false}
       testID={testID}
       style={[

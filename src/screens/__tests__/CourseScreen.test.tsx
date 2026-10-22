@@ -45,6 +45,8 @@ function mount(screen: 'course' | 'examPack') {
     );
   });
   mounted.push(root);
+  // The library has loaded (useLibraryPersistence isn't mounted here); §17 U13's skeletons show until then.
+  act(() => ctx!.app.dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' }));
   return { root, ctx: () => ctx! };
 }
 

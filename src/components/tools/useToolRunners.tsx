@@ -22,7 +22,9 @@ import { useFillForm } from '../reader/useFillForm';
 // What a tool does with the documents picked for it. A result opens the result sheet; null ends the
 // flow (the tool handed over to its own screen or dialog, or a gated tool will report later through
 // `onResult`). A runner that fails says why itself (a snack) and throws, so the flow ends.
-type Runner = (docs: LibraryDocument[], options: ToolOptions) => Promise<ToolResult | null> | ToolResult | null;
+// `onProgress` (§17 U13): for the run sheet's "3 of 5"; the tools that count call it.
+type Runner = (docs: LibraryDocument[], options: ToolOptions, onProgress: Progress) => Promise<ToolResult | null> | ToolResult | null;
+type Progress = (done: number, total: number) => void;
 
 // §17 U8: the Tools tab's runners, one per toolRegistry id (a Record, so a new tool doesn't compile
 // without one). Every runner reuses the flow the tool already has elsewhere: the merge/split/compress
@@ -85,11 +87,11 @@ export function useToolRunners(onResult: (result: ToolResult) => void) {
       go('backup');
       return null;
     },
-    merge: async (docs, options) => runPageToolFor('merge', docs, options),
-    split: async (docs, options) => runPageToolFor('split', docs, options),
-    compress: async (docs, options) => {
+    merge: async (docs, options, onProgress) => runPageToolFor('merge', docs, options, onProgress),
+    split: async (docs, options, onProgress) => runPageToolFor('split', docs, options, onProgress),
+    compress: async (docs, options, onProgress) => {
       try {
-        const message = await compressDocuments(docs, dispatch, options.quality);
+        const message = await compressDocuments(docs, dispatch, options.quality, { progress: onProgress });
         return { tool: 'compress', docIds: docs.map((d) => d.id), message };
       } catch (error) {
         return fail(error);
@@ -159,7 +161,7 @@ export function useToolRunners(onResult: (result: ToolResult) => void) {
     },
   };
 
-  async function runPageToolFor(kind: 'merge' | 'split', docs: LibraryDocument[], options: ToolOptions): Promise<ToolResult> {
+  async function runPageToolFor(kind: 'merge' | 'split', docs: LibraryDocument[], options: ToolOptions, onProgress: Progress): Promise<ToolResult> {
     const { library } = store.getState();
     try {
       const made = await runPageTool(kind, docs, !options.keepOriginals, {
@@ -168,6 +170,7 @@ export function useToolRunners(onResult: (result: ToolResult) => void) {
         submissions: library.submissions,
         open: openDocument,
         quiet: true,
+        onProgress,
       });
       return { tool: kind, docIds: made.map((d) => d.id) };
     } catch (error) {
@@ -178,7 +181,10 @@ export function useToolRunners(onResult: (result: ToolResult) => void) {
   // The table is rebuilt every render (it closes over the hooks above); `run` keeps its identity.
   const latest = useRef(runners);
   latest.current = runners;
-  const run = useCallback(async (tool: ToolDef, docs: LibraryDocument[], options: ToolOptions) => latest.current[tool.id](docs, options), []);
+  const run = useCallback(
+    async (tool: ToolDef, docs: LibraryDocument[], options: ToolOptions, onProgress: Progress = () => undefined) => latest.current[tool.id](docs, options, onProgress),
+    []
+  );
 
   const overlays = (
     <>

@@ -10,6 +10,7 @@ import { SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
 import { useRenderCount, useRenderCountsShown } from '../utils/renderCounts';
+import { markPerf } from '../utils/perfMarks';
 import { lazyScreens } from '../navigation/lazyScreens';
 import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
@@ -56,13 +57,13 @@ function NoScreen() {
   return null;
 }
 
-// §16 G5, dev only (Settings → Developer → Render counts). Required inside the component, so the
-// overlay isn't loaded at boot, and not in a release bundle, like the Filter Lab above.
-function DevRenderCounts() {
+// §16 G5/G9, dev only (Settings → Developer → Performance overlay). Required inside the component,
+// so the overlay isn't loaded at boot, and not in a release bundle, like the Filter Lab above.
+function DevPerfOverlay() {
   const shown = useRenderCountsShown();
   if (!__DEV__ || !shown) return null;
-  const { RenderCountOverlay } = require('../dev/RenderCountOverlay') as typeof import('../dev/RenderCountOverlay');
-  return <RenderCountOverlay />;
+  const { PerfOverlay } = require('../dev/PerfOverlay') as typeof import('../dev/PerfOverlay');
+  return <PerfOverlay />;
 }
 
 // §16 G5: reads single fields, never a whole slice, so a search keystroke, a selection tap, a scan
@@ -121,6 +122,10 @@ export function AppNavigator() {
     // Runs once, when boot is ready; the counts are read as they are at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootReady, screen, navTick, replace]);
+  // §16 G9: when the first screen was up, for the dev performance overlay (a no-op in release).
+  useEffect(() => {
+    if (!booting) markPerf('firstScreen');
+  }, [booting]);
   useEffect(() => {
     if (!booting) return;
     const id = setTimeout(() => setBooting(false), SPLASH_TIMEOUT_MS);
@@ -225,7 +230,7 @@ export function AppNavigator() {
       <SplashIntroBoundary>
         <SplashIntro booting={booting} appLocked={appLocked} />
       </SplashIntroBoundary>
-      <DevRenderCounts />
+      <DevPerfOverlay />
     </View>
   );
 }

@@ -1274,7 +1274,7 @@ As built (2026-10-22):
   onboarding card and "PRO" on the badge.
 
 ## U13 · Motion and feedback *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-22, ahead of U3–U4). JS only. Device check (Verification 13) open; never run on a phone.
 
 Goal: the app feels alive and responsive: every touch answers, and nothing jumps.
 
@@ -1307,6 +1307,61 @@ Tests: `transitions` picks the kind (push/tab/modal) and the reduced-motion vari
 machine (progress, cancel, error → snack); the snack queue order; the ratchet stays down.
 
 Device check: Verification 13.
+
+As built (2026-10-22):
+- **Transitions** (`navigation/transitions.ts`): `pickTransition(change, from, to, dir, reduced)` gives
+  `push` (the 240 ms slide), `tab` (150 ms cross-fade, the incoming root rising `TAB_RISE_DP` = 4), `modal`
+  or `fade` (everything under reduced motion). The modal screens are `MODAL_SCREENS` = Pro and Academic
+  options: they come up from the bottom and go down on Back, and the screen under them doesn't move.
+  `ScreenStack` picks the kind; AppNavigator didn't need to change. `RESTING_STYLE` now names both
+  `translateX` and `translateY`, and every animated transform names both in the same order (the Fabric
+  rule in its comment). The plan's "Reader tools, editors" are RN Modals, not screens: the full-screen
+  ones (FileEditor, FormFillSheet, EditPagesModal, DocumentPickerModal, PagePickerModal, GridPagesModal)
+  take `useModalAnimation()`: slide, or fade under reduced motion.
+- **Snackbar** (`components/shared/Snackbar.tsx`): on `surface3` with elevation 2, ink text and a ghost
+  `Button` for the action (pairs `contrast.test.ts` already checks) instead of the fixed dark bar. Each
+  message rises in (`FadeInDown`) and sinks out (`FadeOutDown`), keyed per message, so the queue's next
+  one rises as the last one goes; swipe sideways (or TalkBack's "Dismiss" action) clears it. Reanimated's
+  `ReduceMotion.System` lands them at once under reduced motion.
+- **`useTask`** (`components/ui/useTask.tsx`, the job side in `services/feedback/task.ts`): `run(labelKey,
+  job, { cancellable, done, failed, haptic })`; `runWithToast(dispatch, …)` is the same without a hook
+  (`documentActions`, tested without rendering). The job gets `task.progress(done, total)` and
+  `task.throwIfCancelled()` (cooperative: between files, never mid-write). State is `ui.task`
+  (`ui/TASK_START|PROGRESS|END`, matched by id); the Snackbar draws it in the snack's place ("Merging…
+  3 of 5", a bar, Cancel) and a snack that arrives meanwhile waits under it, its clock not running. On
+  the end: `done(value)`'s snack, "Stopped" after Cancel, `failed(error)` or "Couldn't do that".
+  Moved onto it: Files' merge, split, compress (Cancel when more than one file) and share preparation
+  (Files' `TaskSheet` is deleted), the Reader's split and compress (`documentActions`, which showed
+  nothing before). `mergeDocuments*` / `splitDocument*` / `splitPdf` take an `onProgress` (by file while
+  PDFs are prepared, by page while scans are drawn); `compressDocuments` takes the task. The Tools tab
+  keeps its run sheet (its flow ends on the result sheet), now with the count and a determinate bar.
+  Not moved: export zip (ExportHost has its own progress), convert (the Pro task gate's own sheet),
+  print (there is no print yet).
+- **Layout animations** (`components/ui/layoutMotion.ts`): `appear` / `disappear` / `settle` presets for
+  Reanimated `entering` / `exiting` / `layout` (Submit sheet's size and 2-per-sheet hints, the groups
+  under them). FlashList rows can't run per-row entering (cells are recycled), so a dispatch that adds or
+  removes rows calls `animateNextListChange()` first: FlashList v2's `prepareForLayoutAnimationRender` on
+  every registered list (`registerAnimatedList`: Files and the course page) and an RN `LayoutAnimation`
+  (opacity, 200 ms), skipped under reduced motion (`theme/useReducedMotion.reducedMotionNow()`, the
+  setting read synchronously). Used by delete, archive, merge/split results and a course section opening.
+  LayoutAnimation on Fabric Android is the part to watch on the device check.
+- **Skeletons**: `SkeletonRows` is built from the kit `Skeleton` (it breathes now) and also fills a
+  course's documents while the library loads; `components/home/HomeSkeleton.tsx` takes the course cards'
+  place (a cold start no longer flashes "Add your courses"); a Reader page with no thumbnail and no render
+  yet breathes on its paper (`SurfacePageView`).
+- **Haptics** (`services/feedback/haptics.ts`): `HAPTICS` / `haptic(kind)` for selection, light,
+  success, warning; the old named helpers call it, plus `hapticLight`. New uses: FilterChip and a
+  ListItem switch (selection), the snack's swipe (light: sheets don't snap until U3), merge/split/compress
+  and a Tools result (success), the delete, discard-scan and clear-pack confirms as they ask (warning).
+  Guard test `services/feedback/__tests__/haptics.test.ts`: no other module imports expo-haptics.
+- **ErrorBoundary**: the crash screen reads the theme's context directly (`useOptionalTheme`, light tokens
+  without a provider) and uses plain RN views and `typeScale`, not the kit, which may be what crashed.
+  The `error` illustration waits for U4.
+- Tests: `transitions.test.ts` (kinds, durations, reduced motion, styles), `services/feedback/__tests__/
+  task.test.ts`, `components/ui/__tests__/useTask.test.ts`, the task toast and queue order in
+  `snackQueue.test.ts`, Home's loading state; the screen tests mark the library loaded. The ratchet went
+  down for ErrorBoundary, Snackbar and SkeletonRows. The Reanimated mock gained the layout builders and
+  `useEvent` (for gesture-handler's GestureDetector).
 
 ## U14 · Usability check with students *(S)*
 Status: planned. Device work.

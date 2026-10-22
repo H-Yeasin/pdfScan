@@ -65,6 +65,13 @@ export const en = {
     removeChip: 'Remove {name}',
     clearField: 'Clear',
     loading: 'Loading',
+    // §17 U13: the snack and the task toast (components/shared/Snackbar, components/ui/useTask).
+    dismiss: 'Dismiss',
+    task: {
+      count: '{done} of {total}',
+      cancelled: 'Stopped',
+      preparing: 'Getting it ready…',
+    },
   },
 
   home: {
@@ -257,10 +264,10 @@ export const en = {
       // §17 U2: every kit component in every variant (src/dev/UiGalleryScreen.tsx).
       uiGallery: 'UI gallery',
       uiGallerySubtitle: 'Every kit component, light and dark, at two font sizes',
-      // §16 G5: the render-count overlay (src/utils/renderCounts.ts).
-      renderCounts: 'Render counts',
-      renderCountsOn: 'Showing. Tap a count to reset; tap here to hide.',
-      renderCountsOff: 'Show how often each screen renders',
+      // §16 G5/G9: the performance overlay (src/dev/PerfOverlay.tsx: JS frames, start-up times, render counts).
+      perfOverlay: 'Performance overlay',
+      perfOverlayOn: 'Showing. Tap the overlay to reset; tap here to hide.',
+      perfOverlayOff: 'Show frame rate, start-up time and render counts',
       // §10 M3: test Pro features before the rewarded ad (M6) exists.
       proPass: 'Grant a Pro pass',
       proPassActive: 'Pro until {time}. Tap to end it now.',

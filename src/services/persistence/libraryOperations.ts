@@ -107,7 +107,8 @@ async function combineInto(
   documentId: string,
   parts: readonly { doc: LibraryDocument; keepIds: boolean }[],
   annotations: readonly Annotation[],
-  newIds?: Map<string, string>
+  newIds?: Map<string, string>,
+  onProgress?: Progress
 ): Promise<Combined> {
   const dir = getDocumentDir(documentId);
   const rowFor = (doc: LibraryDocument, row: LibraryPage, keepIds: boolean, n: number) => {
@@ -131,6 +132,8 @@ async function combineInto(
       } else {
         sources.push(await standardPdfOf(doc));
       }
+      // By file here: a scan's PDF is the slow part; the copy into one PDF after is quick.
+      onProgress?.(sources.length, parts.length);
     }
     // mergePdfs reads every source before writing, so the target's own document.pdf can be both.
     let merged;
@@ -168,7 +171,7 @@ async function combineInto(
   // Rebuilds keep the paper size (A4 or Letter) the document was saved with; a combine takes the
   // first document's.
   const pageSize = await pageSizeOfPdf(parts[0]?.doc.pdfUri);
-  const pdfResult = await buildPdfFromPages(documentId, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize);
+  const pdfResult = await buildPdfFromPages(documentId, pages.map(toSourcePage), 'as-is', undefined, 'standard', pageSize, { onPage: onProgress });
   return { pages, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes, pdfLayout: 'standard', pdfPageSize: pageSize };
 }
 
@@ -193,18 +196,22 @@ export function copyMarks(
 // What a merge or split that keeps its originals adds: the new documents and their copied marks.
 export type CopiedDocuments = { docs: LibraryDocument[]; annotations: Annotation[] };
 
+// §17 U13: how far a merge or split is, for its toast ("Merging… 3 of 5"): files or pages, whichever
+// the work goes by.
+export type Progress = (done: number, total: number) => void;
+
 // Merged output lands in the source docs' course only when they all share one; a merge combining
 // docs from different courses has no single obviously-correct destination, so it goes to Unsorted.
 // Pages keep their ids (see copyPageInto), so bookmarks and annotations follow them.
-export async function mergeDocuments(docs: LibraryDocument[], annotations: readonly Annotation[] = []): Promise<LibraryDocument> {
-  return mergeInto(docs, annotations, true);
+export async function mergeDocuments(docs: LibraryDocument[], annotations: readonly Annotation[] = [], onProgress?: Progress): Promise<LibraryDocument> {
+  return mergeInto(docs, annotations, true, undefined, onProgress);
 }
 
 // §17 U7: a merge that leaves the documents it was made from where they are. The merged pages get
 // new ids and the marks are copied onto them; the originals keep theirs.
-export async function mergeDocumentsKeeping(docs: LibraryDocument[], annotations: readonly Annotation[] = []): Promise<CopiedDocuments> {
+export async function mergeDocumentsKeeping(docs: LibraryDocument[], annotations: readonly Annotation[] = [], onProgress?: Progress): Promise<CopiedDocuments> {
   const newIds = new Map<string, string>();
-  const doc = await mergeInto(docs, annotations, false, newIds);
+  const doc = await mergeInto(docs, annotations, false, newIds, onProgress);
   return { docs: [doc], annotations: copyMarks(annotations, newIds, () => doc.id) };
 }
 
@@ -212,7 +219,8 @@ async function mergeInto(
   docs: LibraryDocument[],
   annotations: readonly Annotation[],
   keepIds: boolean,
-  newIds?: Map<string, string>
+  newIds?: Map<string, string>,
+  onProgress?: Progress
 ): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const name = `Merged_${docs.length}_files`;
@@ -220,7 +228,8 @@ async function mergeInto(
     documentId,
     docs.map((doc) => ({ doc, keepIds })),
     annotations,
-    newIds
+    newIds,
+    onProgress
   );
   return {
     id: documentId,
@@ -247,15 +256,15 @@ export async function appendDocuments(target: LibraryDocument, sources: readonly
 
 // One document per page. Split output stays in the source document's course; pages keep their
 // ids. §7 R2: an imported PDF is split as a PDF (pdfOps.splitPdf), each page copied untouched.
-export async function splitDocument(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<LibraryDocument[]> {
-  return splitInto(doc, annotations, true);
+export async function splitDocument(doc: LibraryDocument, annotations: readonly Annotation[] = [], onProgress?: Progress): Promise<LibraryDocument[]> {
+  return splitInto(doc, annotations, true, undefined, onProgress);
 }
 
 // §17 U7: a split that keeps the document. The parts' pages get new ids and the marks are copied
 // onto them.
-export async function splitDocumentKeeping(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<CopiedDocuments> {
+export async function splitDocumentKeeping(doc: LibraryDocument, annotations: readonly Annotation[] = [], onProgress?: Progress): Promise<CopiedDocuments> {
   const newIds = new Map<string, string>();
-  const docs = await splitInto(doc, annotations, false, newIds);
+  const docs = await splitInto(doc, annotations, false, newIds, onProgress);
   const docOfPage = new Map(docs.flatMap((part) => part.pages.map((p) => [p.id, part.id] as const)));
   return { docs, annotations: copyMarks(annotations.filter((a) => a.documentId === doc.id), newIds, (pageId) => docOfPage.get(pageId)!) };
 }
@@ -264,7 +273,8 @@ async function splitInto(
   doc: LibraryDocument,
   annotations: readonly Annotation[],
   keepIds: boolean,
-  newIds?: Map<string, string>
+  newIds?: Map<string, string>,
+  onProgress?: Progress
 ): Promise<LibraryDocument[]> {
   // The page's copy in part `dir`; a new id is recorded for copyMarks. Moving rows (keepIds) bring
   // their signature PNGs along; copied ones get theirs in copyMarks.
@@ -277,10 +287,14 @@ async function splitInto(
   if (isPdfLevel(doc)) {
     if (!doc.pdfUri) throw new Error(`splitDocument: ${doc.id} has no PDF`);
     const ids: string[] = [];
-    const files = await splitPdf(doc.pdfUri, (i) => {
-      ids[i] = createId('doc');
-      return new File(getDocumentDir(ids[i]), 'document.pdf');
-    });
+    const files = await splitPdf(
+      doc.pdfUri,
+      (i) => {
+        ids[i] = createId('doc');
+        return new File(getDocumentDir(ids[i]), 'document.pdf');
+      },
+      onProgress
+    );
     return files.map((file, i): LibraryDocument => {
       const row = doc.pages[i];
       const page = row ? copyPage(row, ids[i]) : stubPage();
@@ -341,6 +355,7 @@ async function splitInto(
       pdfLayout: 'standard',
       pdfPageSize: pageSize,
     });
+    onProgress?.(i + 1, doc.pages.length);
   }
 
   return results;

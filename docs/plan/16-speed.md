@@ -911,7 +911,8 @@ Tests: `npm run typecheck`, `npm test`.
 Device check: Verification 9.
 
 ## G9 · Measure and record *(S)*
-Status: planned. Device work plus a little dev tooling.
+Status: **done in code** (2026-10-22): the seed and the overlay; the measurements are open (device work,
+`docs/qa/performance.md` §16 G9).
 
 Goal: the numbers in `docs/qa/performance.md` are measured on a real mid-range phone, before and after
 §16–§18.
@@ -933,6 +934,30 @@ Changes:
   Record before §16 (now) and after each wave.
 
 Tests: none beyond `npm test`.
+
+**As built (2026-10-22):**
+- The seed's word boxes came with G4 (`seedLibrary(..., { wordBoxes })`, Filter Lab's "Seed with word
+  boxes"), as 60 words a page in one block of equal boxes. G9 made them realistic: 250 words a page
+  (both seeds, so the two cold starts compare the boxes alone), laid out like ML Kit's output: paragraphs
+  of 45 words as blocks, lines wrapped at the page's width, each word's box as wide as its letters, all
+  inside the 595 × 842 page. About 25 KB of JSON a page, the same as G4's Node measurement (52.6 MB for
+  2,000 pages). `ocrText` / `ocrWithBoxes` are exported for the test.
+- `src/dev/PerfOverlay.tsx` replaces G5's `RenderCountOverlay` (the same toggle, now Settings → Developer →
+  **Performance overlay**; `renderCounts.ts`'s `shown` flag still turns it on). Lines: the JS frame rate
+  over the last second and the slowest frame since a reset (`src/dev/perfStats.ts` `createFrameMeter`, a
+  `requestAnimationFrame` loop that runs only while the overlay is mounted), the time since the process
+  started, when the bundle began to run, when the first screen was up, the JS heap
+  (`readStartup`: React Native's `performance.rnStartupTiming` and `performance.memory`, not in the TS
+  types, each field optional; without them it falls back to the bare clock), then the render counts. Tap
+  resets the counts and the slowest frame. The "moved" highlight compares with the counts before their
+  last change, not before the last render: the frame reading re-renders the overlay twice a second.
+- `src/utils/perfMarks.ts` (on the boot path, imports nothing): `markPerf(name)` keeps the first
+  `performance.now()` of a name in a dev build; AppNavigator marks `'firstScreen'` when `booting` turns
+  false (the splash intro may still be over it).
+- The baseline is built from `3d93dcc` (G1 only), since G2–G8 landed before a phone was free. That
+  commit's seed has no word boxes and 60 words a page; the doc says to note that in its row.
+- Tests: `src/dev/__tests__/perfTools.test.ts` (the frame meter, the start-up reading with and without
+  React Native's timing, the seed's boxes: every word in order, inside the page, 20–60 KB).
 
 ---
 

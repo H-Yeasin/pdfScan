@@ -7,6 +7,7 @@ import { radii, spacing, fontFamily, typeScale, useTheme, touchSlop } from '../.
 import { useT } from '../../i18n/useT';
 import type { SessionPage } from '../../types/models';
 import { PageGrid } from '../shared/PageGrid';
+import { useModalAnimation } from '../../navigation/transitions';
 
 type GridPagesModalProps = {
   visible: boolean;
@@ -19,6 +20,7 @@ type GridPagesModalProps = {
 };
 
 export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDelete, onMerge, onClose }: GridPagesModalProps) {
+  const modalAnimationType = useModalAnimation();
   const { tokens } = useTheme();
   const { t } = useT();
   // Component-local, not store state - this selection is transient to the modal itself (same
@@ -64,7 +66,7 @@ export function GridPagesModal({ visible, pages, selectedIndex, onSelect, onDele
   };
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={selectionMode ? handleCancelSelection : onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType={modalAnimationType} onRequestClose={selectionMode ? handleCancelSelection : onClose}>
       {/* §14 Q4: while selecting, the merge bar pads itself (BottomBar); otherwise the grid stops above the navigation bar. */}
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={selectionMode ? ['top'] : ['top', 'bottom']}>
         {selectionMode ? (

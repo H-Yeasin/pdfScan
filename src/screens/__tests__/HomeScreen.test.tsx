@@ -49,6 +49,8 @@ function mount() {
     );
   });
   mounted.push(root);
+  // The library has loaded (useLibraryPersistence isn't mounted here); §17 U13's skeletons show until then.
+  act(() => ctx!.app.dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' }));
   return { root, ctx: () => ctx! };
 }
 
@@ -81,6 +83,15 @@ function press(root: ReturnType<typeof create>, label: string) {
 }
 
 describe('Home course hub', () => {
+  it('shows placeholder cards, not the first-run card, while the library loads (§17 U13)', () => {
+    const { root, ctx } = mount();
+    act(() => ctx().app.dispatch({ type: 'library/RETRY_LOAD' }));
+    expect(root.root.findAll((n) => n.props.accessibilityRole === 'progressbar' && typeof n.type === 'string').length).toBeGreaterThan(0);
+    expect(texts(root)).not.toContain('Add your courses');
+    act(() => ctx().app.dispatch({ type: 'library/SET_LOAD_STATUS', status: 'ready' }));
+    expect(root.root.findAll((n) => n.props.accessibilityRole === 'progressbar' && typeof n.type === 'string').length).toBe(0);
+  });
+
   it('shows 4 courses, opens one, and a scan from there is filed into it', () => {
     const { root, ctx } = mount();
     act(() => {

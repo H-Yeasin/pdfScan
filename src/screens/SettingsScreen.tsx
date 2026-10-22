@@ -57,7 +57,7 @@ export function SettingsScreen() {
   const classCount = useAppSelector(
     (s) => s.library.timetable.filter((slot) => s.library.courses.some((c) => c.id === slot.courseId && !c.archived)).length
   );
-  const renderCountsOn = useRenderCountsShown();
+  const perfOverlayOn = useRenderCountsShown();
   const entitlement = useEntitlement();
   const isPro = useIsPro();
   const remote = useRemoteConfig();
@@ -320,9 +320,9 @@ export function SettingsScreen() {
             <ListItem icon={ICONS.developer} title={t('settings.developer.uiGallery')} subtitle={t('settings.developer.uiGallerySubtitle')} trailing="chevron" onPress={() => go('uiGallery')} />
             <ListItem
               icon={ICONS.developer}
-              title={t('settings.developer.renderCounts')}
-              subtitle={t(renderCountsOn ? 'settings.developer.renderCountsOn' : 'settings.developer.renderCountsOff')}
-              switchValue={renderCountsOn}
+              title={t('settings.developer.perfOverlay')}
+              subtitle={t(perfOverlayOn ? 'settings.developer.perfOverlayOn' : 'settings.developer.perfOverlayOff')}
+              switchValue={perfOverlayOn}
               onValueChange={setRenderCountsShown}
             />
             <ListItem

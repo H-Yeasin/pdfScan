@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CourseEditorSheet } from '../components/courses/CourseEditorSheet';
 import { CourseHero } from '../components/courses/CourseHero';
@@ -10,6 +10,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { SelectAllButton } from '../components/library/SelectAllButton';
+import { SkeletonRows } from '../components/library/SkeletonRows';
 import { SortMenu } from '../components/library/SortMenu';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
 import { useBackupExport } from '../components/backup/useBackupExport';
@@ -18,7 +19,7 @@ import { DeadlineList } from '../components/deadlines/DeadlineList';
 import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
 import { SortUnsortedSheet } from '../components/courses/SortUnsortedSheet';
 import { BookmarkList } from '../components/bookmarks/BookmarkList';
-import { Button, Chip, FilterChip, IconButton, Text } from '../components/ui';
+import { animateNextListChange, Button, Chip, FilterChip, IconButton, registerAnimatedList, Text } from '../components/ui';
 import { cardBackground } from '../components/ui/Card';
 import { courseBookmarks } from '../services/study/bookmarks';
 import { useShareSubmission } from '../store/useSubmitDocument';
@@ -194,7 +195,14 @@ export function CourseScreen() {
     [shownDocs, docs.length, archivedCount, showArchived, typeFilter, course, deadlines.length, bookmarked.length, submissions.length, openSections]
   );
 
-  const onToggleSection = useCallback((id: CourseSectionId) => setOpenSections((open) => toggleSection(open, id)), []);
+  // §17 U13: a section's rows fade in under its header and the ones below slide down, instead of
+  // jumping; the rows of a document deleted or archived from here fade out the same way.
+  const listRef = useRef<FlashListRef<CoursePageItem>>(null);
+  useEffect(() => registerAnimatedList(listRef), []);
+  const onToggleSection = useCallback((id: CourseSectionId) => {
+    animateNextListChange();
+    setOpenSections((open) => toggleSection(open, id));
+  }, []);
 
   const sectionBody = (id: CourseSectionId) => {
     switch (id) {
@@ -254,8 +262,11 @@ export function CourseScreen() {
     }
   };
 
+  // §17 U13: rows breathing in the documents' place while the library loads, not "Nothing here yet".
   const documentsHeader = (count: number) =>
-    docs.length === 0 ? (
+    docs.length === 0 && state.library.loadStatus === 'loading' ? (
+      <SkeletonRows count={4} />
+    ) : docs.length === 0 ? (
       <EmptyState
         variant="inline"
         title={course ? t('courses.page.emptyCourse', { name: course.name }) : t('courses.page.emptyUnsorted')}
@@ -397,6 +408,7 @@ export function CourseScreen() {
       )}
 
       <FlashList
+        ref={listRef}
         data={items}
         keyExtractor={coursePageItemKey}
         getItemType={coursePageItemType}

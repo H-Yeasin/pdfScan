@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useT } from '../../i18n/useT';
 import type { LayoutMode } from '../../services/pdf/pdfService';
 import type { PageSizeId } from '../../services/pdf/pageSize';
@@ -6,7 +7,7 @@ import { formatLimit } from '../../services/submit/sizeFormat';
 import { ICONS, spacing } from '../../theme';
 import type { Course } from '../../types/models';
 import { SegmentedControl } from '../shared/SegmentedControl';
-import { Button, ListItem, Sheet, Text } from '../ui';
+import { appear, Button, disappear, ListItem, settle, Sheet, Text } from '../ui';
 import { LayoutModeSegmented } from './LayoutModeSegmented';
 import { NameField } from './NameField';
 import { SizeTargetRow } from './SizeTargetRow';
@@ -68,9 +69,11 @@ export function SubmitSheet(props: SubmitSheetProps) {
         <View style={styles.labelRow}>
           <Text variant="label">{t('deliver.fileSize')}</Text>
           {props.sizeLimitBytes !== null ? (
-            <Text variant="caption" color="accentInk">
-              {t('deliver.willBeAtMost', { size: formatLimit(props.sizeLimitBytes) })}
-            </Text>
+            <Animated.View entering={appear} exiting={disappear}>
+              <Text variant="caption" color="accentInk">
+                {t('deliver.willBeAtMost', { size: formatLimit(props.sizeLimitBytes) })}
+              </Text>
+            </Animated.View>
           ) : null}
         </View>
         <SizeTargetRow value={props.sizeLimitBytes} onChange={props.onSizeLimit} />
@@ -86,17 +89,20 @@ export function SubmitSheet(props: SubmitSheetProps) {
         />
       ) : null}
 
-      <View style={styles.group}>
+      {/* §17 U13: the 2-per-sheet hint fades in, and what is below it slides down to make room. */}
+      <Animated.View layout={settle} style={styles.group}>
         <Text variant="label">{t('deliver.pageLayout')}</Text>
         <LayoutModeSegmented value={props.layoutMode} onChange={props.onLayoutMode} />
         {props.layoutMode === '2_in_1' ? (
-          <Text variant="caption" color="muted">
-            {t('deliver.layoutHintTwoUp')}
-          </Text>
+          <Animated.View entering={appear} exiting={disappear}>
+            <Text variant="caption" color="muted">
+              {t('deliver.layoutHintTwoUp')}
+            </Text>
+          </Animated.View>
         ) : null}
-      </View>
+      </Animated.View>
 
-      <View style={styles.group}>
+      <Animated.View layout={settle} style={styles.group}>
         <Text variant="label">{t('deliver.pageSize')}</Text>
         <SegmentedControl
           segments={[
@@ -106,7 +112,7 @@ export function SubmitSheet(props: SubmitSheetProps) {
           value={props.pageSize}
           onChange={props.onPageSize}
         />
-      </View>
+      </Animated.View>
 
       <ListItem
         title={t('deliver.includeAnnotations')}

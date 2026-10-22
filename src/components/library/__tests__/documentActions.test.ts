@@ -51,6 +51,7 @@ describe('§18 W23 documentActions', () => {
     expect(dispatch.mock.calls.filter(([a]) => a.type === 'ui/SHOW_SNACK').map(([a]) => a.msg)).toEqual(['Starred', 'Removed from Starred']);
   });
 
+  // §17 U13: the task toast (ui/TASK_*) shows while it works; its result snack comes after it.
   it('splits, leaves, then replaces the document with its pages', async () => {
     const dispatch = jest.fn();
     const doc = makeDoc();
@@ -59,7 +60,7 @@ describe('§18 W23 documentActions', () => {
     const order: string[] = [];
     dispatch.mockImplementation((a) => order.push(a.type));
     await documentActions(dispatch, courses).split(doc, [], () => order.push('leave'));
-    expect(order).toEqual(['leave', 'library/REPLACE_FILES', 'ui/SHOW_SNACK']);
+    expect(order).toEqual(['ui/TASK_START', 'leave', 'library/REPLACE_FILES', 'ui/TASK_END', 'ui/SHOW_SNACK']);
     expect(deleteDocumentFiles).toHaveBeenCalledWith(doc.id);
   });
 
@@ -70,7 +71,7 @@ describe('§18 W23 documentActions', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     await documentActions(dispatch, courses).split(makeDoc(), [], leave);
     expect(leave).not.toHaveBeenCalled();
-    expect(types(dispatch)).toEqual(['ui/SHOW_SNACK']);
+    expect(types(dispatch)).toEqual(['ui/TASK_START', 'ui/TASK_END', 'ui/SHOW_SNACK']);
     warn.mockRestore();
   });
 });

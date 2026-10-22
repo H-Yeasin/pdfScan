@@ -52,7 +52,7 @@ describe('runPageTool, keeping the originals', () => {
   it('merges into a new document beside them, with copied marks, and deletes nothing', async () => {
     const { dispatch, open, ctx, snacks } = setup();
     await runPageTool('merge', [a, b], false, ctx);
-    expect(mockOps.mergeDocumentsKeeping).toHaveBeenCalledWith([a, b], [mark]);
+    expect(mockOps.mergeDocumentsKeeping).toHaveBeenCalledWith([a, b], [mark], undefined);
     expect(dispatch).toHaveBeenCalledWith({ type: 'library/ADD_FILES', files: [mockMerged], annotations: [mockCopiedMark] });
     expect(dispatch.mock.calls.some(([x]) => x.type === 'library/REPLACE_FILES' || x.type === 'library/REMOVE_FILES')).toBe(false);
     // The result is selected and scrolled to; the snack opens it.
@@ -69,7 +69,7 @@ describe('runPageTool, keeping the originals', () => {
   it('splits beside the original', async () => {
     const { dispatch, ctx } = setup();
     await runPageTool('split', [a], false, ctx);
-    expect(mockOps.splitDocumentKeeping).toHaveBeenCalledWith(a, [mark]);
+    expect(mockOps.splitDocumentKeeping).toHaveBeenCalledWith(a, [mark], undefined);
     expect(dispatch).toHaveBeenCalledWith({ type: 'library/ADD_FILES', files: mockParts, annotations: [] });
     jest.advanceTimersByTime(UNDO_WINDOW_MS * 2);
     expect(deleteDocumentFiles).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('runPageTool, deleting the originals', () => {
   it('replaces them at once and deletes their folders once, after the Undo window', async () => {
     const { dispatch, ctx, snacks } = setup();
     await runPageTool('merge', [a, b], true, ctx);
-    expect(mockOps.mergeDocuments).toHaveBeenCalledWith([a, b], [mark]);
+    expect(mockOps.mergeDocuments).toHaveBeenCalledWith([a, b], [mark], undefined);
     expect(dispatch).toHaveBeenCalledWith({ type: 'library/REPLACE_FILES', ids: ['a', 'b'], files: [mockMerged] });
     expect(snacks()[0].action).toBe('Undo');
     expect(deleteDocumentFiles).not.toHaveBeenCalled();

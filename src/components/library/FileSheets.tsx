@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '../../i18n/useT';
 import { renamedTo } from '../../services/library/rename';
 import type { LibraryDocument } from '../../types/models';
-import { Button, ListItem, ProgressBar, Sheet, Text, TextField } from '../ui';
+import { Button, ListItem, Sheet, Text, TextField } from '../ui';
 
 // §17 U7: the sheets Files' actions ask in. On U3's Sheet (built early here); U3's Dialog and
 // useConfirm will take over Rename and the confirms without the callers changing.
@@ -109,16 +109,6 @@ export function KeepOriginalsSheet({ ask, onConfirm, onClose }: KeepOriginalsShe
         onPress={() => setDeleteOriginals((v) => !v)}
         testID="files-delete-originals"
       />
-    </Sheet>
-  );
-}
-
-// While a merge, split or compress runs: what is happening, and a bar. It can't be closed (the work
-// can't be stopped half-way); it goes when the work is done.
-export function TaskSheet({ label }: { label: string | null }) {
-  return (
-    <Sheet visible={label !== null} onClose={() => {}} title={label ?? undefined} testID="files-task">
-      <ProgressBar accessibilityLabel={label ?? undefined} />
     </Sheet>
   );
 }

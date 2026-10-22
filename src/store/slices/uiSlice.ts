@@ -6,8 +6,14 @@ export type ExportRequest = { scope: BackupScope; courseName?: string };
 
 export type Snack = { msg: string; action?: string; onAction?: () => void } | null;
 
+// §17 U13: a long job running (components/ui/useTask), shown where the snack sits. `done`/`total`
+// once the job counts ("3 of 5"); `onCancel` when it can stop.
+export type TaskToast = { id: string; label: string; done?: number; total?: number; onCancel?: () => void };
+
 export type UiState = {
   snack: Snack;
+  // While a task runs it takes the snack's place; snacks that come meanwhile wait under it.
+  task: TaskToast | null;
   // §9 O6: snacks waiting behind one that has an action (Undo, Done, Scan more), so a later
   // message doesn't take that action away. A plain message is simply replaced.
   snackQueue: NonNullable<Snack>[];
@@ -21,6 +27,7 @@ export type UiState = {
 
 export const initialUiState: UiState = {
   snack: null,
+  task: null,
   snackQueue: [],
   backupToOpen: null,
   exportRequest: null,
@@ -30,6 +37,9 @@ export const initialUiState: UiState = {
 export type UiAction =
   | { type: 'ui/SHOW_SNACK'; msg: string; action?: string; onAction?: () => void }
   | { type: 'ui/CLEAR_SNACK' }
+  | { type: 'ui/TASK_START'; task: TaskToast }
+  | { type: 'ui/TASK_PROGRESS'; id: string; done: number; total: number }
+  | { type: 'ui/TASK_END'; id: string }
   | { type: 'ui/OPEN_BACKUP'; uri: string }
   | { type: 'ui/CLOSE_BACKUP' }
   | { type: 'ui/REQUEST_EXPORT'; request: ExportRequest | null }
@@ -50,6 +60,17 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
     case 'ui/CLEAR_SNACK':
       if (!state.snack && state.snackQueue.length === 0) return state;
       return { ...state, snack: state.snackQueue[0] ?? null, snackQueue: state.snackQueue.slice(1) };
+    // A newer task replaces an older one's toast (two jobs at once are rare: the toast shows the
+    // last one started; the older one's progress and end are ignored by id).
+    case 'ui/TASK_START':
+      return { ...state, task: action.task };
+    case 'ui/TASK_PROGRESS': {
+      const { task } = state;
+      if (!task || task.id !== action.id || (task.done === action.done && task.total === action.total)) return state;
+      return { ...state, task: { ...task, done: action.done, total: action.total } };
+    }
+    case 'ui/TASK_END':
+      return state.task?.id === action.id ? { ...state, task: null } : state;
     case 'ui/OPEN_BACKUP':
       return { ...state, backupToOpen: action.uri };
     case 'ui/CLOSE_BACKUP':

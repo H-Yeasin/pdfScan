@@ -14,7 +14,7 @@ import { SearchBar } from '../components/library/SearchBar';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { SelectAllButton } from '../components/library/SelectAllButton';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
-import { IconButton, ScreenHeader, Text } from '../components/ui';
+import { IconButton, registerAnimatedList, ScreenHeader, Text } from '../components/ui';
 import { BannerSlot } from '../components/ads/BannerSlot';
 import { useRouter } from '../navigation/router';
 import { startScan } from '../services/courses/startScan';
@@ -64,6 +64,8 @@ export function LibraryScreen() {
   const [sortOpen, setSortOpen] = useState(false);
   const importFile = useImportFile();
   const listRef = useRef<FlashListRef<Item>>(null);
+  // §17 U13: deleted, archived and merged rows fade in and out (layoutMotion).
+  useEffect(() => registerAnimatedList(listRef), []);
   const searching = search.trim() !== '';
 
   const setFilters = useCallback((next: DocumentFilters) => dispatch({ type: 'libraryUi/SET_FILTERS', filters: next }), [dispatch]);

@@ -5,6 +5,7 @@ import type { PageFrame } from '../../../services/reader/renderPlan';
 import type { SurfacePage } from '../../../services/reader/surfacePages';
 import type { PageRotation } from '../../../types/models';
 import { usePageImages, type RenderedImage, type RenderImages } from './useRenderQueue';
+import { Skeleton } from '../../ui';
 
 type Rect = { left: number; top: number; width: number; height: number };
 
@@ -102,6 +103,9 @@ export const SurfacePageView = memo(function SurfacePageView({ page, x, y, width
       {thumb ? (
         <Image source={{ uri: page.thumbUri }} style={[styles.image, turnedStyle(thumb, space.turn)]} fadeDuration={0} resizeMethod="scale" resizeMode="stretch" />
       ) : null}
+      {/* §17 U13: nothing drawn yet (no thumbnail, no render): the paper breathes until the first
+          render lands. */}
+      {!thumb && !held.low && !held.base ? <Skeleton style={StyleSheet.absoluteFill} height="100%" radius={0} /> : null}
       {held.low ? <Layer image={held.low} width={width} height={height} onLost={lost} /> : null}
       {live && held.base ? <Layer image={held.base} width={width} height={height} onLost={lost} /> : null}
       {live ? held.tiles.map((tile) => <Picture key={tile.spec.key} image={tile} width={width} height={height} onLost={lost} />) : null}

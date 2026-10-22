@@ -17,6 +17,7 @@ import { HOME_GUTTER } from '../components/home/layout';
 import { ProPassCard } from '../components/home/ProPassCard';
 import { QuickActions } from '../components/home/QuickActions';
 import { RecentFiles } from '../components/home/RecentFiles';
+import { HomeSkeleton } from '../components/home/HomeSkeleton';
 import { SectionHeader } from '../components/home/SectionHeader';
 import { useOpenDocument } from '../components/library/useDocumentListActions';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -54,7 +55,7 @@ export function HomeScreen() {
   const state = useAppSlices('library');
   const recentOpened = useAppSelector((s) => s.settings.recentOpened);
   const homeSemesterId = useAppSelector((s) => s.libraryUi.homeSemesterId);
-  const { files, courses, semesters, deadlines } = state.library;
+  const { files, courses, semesters, deadlines, loadStatus } = state.library;
   const openDocument = useOpenDocument();
 
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -88,7 +89,10 @@ export function HomeScreen() {
         <QuickActions />
         <ContinueCarousel items={resume} courses={courses} onOpen={openDocument} />
 
-        {!hasActiveCourse ? (
+        {/* §17 U13: placeholders while the library loads, not the first-run card. */}
+        {loadStatus === 'loading' ? (
+          <HomeSkeleton />
+        ) : !hasActiveCourse ? (
           <Card>
             <EmptyState
               variant="inline"

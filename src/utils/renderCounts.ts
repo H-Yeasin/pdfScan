@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
 // §16 G5, dev only: how often each named component rendered, for docs/qa/performance.md and G9.
-// A component calls `useRenderCount('Library')` at the top; src/dev/RenderCountOverlay (Settings →
-// Developer → Render counts) shows the numbers, and which ones moved since the last look. This
+// A component calls `useRenderCount('Library')` at the top; src/dev/PerfOverlay (Settings →
+// Developer → Performance overlay) shows the numbers, and which ones moved since the last look. This
 // file is outside src/dev because the screens it counts import it; it imports nothing but React.
 //
 // Counting only happens while the overlay is shown, and never in a release build (`__DEV__` is

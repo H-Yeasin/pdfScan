@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { FormField, FormValues } from '../../services/edit/pdfForm';
 import { useT } from '../../i18n/useT';
 import { radii, spacing, touchSlop, useTheme } from '../../theme';
+import { useModalAnimation } from '../../navigation/transitions';
 
 export type FormFillRequest = { name: string; fields: FormField[] };
 
@@ -24,6 +25,7 @@ function initialValues(fields: readonly FormField[]): FormValues {
 // chips. Saving always makes a filled copy; Flatten is off by default (a portal that wants it says
 // so, and a flattened copy can't be filled in again).
 export function FormFillSheet({ form, onSave, onClose }: FormFillSheetProps) {
+  const modalAnimationType = useModalAnimation();
   const { tokens } = useTheme();
   const { t } = useT();
   const [values, setValues] = useState<FormValues>({});
@@ -116,7 +118,7 @@ export function FormFillSheet({ form, onSave, onClose }: FormFillSheetProps) {
   };
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible={form !== null} animationType="slide" onRequestClose={close}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={form !== null} animationType={modalAnimationType} onRequestClose={close}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={[styles.header, { borderBottomColor: tokens.edge }]}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={close} accessibilityLabel={t('common.close')}>

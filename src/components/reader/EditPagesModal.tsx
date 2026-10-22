@@ -16,6 +16,7 @@ import {
 } from '../../services/persistence/pageEdits';
 import { PageGrid } from '../shared/PageGrid';
 import { thumbFor } from '../../services/library/thumbnails';
+import { useModalAnimation } from '../../navigation/transitions';
 
 type EditPagesModalProps = {
   visible: boolean;
@@ -43,6 +44,7 @@ const TOOLS: { id: ToolId; icon: keyof typeof Ionicons.glyphMap }[] = [
 // delete them - a delete can be undone right here until Save. Extract and Add pages act on the
 // saved document straight away, so they wait until the draft is saved.
 export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract, onAddFromScan, onAddFromDocument }: EditPagesModalProps) {
+  const modalAnimationType = useModalAnimation();
   const { tokens } = useTheme();
   const { t } = useT();
   const [edit, setEdit] = useState<PageEdit>(() => startEdit(doc));
@@ -93,7 +95,7 @@ export function EditPagesModal({ visible, doc, busy, onClose, onSave, onExtract,
   };
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType={modalAnimationType} onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Pressable hitSlop={touchSlop(36)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.cancel')} disabled={busy}>

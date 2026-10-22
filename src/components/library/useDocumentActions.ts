@@ -7,6 +7,8 @@ import { deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { useAppDispatch, useAppSelector } from '../../store/AppStateContext';
 import type { AppAction } from '../../store/appReducer';
 import type { Annotation, Course, LibraryDocument } from '../../types/models';
+import type { TaskControl } from '../../services/feedback/task';
+import { runWithToast } from '../ui';
 
 // §16 G3: libraryOperations (and pdf-lib with it) loads with the first split or compress, not with
 // Home, the Library or the Reader, which use these from their first frame.
@@ -19,10 +21,18 @@ export function libraryOps(): typeof import('../../services/persistence/libraryO
 // PDF can only get smaller by becoming images; the message says when that happened, and when it
 // wouldn't have helped.
 // `quality`: Deliver's 1-5 export ladder (2 by default; §17 U8's Tools offers 1-3).
-export async function compressDocuments(docs: readonly LibraryDocument[], dispatch: Dispatch<AppAction>, quality = 2): Promise<string> {
+// `task` (§17 U13): the toast's progress, file by file, and Cancel between files (the ones done
+// stay compressed).
+export async function compressDocuments(
+  docs: readonly LibraryDocument[],
+  dispatch: Dispatch<AppAction>,
+  quality = 2,
+  task?: Pick<TaskControl, 'progress'> & Partial<Pick<TaskControl, 'throwIfCancelled'>>
+): Promise<string> {
   let rasterized = 0;
   let notSmaller = 0;
-  for (const doc of docs) {
+  for (const [i, doc] of docs.entries()) {
+    task?.throwIfCancelled?.();
     if (isPdfLevel(doc)) {
       const result = await libraryOps().compressImportedPdf(doc, quality);
       if (result.smaller) {
@@ -35,8 +45,14 @@ export async function compressDocuments(docs: readonly LibraryDocument[], dispat
       const compressed = await libraryOps().compressDocument(doc, quality);
       dispatch({ type: 'library/UPDATE_FILE', id: doc.id, patch: compressed });
     }
+    task?.progress(i + 1, docs.length);
   }
   return rasterized ? t('library.compressedAsImages') : notSmaller ? t('library.alreadySmall') : t('library.compressed');
+}
+
+// What a failed merge, split or compress says.
+export function toolFailure(error: unknown): string {
+  return error instanceof PdfEncryptedError ? t('library.passwordProtected') : t('library.toolFailed');
 }
 
 // §18 W23 / §17 U7: what can be done to one document (or, for Move, several) wherever it is shown:
@@ -75,26 +91,24 @@ export function documentActions(dispatch: Dispatch<AppAction>, courses: readonly
     // One file per page. The document is replaced by its pages, so whoever shows it leaves first
     // (`leave`, after the work and before the swap: a failure stays where it was). The marks go
     // with their pages.
+    // §17 U13: both show the task toast while they work ("Splitting… 3 of 12").
     async split(doc: LibraryDocument, annotations: readonly Annotation[], leave?: () => void): Promise<void> {
-      try {
-        const split = await libraryOps().splitDocument(doc, annotations.filter((a) => a.documentId === doc.id));
-        leave?.();
-        dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
-        deleteDocumentFiles(doc.id);
-        snack(t('library.splitInto', { count: split.length }));
-      } catch (error) {
-        console.warn('documentActions: split failed', error);
-        snack(error instanceof PdfEncryptedError ? t('library.passwordProtected') : t('library.toolFailed'));
-      }
+      await runWithToast(
+        dispatch,
+        'library.splitting',
+        async (task) => {
+          const split = await libraryOps().splitDocument(doc, annotations.filter((a) => a.documentId === doc.id), task.progress);
+          leave?.();
+          dispatch({ type: 'library/REPLACE_FILES', ids: [doc.id], files: split });
+          deleteDocumentFiles(doc.id);
+          return split.length;
+        },
+        { done: (count) => t('library.splitInto', { count }), failed: toolFailure, haptic: true }
+      );
     },
 
     async compress(doc: LibraryDocument): Promise<void> {
-      try {
-        snack(await compressDocuments([doc], dispatch));
-      } catch (error) {
-        console.warn('documentActions: compress failed', error);
-        snack(error instanceof PdfEncryptedError ? t('library.passwordProtected') : t('library.toolFailed'));
-      }
+      await runWithToast(dispatch, 'library.compressing', (task) => compressDocuments([doc], dispatch, 2, task), { done: (msg) => msg, failed: toolFailure, haptic: true });
     },
   };
 }

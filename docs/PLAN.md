@@ -342,7 +342,7 @@ reports respect the opt-in.
 - [x] G6 FlashList + `expo-image`, thumbnails never fall back to masters (done in code; needs a new dev build; the thumbnail strip stays a ScrollView; Verification 7 on a device is open)
 - [x] G7 Heavy work off the hot path (Review sliders, progressive ingest, OCR reuse, indexing writes) (done in code; JS only; pdf-lib still holds page bytes until save; Verification 8 on a device is open)
 - [x] G8 Release build: R8 + resource shrinking, React Compiler trial (done in code; needs `npx expo prebuild --clean` and a new build; the React Compiler stays off; the release build, its sizes and Verification 9 on a device are open)
-- [ ] G9 Measure and record (`docs/qa/performance.md`)
+- [x] G9 Measure and record (`docs/qa/performance.md`) — done in code 2026-10-22 (realistic word-box seed, `src/dev/PerfOverlay.tsx`); the device measurements are open
 
 **Done when:** crash reports send nothing unless opted in (and never a replay), cold start is at least
 30% faster than the G9 baseline, Back never remounts a screen or loses a list's place, and Files scrolls
@@ -366,7 +366,7 @@ away: Home · Files · [Scan] · Tools · Me.
 - [x] U10 Me (Settings) (done in code 2026-10-22; device check open)
 - [x] U11 Course, Exam pack, Pro, Onboarding (done in code 2026-10-22; device check open)
 - [x] U12 Copy pass (UK spelling, sentence case, no jargon) (done in code 2026-10-22; device check open)
-- [ ] U13 Motion and feedback
+- [x] U13 Motion and feedback (done in code 2026-10-22; device check open)
 - [ ] U14 Usability check with students
 
 **Done when:** students in the U14 walkthrough meet the tap-count targets without help (scan → saved ≤ 3,

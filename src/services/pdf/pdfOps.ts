@@ -59,14 +59,16 @@ export async function mergePdfs(sources: readonly { uri: string; pages?: readonl
 }
 
 // One single-page PDF per page, loading the source once (Split on a long PDF).
-export async function splitPdf(uri: string, destFor: (page: number) => File): Promise<PdfFile[]> {
+export async function splitPdf(uri: string, destFor: (page: number) => File, onProgress?: (done: number, total: number) => void): Promise<PdfFile[]> {
   const src = await loadPdf(uri);
   const out: PdfFile[] = [];
-  for (const i of src.getPageIndices()) {
+  const indices = src.getPageIndices();
+  for (const i of indices) {
     const single = await PDFDocument.create();
     const [page] = await single.copyPages(src, [i]);
     single.addPage(page);
     out.push(await savePdf(single, destFor(i)));
+    onProgress?.(out.length, indices.length);
   }
   return out;
 }

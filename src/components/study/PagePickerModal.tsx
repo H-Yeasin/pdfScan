@@ -7,6 +7,7 @@ import type { LibraryDocument } from '../../types/models';
 import type { PackItem } from '../../store/slices/packSlice';
 import { useT } from '../../i18n/useT';
 import { PageThumb } from '../shared/PageThumb';
+import { useModalAnimation } from '../../navigation/transitions';
 
 // §5 T6: pick pages from documents (a course's, for the exam pack), each document's pages as a
 // row of thumbnails; tap to select. Pages already in the pack are marked and can't be picked again.
@@ -23,6 +24,7 @@ export function PagePickerModal({
   onAdd: (items: PackItem[]) => void;
   onClose: () => void;
 }) {
+  const modalAnimationType = useModalAnimation();
   const { tokens } = useTheme();
   const { t } = useT();
   const [picked, setPicked] = useState<PackItem[]>([]);
@@ -35,7 +37,7 @@ export function PagePickerModal({
     setPicked((list) => (has(list, item.documentId, item.pageId) ? list.filter((x) => !(x.documentId === item.documentId && x.pageId === item.pageId)) : [...list, item]));
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType={modalAnimationType} onRequestClose={onClose}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={styles.header}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={onClose} accessibilityLabel={t('common.close')}>

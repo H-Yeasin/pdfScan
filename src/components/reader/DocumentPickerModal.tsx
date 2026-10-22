@@ -9,6 +9,7 @@ import type { LibraryDocument } from '../../types/models';
 import { formatBytes } from '../../utils/format';
 import { FileCover } from '../library/FileRow';
 import { Button, IconButton, ListItem, Text } from '../ui';
+import { useModalAnimation } from '../../navigation/transitions';
 
 // §17 U8: choosing several, for a tool (Merge needs 2 or more). `problem` is what still stops
 // Continue ("Pick at least 2"), shown under the list; null when the picked ones can go on.
@@ -38,6 +39,7 @@ type DocumentPickerModalProps = {
 // A list of library documents to pick from: one (§7 R3's "Add pages from another document") or,
 // for a Tools tab tool, several, with checkboxes (§17 U8).
 export function DocumentPickerModal({ visible, title, docs, onPick, multi, onImport, hint, onClose }: DocumentPickerModalProps) {
+  const modalAnimationType = useModalAnimation();
   const { tokens } = useTheme();
   const { t } = useT();
   const [picked, setPicked] = useState<string[]>([]);
@@ -99,7 +101,7 @@ export function DocumentPickerModal({ visible, title, docs, onPick, multi, onImp
   const problem = multi ? multi.problem(pickedDocs.length) : null;
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={visible} animationType={modalAnimationType} onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <View style={styles.headerText}>

@@ -9,7 +9,7 @@ import { activeStack, isRootEntry, rootEntry, TABS, topEntry, type TabId } from 
 import { useRenderCount } from '../utils/renderCounts';
 import { useRouter } from './router';
 import { ScreenRoleContext, type ScreenRole } from './screenRole';
-import { FADE_DURATION_MS, RESTING_STYLE, runSlide, SLIDE_DURATION_MS, transitionStyle } from './transitions';
+import { pickTransition, RESTING_STYLE, runSlide, transitionDuration, transitionStyle, type TransitionKind } from './transitions';
 
 // §16 G2: draws the router's stacks as layers, each screen instance in its own keyed layer, so a
 // navigation never mounts a screen twice:
@@ -65,7 +65,7 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
   useRenderCount('ScreenStack');
   const { nav, transition, navTick } = useRouter();
   const { tokens } = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   // Library's selection bar takes the tab bar's place.
   const selecting = useAppSelector((s) => s.libraryUi.selMode);
@@ -74,11 +74,14 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [settledTick, setSettledTick] = useState(navTick);
   const animating = transition.kind !== 'none' && navTick !== settledTick;
+  const top = topEntry(nav);
+  // §17 U13: push, tab, modal, or a plain fade under reduced motion.
+  const kind: TransitionKind | null =
+    transition.kind === 'none' || !transition.from ? null : pickTransition(transition.kind, transition.from.screen, top.screen, transition.dir, reducedMotion);
   useLayoutEffect(() => {
-    if (!animating) return;
+    if (!animating || !kind) return;
     const tick = navTick;
-    const duration = transition.kind === 'fade' ? FADE_DURATION_MS : SLIDE_DURATION_MS;
-    runSlide(progress, () => setSettledTick((s) => Math.max(s, tick)), duration);
+    runSlide(progress, () => setSettledTick((s) => Math.max(s, tick)), transitionDuration(kind));
     // A new transition (navTick) starts a new animation; an interrupted one just stops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navTick]);
@@ -87,7 +90,6 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
     if (!animating) progress.setValue(0);
   }, [animating, progress]);
 
-  const top = topEntry(nav);
   const leaving = animating ? transition.from : null;
   const topIsRoot = isRootEntry(top);
   const leavingIsRoot = leaving !== null && isRootEntry(leaving);
@@ -102,10 +104,10 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
   // with its tab bar. Otherwise the outer layers, the shell standing in for whichever side is a
   // root. Built once per transition so the memoised layers keep their props.
   const motion = useMemo(() => {
-    const byKey: Record<string, object> = {};
+    const byKey: Record<string, object | undefined> = {};
     let shell: object | undefined;
-    if (!leaving || transition.kind === 'none') return { byKey, shell };
-    const style = (kind: 'incoming' | 'outgoing') => transitionStyle(progress, width, kind, transition.dir, reducedMotion, transition.kind === 'fade' ? 'fade' : 'slide');
+    if (!leaving || !kind) return { byKey, shell };
+    const style = (layer: 'incoming' | 'outgoing') => transitionStyle(progress, { width, height }, layer, transition.dir, kind);
     if (topIsRoot && leavingIsRoot) {
       byKey[top.key] = style('incoming');
       byKey[leaving.key] = style('outgoing');
@@ -116,7 +118,7 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
       else byKey[leaving.key] = style('outgoing');
     }
     return { byKey, shell };
-  }, [leaving, transition, top.key, topIsRoot, leavingIsRoot, progress, width, reducedMotion]);
+  }, [leaving, transition, kind, top.key, topIsRoot, leavingIsRoot, progress, width, height]);
 
   const pushed = activeStack(nav).filter((entry) => !isRootEntry(entry));
   if (leaving && !leavingIsRoot && !pushed.some((entry) => entry.key === leaving.key)) pushed.push(leaving);

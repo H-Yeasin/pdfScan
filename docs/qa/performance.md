@@ -64,6 +64,67 @@ so they're saved like real documents. Do this in a dev build, then install the r
 - **FlashList / expo-image:** add only if budget 2 is missed after the selector change. Record the
   before/after numbers here.
 
+## §16 G9: before and after §16–§18
+
+The numbers that say whether §16–§18 made the app fast. Same phone for every row (a mid-range
+Android phone, about 4 GB of RAM, Android 13 or 14), **release builds**, the seeded library (500
+documents **with word boxes**: Filter Lab → "Seed with word boxes"; a page of the seed carries 250
+words in paragraphs, about 25 KB of boxes, like a real page). Seed in a dev build of the same commit,
+then install the release build over it.
+
+Waves (one row each in the tables below; write the commit you built):
+- **Before §16:** `3d93dcc` (G1 only: safe to run, everything else as it was). The plan wanted this
+  before G2; G2–G8 are already in, so build it from that commit. It predates schema v17 and v18: seed
+  it on its own, in a fresh install (uninstall first), not over a newer database. Its Filter Lab has
+  only "Seed library" (60 words a page, no word boxes: G4 and G9 added the rest), so its row is
+  measured on that lighter library; say so in the row. If it can't be built any more, write "n/a"
+  and use the oldest §16 row instead.
+- **After §16:** G9's commit (G2–G8 in).
+- **Release candidate:** after §17 U14 and §18's device checks, the build that goes to Play.
+
+**Dev aid, not the measurement:** Settings → Developer → **Performance overlay** (`src/dev/PerfOverlay.tsx`,
+dev builds only) shows the JS frame rate over the last second and the slowest JS frame since a reset,
+the time since the process started, when the JS bundle began to run and when the first screen was up
+(`utils/perfMarks.ts` 'firstScreen'; the splash intro can still be over it), the JS heap, and G5's render
+counts. Tap it to reset. Use it to find what moved; its frame rate is the **JS** thread (a
+`requestAnimationFrame` counter), and a dev build is slower everywhere, so the table takes the release
+build's numbers from the tools below.
+
+How to measure each column (5 runs, write the median; force-stop between cold runs:
+`adb shell am force-stop com.yeasin.pdfscan`):
+
+1. **Cold start:** `adb shell am start -W -n com.yeasin.pdfscan/.MainActivity` → `TotalTime`, and a
+   screen recording (`adb shell screenrecord /sdcard/start.mp4`) from the launcher tap to the first
+   frame where Home is fully shown with the splash intro gone (Remove animations **on**, so the intro
+   is skipped and the rows compare). Write the recording's number; `TotalTime` ends earlier since §15 V5.
+   Verification 4: at least 30% faster than the "Before §16" row.
+2. **Files scroll:** Files, All, list view. `adb shell dumpsys gfxinfo com.yeasin.pdfscan reset`, fling
+   top to bottom and back for 10 s, then `adb shell dumpsys gfxinfo com.yeasin.pdfscan` → "Janky frames"
+   (%) and "90th percentile". Budget: ≤ 5% (Verification 7). Note any blank rows after the first frame.
+3. **Reader open:** from Files, tap a seeded document; from the recording, the tap to the first sharp
+   page. Then the same for a 300-page imported PDF (`[300p]` in 18-reader.md): §18's budget is ≤ 1.2 s
+   cold (the first open after a cold start), ≤ 600 ms warm (the second). The "Before" build uses
+   react-native-pdf-jsi; write its numbers anyway.
+4. **20-page scan to Review:** scan 20 pages in the Google scanner (the same 20 sheets each run, Doc
+   mode); from the recording, the scanner's "Save" tap to the first page shown in Review, and to all
+   20 shown. G7 expects the first within about 1 s (Verification 8).
+5. **Save of 20 pages:** in Review, the Save tap → the Done screen (Save screen defaults, OCR on). In
+   the "Before" build, the save button → the Library.
+6. **Memory:** `adb shell dumpsys meminfo com.yeasin.pdfscan` → TOTAL PSS, (a) idle on Files after a
+   cold start, (b) the peak during step 5 (run it every second:
+   `while true; do adb shell dumpsys meminfo com.yeasin.pdfscan | grep "TOTAL PSS"; sleep 1; done`),
+   (c) on page 50 of `[300p]` after a fling. Budgets: under 350 MB during a scan (budget 5), < 350 MB
+   steady in the Reader (§18).
+
+| Date | Phone | Wave (commit) | Cold start (recording / TotalTime) | Files jank % (p90 ms) | Reader: seeded doc | Reader `[300p]` cold / warm | Scan → first page / all 20 | Save 20 pages | PSS idle / Save peak / Reader |
+|---|---|---|---|---|---|---|---|---|---|
+| | | Before §16 (`3d93dcc`) | | | | | | | |
+| | | After §16 | | | | | | | |
+| | | Release candidate | | | | | | | |
+
+Also note, with each row: the APK size (§16 G8), and anything that felt slow that the columns don't
+show. A budget that's missed on the release candidate blocks the release or gets a written reason here.
+
 ## Results
 
 | Date | Phone | Commit | Cold start (median) | Library jank % | Course jank % | Search | Scan progress | Memory (20 pages) |
@@ -175,8 +236,9 @@ played (about 1.1 s from the release) or been skipped. Measure on the same phone
 
 ## §16 G5: render counts
 
-Dev build. Settings → Developer → **Render counts** shows a small overlay with how often each
-counted component rendered since it was turned on (AppNavigator, BootEffects, ScreenStack, TabBar,
+Dev build. Settings → Developer → **Performance overlay** (called "Render counts" before §16 G9)
+shows a small overlay with, under G9's frame and start-up lines, how often each counted component
+rendered since it was turned on (AppNavigator, BootEffects, ScreenStack, TabBar,
 Home, Library, Course, SearchBar, FileRow); a name whose count just moved is in the accent colour.
 Tap the overlay to set the counts back to zero, do one gesture, and read it.
 

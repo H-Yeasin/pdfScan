@@ -8,16 +8,15 @@ import { SignatureModal } from '../shared/SignatureModal';
 import { SignaturePlacementOverlay } from '../shared/SignaturePlacementOverlay';
 import { useBackupExport } from '../backup/useBackupExport';
 import { useOpenCoverOptions } from './useCoverTarget';
-import { compressDocuments, libraryOps, useDocumentActions } from './useDocumentActions';
+import { compressDocuments, libraryOps, toolFailure, useDocumentActions } from './useDocumentActions';
 import { blockedReason, rowMenuSections, type FileToolId } from './fileTools';
-import { KeepOriginalsSheet, RenameSheet, TaskSheet, type KeepOriginalsAsk } from './FileSheets';
-import { Menu } from '../ui';
+import { KeepOriginalsSheet, RenameSheet, type KeepOriginalsAsk } from './FileSheets';
+import { animateNextListChange, Menu, useTask } from '../ui';
 import { useRouter } from '../../navigation/router';
 import { saveSignatureForReuse } from '../../services/signature/savedSignatureStorage';
 import { cleanTemporaryCache, deleteDocumentFiles } from '../../services/persistence/libraryFiles';
 import { cancelDelete, scheduleDelete } from '../../services/library/pendingDeletes';
 import { canSign } from '../../services/documents/formatCapabilities';
-import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import { usePageImage } from '../shared/usePageImage';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useSubmitDocument } from '../../store/useSubmitDocument';
@@ -27,7 +26,7 @@ import type { AppAction } from '../../store/appReducer';
 import type { Annotation, LibraryDocument, Submission } from '../../types/models';
 import { t } from '../../i18n';
 import { useT } from '../../i18n/useT';
-import { hapticSelection } from '../../services/feedback/haptics';
+import { hapticSelection, hapticWarning } from '../../services/feedback/haptics';
 
 // Opens a library document in the Reader and remembers it for Home's "Continue" card.
 export function useOpenDocument() {
@@ -51,6 +50,8 @@ export function confirmDelete(docs: readonly LibraryDocument[], dispatch: Dispat
   if (docs.length === 0) return;
   const count = docs.length;
   const single = count === 1 ? docs[0] : null;
+  // §17 U13: a destructive confirm asking is a warning buzz.
+  hapticWarning();
   Alert.alert(
     single ? t('reader.deleteTitle') : t('library.deleteSelected.title', { count }),
     single ? t('reader.deleteBody', { name: single.name }) : t('library.deleteSelected.body', { count }),
@@ -61,6 +62,7 @@ export function confirmDelete(docs: readonly LibraryDocument[], dispatch: Dispat
         style: 'destructive',
         onPress: () => {
           const ids = docs.map((d) => d.id);
+          animateNextListChange();
           dispatch({ type: 'library/REMOVE_FILES', ids });
           for (const id of ids) {
             try {
@@ -97,6 +99,8 @@ export async function runPageTool(
     // §17 U8: the Tools tab shows the result in its own sheet, so a kept-originals run says nothing
     // and Files' selection is left alone. Deleting the originals still offers Undo.
     quiet?: boolean;
+    // §17 U13: the task toast's "3 of 5".
+    onProgress?: (done: number, total: number) => void;
   }
 ): Promise<LibraryDocument[]> {
   const { dispatch } = ctx;
@@ -105,10 +109,15 @@ export async function runPageTool(
   const marks = ctx.annotations.filter((a) => ids.includes(a.documentId));
   let made: Made;
   if (deleteOriginals) {
-    made = { docs: kind === 'merge' ? [await ops.mergeDocuments(docs, marks)] : await ops.splitDocument(docs[0], marks), annotations: [] };
+    made = {
+      docs: kind === 'merge' ? [await ops.mergeDocuments(docs, marks, ctx.onProgress)] : await ops.splitDocument(docs[0], marks, ctx.onProgress),
+      annotations: [],
+    };
   } else {
-    made = kind === 'merge' ? await ops.mergeDocumentsKeeping(docs, marks) : await ops.splitDocumentKeeping(docs[0], marks);
+    made = kind === 'merge' ? await ops.mergeDocumentsKeeping(docs, marks, ctx.onProgress) : await ops.splitDocumentKeeping(docs[0], marks, ctx.onProgress);
   }
+  // §17 U13: the rows that go and come fade, and the list closes up.
+  animateNextListChange();
   const [first] = made.docs;
   const msg = kind === 'merge' ? t('library.mergedInto', { name: first.name }) : t('library.splitInto', { count: made.docs.length });
 
@@ -159,7 +168,6 @@ export function useDocumentListActions() {
   const [typeTargets, setTypeTargets] = useState<LibraryDocument[] | null>(null);
   const [moveTargets, setMoveTargets] = useState<LibraryDocument[] | null>(null);
   const [keepAsk, setKeepAsk] = useState<KeepOriginalsAsk | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
   const [signTarget, setSignTarget] = useState<LibraryDocument | null>(null);
   const [signStep, setSignStep] = useState<'capture' | 'place' | null>(null);
   const [capturedSignature, setCapturedSignature] = useState<{ uri: string; aspectRatio: number } | null>(null);
@@ -167,6 +175,7 @@ export function useDocumentListActions() {
   const { exportScope, overlay: backupOverlay } = useBackupExport();
   const openCoverOptions = useOpenCoverOptions();
   const documentActions = useDocumentActions();
+  const { run } = useTask();
 
   const selectedDocs = useMemo(() => files.filter((f) => selection.has(f.id)), [files, selection]);
   const snack = useCallback((msg: string) => dispatch({ type: 'ui/SHOW_SNACK', msg }), [dispatch]);
@@ -207,24 +216,23 @@ export function useDocumentListActions() {
     [state.signature.saved]
   );
 
+  // §17 U13: the task toast while it works; runPageTool's own snack (Open, or Undo) is the result.
   const confirmPageTool = useCallback(
     async (ask: KeepOriginalsAsk, deleteOriginals: boolean) => {
-      setBusy(ask.kind === 'merge' ? tr('library.merging') : tr('library.splitting'));
-      try {
-        await runPageTool(ask.kind, ask.docs, deleteOriginals, {
-          dispatch,
-          annotations: state.library.annotations,
-          submissions: state.library.submissions,
-          open: openDocument,
-        });
-      } catch (error) {
-        console.warn('useDocumentListActions: page tool failed', ask.kind, error);
-        snack(error instanceof PdfEncryptedError ? tr('library.passwordProtected') : tr('library.toolFailed'));
-      } finally {
-        setBusy(null);
-      }
+      await run(
+        ask.kind === 'merge' ? 'library.merging' : 'library.splitting',
+        (task) =>
+          runPageTool(ask.kind, ask.docs, deleteOriginals, {
+            dispatch,
+            annotations: state.library.annotations,
+            submissions: state.library.submissions,
+            open: openDocument,
+            onProgress: task.progress,
+          }),
+        { failed: toolFailure, haptic: true }
+      );
     },
-    [dispatch, state.library.annotations, state.library.submissions, openDocument, snack, tr]
+    [run, dispatch, state.library.annotations, state.library.submissions, openDocument]
   );
 
   // One handler for a tool on some documents: the row menu passes its one, the selection bar the
@@ -255,12 +263,8 @@ export function useDocumentListActions() {
             return;
           }
           const { shareDocument } = require('../../services/sharing/shareService') as typeof import('../../services/sharing/shareService');
-          try {
-            await shareDocument(doc, state.library.annotations.filter((a) => a.documentId === doc.id));
-          } catch (error) {
-            console.warn('useDocumentListActions: share failed', error);
-            snack(tr('library.toolFailed'));
-          }
+          // §17 U13: making the copy to share (marks written in, pages zipped) can take a moment.
+          await run('ui.task.preparing', () => shareDocument(doc, state.library.annotations.filter((a) => a.documentId === doc.id)));
           return;
         }
         case 'rename':
@@ -279,18 +283,17 @@ export function useDocumentListActions() {
         case 'split':
           setKeepAsk({ kind: id, docs });
           return;
+        // §17 U13: file by file in the toast, and Cancel between files.
         case 'compress':
-          setBusy(tr('library.compressing'));
-          try {
-            const msg = await compressDocuments(docs, dispatch);
-            dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
-            snack(msg);
-          } catch (error) {
-            console.warn('useDocumentListActions: compress failed', error);
-            snack(error instanceof PdfEncryptedError ? tr('library.passwordProtected') : tr('library.toolFailed'));
-          } finally {
-            setBusy(null);
-          }
+          await run(
+            'library.compressing',
+            async (task) => {
+              const msg = await compressDocuments(docs, dispatch, 2, task);
+              dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
+              return msg;
+            },
+            { cancellable: docs.length > 1, done: (msg) => msg, failed: toolFailure, haptic: true }
+          );
           return;
         case 'sign':
           if (canSign(doc)) startSigning(doc);
@@ -307,6 +310,8 @@ export function useDocumentListActions() {
         case 'archive': {
           const ids = docs.map((d) => d.id);
           const archived = !docs.every((d) => d.archived);
+          // Unless the archived ones are shown, the rows go: they fade and the list closes up.
+          animateNextListChange();
           dispatch({ type: 'library/SET_ARCHIVED', ids, archived });
           dispatch({ type: 'libraryUi/CLEAR_SELECTION' });
           dispatch({
@@ -328,7 +333,7 @@ export function useDocumentListActions() {
           return;
       }
     },
-    [dispatch, snack, tr, openDocument, exportScope, state.library.annotations, documentActions, startSigning, openCoverOptions, submit]
+    [dispatch, snack, tr, run, openDocument, exportScope, state.library.annotations, documentActions, startSigning, openCoverOptions, submit]
   );
 
   const handleSelectionTool = useCallback((id: FileToolId) => runTool(id, selectedDocs, 'selection'), [runTool, selectedDocs]);
@@ -415,7 +420,6 @@ export function useDocumentListActions() {
       />
       <RenameSheet doc={renameDoc} onClose={() => setRenameDoc(null)} onRename={(doc, name) => documentActions.rename(doc, name)} />
       <KeepOriginalsSheet ask={keepAsk} onClose={() => setKeepAsk(null)} onConfirm={(ask, del) => void confirmPageTool(ask, del)} />
-      <TaskSheet label={busy} />
 
       <DocTypePickerModal
         visible={typeTargets !== null}

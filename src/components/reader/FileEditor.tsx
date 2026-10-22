@@ -18,6 +18,7 @@ import { useT } from '../../i18n/useT';
 import { radii, spacing, touchSlop, useTheme } from '../../theme';
 import { CsvGrid } from './CsvGrid';
 import { DocxEditor, type DocxEditorHandle } from './DocxEditor';
+import { useModalAnimation } from '../../navigation/transitions';
 
 export type EditorFile = { uri: string; name: string; format: EditFormat | SheetEditFormat | 'DOCX'; external: boolean };
 
@@ -49,6 +50,7 @@ type Loaded =
 // §12 D9: a Word file's text in DocxEditor (a contenteditable WebView), saved as a copy after a
 // "layout may change" warning.
 export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
+  const modalAnimationType = useModalAnimation();
   const { tokens } = useTheme();
   const { t } = useT();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -175,7 +177,7 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
   }, [dirty, saving, onClose, t]);
 
   return (
-    <Modal statusBarTranslucent navigationBarTranslucent visible={file !== null} animationType="slide" onRequestClose={close}>
+    <Modal statusBarTranslucent navigationBarTranslucent visible={file !== null} animationType={modalAnimationType} onRequestClose={close}>
       <SafeAreaView style={[styles.root, { backgroundColor: tokens.bg }]}>
         <View style={[styles.header, { borderBottomColor: tokens.edge }]}>
           <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={close} accessibilityLabel={t('common.close')}>

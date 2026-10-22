@@ -1,9 +1,5 @@
 {
   "bootstrap/ErrorBoundary.tsx": {
-    "fontSize": 3,
-    "hexColor": 5,
-    "borderRadius": 1,
-    "fontWeight": 2,
     "pressable": 1
   },
   "components/backup/AutoBackupChip.tsx": {
@@ -130,9 +126,6 @@
     "fontSize": 1,
     "fontWeight": 1,
     "pressable": 1
-  },
-  "components/library/SkeletonRows.tsx": {
-    "borderRadius": 1
   },
   "components/library/useDocumentListActions.tsx": {
     "alert": 1
@@ -406,12 +399,6 @@
     "fontWeight": 2,
     "pressable": 4,
     "modal": 1
-  },
-  "components/shared/Snackbar.tsx": {
-    "fontSize": 2,
-    "hexColor": 2,
-    "fontWeight": 1,
-    "pressable": 1
   },
   "components/shared/TextPromptModal.tsx": {
     "fontSize": 4,

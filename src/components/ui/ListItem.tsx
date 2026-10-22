@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useT } from '../../i18n/useT';
 import { ICON_SIZE, ICONS, MIN_TOUCH, radii, spacing, useTheme, type IoniconName } from '../../theme';
+import { hapticSelection } from '../../services/feedback/haptics';
 import { Text } from './Text';
 import { Touchable } from './Touchable';
 
@@ -78,7 +79,12 @@ export function ListItem({
   const isRadio = radioSelected !== undefined;
   const ink = danger ? tokens.danger : tokens.ink;
 
-  const press = isSwitch && !onPress ? () => onValueChange?.(!switchValue) : onPress;
+  // §17 U13: a switch flipping is a selection tick (haptics.ts), from the row or the Switch.
+  const flip = (value: boolean) => {
+    hapticSelection();
+    onValueChange?.(value);
+  };
+  const press = isSwitch && !onPress ? () => flip(!switchValue) : onPress;
   const role = selecting ? 'checkbox' : isSwitch ? 'switch' : isRadio ? 'radio' : press ? 'button' : 'text';
   const checked = selecting ? selected : isSwitch ? switchValue : isRadio ? radioSelected : undefined;
 
@@ -117,7 +123,7 @@ export function ListItem({
         // The row is the control; the Switch only shows the state.
         <Switch
           value={switchValue}
-          onValueChange={onValueChange}
+          onValueChange={flip}
           disabled={disabled}
           trackColor={{ true: tokens.accent, false: tokens.edge }}
           thumbColor={tokens.surface3}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useT } from '../../i18n/useT';
 import { modifiedAt } from '../../services/library/documentSort';
@@ -13,6 +13,7 @@ import { DocumentPickerModal } from '../reader/DocumentPickerModal';
 import { Button, FilterChip, ListItem, ProgressBar, Sheet, Text } from '../ui';
 import { ToolResultSheet } from './ToolResultSheet';
 import { useToolRunners } from './useToolRunners';
+import { hapticSuccess } from '../../services/feedback/haptics';
 
 const COMPRESS_LEVELS: readonly CompressLevel[] = [1, 2, 3];
 
@@ -47,15 +48,25 @@ export function useToolFlow() {
   // The run step starts the tool once; the step's own object is the key, so a re-render doesn't
   // start it twice.
   const running = useRef<FlowState | null>(null);
+  // §17 U13: "3 of 5" under the run sheet's bar, for the tools that count.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   useEffect(() => {
     if (state.step !== 'run' || running.current === state) return;
     running.current = state;
+    setProgress(null);
     const tool = getTool(state.tool);
     const docs = state.docIds.map((id) => store.getState().library.files.find((d) => d.id === id)).filter((d): d is LibraryDocument => !!d);
+    const onProgress = (done: number, total: number) => {
+      if (running.current === state) setProgress({ done, total });
+    };
     Promise.resolve()
-      .then(() => run(tool, docs, state.options))
+      .then(() => run(tool, docs, state.options, onProgress))
       .then(
-        (result) => send({ type: 'done', result }),
+        (result) => {
+          // §17 U13: a tool's result is a success buzz (haptics.ts); the hand-offs (null) aren't.
+          if (result) hapticSuccess();
+          send({ type: 'done', result });
+        },
         (error: unknown) => {
           console.warn('ToolFlow: the tool failed', tool.id, error);
           send({ type: 'failed' });
@@ -110,7 +121,7 @@ export function useToolFlow() {
       {overlays}
       {pickTool ? <Picker tool={pickTool} docs={pickable} onPick={pick} onImport={importForPick} onClose={close} /> : null}
       <OptionsSheet state={state} send={send} />
-      <RunSheet state={state} />
+      <RunSheet state={state} progress={progress} />
       <ToolResultSheet
         docs={resultDocs}
         message={state.step === 'result' ? state.result.message : undefined}
@@ -221,15 +232,16 @@ function OptionsSheet({ state, send }: { state: FlowState; send: (event: Paramet
 
 // Our own work (merge, split, compress) runs to the end: the services have no way to stop half-way,
 // so there is no Cancel, and Back waits too.
-function RunSheet({ state }: { state: FlowState }) {
+function RunSheet({ state, progress }: { state: FlowState; progress: { done: number; total: number } | null }) {
   const { t } = useT();
   const tool = state.step === 'run' ? getTool(state.tool) : null;
   const visible = !!tool && tool.kind === 'run';
+  const counting = progress !== null && progress.total > 1;
   return (
     <Sheet visible={visible} onClose={() => undefined} title={tool ? t(tool.labelKey) : undefined} testID="tool-running">
       <View style={styles.running} accessibilityLiveRegion="polite">
-        <Text>{t('tools.run.working')}</Text>
-        <ProgressBar accessibilityLabel={t('tools.run.working')} />
+        <Text>{counting ? `${t('tools.run.working')} ${t('ui.task.count', { done: progress.done, total: progress.total })}` : t('tools.run.working')}</Text>
+        <ProgressBar value={counting ? progress.done / progress.total : undefined} accessibilityLabel={t('tools.run.working')} />
       </View>
     </Sheet>
   );

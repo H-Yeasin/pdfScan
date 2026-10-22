@@ -30,4 +30,7 @@ export type { TextProps, TextWeight } from './Text';
 export { FIELD_HEIGHT, TextField } from './TextField';
 export type { TextFieldProps } from './TextField';
 export { Touchable } from './Touchable';
+export { runWithToast, useTask } from './useTask';
+export type { TaskOptions } from './useTask';
+export { animateNextListChange, appear, disappear, registerAnimatedList, settle } from './layoutMotion';
 export type { TouchableProps } from './Touchable';

@@ -3,7 +3,7 @@ import { File } from 'expo-file-system';
 import { PDFDocument } from 'pdf-lib';
 import type { Dispatch } from 'react';
 import type { AppAction } from '../store/appReducer';
-import type { Bookmark, LibraryDocument, LibraryPage, OcrLine, PageOcr, Submission } from '../types/models';
+import type { Bookmark, LibraryDocument, LibraryPage, OcrBlock, OcrLine, OcrWord, PageOcr, Submission } from '../types/models';
 import { getDocumentDir } from '../services/persistence/libraryFiles';
 import { createId } from '../utils/id';
 
@@ -19,28 +19,60 @@ export const SEED_COURSES = 8;
 const COURSE_NAMES = ['Calculus II', 'Organic Chemistry', 'Physics I', 'Data Structures', 'Microeconomics', 'World History', 'Linear Algebra', 'Biology'];
 const WORDS = 'integral derivative molecule reaction velocity momentum array tree graph supply demand empire treaty matrix vector cell enzyme theorem proof lecture notes assignment lab quiz'.split(' ');
 
-function ocrText(i: number): string {
-  return Array.from({ length: 60 }, (_, k) => WORDS[(i * 7 + k * 3) % WORDS.length]).join(' ');
+// §16 G9: a page of notes is about 250 words (G4's Node measurement used the same), so search and
+// the word-box load see real sizes, not a token amount.
+const WORDS_PER_PAGE = 250;
+
+export function ocrText(i: number): string {
+  return Array.from({ length: WORDS_PER_PAGE }, (_, k) => WORDS[(i * 7 + k * 3) % WORDS.length]).join(' ');
 }
 
-// §16 G4: the same text as OCR stores it, in lines of six words with a box per word, for the
-// "boot doesn't grow with OCR size" check (docs/qa/performance.md): seed once without and once
-// with, and compare the cold start.
-const WORDS_PER_LINE = 6;
+// §16 G4/G9: the same text as OCR stores it, for the "boot doesn't grow with OCR size" check
+// (docs/qa/performance.md): seed once without and once with, and compare the cold start. Laid out
+// like ML Kit's output for a page of notes: paragraphs (blocks) of a few lines, a box per line and per
+// word, each word as wide as its letters, all in the page's pixels (595 x 842) and inside it. The
+// JSON comes to about 25 KB a page, what G4's Node measurement stored per page (52.6 MB for 2,000).
+const PARAGRAPH_WORDS = 45;
+const LINE_WIDTH = 515;
+const MARGIN = 40;
+const LINE_HEIGHT = 20;
+const LINE_GAP = 4;
+const PARAGRAPH_GAP = 14;
+const CHAR_WIDTH = 6.4;
+const SPACE = 5;
 
-function ocrWithBoxes(text: string): PageOcr {
+export function ocrWithBoxes(text: string): PageOcr {
   const words = text.split(' ');
-  const lines: OcrLine[] = [];
-  for (let start = 0; start < words.length; start += WORDS_PER_LINE) {
-    const row = words.slice(start, start + WORDS_PER_LINE);
-    const top = 60 + lines.length * 40;
-    lines.push({
-      text: row.join(' '),
-      bounding: { left: 40, top, width: 510, height: 28 },
-      words: row.map((word, w) => ({ text: word, bounding: { left: 40 + w * 85, top, width: 78, height: 28 } })),
+  const blocks: OcrBlock[] = [];
+  let top = 50;
+  for (let start = 0; start < words.length; start += PARAGRAPH_WORDS) {
+    const lines: OcrLine[] = [];
+    let row: OcrWord[] = [];
+    let left = MARGIN;
+    const closeLine = () => {
+      if (row.length === 0) return;
+      const last = row[row.length - 1].bounding;
+      lines.push({ text: row.map((w) => w.text).join(' '), bounding: { left: MARGIN, top, width: last.left + last.width - MARGIN, height: LINE_HEIGHT }, words: row });
+      top += LINE_HEIGHT + LINE_GAP;
+      row = [];
+      left = MARGIN;
+    };
+    for (const word of words.slice(start, start + PARAGRAPH_WORDS)) {
+      const width = Math.round(word.length * CHAR_WIDTH);
+      if (left + width > MARGIN + LINE_WIDTH) closeLine();
+      row.push({ text: word, bounding: { left, top, width, height: LINE_HEIGHT } });
+      left += width + SPACE;
+    }
+    closeLine();
+    const first = lines[0].bounding;
+    blocks.push({
+      text: lines.map((l) => l.text).join('\n'),
+      lines,
+      bounding: { left: MARGIN, top: first.top, width: Math.max(...lines.map((l) => l.bounding.width)), height: top - LINE_GAP - first.top },
     });
+    top += PARAGRAPH_GAP;
   }
-  return { text, blocks: [{ text, lines, bounding: { left: 40, top: 60, width: 510, height: lines.length * 40 } }] };
+  return { text, blocks };
 }
 
 async function onePagePdf(): Promise<Uint8Array> {
