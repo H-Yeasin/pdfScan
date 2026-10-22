@@ -1,3 +1,13 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    // modules/pdf-native/android is an Expo module, built only as part of android/
+    // (autolinking supplies the plugin versions). Imported on its own, the Java
+    // extension fails with "Plugin [id: 'com.android.library'] was not found".
+    "java.import.exclusions": [
+        "**/node_modules/**",
+        "**/.metadata/**",
+        "**/archetype-resources/**",
+        "**/META-INF/maven/**",
+        "**/modules/*/android/**"
+    ]
 }
