@@ -30,7 +30,7 @@ describe('course palette', () => {
   it.each(['light', 'dark'] as const)('every colour is readable on %s backgrounds (>= 4.5:1)', (name) => {
     const theme = tokens[name];
     for (const color of COURSE_COLORS) {
-      for (const background of [theme.bg, theme.surface, theme.surface2]) {
+      for (const background of [theme.bg, theme.surface, theme.surface2, theme.surface3]) {
         expect(contrast(courseColorValue(color, theme), background)).toBeGreaterThanOrEqual(4.5);
       }
     }

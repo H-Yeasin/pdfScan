@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
-    borderRadius: radii.chip * 2,
+    borderRadius: radii.full,
     // The line keeps it apart from a night page, which is as dark as the pill.
     borderWidth: StyleSheet.hairlineWidth,
   },

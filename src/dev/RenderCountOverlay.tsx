@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: radii.chip,
+    borderRadius: radii.xs,
     borderWidth: StyleSheet.hairlineWidth,
     opacity: 0.9,
   },

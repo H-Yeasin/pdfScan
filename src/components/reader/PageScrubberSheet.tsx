@@ -116,7 +116,7 @@ export function PageScrubberSheet({ visible, documentId, pages, currentIdx, onPi
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.45)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: radii.card * 2, borderTopRightRadius: radii.card * 2, paddingTop: spacing.sm },
+  sheet: { borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet, paddingTop: spacing.sm },
   handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginBottom: spacing.sm },
   title: { fontWeight: '700', paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   tabs: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },

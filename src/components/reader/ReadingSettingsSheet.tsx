@@ -114,8 +114,8 @@ function SwitchRow({ label, hint, value, onChange }: { label: string; hint?: str
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.45)', justifyContent: 'flex-end' },
   sheet: {
-    borderTopLeftRadius: radii.card * 2,
-    borderTopRightRadius: radii.card * 2,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
     paddingTop: spacing.sm,
     maxHeight: '90%',
   },

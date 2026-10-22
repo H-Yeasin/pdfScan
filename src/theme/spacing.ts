@@ -7,10 +7,18 @@ export const spacing = {
   xxl: 32,
 } as const;
 
+// §17 U1: radii v2 ("bold student": soft, round). Chips and buttons are full pills; `full` stays for
+// round things that aren't either (a dot, an avatar, a FAB). Sheets use `sheet` (the old
+// `radii.sheet` / `* 1.5` were moved to it); something small and square that only wants its
+// corners eased (a frame, a tool cell) uses `xs` or `thumb`, never `chip`, which is now a pill.
 export const radii = {
-  chip: 8,
-  card: 12,
-  thumb: 6,
+  xs: 6,
+  thumb: 8,
+  input: 14,
+  card: 20,
+  sheet: 28,
+  chip: 999,
+  button: 999,
   full: 999,
 } as const;
 

@@ -56,6 +56,14 @@ export const en = {
     skipIntro: 'Skip intro',
   },
 
+  // §17 U2: the UI kit's own words (components/ui).
+  ui: {
+    badge: { pro: 'Pro', new: 'New' },
+    removeChip: 'Remove {name}',
+    clearField: 'Clear',
+    loading: 'Loading',
+  },
+
   home: {
     yourCourses: 'Your courses',
     semesterA11y: 'Semester: {name}. Change',
@@ -187,6 +195,9 @@ export const en = {
       filterLabSubtitle: 'Compare every filter and tune its constants',
       readerLab: 'Reader Lab',
       readerLabSubtitle: 'Time PDF pages and tiles, check passwords, links and rotation',
+      // §17 U2: every kit component in every variant (src/dev/UiGalleryScreen.tsx).
+      uiGallery: 'UI gallery',
+      uiGallerySubtitle: 'Every kit component, light and dark, at two font sizes',
       // §16 G5: the render-count overlay (src/utils/renderCounts.ts).
       renderCounts: 'Render counts',
       renderCountsOn: 'Showing. Tap a count to reset; tap here to hide.',

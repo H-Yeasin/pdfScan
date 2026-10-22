@@ -235,7 +235,7 @@ Storage, Manage courses, Onboarding. Back pops (§16 G2).
 ---
 
 ## U1 · Tokens v2 *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-22). JS only. Device check (Verification 1) open.
 
 Goal: every colour, size, radius, shadow, duration and icon the redesign needs is a token, in both themes,
 with contrast checked.
@@ -287,8 +287,34 @@ values; `useMotion` under reduced motion.
 
 Device check: Verification 1.
 
+As built (2026-10-22):
+- `theme/tokens.ts`: the new tokens in both themes. Changed from the starting table so every pair passes
+  `contrast.test.ts` (which now also checks `surface3`, the states on their `…Soft`, marigold, and
+  `focus` at 3:1): light `highlightInk` `#7d5200`, `success` `#2b6e2f`, `warning` `#8f5400`; `surface3`
+  light `#ffffff`, dark `#302c28`; `scrim` light `rgba(20,18,15,.5)`, dark `rgba(0,0,0,.6)`; `focus`
+  `#0b57d0` / `#a8c7fa`, not part of an accent. Dark `danger` moved from `#f16253` to `#f1695a`: the old
+  one was 4.24:1 on `surface3`, and lighter than `#f1695a` drops white icons on it under 3:1.
+- `courseTint(color, theme)` in `services/courses/palette.ts` takes a `ThemeName` (the accent never
+  touches surfaces or course colours) and mixes with `theme/contrast.mixHex`. Light is **12 %**, not 14 %:
+  at 14 % teal on its own tint is 4.42:1. Dark 22 %. `COURSE_TINT` holds both.
+- `typography.ts`: typeScale v2 plus `TypeVariant`. `overline` carries `letterSpacing` and
+  `textTransform`. `display` is now 32 (nothing used it).
+- `spacing.ts`: radii v2, plus `full` kept. Every `radii.card * 2` / `* 1.5` sheet top is now
+  `radii.sheet` (16 sheets, 24/18 → 28; U3 still moves them onto `Sheet`). `radii.chip` is a pill now,
+  so its four square uses moved to `radii.thumb` (Capture's thumbnail, the academic template frame,
+  DocxEditor's tool cells, FileEditor's mono button) and the fast-scroll bubble to `radii.input`.
+- `elevation(level, theme)` takes a `ThemeName`: light gives a warm (ink) shadow on `surface`
+  (`surface3` at level 3), dark gives `surface` / `surface2` / `surface3` for levels 1–3 and no shadow.
+- `motion.ts`: `durations`, `springs` (`satisfies WithSpringConfig`), `PRESS_SCALE`, `motionFor(reduced)`
+  (pure) and `useMotion()`. A spring has no duration, so code that springs checks `motion.reduced`.
+- `icons.ts`: `ICONS: Record<ActionId, IoniconName>` (61 actions, the five tabs included) and
+  `ICON_SIZE { bar, row, inline }`. Picks are a first pass; change them by eye in U2/U5.
+- Tests: `theme/__tests__/tokens.test.tsx` (`courseTint` ink and body text ≥ 4.5:1 and distinct, no
+  duplicate icon, no developer icons, elevation, radii, `useMotion` under reduced motion); the course
+  palette test also checks `surface3`.
+
 ## U2 · The UI kit *(L)*
-Status: planned. JS only. Split point: (a) Text, Button, IconButton, Touchable, Card, ListItem, Chip and
+Status: done in code (2026-10-22). JS only. Device check (Verification 2) and the gallery screenshot open. Split point: (a) Text, Button, IconButton, Touchable, Card, ListItem, Chip and
 the ratchet test; (b) ScreenHeader, TextField, Badge, ProgressBar, Skeleton and the gallery.
 
 Goal: one set of components that every screen is built from, so the app looks designed by one hand.
@@ -348,6 +374,33 @@ Tests: render tests for `Button` (loading and disabled states, the a11y role and
 `hardcodedStrings` and `a11yLabels` stay green.
 
 Device check: Verification 2.
+
+As built (2026-10-22):
+- `src/components/ui/` (import from `components/ui`): `Text` (`variant`, `color` as a token name or a
+  value, `weight` picks the Figtree family, `chrome` caps at `CHROME_MAX_FONT_SCALE`; display/headline/
+  title stop at 1.3/1.4/1.6), `Touchable` (Reanimated press scale, token ripple, `haptic` →
+  `hapticSelection`, required `accessibilityRole`, hitSlop measured up to 48 dp; `scale={false}` for
+  wide rows and cards, `rippleRadius` for round controls), `Button`, `IconButton` (`selected`,
+  `badge`), `Card` (`tone`, `tint` → `courseTint`), `ListItem` (selection checkbox, switch rows are the
+  switch, ⋯ with its own `onMore`), `Chip` (× is its own button) / `FilterChip`, `TextField`, `Badge`,
+  `ProgressBar`, `Skeleton` (an opacity breath, not a gradient), `Divider`, `ScreenHeader` +
+  `useScreenHeader()`. Words in `en.ts` `ui.*`.
+- `ScreenHeader`: U3's Menu isn't built, so `onMore` draws the ⋯ as one of the three actions and the
+  screen opens what it has; extra actions past three are dropped with a dev warning (U3 wires them into
+  `Menu`). A `large` header with `scroll` floats over the content (absolute) and the content pads by
+  `contentTop`, so folding never moves the content under the finger.
+- No `onDanger` token: the danger button's label is white or the dark paper, whichever reads better
+  (`kitColors.onDanger`); white on dark-mode danger is only 3:1.
+- `TextField` doesn't handle the keyboard itself: the sheet (U3) or the screen's ScrollView does.
+- `NameField` is now a thin wrapper of `TextField` (radius `input`, not a pill; it gained a clear button).
+- `src/dev/UiGalleryScreen.tsx` (route `uiGallery`, Settings → Developer → UI gallery). The theme switch
+  is the app's; Android has no per-screen font scale, so the 1.3 check uses the phone's font size
+  (the header shows the scale). Screenshot: not taken yet (needs the phone).
+- Ratchet: `src/__tests__/designSystem.test.ts` + `designSystem.baseline.json` (comments stripped;
+  `DESIGN_BASELINE=update` rewrites it). `a11yLabels.test.ts` now also scans `<Touchable`.
+- Tests: `components/ui/__tests__/kit.test.tsx` (Text family/colour/caps, slop, Button busy/disabled and
+  every look's contrast under every accent, IconButton, ListItem checkbox/switch, chips, TextField,
+  ProgressBar, ScreenHeader).
 
 ## U3 · Sheets, dialogs and menus *(L)*
 Status: planned. JS only. Split point: (a) `Sheet`, `Dialog`/`useConfirm`, `Menu` + all 26 `Alert.alert`

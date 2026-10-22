@@ -190,7 +190,7 @@ export function FileEditor({ file, onSave, onClose }: FileEditorProps) {
               accessibilityRole="switch"
               accessibilityState={{ checked: mono }}
               accessibilityLabel={t('reader.editFile.monospace')}
-              style={[styles.iconButton, mono && { backgroundColor: tokens.accentSoft, borderRadius: radii.chip }]}
+              style={[styles.iconButton, mono && { backgroundColor: tokens.accentSoft, borderRadius: radii.thumb }]}
               onPress={() => setMono((v) => !v)}
             >
               <Ionicons name="code-slash-outline" size={20} color={mono ? tokens.accentInk : tokens.muted} />

@@ -21,6 +21,8 @@ export type ScreenName =
   // Dev-only (__DEV__): see src/dev/FilterLabScreen.tsx.
   | 'filterLab'
   // Dev-only (__DEV__): see src/dev/ReaderLabScreen.tsx (§18 W7).
-  | 'readerLab';
+  | 'readerLab'
+  // Dev-only (__DEV__): see src/dev/UiGalleryScreen.tsx (§17 U2).
+  | 'uiGallery';
 export type NavDir = 'fwd' | 'back';
 // The tabs and the back stacks are in navigation/navStack.ts (§16 G2).

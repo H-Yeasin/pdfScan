@@ -18,3 +18,16 @@ export function contrastRatio(a: string, b: string): number {
 // WCAG AA: 4.5:1 for normal text, 3:1 for large text (18.66 px bold / 24 px) and icons.
 export const AA_TEXT = 4.5;
 export const AA_LARGE = 3;
+
+// §17 U1: `amount` of `top` laid over `base` (0 = base, 1 = top), both opaque #rrggbb; the result is
+// opaque too, so contrast can still be measured on it (a course's tint, services/courses/palette.ts).
+export function mixHex(base: string, top: string, amount: number): string {
+  const a = parseInt(base.replace('#', ''), 16);
+  const b = parseInt(top.replace('#', ''), 16);
+  const out = [16, 8, 0].map((shift) => {
+    const x = (a >> shift) & 255;
+    const y = (b >> shift) & 255;
+    return Math.round(x + (y - x) * amount);
+  });
+  return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}

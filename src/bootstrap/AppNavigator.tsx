@@ -46,6 +46,7 @@ const SCREENS: ScreenMap = lazyScreens({
   // release bundle's requires, so the Filter Lab isn't in one.
   filterLab: __DEV__ ? () => (require('../dev/FilterLabScreen') as typeof import('../dev/FilterLabScreen')).FilterLabScreen : () => NoScreen,
   readerLab: __DEV__ ? () => (require('../dev/ReaderLabScreen') as typeof import('../dev/ReaderLabScreen')).ReaderLabScreen : () => NoScreen,
+  uiGallery: __DEV__ ? () => (require('../dev/UiGalleryScreen') as typeof import('../dev/UiGalleryScreen')).UiGalleryScreen : () => NoScreen,
 });
 
 function NoScreen() {

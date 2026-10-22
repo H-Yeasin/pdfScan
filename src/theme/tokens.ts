@@ -16,6 +16,28 @@ export type ThemeTokens = {
   onAccent: string;
   accentSoft: string;
   danger: string;
+  // §17 U1: marigold, the brand's second colour. `highlight` is a fill only (a badge, a "new" dot, the
+  // celebration): it is too light for text on paper. Text and icons in marigold use highlightInk;
+  // text drawn ON the fill uses onHighlight; highlightSoft is a tinted background (a tip, a streak).
+  highlight: string;
+  highlightInk: string;
+  onHighlight: string;
+  highlightSoft: string;
+  // §17 U1: semantic states. Each is text-safe (4.5:1) on bg, every surface and its own …Soft, so a
+  // banner can be its …Soft background with the state colour as its text and icon.
+  success: string;
+  successSoft: string;
+  warning: string;
+  warningSoft: string;
+  info: string;
+  infoSoft: string;
+  // §17 U1: surface3 is the raised step (sheets, menus, a card on a card). In dark it is how height
+  // shows, since dark has no shadows (theme/elevation.ts); in light it is near white. scrim is the one
+  // dim behind every sheet and dialog (it was 9 alphas). focus is the keyboard/switch focus ring,
+  // 3:1 on every surface and the same whatever the accent, so it never blends into a selected chip.
+  surface3: string;
+  scrim: string;
+  focus: string;
   // Course colours (services/courses/palette.ts), each at least 4.5:1 against bg, surface and
   // surface2 so they work as text, icons and dots - see palette.test.ts.
   courseColors: Record<CourseColor, string>;
@@ -35,6 +57,19 @@ const light: ThemeTokens = {
   onAccent: '#ffffff',
   accentSoft: '#dfeee4',
   danger: '#c0392b',
+  highlight: '#f2b705',
+  highlightInk: '#7d5200',
+  onHighlight: '#201e1d',
+  highlightSoft: '#fbecc0',
+  success: '#2b6e2f',
+  successSoft: '#e1efdf',
+  warning: '#8f5400',
+  warningSoft: '#f8e7cc',
+  info: '#1d5fbf',
+  infoSoft: '#e1eaf7',
+  surface3: '#ffffff',
+  scrim: 'rgba(20,18,15,.5)',
+  focus: '#0b57d0',
   courseColors: {
     teal: '#0f766e',
     blue: '#1d4ed8',
@@ -63,8 +98,22 @@ const dark: ThemeTokens = {
   // §9 O4b: the bright dark-theme accent takes dark labels (white on it is 2.8:1).
   onAccent: '#0b1f14',
   accentSoft: '#17291f',
-  // §9 O4b: lightened from #e74c3c so error text reaches 4.5:1 on every dark surface.
-  danger: '#f16253',
+  // §9 O4b: lightened from #e74c3c so error text reaches 4.5:1 on every dark surface; §17 U1 lifted it
+  // from #f16253 again for surface3.
+  danger: '#f1695a',
+  highlight: '#f5c542',
+  highlightInk: '#ffd970',
+  onHighlight: '#201e1d',
+  highlightSoft: '#3a3015',
+  success: '#81c995',
+  successSoft: '#1a2a1e',
+  warning: '#f6b26b',
+  warningSoft: '#33261a',
+  info: '#8ab4f8',
+  infoSoft: '#1b2638',
+  surface3: '#302c28',
+  scrim: 'rgba(0,0,0,.6)',
+  focus: '#a8c7fa',
   courseColors: {
     teal: '#5eead4',
     blue: '#93c5fd',

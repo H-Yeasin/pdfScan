@@ -1,4 +1,6 @@
-import type { ThemeTokens } from '../../theme';
+import type { ThemeName, ThemeTokens } from '../../theme';
+import { mixHex } from '../../theme/contrast';
+import { tokens as themeTokens } from '../../theme/tokens';
 import type { Course, CourseColor } from '../../types/models';
 
 // The 10 course colours, in the order new courses get them. Courses store the id; the actual
@@ -36,4 +38,17 @@ export function nextCourseColor(courses: readonly Pick<Course, 'color' | 'archiv
 
 export function courseColorValue(color: CourseColor, tokens: ThemeTokens): string {
   return tokens.courseColors[color] ?? tokens.courseColors[COURSE_COLORS[0]];
+}
+
+// §17 U1: how much of a course's colour goes into its card. Dark needs more: its course colours are
+// pastels, and a little of a pastel on a near-black surface barely shows. Light is 12 %, not the
+// planned 14 %: at 14 % teal text on its own tint drops to 4.42:1.
+export const COURSE_TINT = { light: 0.12, dark: 0.22 } as const;
+
+// A soft card background for a course: its colour mixed into `surface`. The course's own colour stays
+// the text and icon colour on it (at least 4.5:1, services/courses/__tests__/palette.test.ts). The
+// accent never changes surface or course colours, so the base tokens of the theme are enough.
+export function courseTint(color: CourseColor, theme: ThemeName): string {
+  const t = themeTokens[theme];
+  return mixHex(t.surface, courseColorValue(color, t), COURSE_TINT[theme]);
 }

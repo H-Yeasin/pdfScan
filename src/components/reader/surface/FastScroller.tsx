@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.chip * 2,
+    borderRadius: radii.input,
   },
   bubbleWide: { width: BUBBLE_WIDTH_SECTION },
   bubbleText: { fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },

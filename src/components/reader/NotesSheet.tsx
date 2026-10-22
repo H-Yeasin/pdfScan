@@ -158,8 +158,8 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '80%',
-    borderTopLeftRadius: radii.card * 2,
-    borderTopRightRadius: radii.card * 2,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
     paddingTop: spacing.lg,
   },
   header: {

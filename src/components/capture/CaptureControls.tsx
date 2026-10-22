@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   thumbnail: {
     width: SIDE_BUTTON_SIZE,
     height: SIDE_BUTTON_SIZE,
-    borderRadius: radii.chip,
+    borderRadius: radii.thumb,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,

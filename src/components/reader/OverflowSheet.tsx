@@ -108,8 +108,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: radii.card * 2,
-    borderTopRightRadius: radii.card * 2,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.sm,
     maxHeight: '90%',

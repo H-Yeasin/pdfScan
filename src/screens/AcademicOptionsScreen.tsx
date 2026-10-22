@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   templateFrame: {
     padding: 3,
     borderWidth: 2,
-    borderRadius: radii.chip,
+    borderRadius: radii.thumb,
   },
   templateLabel: {
     fontSize: 13,

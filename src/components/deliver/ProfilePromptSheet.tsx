@@ -65,8 +65,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,.4)',
   },
   sheet: {
-    borderTopLeftRadius: radii.card * 2,
-    borderTopRightRadius: radii.card * 2,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
     padding: spacing.lg,
     gap: spacing.md,
   },

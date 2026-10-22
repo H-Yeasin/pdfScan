@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 
 // §9 O4a: every button has a name a screen reader can say. Scans each .tsx under src for
-// `<Pressable` / `<TouchableOpacity` elements and fails on any that has neither an
+// `<Pressable` / `<TouchableOpacity` / `<Touchable` (the UI kit's, §17 U2) elements and fails on any that has neither an
 // `accessibilityLabel` nor a `<Text>` inside it (TalkBack reads a button's text as its name), or
 // that has no `accessibilityRole` (without one TalkBack doesn't say "button"). Elements that only
 // swallow taps (a sheet's body inside its backdrop) are `accessible={false}`. Run with
@@ -14,7 +14,7 @@ const EXEMPT_DIRS = ['dev'];
 // `file:line` of buttons that are deliberately unnamed. Keep this short, with a reason each.
 const ALLOWED = new Set<string>([]);
 
-const BUTTON = /<(Pressable|TouchableOpacity)\b/g;
+const BUTTON = /<(Pressable|TouchableOpacity|Touchable)\b/g;
 
 // The index just past the opening tag's '>' (and whether it self-closes), skipping braces and
 // strings so `onPress={() => a > b}` doesn't end the tag early.

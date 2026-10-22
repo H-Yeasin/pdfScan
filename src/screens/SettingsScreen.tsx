@@ -251,6 +251,12 @@ export function SettingsScreen() {
               onPress={() => go('readerLab')}
             />
             <SettingRow
+              title={t('settings.developer.uiGallery')}
+              subtitle={t('settings.developer.uiGallerySubtitle')}
+              chevron
+              onPress={() => go('uiGallery')}
+            />
+            <SettingRow
               title={t('settings.developer.renderCounts')}
               subtitle={t(renderCountsOn ? 'settings.developer.renderCountsOn' : 'settings.developer.renderCountsOff')}
               onPress={() => setRenderCountsShown(!renderCountsOn)}

@@ -354,8 +354,8 @@ away: Home · Files · [Scan] · Tools · Me.
 
 **Detailed steps:** [`docs/plan/17-design-flow.md`](plan/17-design-flow.md)
 
-- [ ] U1 Tokens v2 (highlight, semantic colours, type scale, elevation, motion, icon map)
-- [ ] U2 UI kit (`components/ui/`) + the ratchet test against hand-rolled styles
+- [x] U1 Tokens v2 (highlight, semantic colours, type scale, elevation, motion, icon map) (done in code 2026-10-22; device check open)
+- [x] U2 UI kit (`components/ui/`) + the ratchet test against hand-rolled styles (done in code 2026-10-22; device check open)
 - [ ] U3 Sheet, Dialog / `useConfirm`, Menu (every `Alert` and `Modal` migrated)
 - [ ] U4 Illustrations and brand moments
 - [ ] U5 The new shell: 4 tabs + the centre Scan button (Capture removed; Home always the start)

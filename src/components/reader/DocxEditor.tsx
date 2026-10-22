@@ -149,5 +149,5 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   toolbar: { borderBottomWidth: StyleSheet.hairlineWidth },
   toolRow: { paddingHorizontal: spacing.sm, gap: spacing.xs },
-  tool: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', borderRadius: radii.chip },
+  tool: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', borderRadius: radii.thumb },
 });
