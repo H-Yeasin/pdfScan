@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DOC_TYPES, docTypeCounts, getDocType } from '../../services/courses/docTypes';
+import { DOC_TYPES } from '../../services/courses/docTypes';
 import { radii, spacing, useTheme, CHROME_MAX_FONT_SCALE } from '../../theme';
-import type { DocType, LibraryDocument } from '../../types/models';
+import type { DocType } from '../../types/models';
 import { useT } from '../../i18n/useT';
 
 function Chip({ label, icon, selected, onPress }: { label: string; icon?: keyof typeof Ionicons.glyphMap; selected: boolean; onPress: () => void }) {
@@ -21,35 +21,6 @@ function Chip({ label, icon, selected, onPress }: { label: string; icon?: keyof 
       {icon ? <Ionicons name={icon} size={15} color={selected ? tokens.accentInk : tokens.muted} /> : null}
       <Text maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE} style={[styles.chipLabel, { color: selected ? tokens.accentInk : tokens.ink }]}>{label}</Text>
     </Pressable>
-  );
-}
-
-// Filter chips for a document list: "All" plus each type present, with counts. Hidden when every
-// document has the same type (nothing to filter), unless a filter is on, so it can be cleared.
-export function DocTypeFilterChips({
-  docs,
-  value,
-  onChange,
-}: {
-  docs: readonly Pick<LibraryDocument, 'docType'>[];
-  value: DocType | null;
-  onChange: (type: DocType | null) => void;
-}) {
-  const { t } = useT();
-  const counts = docTypeCounts(docs);
-  if (counts.length < 2 && value === null) return null;
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
-      <Chip label={t('courses.allCount', { count: docs.length })} selected={value === null} onPress={() => onChange(null)} />
-      {counts.map(({ type, count }) => (
-        <Chip
-          key={type}
-          label={t('courses.docTypeCount', { type: t(getDocType(type).pluralKey), count })}
-          selected={value === type}
-          onPress={() => onChange(value === type ? null : type)}
-        />
-      ))}
-    </ScrollView>
   );
 }
 
@@ -110,14 +81,6 @@ export function DocTypePickerModal({
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flexGrow: 0,
-  },
-  row: {
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
-  },
   wrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',

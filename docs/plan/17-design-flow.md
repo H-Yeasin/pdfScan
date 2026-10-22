@@ -1104,7 +1104,8 @@ As built (2026-10-22):
   zero hand-rolled styles, except `AccentPicker`, which keeps its own for now.
 
 ## U11 · Course, Exam pack, Pro and Onboarding *(M)*
-Status: planned. JS only. Needs U4.
+Status: done in code (2026-10-22), ahead of U3–U4. JS only. Device check (Verification 11) open; never run on a
+phone.
 
 Goal: the remaining screens match the kit, and nothing important is pinned outside the scroll or
 hidden behind an unlabeled icon.
@@ -1139,6 +1140,59 @@ Tests: Course sections (collapsed counts, expand); Exam pack's confirm; Pro scre
 the onboarding steps (`services/onboarding`); `a11yLabels`.
 
 Device check: Verification 11.
+
+As built (2026-10-22):
+- **Ahead of U3–U4.** U4's illustrations don't exist yet, so the Pro hero draws the `pro` icon on a marigold disc
+  and onboarding's steps are `components/onboarding/StepArt.tsx` (a folded-corner page in theme colours, plain
+  `react-native-svg`, with the step's icon and a marigold dot); both are swapped for `Illustration` in U4.
+  U3's `useConfirm` doesn't exist either: Exam pack's Clear asks through `components/study/confirmClearPack.ts`
+  (an `Alert` in a `.ts`, like `askDiscardScan`), which U3 replaces.
+- **Course** (`screens/CourseScreen.tsx`): a bar on the course's tint (Back, the name once the hero has scrolled
+  under it, Export as an icon with a label), then one FlashList, not a `SectionList` (AGENTS.md: a long list is a
+  FlashList; the rows are the memo'd `FileRow`s). Its header is `components/courses/CourseHero.tsx`: the tint,
+  `CourseBadge`, the name as a headline, code · teacher, then Scan (a filled `Button`), Exam pack (with the
+  pack's count), Sort unsorted (Unsorted, when there is something to sort and a course to sort into), Edit; the
+  one-time "Sort them now?" is a card in it. The list's items come from the pure
+  `services/courses/coursePage.ts` (`coursePageItems`, `initialOpenSections`, `toggleSection`): "Documents · N"
+  with Files' sort (`settings.filesView.sort`, the same `SortMenu`, so the order is the one Files uses) and the
+  type chips (kit `FilterChip`s with counts; `DocTypeFilterChips` is deleted), the documents, a line when a type
+  filter or archiving hides all of them, Show archived, then Deadlines, Bookmarks and Submissions as
+  `components/courses/CourseSectionHeader.tsx` (a count `Badge`, a chevron, `expanded` for TalkBack) that open
+  in place. Deadlines is there for every course (0 included; "Add deadline" is inside it), the other two once
+  there is one. A tapped reminder opens the page with Deadlines open. An empty course says so (with Scan into
+  this course) where the documents would be, so its sections are still there. The floating Scan stays.
+  Strings: `courses.page.documents`, `noneOfType`, `allArchived`, `examPack`, `sortUnsorted`, `courses.all`;
+  `addDeadline` lost its "+ ", `noDeadlinesBody` its instruction; `sortInto`, `examPackA11y`,
+  `courses.allCount` / `docTypeCount` are gone.
+- **Exam pack** (`screens/ExamPackScreen.tsx`): `ScreenHeader` with Clear as its trailing ghost button (asks
+  first; "Clear the exam pack?", the pages count, the documents untouched), the pages as `ListItem`s in a card
+  (thumbnail, "name · p. N", ↑ ↓ × as small `IconButton`s; a tap opens the page in the Reader), the three
+  options as switch rows in a card, Build as a full-width `Button` (loading while it builds). `study.pack.addPages`
+  went (the kit button says `study.addPages`).
+- **Pro** (`screens/ProScreen.tsx`): `ScreenHeader` "PDF Scan Pro", the marigold hero "1 hour of every Pro tool"
+  (`pro.heroTitle`), a running pass as "Pro pass active · 42 min left" (Home's `passLeftLabel`, counting down by
+  the minute) with "Pro until 15:40", the highlight `Button` "Watch an ad to start" (`pro.watchStart`; "for 1 more
+  hour" while one runs), the day's cap "2 of 3 left today" (`pro.leftOf`), the benefits as tiles
+  (`components/pro/FeatureList.tsx`, `PRO_FEATURE_ICONS`: the action's own `ICONS` entry where there is one),
+  "Everything else stays free" as a flat card with a hairline, the lapse note. `pro.title`, `pro.watch`,
+  `pro.left`, `pro.activeBody` are gone. Still no price, purchase or "pay elsewhere" text (the test checks).
+- **Onboarding** (`screens/OnboardingScreen.tsx`): Skip and Next / Start are kit `Button`s (Next with an arrow),
+  the page titles `display`, the page dots a pill for the current page (not colour alone), the privacy promise an
+  accent card, the example file name `bodyStrong` (Figtree), the crash-report opt-in a `ListItem` switch in its
+  own card under the courses form, off by default. Pages and the button's word come from
+  `services/onboarding/onboarding.ts` (`ONBOARDING_PAGES`, `ONBOARDING_STEPS`, `onboardingPrimary`,
+  `clampOnboardingPage`). Page 2's "Skip" is the top bar's (it finishes; what was typed is kept).
+  `StudentCard` is on the kit (`Text`, `elevation(2)`, radii), so its shadow follows the theme.
+- Left for U3: the course sheets (`CourseEditorSheet`, `SortUnsortedSheet`, `CourseSheet`, `DeadlineEditorSheet`,
+  `TimetableEditor`) and `PagePickerModal` keep their own styles until they move onto `Sheet`. `SettingRow` stays
+  for Backup and Storage.
+- Tests: `services/courses/__tests__/coursePage.test.ts` (order, closed counts, opening in place, hidden
+  sections, the reminder), `screens/__tests__/CourseScreen.test.tsx` (labelled actions, sections closed with
+  counts and `expanded`, open and close, the reminder, the pack chip; Exam pack's Clear asks and clears only on
+  the destructive answer), `ProScreen.test.tsx` (texts from the catalog), `onboarding.test.ts` (pages, the
+  button's word, the clamp), `OnboardingScreen.test.tsx` (the opt-in off and in its card, the file name not
+  monospace), `HomeScreen.test.tsx` (a course's type chips by `testID`). Ratchet: the four screens,
+  `StudentCard` and `FeatureList` are at zero hand-rolled styles.
 
 ## U12 · Copy pass *(M)*
 Status: planned. JS only. Can run any time after U2.

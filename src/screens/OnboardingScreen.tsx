@@ -1,38 +1,47 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { BrandMark } from '../components/brand/BrandMark';
 import { CourseSetupFields, useCourseSetupForm } from '../components/courses/CourseSetupForm';
 import { NameField } from '../components/deliver/NameField';
-import { SettingRow } from '../components/settings/SettingRow';
+import { StepArt } from '../components/onboarding/StepArt';
+import { StudentCard } from '../components/onboarding/StudentCard';
+import { Button, Card, ListItem, Text } from '../components/ui';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { useBackHandler } from '../navigation/useBackHandler';
-import { StudentCard } from '../components/onboarding/StudentCard';
 import { courseColorValue } from '../services/courses/palette';
-import { exampleFileName, studentCard } from '../services/onboarding/onboarding';
+import {
+  clampOnboardingPage,
+  exampleFileName,
+  ONBOARDING_PAGES,
+  ONBOARDING_STEPS,
+  onboardingPrimary,
+  studentCard,
+  type OnboardingStep,
+} from '../services/onboarding/onboarding';
 import { useAppDispatch, useAppSelector } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, useTheme } from '../theme';
+import { ICONS, radii, spacing, useTheme, type IoniconName } from '../theme';
 
-const PAGES = 3;
+const STEP_ICONS: Record<OnboardingStep, IoniconName> = { scan: ICONS.scan, file: ICONS.files, submit: ICONS.submit };
 
 // §9 O2: three short pages for a new user, every one skippable - what the app does (and the
 // privacy promise), about you (name and roll, with the file name they make), and this term's
 // courses (the QuickSetupSheet form) with the crash-report opt-in. What's typed is kept whenever
 // the student leaves: the profile is saved as it's typed, and Skip or Start saves the valid
 // course rows. Camera permission waits for the first scan.
+// §17 U11: on the kit; the steps are small pictures, the crash-report opt-in is its own card under
+// the courses (off by default, as ever), and the example file name is in the body font.
 export function OnboardingScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
@@ -58,8 +67,9 @@ export function OnboardingScreen() {
 
   const goToPage = useCallback(
     (next: number) => {
-      setPage(next);
-      pager.current?.scrollTo({ x: next * width, animated: true });
+      const target = clampOnboardingPage(next);
+      setPage(target);
+      pager.current?.scrollTo({ x: target * width, animated: true });
     },
     [width]
   );
@@ -75,17 +85,15 @@ export function OnboardingScreen() {
   };
 
   const onScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setPage(Math.round(event.nativeEvent.contentOffset.x / width));
+    setPage(clampOnboardingPage(event.nativeEvent.contentOffset.x / width));
   };
 
-  const last = page === PAGES - 1;
+  const primary = onboardingPrimary(page);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
       <View style={styles.topBar}>
-        <Pressable onPress={finish} hitSlop={12} accessibilityRole="button">
-          <Text style={[styles.skip, { color: tokens.muted }]}>{t('onboarding.skip')}</Text>
-        </Pressable>
+        <Button size="sm" variant="ghost" label={t('onboarding.skip')} onPress={finish} testID="onboarding-skip" />
       </View>
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -100,36 +108,35 @@ export function OnboardingScreen() {
           <ScrollView style={{ width }} contentContainerStyle={styles.page}>
             {/* §15 V4: the logo where a new student first meets the app. */}
             <BrandMark size={72} wordmark />
-            <Text style={[styles.title, { color: tokens.ink }]}>{t('onboarding.what.title')}</Text>
+            <Text variant="display" accessibilityRole="header">
+              {t('onboarding.what.title')}
+            </Text>
             <View style={styles.steps}>
-              {(
-                [
-                  { icon: 'scan-outline', label: t('onboarding.what.scan') },
-                  { icon: 'folder-open-outline', label: t('onboarding.what.file') },
-                  { icon: 'paper-plane-outline', label: t('onboarding.what.submit') },
-                ] as const
-              ).map((step, i) => (
-                <View key={step.icon} style={styles.stepWrap}>
-                  {i > 0 ? <Ionicons name="chevron-forward" size={18} color={tokens.muted} /> : null}
-                  <View style={styles.step}>
-                    <View style={[styles.stepIcon, { backgroundColor: tokens.accentSoft }]}>
-                      <Ionicons name={step.icon} size={30} color={tokens.accentInk} />
-                    </View>
-                    <Text style={[styles.stepLabel, { color: tokens.ink }]}>{step.label}</Text>
-                  </View>
+              {ONBOARDING_STEPS.map((step) => (
+                <View key={step} style={styles.step}>
+                  <StepArt icon={STEP_ICONS[step]} />
+                  <Text variant="label" align="center">
+                    {t(`onboarding.what.${step}`)}
+                  </Text>
                 </View>
               ))}
             </View>
-            <Text style={[styles.body, { color: tokens.ink }]}>{t('onboarding.what.body')}</Text>
-            <View style={[styles.promise, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-              <Ionicons name="lock-closed-outline" size={18} color={tokens.accentInk} />
-              <Text style={[styles.promiseText, { color: tokens.ink }]}>{t('onboarding.what.privacy')}</Text>
-            </View>
+            <Text variant="body">{t('onboarding.what.body')}</Text>
+            <Card tone="accent" style={styles.promise}>
+              <Ionicons name={ICONS.lock} size={18} color={tokens.accentInk} />
+              <Text variant="label" style={styles.flex}>
+                {t('onboarding.what.privacy')}
+              </Text>
+            </Card>
           </ScrollView>
 
           <ScrollView style={{ width }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-            <Text style={[styles.title, { color: tokens.ink }]}>{t('onboarding.you.title')}</Text>
-            <Text style={[styles.body, { color: tokens.muted }]}>{t('onboarding.you.body')}</Text>
+            <Text variant="display" accessibilityRole="header">
+              {t('onboarding.you.title')}
+            </Text>
+            <Text variant="body" color="muted">
+              {t('onboarding.you.body')}
+            </Text>
             <StudentCard card={card} />
             <NameField
               label={t('settings.profile.name')}
@@ -143,44 +150,52 @@ export function OnboardingScreen() {
               value={profile.roll}
               onChange={(roll) => dispatch({ type: 'settings/SET_PROFILE', profile: { roll } })}
             />
-            <View style={[styles.example, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-              <Text style={[styles.exampleLabel, { color: tokens.muted }]}>{t('onboarding.you.example')}</Text>
-              <Text style={[styles.exampleName, { color: tokens.ink }]} selectable>
+            <Card elevation={0} style={[styles.example, { borderColor: tokens.edge }]}>
+              <Text variant="caption" color="muted">
+                {t('onboarding.you.example')}
+              </Text>
+              <Text variant="bodyStrong" selectable>
                 {exampleFileName(profile, { name: t('onboarding.you.sampleName'), roll: t('onboarding.you.sampleRoll') })}
               </Text>
-            </View>
+            </Card>
           </ScrollView>
 
           <ScrollView style={{ width }} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-            <Text style={[styles.title, { color: tokens.ink }]}>{t('onboarding.courses.title')}</Text>
-            <Text style={[styles.body, { color: tokens.muted }]}>{t('onboarding.courses.body')}</Text>
+            <Text variant="display" accessibilityRole="header">
+              {t('onboarding.courses.title')}
+            </Text>
+            <Text variant="body" color="muted">
+              {t('onboarding.courses.body')}
+            </Text>
             <StudentCard card={card} />
             <CourseSetupFields form={form} autoFocus={false} />
-            <SettingRow
-              title={t('settings.privacy.crashReports')}
-              subtitle={t('settings.privacy.crashReportsSubtitle')}
-              toggle={{
-                value: crashReportsEnabled,
-                onChange: (enabled) => dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled }),
-              }}
-            />
+            {/* §9 O2: opt-in only; off until the student turns it on. */}
+            <Card padded={false} style={Platform.OS === 'android' && styles.clip}>
+              <ListItem
+                icon={ICONS.crashReports}
+                title={t('settings.privacy.crashReports')}
+                subtitle={t('settings.privacy.crashReportsSubtitle')}
+                switchValue={crashReportsEnabled}
+                onValueChange={(enabled) => dispatch({ type: 'settings/SET_CRASH_REPORTS', enabled })}
+                testID="onboarding-crash-reports"
+              />
+            </Card>
           </ScrollView>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <View style={styles.dots} accessibilityLabel={t('onboarding.pageA11y', { page: page + 1, total: PAGES })}>
-          {Array.from({ length: PAGES }, (_, i) => (
-            <View key={i} style={[styles.dot, { backgroundColor: i === page ? tokens.accent : tokens.edge }]} />
+        <View style={styles.dots} accessible accessibilityLabel={t('onboarding.pageA11y', { page: page + 1, total: ONBOARDING_PAGES.length })}>
+          {ONBOARDING_PAGES.map((id, i) => (
+            <View key={id} style={[styles.dot, i === page && styles.dotOn, { backgroundColor: i === page ? tokens.accent : tokens.edge }]} />
           ))}
         </View>
-        <Pressable
-          style={[styles.primary, { backgroundColor: tokens.accent }]}
-          onPress={() => (last ? finish() : goToPage(page + 1))}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{last ? t('onboarding.start') : t('onboarding.next')}</Text>
-        </Pressable>
+        <Button
+          label={primary === 'start' ? t('onboarding.start') : t('onboarding.next')}
+          icon={primary === 'start' ? undefined : 'arrow-forward'}
+          onPress={() => (primary === 'start' ? finish() : goToPage(page + 1))}
+          testID="onboarding-primary"
+        />
       </View>
     </SafeAreaView>
   );
@@ -196,77 +211,38 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  skip: {
-    fontSize: 15,
-    fontWeight: '600',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   page: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
     gap: spacing.lg,
   },
-  title: {
-    fontFamily: fontFamily.heading,
-    fontSize: 28,
-  },
-  body: {
-    fontSize: 15.5,
-    lineHeight: 22,
-  },
   steps: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.lg,
-  },
-  stepWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: spacing.md,
   },
   step: {
     alignItems: 'center',
-    gap: spacing.xs,
-    width: 84,
-  },
-  stepIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    gap: spacing.sm,
+    width: 88,
   },
   promise: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  promiseText: {
-    flex: 1,
-    fontSize: 14.5,
-    fontWeight: '600',
   },
   example: {
     gap: spacing.xs,
     padding: spacing.md,
-    borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  exampleLabel: {
-    fontSize: 13,
-  },
-  exampleName: {
-    fontSize: 14.5,
-    fontFamily: 'monospace',
+  // The switch row's ripple stays inside the corners (Android only: on iOS it would cut the shadow).
+  clip: {
+    overflow: 'hidden',
   },
   footer: {
     flexDirection: 'row',
@@ -277,20 +253,16 @@ const styles = StyleSheet.create({
   },
   dots: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   dot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
-  },
-  primary: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 2,
     borderRadius: radii.full,
   },
-  primaryLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+  // The current page's dot is a short pill, so it doesn't rest on colour alone.
+  dotOn: {
+    width: 20,
   },
 });

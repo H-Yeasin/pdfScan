@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { useT } from '../../i18n/useT';
 import type { StudentCard as Card } from '../../services/onboarding/onboarding';
-import { fontFamily, radii, spacing, useTheme } from '../../theme';
+import { elevation, radii, spacing, useTheme } from '../../theme';
+import { Text } from '../ui';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 
 const MAX_CHIPS = 4;
@@ -13,7 +14,7 @@ const MAX_CHIPS = 4;
 // filled gives the card a small pop (skipped with reduce motion), and the bar along the bottom
 // shows how much is done. One element for screen readers, read as a summary.
 export function StudentCard({ card }: { card: Card }) {
-  const { tokens } = useTheme();
+  const { tokens, theme } = useTheme();
   const { t } = useT();
   const reducedMotion = useReducedMotion();
   const scale = useRef(new Animated.Value(1)).current;
@@ -43,15 +44,15 @@ export function StudentCard({ card }: { card: Card }) {
 
   return (
     <Animated.View
-      style={[styles.card, { backgroundColor: tokens.surface, borderColor: tokens.edge, transform: [{ scale }] }]}
+      style={[styles.card, elevation(2, theme), { borderColor: tokens.edge, transform: [{ scale }] }]}
       accessible
       accessibilityLabel={a11y}
     >
       <View style={[styles.band, { backgroundColor: tokens.accent }]}>
-        <Text style={[styles.bandTitle, { color: tokens.onAccent }]} numberOfLines={1}>
+        <Text variant="label" color="onAccent" numberOfLines={1} style={styles.bandTitle}>
           {t('onboarding.card.label')}
         </Text>
-        <Text style={[styles.bandSemester, { color: tokens.onAccent }]} numberOfLines={1}>
+        <Text variant="label" color="onAccent" numberOfLines={1}>
           {card.semester}
         </Text>
       </View>
@@ -59,16 +60,18 @@ export function StudentCard({ card }: { card: Card }) {
       <View style={styles.body}>
         <View style={[styles.avatar, { backgroundColor: tokens.accentSoft }]}>
           {card.initials ? (
-            <Text style={[styles.initials, { color: tokens.accentInk }]}>{card.initials}</Text>
+            <Text variant="title" color="accentInk">
+              {card.initials}
+            </Text>
           ) : (
             <Ionicons name="person-outline" size={26} color={tokens.accentInk} />
           )}
         </View>
         <View style={styles.identity}>
-          <Text style={[styles.name, { color: card.name ? tokens.ink : tokens.muted }]} numberOfLines={1}>
+          <Text variant="title" color={card.name ? 'ink' : 'muted'} numberOfLines={1}>
             {card.name || t('onboarding.card.namePlaceholder')}
           </Text>
-          <Text style={[styles.roll, { color: card.roll ? tokens.ink : tokens.muted }]} numberOfLines={1}>
+          <Text variant="body" color={card.roll ? 'ink' : 'muted'} numberOfLines={1} style={styles.roll}>
             {card.roll ? t('onboarding.card.roll', { roll: card.roll }) : t('onboarding.card.rollPlaceholder')}
           </Text>
         </View>
@@ -80,18 +83,22 @@ export function StudentCard({ card }: { card: Card }) {
             {shown.map((course, i) => (
               <View key={`${course.label}-${i}`} style={[styles.chip, { borderColor: course.color }]}>
                 <View style={[styles.chipDot, { backgroundColor: course.color }]} />
-                <Text style={[styles.chipLabel, { color: tokens.ink }]} numberOfLines={1}>
+                <Text variant="label" numberOfLines={1} style={styles.chipLabel}>
                   {course.label}
                 </Text>
               </View>
             ))}
             {extra > 0 ? (
-              <Text style={[styles.more, { color: tokens.muted }]}>{t('onboarding.card.more', { count: extra })}</Text>
+              <Text variant="label" color="muted">
+                {t('onboarding.card.more', { count: extra })}
+              </Text>
             ) : null}
           </>
         ) : (
           <View style={[styles.chip, styles.chipEmpty, { borderColor: tokens.edge }]}>
-            <Text style={[styles.chipLabel, { color: tokens.muted }]}>{t('onboarding.card.coursesPlaceholder')}</Text>
+            <Text variant="label" color="muted" style={styles.chipLabel}>
+              {t('onboarding.card.coursesPlaceholder')}
+            </Text>
           </View>
         )}
       </View>
@@ -104,7 +111,7 @@ export function StudentCard({ card }: { card: Card }) {
         </View>
         <View style={styles.status}>
           {ready ? <Ionicons name="checkmark-circle" size={15} color={tokens.accentInk} /> : null}
-          <Text style={[styles.statusText, { color: ready ? tokens.accentInk : tokens.muted }]}>
+          <Text variant="caption" weight="semibold" color={ready ? 'accentInk' : 'muted'}>
             {ready ? t('onboarding.card.ready') : t('onboarding.card.progress', { done: card.done, total: card.total })}
           </Text>
         </View>
@@ -115,14 +122,9 @@ export function StudentCard({ card }: { card: Card }) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radii.card + 4,
+    borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
   },
   band: {
     flexDirection: 'row',
@@ -134,13 +136,6 @@ const styles = StyleSheet.create({
   },
   bandTitle: {
     flexShrink: 1,
-    fontSize: 12.5,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  bandSemester: {
-    fontSize: 12.5,
-    fontWeight: '600',
   },
   body: {
     flexDirection: 'row',
@@ -152,24 +147,15 @@ const styles = StyleSheet.create({
   avatar: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  initials: {
-    fontFamily: fontFamily.heading,
-    fontSize: 22,
   },
   identity: {
     flex: 1,
     gap: 2,
   },
-  name: {
-    fontFamily: fontFamily.heading,
-    fontSize: 20,
-  },
   roll: {
-    fontSize: 14,
     fontVariant: ['tabular-nums'],
   },
   chips: {
@@ -196,16 +182,10 @@ const styles = StyleSheet.create({
   chipDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: radii.full,
   },
   chipLabel: {
     flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  more: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   footer: {
     gap: spacing.xs,
@@ -219,15 +199,11 @@ const styles = StyleSheet.create({
   segment: {
     flex: 1,
     height: 5,
-    borderRadius: 3,
+    borderRadius: radii.full,
   },
   status: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  statusText: {
-    fontSize: 12.5,
-    fontWeight: '600',
   },
 });

@@ -94,4 +94,20 @@ describe('OnboardingScreen', () => {
     act(() => names[names.length - 4].props.onChangeText('Chemistry'));
     expect(texts()).toEqual(expect.arrayContaining(['Chemistry', '3 of 4 done']));
   });
+
+  // §17 U11
+  it('keeps crash reports off until the student turns them on, in a card of their own', () => {
+    const { root, probe } = render();
+    const row = root.root.findAll((n) => n.props.testID === 'onboarding-crash-reports' && n.props.accessibilityRole === 'switch')[0];
+    expect(row.props.accessibilityState.checked).toBe(false);
+    act(() => row.props.onPress());
+    expect(probe.app.state.settings.crashReportsEnabled).toBe(true);
+  });
+
+  it('shows the example file name in the body font, not monospace', () => {
+    const { root } = render();
+    const name = root.root.findAll((n) => typeof n.type === 'string' && n.props.children === '2021331045_Rahim_CSE101_HW1.pdf')[0];
+    const style = [name.props.style].flat(Infinity).reduce((acc, s) => ({ ...acc, ...(s || {}) }), {} as { fontFamily?: string });
+    expect(style.fontFamily).not.toBe('monospace');
+  });
 });

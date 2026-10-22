@@ -1,27 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { passLeftLabel } from '../components/home/ProPassCard';
 import { FeatureList } from '../components/pro/FeatureList';
 import { passEndLabel } from '../components/pro/passEndLabel';
+import { Button, Card, ScreenHeader, Text } from '../components/ui';
 import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { watchAdForPass, type WatchResult } from '../services/ads/rewarded';
+import { passMinutesLeft } from '../services/courses/homeSelectors';
 import { loadPassLog, passesLeftToday } from '../services/pro/dayPass';
 import { getEntitlement, useEntitlement, useIsPro } from '../services/pro/entitlement';
 import { useRemoteConfig } from '../services/remote/remoteConfig';
 import { useAppDispatch, useAppSelector } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, useTheme, touchSlop } from '../theme';
+import { ICONS, radii, spacing, useTheme } from '../theme';
 import { hapticSuccess } from '../services/feedback/haptics';
 
 // §10 M6: what Pro includes (live features only), what stays free, and one button: watch a
-// rewarded ad, get Pro for `pass_hours`. Opened from Settings and wherever a Pro feature is
-// touched; Back returns there. While `pro_sales_enabled` is off (now) there are no prices and no
-// purchase buttons at all, and nothing here mentions paying anywhere else (Play policy).
-
+// rewarded ad, get Pro for `pass_hours`. Opened from Me, Home's pass card and wherever a Pro
+// feature is touched; Back returns there. While `pro_sales_enabled` is off (now) there are no
+// prices and no purchase buttons at all, and nothing here mentions paying anywhere else (Play
+// policy, AGENTS.md).
+// §17 U11: on the kit: a marigold hero, the button and the day's cap under it, the benefits as
+// tiles, and what stays free as a quiet card. The hero's mark stands in for U4's `pro`
+// illustration until that exists.
 export function ProScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
+  const insets = useSafeAreaInsets();
   const { back } = useRouter();
   const dispatch = useAppDispatch();
   const remote = useRemoteConfig();
@@ -30,15 +37,24 @@ export function ProScreen() {
   const personalizedAdsEnabled = useAppSelector((s) => s.settings.personalizedAdsEnabled);
   const [passLog, setPassLog] = useState<number[] | null>(null);
   const [watching, setWatching] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   const reloadLog = useCallback(() => {
     void loadPassLog().then(setPassLog);
   }, []);
   useEffect(reloadLog, [reloadLog]);
 
-  const left = passLog ? passesLeftToday(passLog, Date.now(), remote.passMaxPerDay) : 0;
+  const left = passLog ? passesLeftToday(passLog, now, remote.passMaxPerDay) : 0;
   const available = remote.adsEnabled;
-  const passActive = isPro && entitlement?.source === 'pass' && entitlement.expiresAt !== undefined;
+  const passEnd = isPro && entitlement?.source === 'pass' ? entitlement.expiresAt : undefined;
+
+  // The time left counts down by the minute while a pass runs.
+  useEffect(() => {
+    setNow(Date.now());
+    if (passEnd === undefined) return;
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [passEnd]);
 
   const watch = async () => {
     setWatching(true);
@@ -65,67 +81,78 @@ export function ProScreen() {
   };
 
   const hours = remote.passHours;
+  const status = !available
+    ? t('pro.unavailable')
+    : passLog === null
+      ? ''
+      : left > 0
+        ? t('pro.leftOf', { left, max: remote.passMaxPerDay })
+        : t('pro.noneLeft');
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable
-          hitSlop={touchSlop(44)}
-          accessibilityRole="button"
-          style={styles.headerButton}
-          onPress={back}
-          accessibilityLabel={t('common.back')}
-        >
-          <Ionicons name="chevron-back" size={20} color={tokens.ink} />
-        </Pressable>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={[styles.kicker, { color: tokens.accentInk }]}>{t('pro.kicker')}</Text>
-        <Text accessibilityRole="header" style={[styles.title, { color: tokens.ink }]}>
-          {t('pro.title')}
-        </Text>
-        <Text style={[styles.subtitle, { color: tokens.muted }]}>{t('pro.subtitle', { count: hours })}</Text>
-
-        {passActive && entitlement?.expiresAt ? (
-          <View style={[styles.activeCard, { backgroundColor: tokens.accentSoft }]}>
-            <Ionicons name="checkmark-circle" size={20} color={tokens.accentInk} />
-            <View style={styles.activeText}>
-              <Text style={[styles.activeTitle, { color: tokens.ink }]}>{t('pro.active', { time: passEndLabel(entitlement.expiresAt) })}</Text>
-              <Text style={[styles.note, { color: tokens.ink }]}>{t('pro.activeBody')}</Text>
-            </View>
+    <View style={[styles.container, { backgroundColor: tokens.bg }]}>
+      <ScreenHeader title={t('pro.kicker')} back={back} />
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: spacing.xxl + insets.bottom }]}>
+        <Card tone="highlight" style={styles.hero}>
+          <View style={[styles.mark, { backgroundColor: tokens.highlight }]}>
+            <Ionicons name={ICONS.pro} size={36} color={tokens.onHighlight} />
           </View>
+          <Text variant="headline" align="center" accessibilityRole="header">
+            {t('pro.heroTitle', { count: hours })}
+          </Text>
+          <Text variant="body" color="muted" align="center">
+            {t('pro.subtitle', { count: hours })}
+          </Text>
+        </Card>
+
+        {passEnd !== undefined ? (
+          <Card tone="accent" style={styles.active} testID="pro-active">
+            <Ionicons name="checkmark-circle" size={22} color={tokens.accentInk} />
+            <View style={styles.flex}>
+              <Text variant="bodyStrong">{t('home.passActive', { left: passLeftLabel(Math.max(1, passMinutesLeft(passEnd, now))) })}</Text>
+              <Text variant="caption" color="muted">
+                {t('pro.active', { time: passEndLabel(passEnd) })}
+              </Text>
+            </View>
+          </Card>
         ) : null}
 
-        <Text style={[styles.sectionLabel, { color: tokens.muted }]}>{t('pro.includes')}</Text>
-        <View style={styles.featuresWrap}>
-          <FeatureList />
-        </View>
-
-        <View style={[styles.freeCard, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-          <Text style={[styles.freeTitle, { color: tokens.ink }]}>{t('pro.freeTitle')}</Text>
-          <Text style={[styles.note, { color: tokens.muted }]}>{t('pro.freeBody')}</Text>
-        </View>
-
-        {available && left > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ busy: watching, disabled: watching || passLog === null }}
-            disabled={watching || passLog === null}
-            style={[styles.primary, { backgroundColor: tokens.accent }]}
-            onPress={() => void watch()}
-          >
-            {watching ? <ActivityIndicator color={tokens.onAccent} /> : null}
-            <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>
-              {watching ? t('pro.loading') : t(passActive ? 'pro.watchMore' : 'pro.watch', { count: hours })}
+        <View style={styles.offer}>
+          {available && left > 0 ? (
+            <Button
+              variant="highlight"
+              icon={ICONS.pro}
+              label={watching ? t('pro.loading') : passEnd !== undefined ? t('pro.watchMore', { count: hours }) : t('pro.watchStart')}
+              loading={watching}
+              disabled={passLog === null}
+              onPress={() => void watch()}
+              fullWidth
+              testID="pro-watch"
+            />
+          ) : null}
+          {status ? (
+            <Text variant="caption" color="muted" align="center" accessibilityLiveRegion="polite">
+              {status}
             </Text>
-          </Pressable>
-        ) : null}
-        <Text style={[styles.status, { color: tokens.muted }]}>
-          {!available ? t('pro.unavailable') : passLog === null ? '' : left > 0 ? t('pro.left', { count: left }) : t('pro.noneLeft')}
+          ) : null}
+        </View>
+
+        <Text variant="overline" color="muted" accessibilityRole="header">
+          {t('pro.includes')}
         </Text>
-        <Text style={[styles.note, { color: tokens.muted }]}>{t('pro.lapseNote')}</Text>
+        <FeatureList />
+
+        <Card elevation={0} style={[styles.free, { borderColor: tokens.edge }]}>
+          <Text variant="title">{t('pro.freeTitle')}</Text>
+          <Text variant="body" color="muted">
+            {t('pro.freeBody')}
+          </Text>
+        </Card>
+        <Text variant="caption" color="muted">
+          {t('pro.lapseNote')}
+        </Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -133,95 +160,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  flex: {
+    flex: 1,
   },
   body: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
-  },
-  kicker: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
-  title: {
-    fontFamily: fontFamily.heading,
-    fontSize: 30,
-    lineHeight: 36,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 21,
-    marginBottom: spacing.sm,
-  },
-  activeCard: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radii.card,
-  },
-  activeText: {
-    flex: 1,
-    gap: 2,
-  },
-  activeTitle: {
-    fontSize: 15.5,
-    fontWeight: '600',
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginTop: spacing.sm,
-  },
-  featuresWrap: {
-    marginBottom: spacing.sm,
-  },
-  freeCard: {
-    padding: spacing.lg,
-    borderRadius: radii.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 5,
-  },
-  freeTitle: {
-    fontFamily: fontFamily.heading,
-    fontSize: 18,
-  },
-  note: {
-    fontSize: 13.5,
-    lineHeight: 19,
-  },
-  primary: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minHeight: 52,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    gap: spacing.lg,
+  },
+  hero: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xl,
+  },
+  mark: {
+    width: 72,
+    height: 72,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
-  primaryLabel: {
-    // Wraps beside the icon at large font scales instead of running past the button.
-    flexShrink: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+  active: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  status: {
-    fontSize: 13.5,
-    textAlign: 'center',
+  offer: {
+    gap: spacing.sm,
+  },
+  // Quiet: flat, with a hairline instead of a shadow.
+  free: {
+    gap: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });

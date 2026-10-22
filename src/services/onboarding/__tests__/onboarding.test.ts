@@ -1,5 +1,5 @@
 import { savableQuickSetup } from '../../courses/courseSetup';
-import { exampleFileName, initialsOf, onboardingDecision, studentCard } from '../onboarding';
+import { clampOnboardingPage, exampleFileName, initialsOf, ONBOARDING_PAGES, onboardingDecision, onboardingPrimary, studentCard } from '../onboarding';
 import type { Course } from '../../../types/models';
 
 describe('onboardingDecision', () => {
@@ -92,5 +92,23 @@ describe('studentCard', () => {
     expect(initialsOf('Md. Rahim Uddin')).toBe('MU');
     expect(initialsOf('রহিম উদ্দিন')).toBe('রউ');
     expect(initialsOf('   ')).toBe('');
+  });
+});
+
+// §17 U11: what the footer's button does on each page.
+describe('onboarding pages', () => {
+  it('is three pages: what it does, about you, your courses', () => {
+    expect(ONBOARDING_PAGES).toEqual(['what', 'you', 'courses']);
+  });
+
+  it('says Next until the last page, then Start', () => {
+    expect([0, 1, 2].map(onboardingPrimary)).toEqual(['next', 'next', 'start']);
+  });
+
+  it('keeps a swipe or a tap inside the pager', () => {
+    expect(clampOnboardingPage(-1)).toBe(0);
+    expect(clampOnboardingPage(1.4)).toBe(1);
+    expect(clampOnboardingPage(1.6)).toBe(2);
+    expect(clampOnboardingPage(3)).toBe(2);
   });
 });

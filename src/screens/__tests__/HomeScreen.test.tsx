@@ -127,14 +127,15 @@ describe('Home course hub', () => {
       });
     });
     press(root, 'Math');
-    expect(texts(root)).toEqual(expect.arrayContaining(['Homework 1', 'Lecture notes', 'Old scan', 'All 3']));
+    expect(texts(root)).toEqual(expect.arrayContaining(['Homework 1', 'Lecture notes', 'Old scan']));
 
-    press(root, 'Assignments 1');
+    // §17 U11: kit FilterChips, the count drawn after the label.
+    pressId(root, 'course-type-assignment');
     expect(texts(root)).toContain('Homework 1');
     expect(texts(root)).not.toContain('Lecture notes');
     expect(texts(root)).not.toContain('Old scan');
 
-    press(root, 'All 3');
+    pressId(root, 'course-type-all');
     expect(texts(root)).toContain('Old scan');
   });
 });

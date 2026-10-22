@@ -58,15 +58,18 @@ describe('ProScreen', () => {
     setRemoteConfig({ ...REMOTE_DEFAULTS, adsEnabled: true });
     await render(<ProScreen />);
     const all = texts();
-    expect(all).toContain('Watch an ad, get Pro for 1 hour');
-    expect(all).toContain('3 passes left today');
+    // §17 U11: the catalog's texts.
+    expect(all).toContain('1 hour of every Pro tool');
+    expect(all).toContain('Watch an ad to start');
+    expect(all).toContain('3 of 3 left today');
     expect(all).toContain('More cover page designs');
+    expect(all).toContain('Everything else stays free');
     expect(all.some((s) => /৳|\$|price|buy|purchase|restore/i.test(s))).toBe(false);
   });
 
   it('shows no button while ads are off', async () => {
     await render(<ProScreen />);
-    expect(texts()).not.toContain('Watch an ad, get Pro for 1 hour');
+    expect(texts()).not.toContain('Watch an ad to start');
     expect(texts()).toContain("Ads aren't available right now, so the pass can't be offered. Try again later.");
   });
 });

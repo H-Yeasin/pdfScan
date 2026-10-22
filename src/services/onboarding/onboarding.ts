@@ -82,3 +82,21 @@ export function studentCard(input: {
     total: Object.keys(steps).length,
   };
 }
+
+// §17 U11: the introduction's pages, in order, and what the footer's button does on each: Next
+// until the last, which is Start (it saves and goes Home). Skip, at the top, finishes from any page.
+export type OnboardingPage = 'what' | 'you' | 'courses';
+export const ONBOARDING_PAGES: readonly OnboardingPage[] = ['what', 'you', 'courses'];
+
+// Page 1's three steps, each a small picture with its label.
+export type OnboardingStep = 'scan' | 'file' | 'submit';
+export const ONBOARDING_STEPS: readonly OnboardingStep[] = ['scan', 'file', 'submit'];
+
+export function onboardingPrimary(page: number): 'next' | 'start' {
+  return page >= ONBOARDING_PAGES.length - 1 ? 'start' : 'next';
+}
+
+// The page a swipe or a tap lands on, kept inside the pager.
+export function clampOnboardingPage(page: number): number {
+  return Math.max(0, Math.min(ONBOARDING_PAGES.length - 1, Math.round(page)));
+}

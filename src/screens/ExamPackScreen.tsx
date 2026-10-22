@@ -1,25 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NameField } from '../components/deliver/NameField';
 import { PagePickerModal } from '../components/study/PagePickerModal';
+import { confirmClearPack } from '../components/study/confirmClearPack';
 import { useOpenDocument } from '../components/library/useDocumentListActions';
+import { Button, Card, Divider, IconButton, ListItem, ScreenHeader, Text } from '../components/ui';
 import { useRouter } from '../navigation/router';
 import { hasPageMasters } from '../services/documents/formatCapabilities';
 import { buildExamPack, defaultPackTitle } from '../services/study/buildExamPack';
 import { useAppDispatch, useAppSlices } from '../store/AppStateContext';
-import { fontFamily, radii, spacing, typeScale, useTheme, touchSlop } from '../theme';
+import { ICONS, radii, spacing, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 import { PageThumb } from '../components/shared/PageThumb';
 import { EmptyState } from '../components/shared/EmptyState';
 
+type PackOption = 'contents' | 'includeAnnotations' | 'pageNumbers';
+
 // §5 T6: the exam-pack tray: the picked pages in order (move up/down, remove), "Add pages" from
 // the course's documents, a title and options, and Build, which makes a new searchable,
-// annotated document in the course.
+// annotated document in the course. §17 U11: on the kit; Clear asks first.
 export function ExamPackScreen() {
   const { tokens } = useTheme();
   const { t } = useT();
+  const insets = useSafeAreaInsets();
   const { back } = useRouter();
   const dispatch = useAppDispatch();
   const state = useAppSlices('deliver', 'library', 'pack');
@@ -76,45 +80,42 @@ export function ExamPackScreen() {
     }
   };
 
-  const option = (key: 'contents' | 'includeAnnotations' | 'pageNumbers', title: string, subtitle: string) => (
-    <View style={styles.optionRow}>
-      <View style={styles.flex}>
-        <Text style={[styles.optionTitle, { color: tokens.ink }]}>{title}</Text>
-        <Text style={[styles.meta, { color: tokens.muted }]}>{subtitle}</Text>
-      </View>
-      <Switch
-        value={pack[key]}
-        onValueChange={(value) => dispatch({ type: 'pack/SET_OPTION', option: key, value })}
-        trackColor={{ true: tokens.accent, false: tokens.surface2 }}
-      />
-    </View>
+  const option = (key: PackOption, title: string, subtitle: string) => (
+    <ListItem
+      title={title}
+      subtitle={subtitle}
+      switchValue={pack[key]}
+      onValueChange={(value) => dispatch({ type: 'pack/SET_OPTION', option: key, value })}
+    />
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable hitSlop={touchSlop(44)} accessibilityRole="button" style={styles.iconButton} onPress={back} accessibilityLabel={t('common.back')}>
-          <Ionicons name="chevron-back" size={22} color={tokens.ink} />
-        </Pressable>
-        <Text style={[styles.title, { color: tokens.ink }]}>{t('study.pack.title')}</Text>
-        {rows.length ? (
-          <Pressable onPress={() => dispatch({ type: 'pack/CLEAR' })} accessibilityRole="button" hitSlop={8} style={styles.clear}>
-            <Text style={[styles.link, { color: tokens.muted }]}>{t('study.pack.clear')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+    <View style={[styles.container, { backgroundColor: tokens.bg }]}>
+      <ScreenHeader
+        title={t('study.pack.title')}
+        back={back}
+        trailing={
+          rows.length ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              label={t('study.pack.clear')}
+              onPress={() => confirmClearPack(rows.length, () => dispatch({ type: 'pack/CLEAR' }))}
+              testID="pack-clear"
+            />
+          ) : null
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <NameField label={t('study.pack.titleField')} value={pack.title} onChange={(title) => dispatch({ type: 'pack/SET_TITLE', title })} placeholder={placeholderTitle} />
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionLabel, { color: tokens.muted }]}>
+            <Text variant="overline" color="muted" accessibilityRole="header" style={styles.flex}>
               {t('study.pack.pages', { count: rows.length })}
             </Text>
-            <Pressable onPress={() => setPickerOpen(true)} accessibilityRole="button" hitSlop={8}>
-              <Text style={[styles.link, { color: tokens.accentInk }]}>{t('study.pack.addPages')}</Text>
-            </Pressable>
+            {rows.length ? <Button size="sm" variant="ghost" icon={ICONS.addPage} label={t('study.addPages')} onPress={() => setPickerOpen(true)} /> : null}
           </View>
           {rows.length === 0 ? (
             <EmptyState
@@ -123,45 +124,76 @@ export function ExamPackScreen() {
               body={t('study.pack.emptyHint')}
               action={{ label: t('study.addPages'), onPress: () => setPickerOpen(true) }}
             />
-          ) : null}
-          {rows.map((row, i) => (
-            <View key={`${row.item.documentId}:${row.item.pageId}`} style={[styles.row, { backgroundColor: tokens.surface, borderColor: tokens.edge }]}>
-              <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
-                {row.page ? <PageThumb documentId={row.item.documentId} page={row.page} style={styles.thumbImage} /> : null}
-              </View>
-              <Text style={[styles.rowText, { color: row.doc ? tokens.ink : tokens.muted }]} numberOfLines={2}>
-                {row.doc && row.idx >= 0 ? t('study.pack.rowLabel', { name: row.doc.name, page: row.idx + 1 }) : t('study.pack.missing')}
-              </Text>
-              <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i - 1 })} disabled={i === 0} accessibilityState={{ disabled: i === 0 }} hitSlop={6} accessibilityLabel={t('study.pack.moveUp')}>
-                <Ionicons name="arrow-up" size={18} color={i === 0 ? tokens.edge : tokens.ink} />
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i + 1 })} disabled={i === rows.length - 1} accessibilityState={{ disabled: i === rows.length - 1 }} hitSlop={6} accessibilityLabel={t('study.pack.moveDown')}>
-                <Ionicons name="arrow-down" size={18} color={i === rows.length - 1 ? tokens.edge : tokens.ink} />
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => dispatch({ type: 'pack/REMOVE', index: i })} hitSlop={6} accessibilityLabel={t('study.pack.remove')}>
-                <Ionicons name="close" size={18} color={tokens.muted} />
-              </Pressable>
-            </View>
-          ))}
+          ) : (
+            <Card padded={false} style={Platform.OS === 'android' && styles.clip}>
+              {rows.map((row, i) => {
+                const first = i === 0;
+                const last = i === rows.length - 1;
+                const label =
+                  row.doc && row.idx >= 0 ? t('study.pack.rowLabel', { name: row.doc.name, page: row.idx + 1 }) : t('study.pack.missing');
+                return (
+                  <View key={`${row.item.documentId}:${row.item.pageId}`}>
+                    {first ? null : <Divider inset="text" />}
+                    <ListItem
+                      title={label}
+                      titleLines={2}
+                      disabled={!row.doc}
+                      leading={
+                        <View style={[styles.thumb, { backgroundColor: tokens.surface2 }]}>
+                          {row.page ? <PageThumb documentId={row.item.documentId} page={row.page} style={styles.thumbImage} /> : null}
+                        </View>
+                      }
+                      onPress={
+                        row.doc && row.page
+                          ? () => {
+                              openDocument(row.doc!);
+                              dispatch({ type: 'reader/SET_TARGET', target: { pageId: row.item.pageId } });
+                            }
+                          : undefined
+                      }
+                      trailing={
+                        <View style={styles.rowActions}>
+                          <IconButton
+                            size="sm"
+                            icon="arrow-up"
+                            accessibilityLabel={t('study.pack.moveUp')}
+                            disabled={first}
+                            onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i - 1 })}
+                          />
+                          <IconButton
+                            size="sm"
+                            icon="arrow-down"
+                            accessibilityLabel={t('study.pack.moveDown')}
+                            disabled={last}
+                            onPress={() => dispatch({ type: 'pack/MOVE', from: i, to: i + 1 })}
+                          />
+                          <IconButton size="sm" icon={ICONS.close} accessibilityLabel={t('study.pack.remove')} onPress={() => dispatch({ type: 'pack/REMOVE', index: i })} />
+                        </View>
+                      }
+                    />
+                  </View>
+                );
+              })}
+            </Card>
+          )}
         </View>
 
-        <View style={styles.section}>
+        <Card padded={false} style={Platform.OS === 'android' && styles.clip}>
           {option('contents', t('study.pack.contents'), t('study.pack.contentsHint'))}
+          <Divider inset="text" />
           {option('includeAnnotations', t('study.pack.annotations'), t('study.pack.annotationsHint'))}
+          <Divider inset="text" />
           {option('pageNumbers', t('study.pack.pageNumbers'), t('study.pack.pageNumbersHint'))}
-        </View>
+        </Card>
       </ScrollView>
 
-      <View style={[styles.footer, { backgroundColor: tokens.bg, borderTopColor: tokens.edge }]}>
-        {progress ? <Text style={[styles.meta, styles.center, { color: tokens.muted }]}>{progress}</Text> : null}
-        <Pressable
-          style={[styles.build, { backgroundColor: tokens.accent, opacity: rows.length && !building ? 1 : 0.5 }]}
-          onPress={build}
-          disabled={!rows.length || building}
-          accessibilityRole="button"
-        >
-          {building ? <ActivityIndicator color={tokens.onAccent} /> : <Text style={[styles.buildLabel, { color: tokens.onAccent }]}>{t('study.pack.build')}</Text>}
-        </Pressable>
+      <View style={[styles.footer, { backgroundColor: tokens.bg, borderTopColor: tokens.edge, paddingBottom: spacing.lg + insets.bottom }]}>
+        {progress ? (
+          <Text variant="caption" color="muted" align="center" accessibilityLiveRegion="polite">
+            {progress}
+          </Text>
+        ) : null}
+        <Button label={t('study.pack.build')} onPress={() => void build()} disabled={!rows.length} loading={building} fullWidth testID="pack-build" />
       </View>
 
       <PagePickerModal
@@ -171,7 +203,7 @@ export function ExamPackScreen() {
         onAdd={(items) => dispatch({ type: 'pack/ADD', items })}
         onClose={() => setPickerOpen(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -179,29 +211,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
+  flex: {
     flex: 1,
-    fontFamily: fontFamily.heading,
-    fontSize: typeScale.title.fontSize,
-  },
-  clear: {
-    paddingHorizontal: spacing.md,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
     gap: spacing.xl,
   },
@@ -211,25 +226,12 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    minHeight: 36,
   },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  link: {
-    fontSize: 13.5,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.sm,
-    borderRadius: radii.card,
-    borderWidth: StyleSheet.hairlineWidth,
+  // The first and last rows' ripple stays inside the corners. Android only, as in Card: on iOS the
+  // clip would cut the shadow.
+  clip: {
+    overflow: 'hidden',
   },
   thumb: {
     width: 36,
@@ -241,41 +243,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  rowText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  optionRow: {
+  rowActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  flex: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 15,
-  },
-  meta: {
-    fontSize: 12.5,
-    lineHeight: 17,
-  },
-  center: {
-    textAlign: 'center',
   },
   footer: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     gap: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  build: {
-    height: 52,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buildLabel: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

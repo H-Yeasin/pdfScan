@@ -1,47 +1,62 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
-import { spacing, useTheme } from '../../theme';
+import { StyleSheet, View } from 'react-native';
+import { ICON_SIZE, ICONS, radii, spacing, useTheme, type IoniconName } from '../../theme';
 import { useT } from '../../i18n/useT';
-import { liveProFeatures } from '../../services/pro/proFeatures';
+import { liveProFeatures, type ProFeatureId } from '../../services/pro/proFeatures';
+import { Card, Text } from '../ui';
 
+// What each Pro feature looks like on its tile. The action's own icon where there is one (ICONS),
+// so a tile looks like the button it unlocks.
+export const PRO_FEATURE_ICONS: Record<ProFeatureId, IoniconName> = {
+  coverTemplates: ICONS.addCover,
+  themeAccents: ICONS.theme,
+  appLock: ICONS.lock,
+  noBanners: ICONS.ads,
+  pdfPasswords: 'key-outline',
+  driveBackup: ICONS.backup,
+  convert: ICONS.convertToPdf,
+  editFiles: ICONS.editFile,
+  pdfForms: ICONS.fillForm,
+};
+
+// §17 U11: what Pro includes, as tiles (an icon and one line each), two to a row. Live features
+// only: a planned one is never offered as part of Pro.
 export function FeatureList() {
   const { tokens } = useTheme();
   const { t } = useT();
 
   return (
-    <View style={styles.list}>
+    <View style={styles.grid}>
       {liveProFeatures().map((feature) => (
-        <View key={feature.id} style={styles.row}>
-          <View style={[styles.iconWrap, { backgroundColor: tokens.accentSoft }]}>
-            <Ionicons name="checkmark" size={13} color={tokens.accentInk} />
+        <Card key={feature.id} style={styles.tile} testID={`pro-feature-${feature.id}`}>
+          <View style={[styles.iconWell, { backgroundColor: tokens.highlightSoft }]}>
+            <Ionicons name={PRO_FEATURE_ICONS[feature.id]} size={ICON_SIZE.row} color={tokens.highlightInk} />
           </View>
-          <Text style={[styles.label, { color: tokens.ink }]}>{t(feature.labelKey)}</Text>
-        </View>
+          <Text variant="label">{t(feature.labelKey)}</Text>
+        </Card>
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    gap: spacing.md,
-  },
-  row: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
-  iconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  // Two to a row: half the width less half the gap.
+  tile: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  iconWell: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
-  },
-  label: {
-    flex: 1,
-    fontSize: 15.5,
-    lineHeight: 21,
   },
 });

@@ -364,7 +364,7 @@ away: Home · Files · [Scan] · Tools · Me.
 - [x] U8 Tools hub: every tool in one grid, pick → options → run → result, recently used (done in code 2026-10-22; device check open)
 - [x] U9 Review → Save → Done (mode after scanning, Submit sheet, `saveScan.ts`) (done in code 2026-10-22; device check open)
 - [x] U10 Me (Settings) (done in code 2026-10-22; device check open)
-- [ ] U11 Course, Exam pack, Pro, Onboarding
+- [x] U11 Course, Exam pack, Pro, Onboarding (done in code 2026-10-22; device check open)
 - [ ] U12 Copy pass (UK spelling, sentence case, no jargon)
 - [ ] U13 Motion and feedback
 - [ ] U14 Usability check with students

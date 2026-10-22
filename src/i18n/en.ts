@@ -1159,7 +1159,8 @@ export const en = {
   pro: {
     // §10 M6: the Pro screen. No prices or purchase buttons while pro_sales_enabled is off.
     kicker: 'PDF Scan Pro',
-    title: 'Try every Pro feature free',
+    // §17 U11: the hero.
+    heroTitle: { one: '{count} hour of every Pro tool', other: '{count} hours of every Pro tool' },
     subtitle: {
       one: 'Watch one short ad and Pro is yours for {count} hour. No account, no payment.',
       other: 'Watch one short ad and Pro is yours for {count} hours. No account, no payment.',
@@ -1168,14 +1169,14 @@ export const en = {
     freeTitle: 'Everything else stays free',
     freeBody:
       'Scanning, all filters, text recognition in every language, Submit, courses, search, study tools and backups are free, with or without Pro. Nothing free will ever become Pro.',
-    watch: { one: 'Watch an ad, get Pro for {count} hour', other: 'Watch an ad, get Pro for {count} hours' },
+    watchStart: 'Watch an ad to start',
     watchMore: { one: 'Watch an ad for {count} more hour', other: 'Watch an ad for {count} more hours' },
     loading: 'Loading the ad…',
-    left: { one: '{count} pass left today', other: '{count} passes left today' },
+    // The day's cap: "2 of 3 left today".
+    leftOf: '{left} of {max} left today',
     noneLeft: "That's all the passes for today. Come back tomorrow.",
     unavailable: "Ads aren't available right now, so the pass can't be offered. Try again later.",
     active: 'Pro until {time}',
-    activeBody: 'Every Pro feature is on until then.',
     granted: 'Pro is on until {time}. Enjoy!',
     closedEarly: 'The ad was closed before the end, so no pass this time.',
     lapseNote: 'When a pass ends, your app lock stays on and covers you already made keep their design.',
@@ -1538,9 +1539,13 @@ export const en = {
       built: { one: '{name} · {count} page', other: '{name} · {count} pages' },
       buildFailed: "Couldn't build the exam pack. Try again.",
       clear: 'Clear',
+      clearTitle: 'Clear the exam pack?',
+      clearBody: {
+        one: 'Its {count} page comes out of the pack. The documents it came from stay as they are.',
+        other: 'Its {count} pages come out of the pack. The documents they came from stay as they are.',
+      },
       titleField: 'Title',
       pages: { one: '{count} page', other: '{count} pages' },
-      addPages: '+ Add pages',
       emptyTitle: 'Nothing in the pack yet',
       emptyHint: 'Add pages here, from a course\'s bookmarks ("Add all"), or from page search results in the Library.',
       rowLabel: '{name} · p. {page}',
@@ -1564,8 +1569,7 @@ export const en = {
   courses: {
     docTypes: { assignment: 'Assignment', notes: 'Notes', handout: 'Handout', exam: 'Exam', lab: 'Lab', other: 'Other' },
     docTypesPlural: { assignment: 'Assignments', notes: 'Notes', handout: 'Handouts', exam: 'Exams', lab: 'Labs', other: 'Other' },
-    docTypeCount: '{type} {count}',
-    allCount: 'All {count}',
+    all: 'All',
     semesterNames: { spring: 'Spring {year}', summer: 'Summer {year}', fall: 'Fall {year}' },
     errors: {
       nameMissing: 'Give the course a name',
@@ -1636,14 +1640,18 @@ export const en = {
       open: 'Open',
       archived: 'Archived',
       unsortedSubtitle: 'Documents not filed under a course',
-      examPackA11y: 'Exam pack',
+      examPack: 'Exam pack',
       examPackCountA11y: { one: 'Exam pack, {count} page', other: 'Exam pack, {count} pages' },
-      sortInto: 'Sort into courses',
+      sortUnsorted: 'Sort unsorted',
       sortBanner: { one: '{count} document has no course. Sort them now?', other: '{count} documents have no course. Sort them now?' },
       notNow: 'Not now',
       sortNow: 'Sort now',
+      // §17 U11: the documents' header, then the sections that open in place.
+      documents: 'Documents · {count}',
+      noneOfType: 'No documents of this type here.',
+      allArchived: 'Every document here is archived.',
       deadlines: 'Deadlines',
-      addDeadline: '+ Add deadline',
+      addDeadline: 'Add deadline',
       bookmarked: 'Bookmarked',
       addAllToPack: 'Add all to exam pack',
       showLess: 'Show less',
@@ -1653,7 +1661,7 @@ export const en = {
       emptyBody: 'Scan your first assignment for {course}.',
       emptyUnsortedBody: "Scans that aren't filed under a course land here.",
       noDeadlines: 'No deadlines',
-      noDeadlinesBody: "Tap “+ Add deadline” to get a reminder before it's due.",
+      noDeadlinesBody: "Add one and you'll get a reminder before it's due.",
       scanInto: 'Scan into this course',
       scanIntoA11y: 'Scan into {name}',
       submitted: 'Submitted',

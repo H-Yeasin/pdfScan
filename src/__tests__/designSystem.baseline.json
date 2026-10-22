@@ -137,16 +137,6 @@
   "components/library/useDocumentListActions.tsx": {
     "alert": 1
   },
-  "components/onboarding/StudentCard.tsx": {
-    "fontSize": 8,
-    "hexColor": 1,
-    "borderRadius": 3,
-    "fontWeight": 5
-  },
-  "components/pro/FeatureList.tsx": {
-    "fontSize": 1,
-    "borderRadius": 1
-  },
   "components/pro/ProBadge.tsx": {
     "fontSize": 1
   },
@@ -457,30 +447,8 @@
     "fontWeight": 1,
     "pressable": 1
   },
-  "screens/CourseScreen.tsx": {
-    "fontSize": 7,
-    "borderRadius": 3,
-    "fontWeight": 5,
-    "pressable": 13
-  },
-  "screens/ExamPackScreen.tsx": {
-    "fontSize": 6,
-    "fontWeight": 3,
-    "pressable": 7
-  },
   "screens/ManageFoldersScreen.tsx": {
     "pressable": 1
-  },
-  "screens/OnboardingScreen.tsx": {
-    "fontSize": 8,
-    "borderRadius": 2,
-    "fontWeight": 4,
-    "pressable": 2
-  },
-  "screens/ProScreen.tsx": {
-    "fontSize": 9,
-    "fontWeight": 4,
-    "pressable": 2
   },
   "screens/StorageScreen.tsx": {
     "fontSize": 7,
