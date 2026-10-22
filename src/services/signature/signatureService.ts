@@ -1,6 +1,11 @@
 import type { RefObject } from 'react';
 import type { View } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
+
+// react-native-view-shot loads on the first capture, not with the screen that imports this file
+// (§16 G8: only signing ever needs it).
+function captureRef(...args: Parameters<typeof import('react-native-view-shot').captureRef>) {
+  return (require('react-native-view-shot') as typeof import('react-native-view-shot')).captureRef(...args);
+}
 
 // Flattens whatever is rendered inside the given view (expected to be a page image with a
 // SignaturePad drawn on top) into a single real JPEG file.

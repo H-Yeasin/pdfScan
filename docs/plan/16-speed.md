@@ -832,7 +832,61 @@ Tests: `ingestBatch` (pages appear in order before OCR; cancel mid-OCR keeps the
 Device check: Verification 8.
 
 ## G8 · Release build *(S–M; needs a new dev build)*
-Status: planned.
+Status: done in code (2026-10-22). **Needs `npx expo prebuild --clean` and a new build** (R8 and resource
+shrinking only change release builds; a dev build is unaffected). The React Compiler stays **off** (see As
+built). Open: the release build itself, its sizes, and Verification 9 on a device. Nothing here has been
+built: Maven Central answered 403 from the machine this was written on, so Gradle could not fetch the
+`expo-image` dependencies that G6 added.
+
+As built:
+- **`expo-build-properties` 57.0.22** (`npx expo install`). In SDK 57 the R8 option is
+  `android.enableMinifyInReleaseBuilds`. The `enableProguardInReleaseBuilds` named above doesn't exist.
+  `app.json` sets it and `enableShrinkResourcesInReleaseBuilds` to `true`. A prebuild writes both into
+  `android/gradle.properties` (checked); the generated `android/app/build.gradle` already reads them.
+  `enableBundleCompression` stays at its default, `false`: a compressed bundle is smaller but starts more
+  slowly, and Hermes reads the uncompressed bundle with mmap.
+- **No extra keep rules.** The usual suspects bring their own consumer rules: pdfiumandroid keeps
+  `io.legere.pdfiumandroid.**` (its `proguard.txt`, checked in the Gradle cache), and expo-modules-core keeps
+  every `Module` subclass, `Record`, `SharedObject` and `Enumerable`. That covers `modules/pdf-native`,
+  whose classes are found through the generated package list, not by name. ML Kit, Firebase, Google
+  Mobile Ads and Sentry ship rules in their AARs. If the release build or the walkthrough breaks, add a rule
+  under `android.extraProguardRules` in the same plugin entry, one `# why` line above each rule (the string
+  is appended to `proguard-rules.pro`, so `#` comments work). Look for `ClassNotFoundException`,
+  `NoSuchMethodError` or `NoSuchFieldError` in `adb logcat`, and for "Missing class" in the R8 task's
+  output.
+- **Sentry and the mapping file.** With R8 on, Java/Kotlin frames in a native crash are obfuscated. JS
+  errors aren't affected (Hermes source maps go up as before). The Sentry Expo plugin uploads the mapping
+  only with `experimental_android.enableAndroidGradlePlugin`, which adds Sentry's Gradle plugin and native
+  symbol upload, so it's a separate decision and isn't turned on here. Until then, keep
+  `android/app/build/outputs/mapping/release/mapping.txt` for each release you ship, and upload it to Play
+  Console (App bundle explorer → Downloads → ReTrace mapping file) so Play's crash reports are readable.
+  An EAS build keeps it with the build artifacts.
+- **`expo-blur` uninstalled** (0 imports). **`signatureService.ts`** loads `react-native-view-shot` with a
+  `require` inside `captureRef`, so it loads on the first capture, not with the screens that import the
+  service.
+- **React Compiler: tried, left off.** SDK 57 needs only `"experiments": { "reactCompiler": true }` in
+  `app.json`: `babel-preset-expo` brings `babel-plugin-react-compiler` 1.0.0 and turns it on when Metro
+  says so. Jest doesn't pass that flag, so `npm test` would pass either way and proves nothing. A static run
+  over `src` (the same plugin, `target: '19'`, a logger, no panic) compiled 214 functions and skipped 168 in
+  73 files. A skipped function stays as it is, so the skips are safe. The reasons:
+  - `try … finally` and `try` without `catch` aren't supported yet (Deliver's save, Review, the Pro task
+    hooks, the convert/edit hooks, the signature modals);
+  - refs read during render (`useReaderDocument`, `useLibraryPersistence`, `useBackHandler`,
+    `useAppLock` and others: the "latest value in a ref" pattern);
+  - writes to Reanimated shared values with `.value` (`useSurfaceGestures`, `AdjustSlider`, `CropOverlay`,
+    `useReaderChrome`);
+  - disabled `react-hooks` lint rules (`ScreenStack`, `CaptureScreen`, `useSurfaceView`, `useReaderDocument`
+    and others);
+  - `LibraryScreen.tsx:172`: an existing `useMemo` it couldn't keep.
+
+  So the hot paths G5 and G6 already memoised by hand (the Library rows, the reader surface, Review) would
+  mostly not be compiled, and the gain is in components that are cheap already. The risk is in what *does*
+  compile: Reanimated 4 supports the compiler only with `.get()` / `.set()`, and reads with `.value` in
+  compiled components can be memoised wrongly. The plan's rule is "keep it only if the walkthrough and the
+  render counts are clean", and neither can run without a phone. To try it: add the `experiments` key, make
+  a release build, run the walkthrough, compare G5's render counts (`docs/qa/performance.md`). Do it after
+  the shared-value reads move to `.get()` / `.set()`.
+- `app.json` and `package.json` diffs: no trailing whitespace, no line over 120 characters.
 
 Goal: a smaller, faster release APK/AAB, with nothing broken by shrinking.
 

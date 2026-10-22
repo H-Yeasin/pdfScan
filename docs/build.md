@@ -369,6 +369,10 @@ eas build --platform android --profile production
   builds can go up with `eas submit --platform android --profile production` (needs a Google
   Play service account key set up in EAS) or by hand the same way.
 - Test the internal-testing release from the Play Store on a real phone before promoting it.
+- **R8 is on for release builds** (§16 G8: `expo-build-properties` in `app.json`), so Java/Kotlin
+  stack traces are obfuscated. Upload each release's ReTrace mapping file
+  (`android/app/build/outputs/mapping/release/mapping.txt`, or the EAS build's artifacts) in Play
+  Console ▸ App bundle explorer ▸ Downloads.
 
 ### Locally (only if you can't use EAS)
 

@@ -86,6 +86,27 @@ move. Measure it anyway, on the same phone, with a release build:
 | | | before M5 (`80456a1`) | | n/a | |
 | | | M5 | | | |
 
+## §16 G8: R8 and resource shrinking
+
+Release builds only. **Before:** the commit before G8 (R8 off). **After:** G8, after
+`npx expo prebuild --clean --platform android`. Build both the same way (`docs/build.md` §8, locally:
+`./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a`, and `./gradlew bundleRelease` for the
+AAB), on the same machine.
+
+- Sizes: `ls -l` of `app-release.apk` (arm64 only) and `app-release.aab`.
+- Cold start as in "How to measure" (median of 5). R8 shouldn't slow it; it may help a little.
+- Then the walkthrough (§16 Verification 9): scan → OCR → save → share, a banner and a rewarded ad,
+  Remote Config (change a value, restart), a crash report with reports on, the Reader (a PDF, a scan,
+  DOCX, XLSX, TXT), Convert to Word. Keep `adb logcat` open the whole time and look for
+  `ClassNotFoundException`, `NoSuchMethodError` and `NoSuchFieldError`. A rule that fixes one goes under
+  `android.extraProguardRules` in `app.json` (16-speed.md G8, As built).
+- Keep `android/app/build/outputs/mapping/release/mapping.txt` for each release you ship.
+
+| Date | Phone | Build | APK (arm64) | AAB | Cold start | Walkthrough clean? (what broke, which rule fixed it) |
+|---|---|---|---|---|---|---|
+| | | before G8 | | | | n/a |
+| | | G8 | | | | |
+
 ## §16 G3: the boot diet
 
 Measured on the release bundle, not on a phone yet (`npx expo export --platform android --no-minify

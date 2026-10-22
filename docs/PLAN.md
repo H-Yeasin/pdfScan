@@ -341,7 +341,7 @@ reports respect the opt-in.
 - [x] G5 Re-render hygiene: memo'd layers, `BootEffects`, UI fields out of `library` (the `libraryUi` slice), reducer identity (done in code; Verification 6 on a device is open)
 - [x] G6 FlashList + `expo-image`, thumbnails never fall back to masters (done in code; needs a new dev build; the thumbnail strip stays a ScrollView; Verification 7 on a device is open)
 - [x] G7 Heavy work off the hot path (Review sliders, progressive ingest, OCR reuse, indexing writes) (done in code; JS only; pdf-lib still holds page bytes until save; Verification 8 on a device is open)
-- [ ] G8 Release build: R8 + resource shrinking, React Compiler trial (new dev build)
+- [x] G8 Release build: R8 + resource shrinking, React Compiler trial (done in code; needs `npx expo prebuild --clean` and a new build; the React Compiler stays off; the release build, its sizes and Verification 9 on a device are open)
 - [ ] G9 Measure and record (`docs/qa/performance.md`)
 
 **Done when:** crash reports send nothing unless opted in (and never a replay), cold start is at least

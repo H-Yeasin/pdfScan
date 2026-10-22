@@ -188,6 +188,15 @@
           "color": "#1e754a"
         }
       ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
       "./plugins/withBackupRules",
       "./plugins/withDocumentIntentFilters",
       [
