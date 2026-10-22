@@ -8,6 +8,8 @@ import type { RemoteConfig } from '../remote/remoteConfig';
 // Library only; never in Capture, Review, Deliver/Submit or the Reader, never while anything is
 // processing, no full-screen ads. Only screens that render a BannerSlot can ever show one, so
 // `ads_banner_screens` from Remote Config can narrow the list but never widen it past them.
+// Where on the screen is BannerSlot's (§17 U6: inline in Home's scroll, above the tab bar on
+// Library); the rules here are the same for both.
 
 export type BannerScreen = 'home' | 'library';
 

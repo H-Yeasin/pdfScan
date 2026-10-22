@@ -52,10 +52,19 @@ function mount() {
   return { root, ctx: () => ctx! };
 }
 
+// A text node's string; a kit Chip's label is `[label, null]` (no count), read as the label.
+function textOf(children: unknown): string | null {
+  if (typeof children === 'string') return children;
+  if (Array.isArray(children) && children.some((c) => typeof c === 'string') && children.every((c) => typeof c === 'string' || c == null || c === false)) {
+    return children.filter((c) => typeof c === 'string').join('');
+  }
+  return null;
+}
+
 function texts(root: ReturnType<typeof create>): string[] {
   return root.root
-    .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
-    .map((n) => n.props.children as string);
+    .findAll((n) => typeof n.type === 'string' && textOf(n.props.children) !== null)
+    .map((n) => textOf(n.props.children)!);
 }
 
 function press(root: ReturnType<typeof create>, label: string) {
@@ -99,7 +108,7 @@ describe('Home course hub', () => {
 
   it('offers quick setup when there are no courses yet', () => {
     const { root } = mount();
-    expect(texts(root)).toContain('Your courses');
+    expect(texts(root)).toContain('Hi there');
     expect(texts(root)).toContain('Add your courses');
   });
 
@@ -130,6 +139,76 @@ describe('Home course hub', () => {
   });
 });
 
+function pressId(root: ReturnType<typeof create>, testID: string) {
+  const node = root.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0];
+  if (!node) throw new Error(`Nothing pressable with testID "${testID}"`);
+  act(() => node.props.onPress());
+}
+
+// §17 U6: what Home shows, section by section.
+describe('Home sections', () => {
+  it('greets by first name, or says hi', () => {
+    const { root, ctx } = mount();
+    expect(texts(root).some((text) => text === 'Hi there')).toBe(true);
+    act(() => ctx().app.dispatch({ type: 'settings/SET_PROFILE', profile: { name: 'Rahim Uddin' } }));
+    expect(texts(root).some((text) => /^Good (morning|afternoon|evening), Rahim$/.test(text))).toBe(true);
+  });
+
+  it('shows Due soon only when something is due, else an Add a deadline chip', () => {
+    const { root, ctx } = mount();
+    act(() => ctx().app.dispatch({ type: 'library/CREATE_COURSE', id: 'math', name: 'Math' }));
+    expect(texts(root)).not.toContain('Due soon');
+    expect(texts(root)).toContain('Add a deadline');
+
+    act(() =>
+      ctx().app.dispatch({
+        type: 'library/ADD_DEADLINE',
+        deadline: { id: 'd1', courseId: 'math', title: 'Problem set', dueAt: Date.now() + 86_400_000, reminderIds: [], createdAt: 0 },
+      })
+    );
+    expect(texts(root)).toContain('Due soon');
+    expect(texts(root)).not.toContain('Add a deadline');
+  });
+
+  it('continues at most three documents and lists five recent ones', () => {
+    const { root, ctx } = mount();
+    act(() => {
+      const { dispatch } = ctx().app;
+      dispatch({ type: 'library/SET_FILES', files: Array.from({ length: 6 }, (_, i) => makeDoc({ id: `d${i}`, name: `Doc ${i}`, createdAt: 1000 + i })) });
+      for (const id of ['d0', 'd1', 'd2', 'd3']) dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: { id, at: 5000 + Number(id[1]) } });
+    });
+    const continued = root.root.findAll((n) => typeof n.props.testID === 'string' && n.props.testID.startsWith('home-continue-') && typeof n.type === 'string');
+    expect(new Set(continued.map((n) => n.props.testID))).toEqual(new Set(['home-continue-d3', 'home-continue-d2', 'home-continue-d1']));
+    const recent = new Set(
+      root.root.findAll((n) => typeof n.props.testID === 'string' && n.props.testID.startsWith('home-recent-')).map((n) => n.props.testID)
+    );
+    expect(recent.size).toBe(5);
+    expect(recent.has('home-recent-d0')).toBe(false);
+  });
+
+  it('opens Files with the search open from the search bar', () => {
+    const { ctx, root } = mount();
+    pressId(root, 'home-search');
+    expect(ctx().router.tab).toBe('library');
+    expect(ctx().app.state.libraryUi.searchOpen).toBe(true);
+  });
+
+  it('scans in a mode from Scan as, and remembers it', () => {
+    const { ctx, root } = mount();
+    pressId(root, 'home-mode-board');
+    expect(ctx().app.state.settings.lastCaptureMode).toBe('board');
+    expect(ctx().app.state.capture.scannerRequested).toBe(true);
+  });
+
+  it("archives a course from its card's ⋯ menu", () => {
+    const { ctx, root } = mount();
+    act(() => ctx().app.dispatch({ type: 'library/CREATE_COURSE', id: 'math', name: 'Math' }));
+    pressId(root, 'home-course-more-math');
+    pressId(root, 'menu-archive');
+    expect(ctx().app.state.library.courses.find((c) => c.id === 'math')?.archived).toBe(true);
+  });
+});
+
 // §6 L4: under the pseudo-locale every catalog string is accented, so English that still shows is
 // hard-coded. Home with a course, a document and an Unsorted one shows most of its strings.
 describe('Home in the pseudo-locale', () => {
@@ -145,7 +224,7 @@ describe('Home in the pseudo-locale', () => {
       dispatch({ type: 'library/CREATE_COURSE', id: 'chem', name: 'Chemistry', fields: { semesterId: 's1' } });
       dispatch({
         type: 'library/SET_FILES',
-        files: [makeDoc({ id: 'a', name: 'Waves', courseId: 'phy' }), makeDoc({ id: 'b', name: 'Loose page' })],
+        files: [makeDoc({ id: 'a', name: 'Waves', courseId: 'phy' }), makeDoc({ id: 'b', name: 'Loose leaf' })],
       });
     });
 

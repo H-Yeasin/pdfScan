@@ -7,8 +7,18 @@ tasks can't run** (they need a rewarded ad watched to the end). Do the
 
 ## What the app does
 
-- One adaptive banner above the tab bar on Home and Library. Never in Capture, Review,
-  Deliver/Submit or the Reader, never while a scan is being processed, no full-screen ads.
+- One adaptive banner on Home and Library. On Library it sits above the tab bar; on Home (since
+  §17 U6) it is an **inline adaptive banner inside the scroll**, between the course cards (or
+  Due soon) and Recent files, at most 100 dp tall, so the bottom of Home no longer stacks the
+  ad on the tab bar. Never in Capture, Review, Deliver/Submit or the Reader, never while a scan
+  is being processed, no full-screen ads.
+- **Placement note for AdMob (owner):** both placements use the same banner unit
+  (`ads_banner_unit_android`); an adaptive banner unit serves the inline size too, so no new unit
+  is needed. AdMob's policy on ads in scrolling content applies to Home: the banner keeps the
+  section gap (16 dp) to everything around it (the course cards above, Recent files' header
+  and its "See all" below), so a tap meant for a course or a file doesn't land on the ad. Check
+  that gap on a small phone during the device check. Leave `ads_banner_screens` as
+  `home,library` (it can only narrow the list).
 - No banner before the introduction is done, in a student's first two starts, offline, or
   while a Pro pass is active. All the rules: `src/services/ads/adPolicy.ts`.
 - The Google Mobile Ads SDK (and its consent form) loads only when a banner could show, after
@@ -82,8 +92,9 @@ Do these in order; each is needed for a release build to serve real ads (§14 Q2
 
 ## Checks on a phone (dev build, test ads)
 
-- Banner on Home and Library only, above the tab bar; none in capture → review → deliver/submit
-  or the Reader; none while a scan is processing.
+- Banner on Home and Library only: on Library above the tab bar, on Home inside the scroll
+  between the courses and Recent files (it scrolls with the page, no taller than 100 dp); none
+  in capture → review → deliver/submit or the Reader; none while a scan is processing.
 - None in the first two starts or before the introduction is done; none offline.
 - Settings (dev) "Grant a Pro pass": banners disappear; ending it brings them back.
 - `ads_enabled = false` in Remote Config: no banner after the next start, and no ads SDK

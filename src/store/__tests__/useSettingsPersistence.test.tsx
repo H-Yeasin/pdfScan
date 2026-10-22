@@ -207,3 +207,28 @@ describe('§12 D2 reading settings', () => {
     expect(ctx().state.settings.reading).toMatchObject({ layout: 'continuous', fit: 'page', night: false });
   });
 });
+
+// §17 U6: Home's Continue row reads the documents last opened.
+describe('the recently opened documents', () => {
+  it('keep their order across a restart', async () => {
+    const first = await mount();
+    await act(async () => {
+      first().dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: { id: 'a', at: 1 } });
+      first().dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: { id: 'b', at: 2 } });
+    });
+    await flush();
+
+    const second = await mount();
+    expect(second().state.settings.recentOpened).toEqual([
+      { id: 'b', at: 2 },
+      { id: 'a', at: 1 },
+    ]);
+    expect(second().state.settings.lastOpened).toEqual({ id: 'b', at: 2 });
+  });
+
+  it('start from the one last opened in settings saved before U6', async () => {
+    await AsyncStorage.setItem('app:settings', JSON.stringify({ themePref: 'system', firstRun: false, ocrScript: 'latin', lastOpened: { id: 'old', at: 5 } }));
+    const ctx = await mount();
+    expect(ctx().state.settings.recentOpened).toEqual([{ id: 'old', at: 5 }]);
+  });
+});

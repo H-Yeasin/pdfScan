@@ -61,7 +61,7 @@ export const RewardedAd = {
     return lastRewarded;
   }),
 };
-export const BannerAdSize = { ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER' };
+export const BannerAdSize = { ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER', INLINE_ADAPTIVE_BANNER: 'INLINE_ADAPTIVE_BANNER' };
 export function BannerAd(props: Record<string, unknown>) {
   return createElement('BannerAd', props);
 }

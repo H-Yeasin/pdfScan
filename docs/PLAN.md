@@ -359,7 +359,7 @@ away: Home · Files · [Scan] · Tools · Me.
 - [ ] U3 Sheet, Dialog / `useConfirm`, Menu (every `Alert` and `Modal` migrated)
 - [ ] U4 Illustrations and brand moments
 - [x] U5 The new shell: 4 tabs + the centre Scan button (Capture removed; Home always the start) (done in code 2026-10-22; device check open)
-- [ ] U6 Home
+- [x] U6 Home (done in code 2026-10-22; device check open)
 - [ ] U7 Files: folders, filters, sort, grid, row menus, Rename, checkboxes, safe merge/split, import
 - [ ] U8 Tools hub
 - [ ] U9 Review → Save → Done (mode after scanning, Submit sheet, `saveScan.ts`)

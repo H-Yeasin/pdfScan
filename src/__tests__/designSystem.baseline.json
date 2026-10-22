@@ -82,11 +82,7 @@
     "modal": 1
   },
   "components/courses/SemesterSwitcher.tsx": {
-    "fontSize": 2,
-    "fontWeight": 1,
-    "alert": 1,
-    "pressable": 4,
-    "modal": 1
+    "alert": 1
   },
   "components/courses/SortUnsortedSheet.tsx": {
     "fontSize": 6,
@@ -550,12 +546,6 @@
     "fontSize": 6,
     "fontWeight": 3,
     "pressable": 7
-  },
-  "screens/HomeScreen.tsx": {
-    "fontSize": 9,
-    "fontWeight": 6,
-    "alert": 1,
-    "pressable": 8
   },
   "screens/LibraryScreen.tsx": {
     "fontSize": 2,

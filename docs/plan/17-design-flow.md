@@ -582,7 +582,7 @@ As built (2026-10-22):
   static scan can't tell a tab from a button); `hints.ts` needed no change.
 
 ## U6 · Home *(M)*
-Status: planned. JS only.
+Status: done in code (2026-10-22). JS only. Device check (Verification 6) open; never run on a phone.
 
 Goal: Home answers "what do I do now?": scan, continue, find, what's due.
 
@@ -616,6 +616,60 @@ Tests: the section rules (`dueSoon` empty → no section; the continue list keep
 name fallback); `a11yLabels`; `hardcodedStrings`.
 
 Device check: Verification 6.
+
+As built (2026-10-22):
+- `HomeScreen` is a list of sections from `components/home/`: `HomeHeader` (the greeting, the semester
+  `Chip`, the search entry), `BackupReminderCard` (§8 B5's reminder, moved onto the kit), `QuickActions`,
+  `ContinueCarousel`, `CourseGrid`, `DueSoon`, the inline banner, `RecentFiles`, `ProPassCard`; plus
+  `SectionHeader`, `DocThumb` (the 400 px thumbnail or the format's icon) and `layout.HOME_GUTTER` (the
+  horizontal rows bleed through it). Home is off the ratchet's baseline (no hand-rolled styles left).
+- Greeting: `homeSelectors.greetingName` (the first word of `settings.profile.name`) and `dayPart`
+  (morning before 12, afternoon before 17, else evening) → `home.greeting.*`, or "Hi there". The hour
+  comes from Home's day clock, so it updates when Home is shown again.
+- Semester: the chip has the timetable icon in front (the kit's `Chip` has no trailing icon, so no ▾).
+  `SemesterSwitcher` is on the kit's `Menu` now (U3 moves it onto `Sheet`): the shown semester ticked,
+  the dated one with a "Current" badge, then "Archive …"; the archive confirm is still an `Alert`
+  until U3's Dialog (the baseline keeps that one).
+- Search: a `TextField` look-alike (`accessibilityRole="search"`) → `libraryUi/OPEN_SEARCH` (search open
+  and empty, selection off, `searchFocus` + 1) and `go('library')`, which puts Files at its root. Files
+  keys its `SearchBar` on `searchFocus`, so the field takes the keyboard again even if it was open.
+- Scan as: one `Chip` per `CAPTURE_MODES` entry, then Import photos and Import a file. They call
+  `useScanChoice()`, which now lives in `ScanModeSheet.tsx` and is shared with the Scan button's sheet
+  (a mode is remembered and scans at once). The one-time Scan hint was already on the tab bar (U5).
+- Continue: `settings.recentOpened` (new; the last 10 opened, newest first; `settings/SET_LAST_OPENED`
+  adds to it, `LOAD_RECENT_OPENED` reads it back through `normalizeRecentOpened`; settings saved before
+  U6 start from `lastOpened`). `continueDocuments` merges it with the newest saved document (when it came
+  after) and keeps 3; deleted and archived documents drop out. A card is on its course's tint, with "Page
+  12 of 40" from `continueProgress` (the saved page position by page id, else `lastPage` for a standard
+  layout only), else "N pages" (or the format for a file without pages). `continueDocument` is gone.
+- Courses: `CourseGrid` cards are `Card tone="tinted"` with the badge, code, name, "n docs · when" and the
+  next class (`timetable.nextClass` / `nextClassLabel`: "In class now", "Today 9:30", "Tomorrow 9:30",
+  "Mon 9:30"). The ⋯ (`IconButton`, "More for {name}") and a long-press open a `Menu`: Edit, Move earlier,
+  Move later, Archive. Unsorted is a `ListItem` under the grid.
+- Due soon: only when `dueSoon()` has something. Otherwise the "Add a deadline" chip sits on the
+  **Courses** section's header row (the plan said the next section's; Courses is the one that's always
+  there when a deadline can be added, since a deadline needs a course). No course → neither.
+- Recent files: `recentFiles` (the 5 newest, not archived) as `ListItem`s in one `Card`; "See all" →
+  `go('library')`.
+- Pro pass: `proPassCardState` decides: a running pass → "Pro pass active · 42 min left" on the
+  highlight `Card` (counts down by the minute while Home is on screen; "1 h 20 min left" past an hour,
+  since passes add up); no Pro → a ghost "Get 1 hour of Pro" button; nothing for a paid licence, and no
+  offer while `ads_enabled` is off (there is no Remote Config switch for Pro itself; without ads no pass
+  can be watched for). Both open the Pro screen.
+- Banner: `BannerSlot` takes `inline={{ width }}`: an `INLINE_ADAPTIVE_BANNER` of Home's content width,
+  `maxHeight` 100 (`INLINE_BANNER_MAX_HEIGHT`), between Courses/Due soon and Recent files. Library keeps
+  the anchored one. `adPolicy`'s rules didn't change (placement is BannerSlot's); `docs/ads.md` has the
+  owner's placement note.
+- Strings: `home.greeting.*`, `greetingNoName`, `search`, `searchHint`, `scanAs`, `continue`, `pageOf`,
+  `pages`, `courses`, `addDeadlineChip`, `classNow/Today/Tomorrow`, `courseMore`, `recentFiles`, `seeAll`,
+  `seeAllA11y`, `passActive`, `passMinutes`, `passHoursMinutes`, `getPass`; `home.nothingDue*` are gone;
+  `courses.semesterSwitcher.current` is now a badge label ("Current").
+- Tests: `homeSelectors` (continue merge, at most 3, deleted/archived, the recent list, progress, recent
+  files, greeting, pass minutes), `nextClass.test.ts`, `components/home/__tests__/proPassCard.test.ts`,
+  `useSettingsPersistence` (the recent list survives a restart; old settings), `HomeScreen.test.tsx`
+  (greeting, Due soon only when due, Continue ≤ 3 and Recent 5, search opens Files, Scan as scans in
+  the mode, the ⋯ menu archives), plus the existing pseudo-locale, `a11yLabels`, `hardcodedStrings`,
+  `bootImports` and ratchet tests.
 
 ## U7 · Files (the Library) *(L)*
 Status: planned. JS only. Split point: (a) layout, filter sheet, sort, row menu, rename, import; (b)
