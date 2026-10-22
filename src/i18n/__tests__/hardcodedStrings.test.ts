@@ -17,7 +17,10 @@ const ALLOWED = new Set(['PDF Scan', 'PHY 101', 'PDF', 'JPG', 'A4', 'DOCX', 'XLS
 
 const PATTERNS: RegExp[] = [
   // JSX text: after a tag's closing '>' (never '=>' or a spaced comparison), up to a closing tag.
-  /(?<=[\w"'}/])>\s*([A-Za-z][^<>{}=;]*?)\s*<\//g,
+  // A separator in front ("  · Archived") doesn't make it code (§17 U12).
+  /(?<=[\w"'}/])>\s*(?:[·•]\s*)?([A-Za-z][^<>{}=;]*?)\s*<\//g,
+  // A shown prop's default value: `submitLabel = 'Save',` (§17 U12). The spaces around '=' keep JSX out.
+  /\b(?:\w*[Ll]abel|title|placeholder)\s+=\s+["']([A-Za-z][^"']*)["']\s*[,)]/g,
   // Props that are shown or read aloud.
   /\b(?:label|title|placeholder|subtitle|trailing|submitLabel|accessibilityLabel|accessibilityHint)=["']([A-Za-z][^"']*)["']/g,
   // Snack messages and Alert buttons/titles.
@@ -77,9 +80,11 @@ describe('hard-coded UI strings', () => {
         'Batch OCR and batch export',
       ];
       const key = t('settings.profile.name'); // a comment with Words in it
+      function Prompt({ submitLabel = 'Save', mode = 'text' }) {}
+      <Text>{name}<Text style={s}>  · Archived</Text></Text>
     `;
     expect(hardcodedStrings(source).sort()).toEqual(
-      ['Batch OCR and batch export', 'Cancel', 'Class times', 'Delete?', 'Due soon', 'Each scan gets filed', 'No folder selected'].sort()
+      ['Archived', 'Batch OCR and batch export', 'Cancel', 'Class times', 'Delete?', 'Due soon', 'Each scan gets filed', 'No folder selected', 'Save'].sort()
     );
   });
 

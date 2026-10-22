@@ -13,7 +13,7 @@ const MARK = 56;
 type ToolResultSheetProps = {
   // The documents the tool made or changed (the first is shown); null: closed.
   docs: LibraryDocument[] | null;
-  // Compress's "Compressed · done" and the like; else "Saved in Files".
+  // Compress's "Compressed" and the like; else "Saved in Files".
   message?: string;
   onOpen: (doc: LibraryDocument) => void;
   onShare: (doc: LibraryDocument) => void;

@@ -391,7 +391,6 @@ export function AcademicOptionsScreen() {
         <View style={styles.row}>
           <View style={styles.rowTextWrap}>
             <Text style={[styles.rowLabel, { color: tokens.ink }]}>{t('deliver.academic.borderRow')}</Text>
-            <Text style={[styles.disclosure, { color: tokens.muted }]}>{t('deliver.academic.borderHint')}</Text>
           </View>
           <Switch
             value={enableBorder}
