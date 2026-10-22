@@ -1,6 +1,7 @@
 import type { Annotation, Bookmark, Course, Deadline, DocType, LibraryDocument, LibraryPage, ReaderPosition, Semester, Submission, TimetableSlot } from '../../types/models';
 import { nextCourseColor } from '../../services/courses/palette';
 import { samePosition } from '../../services/documents/positionCodec';
+import { patchEdits } from '../../services/library/documentEdits';
 
 // 'failed' means the stored library couldn't be read. Nothing is written back to disk until a
 // load succeeds, so a read error can never overwrite the real library with an empty one.
@@ -49,6 +50,9 @@ export type LibraryAction =
   | { type: 'library/RETRY_LOAD' }
   | { type: 'library/SET_FILES'; files: LibraryDocument[] }
   | { type: 'library/ADD_FILE'; file: LibraryDocument }
+  // §17 U7: documents made from others that stay (a merge or split that keeps its originals), with
+  // the marks copied onto their pages.
+  | { type: 'library/ADD_FILES'; files: LibraryDocument[]; annotations: Annotation[] }
   | { type: 'library/REMOVE_FILES'; ids: string[] }
   | { type: 'library/TOGGLE_STAR'; id: string }
   | { type: 'library/UPDATE_FILE'; id: string; patch: Partial<LibraryDocument> }
@@ -56,7 +60,9 @@ export type LibraryAction =
   | { type: 'library/SET_PAGE_OCR'; id: string; pages: readonly LibraryPage[] }
   // §16 G6: a thumbnail built for a page that had none (services/library/thumbnails.ts).
   | { type: 'library/SET_PAGE_THUMB'; id: string; pageId: string; thumbUri: string }
-  | { type: 'library/REPLACE_FILES'; ids: string[]; files: LibraryDocument[] }
+  // `submissions` (§17 U7): an Undo that puts the replaced documents back brings their
+  // submissions back with them (the replace dropped them).
+  | { type: 'library/REPLACE_FILES'; ids: string[]; files: LibraryDocument[]; submissions?: Submission[] }
   | { type: 'library/SET_COURSES'; courses: Course[] }
   // `color` defaults to the next unused palette colour; the course goes to the end of the list.
   | { type: 'library/CREATE_COURSE'; id: string; name: string; fields?: Partial<Omit<CourseFields, 'name'>> }
@@ -130,6 +136,12 @@ function followPages<T extends { documentId: string; pageId: string }>(
   });
 }
 
+// Submissions stay newest first (as loaded) with the restored ones among them.
+function withRestored(kept: Submission[], restored: readonly Submission[] | undefined): Submission[] {
+  if (!restored?.length) return kept;
+  return [...restored, ...kept].sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export function libraryReducer(state: LibraryState, action: LibraryAction): LibraryState {
   switch (action.type) {
     // §7 R4: where the Reader is in a document. The pages array is kept as it is, so saving it
@@ -154,6 +166,12 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return { ...state, files: action.files };
     case 'library/ADD_FILE':
       return { ...state, files: [action.file, ...state.files] };
+    case 'library/ADD_FILES':
+      return {
+        ...state,
+        files: [...action.files, ...state.files],
+        annotations: action.annotations.length ? [...state.annotations, ...action.annotations] : state.annotations,
+      };
     case 'library/REMOVE_FILES':
       return {
         ...state,
@@ -166,7 +184,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/TOGGLE_STAR':
       return {
         ...state,
-        files: state.files.map((f) => (f.id === action.id ? { ...f, star: !f.star } : f)),
+        files: state.files.map((f) => (f.id === action.id ? { ...f, star: !f.star, updatedAt: Date.now() } : f)),
       };
     case 'library/UPDATE_FILE':
       return {
@@ -180,9 +198,11 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         bookmarks: action.patch.pages
           ? state.bookmarks.filter((b) => b.documentId !== action.id || action.patch.pages!.some((p) => p.id === b.pageId))
           : state.bookmarks,
+        // §17 U7: an edit moves the document's "Date modified" as the stored updated_at moves
+        // (documentEdits); so do a star, a move, a type and archiving below.
         files: state.files.map((f) => {
           if (f.id !== action.id) return f;
-          return { ...f, ...action.patch };
+          return patchEdits(action.patch) ? { ...f, ...action.patch, updatedAt: Date.now() } : { ...f, ...action.patch };
         }),
       };
     case 'library/SET_PAGE_OCR': {
@@ -214,8 +234,9 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
         ...state,
         files: [...action.files, ...state.files.filter((f) => !action.ids.includes(f.id))],
         // A document replaced by others (merge, split) takes its submissions with it.
-        submissions: state.submissions.filter(
-          (s) => !action.ids.includes(s.documentId) || action.files.some((f) => f.id === s.documentId)
+        submissions: withRestored(
+          state.submissions.filter((s) => !action.ids.includes(s.documentId) || action.files.some((f) => f.id === s.documentId)),
+          action.submissions
         ),
         // §7 R2: merge and split keep page ids, so a replaced document's bookmarks and annotations
         // move to the new document that has their page; the rest go with it.
@@ -260,7 +281,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
       return {
         ...state,
         files: state.files.map((f) =>
-          action.ids.includes(f.id) ? { ...f, courseId: action.courseId ?? undefined } : f
+          action.ids.includes(f.id) ? { ...f, courseId: action.courseId ?? undefined, updatedAt: Date.now() } : f
         ),
       };
     case 'library/SET_SEMESTERS':
@@ -300,7 +321,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/SET_ARCHIVED':
       return {
         ...state,
-        files: state.files.map((f) => (action.ids.includes(f.id) ? { ...f, archived: action.archived || undefined } : f)),
+        files: state.files.map((f) => (action.ids.includes(f.id) ? { ...f, archived: action.archived || undefined, updatedAt: Date.now() } : f)),
       };
     case 'library/SET_DEADLINES':
       return { ...state, deadlines: byDueAt(action.deadlines) };
@@ -341,7 +362,7 @@ export function libraryReducer(state: LibraryState, action: LibraryAction): Libr
     case 'library/SET_DOC_TYPE':
       return {
         ...state,
-        files: state.files.map((f) => (action.ids.includes(f.id) && f.docType !== action.docType ? { ...f, docType: action.docType } : f)),
+        files: state.files.map((f) => (action.ids.includes(f.id) && f.docType !== action.docType ? { ...f, docType: action.docType, updatedAt: Date.now() } : f)),
       };
     default:
       return state;

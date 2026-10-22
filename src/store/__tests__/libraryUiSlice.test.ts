@@ -1,6 +1,7 @@
 import { initialLibraryUiState, libraryUiReducer } from '../slices/libraryUiSlice';
 import type { LibraryUiAction, LibraryUiState } from '../slices/libraryUiSlice';
 import type { LibraryAction } from '../slices/librarySlice';
+import { NO_FILTERS } from '../../services/library/documentFilters';
 
 function run(...actions: (LibraryUiAction | LibraryAction)[]): LibraryUiState {
   return actions.reduce(libraryUiReducer, initialLibraryUiState);
@@ -74,9 +75,22 @@ describe('libraryUiSlice search and tabs', () => {
     expect(state.searchResultIds).toBeNull();
   });
 
-  it('changing tab closes the open course', () => {
-    const state = run({ type: 'libraryUi/SET_ACTIVE_COURSE', id: 'c1' }, { type: 'libraryUi/SET_TAB', tab: 'courses' });
-    expect(state).toMatchObject({ tab: 'courses', activeCourseId: null });
+  // §17 U7: Files' filters and the one-time scroll to a result.
+  it('keeps filters until cleared, and a deleted course leaves them', () => {
+    const filters = { ...NO_FILTERS, courseIds: ['c1', 'c2'], starred: true };
+    const state = run({ type: 'libraryUi/SET_FILTERS', filters });
+    expect(state.filters).toBe(filters);
+    expect(libraryUiReducer(state, { type: 'library/DELETE_COURSE', id: 'c1' }).filters).toEqual({ ...filters, courseIds: ['c2'] });
+    expect(libraryUiReducer(state, { type: 'libraryUi/CLEAR_FILTERS' }).filters).toBe(NO_FILTERS);
+  });
+
+  it('REVEAL selects the result alone when asked, and REVEALED forgets it', () => {
+    const selecting = run({ type: 'libraryUi/SELECT_ALL', ids: ['a', 'b'] }, { type: 'libraryUi/REVEAL', id: 'm', select: true });
+    expect(selecting).toMatchObject({ revealId: 'm', selMode: true });
+    expect([...selecting.selection]).toEqual(['m']);
+    const plain = run({ type: 'libraryUi/REVEAL', id: 'n' });
+    expect(plain).toMatchObject({ revealId: 'n', selMode: false });
+    expect(libraryUiReducer(plain, { type: 'libraryUi/REVEALED' }).revealId).toBeNull();
   });
 
   it('a deleted course or deadline is no longer the one shown', () => {
@@ -98,7 +112,8 @@ describe('libraryUiSlice identity', () => {
     );
     const same: (LibraryUiAction | LibraryAction)[] = [
       { type: 'libraryUi/SET_SEL_MODE', on: true },
-      { type: 'libraryUi/SET_TAB', tab: 'recent' },
+      { type: 'libraryUi/CLEAR_FILTERS' },
+      { type: 'libraryUi/REVEALED' },
       { type: 'libraryUi/SET_SEARCH', search: 'x' },
       { type: 'libraryUi/SET_SEARCH_RESULT_IDS', ids: null },
       { type: 'libraryUi/SET_INDEXING', progress: { documentId: 'd', done: 2, total: 5 } },

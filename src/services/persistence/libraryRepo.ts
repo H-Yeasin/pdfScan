@@ -21,6 +21,7 @@ import { decodePosition, encodePosition } from '../documents/positionCodec';
 import { parseOcrScript } from '../scripts/registry';
 import { parseSubmitPreset, serializeSubmitPreset } from '../submit/preset';
 import { fromStoredPath, toStoredPath } from './libraryFiles';
+import { NOT_EDITS } from '../library/documentEdits';
 
 // Row shapes exactly as stored (see migrations.ts). Paths are relative to the document directory;
 // libraryFiles.ts's toStoredPath/fromStoredPath convert at this boundary only.
@@ -268,6 +269,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<LoadedLibrary> {
       contentUri: fromStoredPath(row.content_path),
       sizeBytes: row.size_bytes,
       createdAt: row.created_at,
+      updatedAt: row.updated_at,
       star: !!row.star,
       tag: row.tag ?? undefined,
       locked: !!row.locked,
@@ -866,14 +868,8 @@ export async function archiveSemester(db: SQLiteDatabase, id: string): Promise<v
   });
 }
 
-// §8: what isn't an edit of the document - the page the Reader is on (§7 R4), the integrity
-// check's missing-files flag (§8 B1) and the backfill's "couldn't read the PDF" (§16 G4). A change
-// to only these keeps documents.updated_at, which backups compare (B2's importPlan: "already here"
-// vs "changed since") and which says when the library last changed (B5's reminder and automatic
-// backups) - so reading a document doesn't count as changing it. Nor does loading its word boxes
-// (§16 G4, blocksLoadedOnly).
-const NOT_EDITS: readonly (keyof LibraryDocument)[] = ['lastPage', 'lastPosition', 'missingFiles', 'pdfInfoFailed'];
-
+// §8: whether a write changes the document (NOT_EDITS, services/library/documentEdits). Loading its
+// word boxes isn't one either (§16 G4, blocksLoadedOnly).
 export function documentEdited(before: LibraryDocument, after: LibraryDocument): boolean {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)] as (keyof LibraryDocument)[]);
   for (const key of keys) {

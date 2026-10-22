@@ -229,3 +229,37 @@ describe('library/SET_PAGE_OCR', () => {
     expect(state.files[0]).toBe(changed);
   });
 });
+
+// §17 U7: "Date modified", documents added beside their originals, and an Undo's submissions.
+describe('librarySlice for Files', () => {
+  const doc = makeDoc({ id: 'd', updatedAt: 1 });
+  const base = run({ type: 'library/SET_FILES', files: [doc] });
+
+  it('stamps updatedAt on an edit, a star, a move, a type and archiving, not on reading', () => {
+    const edited = (action: LibraryAction) => libraryReducer(base, action).files[0].updatedAt!;
+    expect(edited({ type: 'library/UPDATE_FILE', id: 'd', patch: { name: 'New' } })).toBeGreaterThan(1);
+    expect(edited({ type: 'library/TOGGLE_STAR', id: 'd' })).toBeGreaterThan(1);
+    expect(edited({ type: 'library/ASSIGN_COURSE', ids: ['d'], courseId: 'c' })).toBeGreaterThan(1);
+    expect(edited({ type: 'library/SET_DOC_TYPE', ids: ['d'], docType: 'lab' })).toBeGreaterThan(1);
+    expect(edited({ type: 'library/SET_ARCHIVED', ids: ['d'], archived: true })).toBeGreaterThan(1);
+    expect(edited({ type: 'library/UPDATE_FILE', id: 'd', patch: { lastPage: 4, missingFiles: true } })).toBe(1);
+  });
+
+  it('ADD_FILES puts new documents first and adds their marks', () => {
+    const mark = { id: 'm', documentId: 'n', pageId: 'p', kind: 'highlight', color: '', data: {}, createdAt: 0, updatedAt: 0 } as never;
+    const state = libraryReducer(base, { type: 'library/ADD_FILES', files: [makeDoc({ id: 'n' })], annotations: [mark] });
+    expect(state.files.map((f) => f.id)).toEqual(['n', 'd']);
+    expect(state.annotations).toEqual([mark]);
+  });
+
+  it('REPLACE_FILES brings back the submissions an Undo restores, newest first', () => {
+    const old = { id: 's-old', documentId: 'd', createdAt: 5 } as never;
+    const kept = { id: 's-kept', documentId: 'x', createdAt: 9 } as never;
+    const state = run(
+      { type: 'library/SET_FILES', files: [makeDoc({ id: 'm' }), makeDoc({ id: 'x' })] },
+      { type: 'library/SET_SUBMISSIONS', submissions: [kept] },
+      { type: 'library/REPLACE_FILES', ids: ['m'], files: [doc], submissions: [old] }
+    );
+    expect(state.submissions.map((s) => s.id)).toEqual(['s-kept', 's-old']);
+  });
+});

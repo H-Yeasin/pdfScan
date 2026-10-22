@@ -1,6 +1,5 @@
 import type { LibraryAction } from './librarySlice';
-
-export type LibraryTab = 'starred' | 'recent' | 'courses';
+import { NO_FILTERS, type DocumentFilters } from '../../services/library/documentFilters';
 
 export type IndexingProgress = { documentId: string; done: number; total: number };
 
@@ -13,7 +12,11 @@ export type LibraryUiState = {
   // A set, so a row's "am I selected" is O(1). Insertion order is the order they were picked in.
   selection: ReadonlySet<string>;
   selMode: boolean;
-  tab: LibraryTab;
+  // §17 U7: what Files' list is narrowed to (documentFilters). Kept while the app runs, so going
+  // to a document and back finds the list as it was; not saved.
+  filters: DocumentFilters;
+  // §17 U7: a document Files scrolls to once (a merge's or an import's result), then clears.
+  revealId: string | null;
   search: string;
   searchOpen: boolean;
   // §17 U6: counts OPEN_SEARCH, so the Files search field takes the keyboard again when Home's
@@ -37,7 +40,8 @@ const NO_SELECTION: ReadonlySet<string> = new Set();
 export const initialLibraryUiState: LibraryUiState = {
   selection: NO_SELECTION,
   selMode: false,
-  tab: 'recent',
+  filters: NO_FILTERS,
+  revealId: null,
   search: '',
   searchOpen: false,
   searchFocus: 0,
@@ -54,7 +58,11 @@ export type LibraryUiAction =
   | { type: 'libraryUi/CLEAR_SELECTION' }
   // §14 Q5: selects exactly `ids` (the visible list); an empty array selects none but stays selecting.
   | { type: 'libraryUi/SELECT_ALL'; ids: readonly string[] }
-  | { type: 'libraryUi/SET_TAB'; tab: LibraryTab }
+  | { type: 'libraryUi/SET_FILTERS'; filters: DocumentFilters }
+  | { type: 'libraryUi/CLEAR_FILTERS' }
+  // §17 U7: select `id` alone (selection mode on) and scroll Files to it.
+  | { type: 'libraryUi/REVEAL'; id: string; select?: boolean }
+  | { type: 'libraryUi/REVEALED' }
   | { type: 'libraryUi/SET_SEARCH'; search: string }
   | { type: 'libraryUi/TOGGLE_SEARCH_OPEN' }
   // §17 U6, Home's search bar: Files with an empty search open and focused.
@@ -101,9 +109,16 @@ export function libraryUiReducer(state: LibraryUiState, action: LibraryUiAction 
       return { ...state, selection: NO_SELECTION, selMode: false };
     case 'libraryUi/SELECT_ALL':
       return { ...state, selection: new Set(action.ids), selMode: true };
-    case 'libraryUi/SET_TAB':
-      if (state.tab === action.tab && state.activeCourseId === null) return state;
-      return { ...state, tab: action.tab, activeCourseId: null };
+    case 'libraryUi/SET_FILTERS':
+      return state.filters === action.filters ? state : { ...state, filters: action.filters };
+    case 'libraryUi/CLEAR_FILTERS':
+      return state.filters === NO_FILTERS ? state : { ...state, filters: NO_FILTERS };
+    case 'libraryUi/REVEAL':
+      return action.select
+        ? { ...state, revealId: action.id, selection: new Set([action.id]), selMode: true }
+        : { ...state, revealId: action.id };
+    case 'libraryUi/REVEALED':
+      return state.revealId === null ? state : { ...state, revealId: null };
     case 'libraryUi/SET_SEARCH': {
       const searchResultIds = action.search.trim() ? state.searchResultIds : null;
       if (state.search === action.search && state.searchResultIds === searchResultIds) return state;
@@ -133,8 +148,15 @@ export function libraryUiReducer(state: LibraryUiState, action: LibraryUiAction 
       const selection = without(state.selection, action.ids);
       return selection === state.selection ? state : { ...state, selection };
     }
-    case 'library/DELETE_COURSE':
-      return state.activeCourseId === action.id ? { ...state, activeCourseId: null } : state;
+    case 'library/DELETE_COURSE': {
+      // A filter on the deleted course would narrow the list to nothing, with no chip to name it.
+      const filters = state.filters.courseIds.includes(action.id)
+        ? { ...state.filters, courseIds: state.filters.courseIds.filter((id) => id !== action.id) }
+        : state.filters;
+      const activeCourseId = state.activeCourseId === action.id ? null : state.activeCourseId;
+      if (filters === state.filters && activeCourseId === state.activeCourseId) return state;
+      return { ...state, filters, activeCourseId };
+    }
     case 'library/DELETE_DEADLINE':
       return state.highlightDeadlineId === action.id ? { ...state, highlightDeadlineId: null } : state;
     default:

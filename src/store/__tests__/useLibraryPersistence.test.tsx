@@ -8,6 +8,7 @@ import * as libraryRepo from '../../services/persistence/libraryRepo';
 import { loadAll } from '../../services/persistence/libraryRepo';
 import { AppStateProvider, useAppState } from '../AppStateContext';
 import { useLibraryPersistence } from '../useLibraryPersistence';
+import { NO_FILTERS } from '../../services/library/documentFilters';
 
 type Ctx = ReturnType<typeof useAppState>;
 
@@ -92,7 +93,7 @@ describe('useLibraryPersistence', () => {
         dispatch({ type: 'libraryUi/SET_SEARCH_RESULT_IDS', ids: ['a'] });
         dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true });
         dispatch({ type: 'libraryUi/TOGGLE_SELECTION', id: 'a' });
-        dispatch({ type: 'libraryUi/SET_TAB', tab: 'starred' });
+        dispatch({ type: 'libraryUi/SET_FILTERS', filters: { ...NO_FILTERS, starred: true } });
         dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id: 'c1' });
         dispatch({ type: 'libraryUi/SET_INDEXING', progress: { documentId: 'a', done: 1, total: 9 } });
       });

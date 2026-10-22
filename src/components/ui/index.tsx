@@ -20,6 +20,8 @@ export type { MenuItem, MenuProps, MenuSection } from './Menu';
 export { clampProgress, ProgressBar } from './ProgressBar';
 export type { ProgressBarProps } from './ProgressBar';
 export { HEADER_BAR_HEIGHT, ScreenHeader, useScreenHeader } from './ScreenHeader';
+export { Sheet } from './Sheet';
+export type { SheetProps } from './Sheet';
 export type { HeaderAction, ScreenHeaderProps, ScreenHeaderScroll } from './ScreenHeader';
 export { Skeleton } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';

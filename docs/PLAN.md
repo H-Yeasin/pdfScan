@@ -360,7 +360,7 @@ away: Home · Files · [Scan] · Tools · Me.
 - [ ] U4 Illustrations and brand moments
 - [x] U5 The new shell: 4 tabs + the centre Scan button (Capture removed; Home always the start) (done in code 2026-10-22; device check open)
 - [x] U6 Home (done in code 2026-10-22; device check open)
-- [ ] U7 Files: folders, filters, sort, grid, row menus, Rename, checkboxes, safe merge/split, import
+- [x] U7 Files: folders, filters, sort, grid, row menus, Rename, checkboxes, safe merge/split, import (done in code 2026-10-22; device check open)
 - [ ] U8 Tools hub
 - [ ] U9 Review → Save → Done (mode after scanning, Submit sheet, `saveScan.ts`)
 - [ ] U10 Me (Settings)

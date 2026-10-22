@@ -8,7 +8,7 @@ import { CourseEditorSheet } from '../components/courses/CourseEditorSheet';
 import { DocTypeFilterChips } from '../components/courses/DocTypeChips';
 import { UNSORTED_COURSE_ID } from '../components/courses/CourseList';
 import { EmptyState } from '../components/shared/EmptyState';
-import { FileRow, FileRowGap } from '../components/library/FileRow';
+import { FileRow } from '../components/library/FileRow';
 import { SelectionBar } from '../components/library/SelectionBar';
 import { SelectAllButton } from '../components/library/SelectAllButton';
 import { useDocumentListActions, useOpenDocument } from '../components/library/useDocumentListActions';
@@ -46,13 +46,13 @@ export function CourseScreen() {
   const store = useAppStore();
   const { files, courses } = state.library;
   const { activeCourseId, selection, selMode, highlightDeadlineId } = state.libraryUi;
-  const { selectedDocs, handlePressRow, handleLongPress, handleSelectionTool, overlays } = useDocumentListActions();
+  const { selectedDocs, handlePressRow, handleLongPress, handleMore, handleSelectionTool, overlays } = useDocumentListActions();
   // §8 B3: "Export course…" (Unsorted: its documents).
   const { exportScope, overlay: exportOverlay } = useBackupExport();
   // Stable, so the memo'd FileRows only re-render when their own data changes (§9 O5).
   const onRowPress = useStableCallback(handlePressRow);
   const onRowLongPress = useStableCallback(handleLongPress);
-  const onRowStar = useStableCallback((doc: LibraryDocument) => dispatch({ type: 'library/TOGGLE_STAR', id: doc.id }));
+  const onRowMore = useStableCallback(handleMore);
   const [editing, setEditing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<DocType | null>(null);
 
@@ -93,10 +93,10 @@ export function CourseScreen() {
         selectionMode={selMode}
         onPress={onRowPress}
         onLongPress={onRowLongPress}
-        onToggleStar={onRowStar}
+        onMore={onRowMore}
       />
     ),
-    [selection, selMode, onRowPress, onRowLongPress, onRowStar]
+    [selection, selMode, onRowPress, onRowLongPress, onRowMore]
   );
   // §5 T5: bookmarked pages across this course's documents (3 shown until "Show all").
   const bookmarked = useMemo(
@@ -285,10 +285,9 @@ export function CourseScreen() {
           <FlashList
             data={shownDocs}
             keyExtractor={docKey}
-            ItemSeparatorComponent={FileRowGap}
             // Room for the floating Scan button above the navigation bar; while selecting, the
             // SelectionBar (a BottomBar) sits below the list and clears the bar itself.
-            contentContainerStyle={{ padding: spacing.lg, paddingBottom: selMode ? spacing.lg : 96 + insets.bottom }}
+            contentContainerStyle={{ paddingVertical: spacing.sm, paddingBottom: selMode ? spacing.lg : 96 + insets.bottom }}
             ListFooterComponent={
               <>
                 {archivedCount > 0 ? (

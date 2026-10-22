@@ -35,6 +35,11 @@ export type ActionId =
   | 'delete'
   | 'select'
   | 'selectAll'
+  | 'open'
+  | 'archive'
+  | 'exportZip'
+  | 'gridView'
+  | 'listView'
   // Convert and edit
   | 'convertToPdf'
   | 'convertToWord'
@@ -110,6 +115,12 @@ export const ICONS: Record<ActionId, IoniconName> = {
   delete: 'trash-outline',
   select: 'checkmark-circle-outline',
   selectAll: 'checkmark-done-outline',
+  // §17 U7: Files' row menu, selection bar and toolbar.
+  open: 'open-outline',
+  archive: 'archive-outline',
+  exportZip: 'file-tray-full-outline',
+  gridView: 'grid-outline',
+  listView: 'reorder-three-outline',
 
   convertToPdf: 'document-outline',
   convertToWord: 'document-text-outline',

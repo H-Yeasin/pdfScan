@@ -12,13 +12,8 @@ import { BottomBar } from '../BottomBar';
 import { Snackbar } from '../Snackbar';
 import { spacing } from '../../../theme';
 
-// §18 W10: the Reader's bars slide with Reanimated, which needs its native module (and so does
-// the package's own mock). The bar only needs a view and its style computed once.
-jest.mock('react-native-reanimated', () => ({
-  __esModule: true,
-  default: { View: jest.requireActual('react-native').View },
-  useAnimatedStyle: (style: () => object) => style(),
-}));
+// §18 W10: the Reader's bars slide with Reanimated; the shared mock (jest.config.js) computes each
+// animated style once, and gives Files' kit pieces their animated components.
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../SignatureCaptureModal', () => ({ SignatureCaptureModal: () => null }));
 jest.mock('../SignatureModal', () => ({ SignatureModal: () => null }));

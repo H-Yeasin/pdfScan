@@ -8,6 +8,7 @@ import type { CaptureMode, EnhanceMode, OcrScript, StudentProfile } from '../../
 import type { AutoBackupFrequency } from '../../services/backup/schedule';
 import { DEFAULT_APP_LOCK, type AppLockSettings } from '../../services/security/appLock';
 import { DEFAULT_READING, type ReadingSettings } from '../../services/documents/readingSettings';
+import { DEFAULT_FILES_VIEW, type FilesView } from '../../services/library/filesView';
 
 export type SettingsState = {
   // False until persisted settings have been read, so behaviour that depends on them (like
@@ -87,6 +88,8 @@ export type SettingsState = {
   appSessions: number;
   // §12 D2: the Reader's layout, night overlay and keep-awake (services/documents/readingSettings).
   reading: ReadingSettings;
+  // §17 U7: Files' order and list or grid (services/library/filesView).
+  filesView: FilesView;
 };
 
 export const initialSettingsState: SettingsState = {
@@ -123,6 +126,7 @@ export const initialSettingsState: SettingsState = {
   appLock: DEFAULT_APP_LOCK,
   appSessions: 0,
   reading: DEFAULT_READING,
+  filesView: DEFAULT_FILES_VIEW,
 };
 
 // The user's "apply to all" choice for this mode wins over the mode's built-in default.
@@ -172,7 +176,8 @@ export type SettingsAction =
   // The stored count plus this start.
   | { type: 'settings/COUNT_SESSION'; stored: number }
   // A partial patch: each reading option changes on its own.
-  | { type: 'settings/SET_READING'; reading: Partial<ReadingSettings> };
+  | { type: 'settings/SET_READING'; reading: Partial<ReadingSettings> }
+  | { type: 'settings/SET_FILES_VIEW'; view: Partial<FilesView> };
 
 export function settingsReducer(state: SettingsState, action: SettingsAction): SettingsState {
   switch (action.type) {
@@ -246,6 +251,11 @@ export function settingsReducer(state: SettingsState, action: SettingsAction): S
       return { ...state, appLock: { ...state.appLock, ...action.appLock } };
     case 'settings/SET_READING':
       return { ...state, reading: { ...state.reading, ...action.reading } };
+    case 'settings/SET_FILES_VIEW': {
+      const view = { ...state.filesView, ...action.view };
+      if (view.layout === state.filesView.layout && view.sort.key === state.filesView.sort.key && view.sort.dir === state.filesView.sort.dir) return state;
+      return { ...state, filesView: view };
+    }
     default:
       return state;
   }

@@ -66,6 +66,8 @@ export type PersistedSettings = {
   appSessions?: number;
   // Optional: added in §12 D2 (read by normalizeReading).
   reading?: unknown;
+  // Optional: added in §17 U7 (read by normalizeFilesView).
+  filesView?: unknown;
 };
 
 async function readSettings(): Promise<PersistedSettings | null> {

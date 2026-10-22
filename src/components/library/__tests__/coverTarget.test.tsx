@@ -7,7 +7,8 @@ import { AppStateProvider, useAppState } from '../../../store/AppStateContext';
 import { AcademicOptionsScreen } from '../../../screens/AcademicOptionsScreen';
 import { makeDoc } from '../../../test/fixtures';
 import { addCoverToDocument } from '../../../services/persistence/addCover';
-import { SelectionBar } from '../SelectionBar';
+import { blockedReason, moreMenuSections } from '../fileTools';
+import { t } from '../../../i18n';
 import { useOpenCoverOptions } from '../useCoverTarget';
 import type { LibraryDocument } from '../../../types/models';
 
@@ -27,39 +28,26 @@ const metrics = { frame: { x: 0, y: 0, width: 360, height: 780 }, insets: { top:
 const pdf = makeDoc({ id: 'pdf', name: 'Notes', format: 'PDF' });
 const docx = makeDoc({ id: 'docx', name: 'Essay', format: 'DOCX', pages: [] });
 
-function renderBar(selectedDocs: LibraryDocument[], onPress = jest.fn()) {
-  let root!: ReactTestRenderer;
-  act(() => {
-    root = create(
-      <SafeAreaProvider initialMetrics={metrics}>
-        <ThemeProvider>
-          <SelectionBar selectedDocs={selectedDocs} onPress={onPress} />
-        </ThemeProvider>
-      </SafeAreaProvider>
-    );
-  });
-  const cover = root.root.find((n) => n.props.testID === 'selection-tool-cover' && typeof n.type !== 'string');
-  const dimmed = (cover.props.style as unknown[]).some((s) => !!s && (s as { opacity?: number }).opacity === 0.38);
-  return { cover, dimmed, onPress };
+// §17 U7: Cover is under the selection bar's More. It never sits there greyed out: a selection it
+// can't run on says why (fileTools.blockedReason), shown as the item's hint and, on a tap, a snack.
+function coverItem(selectedDocs: LibraryDocument[]) {
+  const [section] = moreMenuSections(selectedDocs, t);
+  return section.items.find((item) => item.id === 'cover')!;
 }
 
-describe('§14 Q7 SelectionBar Cover', () => {
-  it('is enabled for one PDF', () => {
-    const { cover, dimmed, onPress } = renderBar([pdf]);
-    expect(cover.props.disabled).toBe(false);
-    expect(dimmed).toBe(false);
-    act(() => cover.props.onPress());
-    expect(onPress).toHaveBeenCalledWith('cover');
+describe('§14 Q7 / §17 U7 selection Cover', () => {
+  it('runs for one PDF', () => {
+    expect(blockedReason('cover', [pdf])).toBeNull();
+    expect(coverItem([pdf]).hint).toBeUndefined();
   });
 
-  it('is disabled for two documents', () => {
-    expect(renderBar([pdf, makeDoc({ id: 'pdf2' })]).cover.props.disabled).toBe(true);
+  it('says one at a time for two documents', () => {
+    expect(blockedReason('cover', [pdf, makeDoc({ id: 'pdf2' })])).toBe('library.why.oneAtATime');
   });
 
-  it('is dimmed but tappable for a DOCX, to say why', () => {
-    const { cover, dimmed } = renderBar([docx]);
-    expect(dimmed).toBe(true);
-    expect(cover.props.disabled).toBe(false);
+  it('says to convert first for a DOCX', () => {
+    expect(blockedReason('cover', [docx])).toBe('library.cover.convertFirst');
+    expect(coverItem([docx]).hint).toBe(t('library.cover.convertFirst'));
   });
 });
 

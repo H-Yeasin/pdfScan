@@ -50,7 +50,8 @@ describe('libraryRepo', () => {
 
     const loaded = await loadAll(await getDb());
     expect(loaded.courses).toEqual([course]);
-    expect(loaded.documents[0]).toEqual({ ...doc, contentUri: undefined, sourceKind: undefined });
+    // §17 U7: updated_at comes back as the document's updatedAt.
+    expect(loaded.documents[0]).toEqual({ ...doc, contentUri: undefined, sourceKind: undefined, updatedAt: expect.any(Number) });
   });
 
   it("keeps a page's full-page layout (ID cards) through a save and reload", async () => {

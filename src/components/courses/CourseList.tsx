@@ -1,3 +1,4 @@
+import { UNSORTED_COURSE_ID } from '../../services/library/documentFilters';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
@@ -12,7 +13,8 @@ import { useT } from '../../i18n/useT';
 
 // Sentinel id for the synthetic "Unsorted" bucket — never a real Course.id,
 // so it can share the same activeCourseId slot as real course ids.
-export const UNSORTED_COURSE_ID = '__unsorted__';
+// It lives with Files' filters now (§17 U7); exported here for the screens that took it from here.
+export { UNSORTED_COURSE_ID };
 
 type CourseListProps = {
   counts: Record<string, number>;

@@ -164,6 +164,11 @@ export type LibraryDocument = {
   contentUri?: string;
   sizeBytes: number;
   createdAt: number;
+  // §17 U7: when it last changed (documents.updated_at: a save, an edit, a rename, a move, a star;
+  // never reading it, services/library/documentEdits). Files' "Date modified" sorts by it. Loaded
+  // from the database and kept by the reducer; undefined for a document made in this session and
+  // not changed since, which reads as createdAt (documentSort.modifiedAt).
+  updatedAt?: number;
   star: boolean;
   tag?: string;
   // UI-only signal: no real PDF encryption is implemented. Every surface that shows

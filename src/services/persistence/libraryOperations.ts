@@ -101,14 +101,21 @@ type Combined = Pick<LibraryDocument, 'pages' | 'pdfUri' | 'sizeBytes' | 'source
 // All scans → rebuilt from the masters. Any imported PDF among them (§7 R2) → combined as PDFs
 // (pdfOps.mergePdfs): imported pages are copied untouched, keeping their text and quality; a scan
 // contributes its standard PDF (standardPdfOf); the result is a PDF-level document.
+// `newIds` (§17 U7) collects old page id → new page id for the pages copied under a new id, so
+// their marks can be copied after them (copyMarks).
 async function combineInto(
   documentId: string,
   parts: readonly { doc: LibraryDocument; keepIds: boolean }[],
-  annotations: readonly Annotation[]
+  annotations: readonly Annotation[],
+  newIds?: Map<string, string>
 ): Promise<Combined> {
   const dir = getDocumentDir(documentId);
-  const rowFor = (doc: LibraryDocument, row: LibraryPage, keepIds: boolean, n: number) =>
-    doc.id === documentId ? row : copyPageInto(row, dir, n, { keepId: keepIds, byId: true });
+  const rowFor = (doc: LibraryDocument, row: LibraryPage, keepIds: boolean, n: number) => {
+    if (doc.id === documentId) return row;
+    const page = copyPageInto(row, dir, n, { keepId: keepIds, byId: true });
+    if (!keepIds) newIds?.set(row.id, page.id);
+    return page;
+  };
   // §18 W16: a part that goes away takes its rows along (keepIds), and a signature row's PNG is
   // a file of its document: it comes too.
   for (const { doc, keepIds } of parts) {
@@ -165,16 +172,55 @@ async function combineInto(
   return { pages, pdfUri: pdfResult.uri, sizeBytes: pdfResult.sizeBytes, pdfLayout: 'standard', pdfPageSize: pageSize };
 }
 
+// §17 U7: the marks (highlights, ink, notes, signatures) of pages copied under new ids, as new rows
+// on the copies. `documentFor` names the document each new page is in; a signature's PNG is copied
+// into that document's folder. Rows of pages that weren't copied are left out.
+export function copyMarks(
+  annotations: readonly Annotation[],
+  newIds: ReadonlyMap<string, string>,
+  documentFor: (newPageId: string) => string
+): Annotation[] {
+  const now = Date.now();
+  return annotations.flatMap((a) => {
+    const pageId = newIds.get(a.pageId);
+    if (!pageId) return [];
+    const documentId = documentFor(pageId);
+    copySignatureFiles([a], documentId);
+    return [{ ...a, id: createId('annot'), documentId, pageId, createdAt: now, updatedAt: now }];
+  });
+}
+
+// What a merge or split that keeps its originals adds: the new documents and their copied marks.
+export type CopiedDocuments = { docs: LibraryDocument[]; annotations: Annotation[] };
+
 // Merged output lands in the source docs' course only when they all share one; a merge combining
 // docs from different courses has no single obviously-correct destination, so it goes to Unsorted.
 // Pages keep their ids (see copyPageInto), so bookmarks and annotations follow them.
 export async function mergeDocuments(docs: LibraryDocument[], annotations: readonly Annotation[] = []): Promise<LibraryDocument> {
+  return mergeInto(docs, annotations, true);
+}
+
+// §17 U7: a merge that leaves the documents it was made from where they are. The merged pages get
+// new ids and the marks are copied onto them; the originals keep theirs.
+export async function mergeDocumentsKeeping(docs: LibraryDocument[], annotations: readonly Annotation[] = []): Promise<CopiedDocuments> {
+  const newIds = new Map<string, string>();
+  const doc = await mergeInto(docs, annotations, false, newIds);
+  return { docs: [doc], annotations: copyMarks(annotations, newIds, () => doc.id) };
+}
+
+async function mergeInto(
+  docs: LibraryDocument[],
+  annotations: readonly Annotation[],
+  keepIds: boolean,
+  newIds?: Map<string, string>
+): Promise<LibraryDocument> {
   const documentId = createId('doc');
   const name = `Merged_${docs.length}_files`;
   const combined = await combineInto(
     documentId,
-    docs.map((doc) => ({ doc, keepIds: true })),
-    annotations
+    docs.map((doc) => ({ doc, keepIds })),
+    annotations,
+    newIds
   );
   return {
     id: documentId,
@@ -202,6 +248,32 @@ export async function appendDocuments(target: LibraryDocument, sources: readonly
 // One document per page. Split output stays in the source document's course; pages keep their
 // ids. §7 R2: an imported PDF is split as a PDF (pdfOps.splitPdf), each page copied untouched.
 export async function splitDocument(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<LibraryDocument[]> {
+  return splitInto(doc, annotations, true);
+}
+
+// §17 U7: a split that keeps the document. The parts' pages get new ids and the marks are copied
+// onto them.
+export async function splitDocumentKeeping(doc: LibraryDocument, annotations: readonly Annotation[] = []): Promise<CopiedDocuments> {
+  const newIds = new Map<string, string>();
+  const docs = await splitInto(doc, annotations, false, newIds);
+  const docOfPage = new Map(docs.flatMap((part) => part.pages.map((p) => [p.id, part.id] as const)));
+  return { docs, annotations: copyMarks(annotations.filter((a) => a.documentId === doc.id), newIds, (pageId) => docOfPage.get(pageId)!) };
+}
+
+async function splitInto(
+  doc: LibraryDocument,
+  annotations: readonly Annotation[],
+  keepIds: boolean,
+  newIds?: Map<string, string>
+): Promise<LibraryDocument[]> {
+  // The page's copy in part `dir`; a new id is recorded for copyMarks. Moving rows (keepIds) bring
+  // their signature PNGs along; copied ones get theirs in copyMarks.
+  const copyPage = (row: LibraryPage, documentId: string): LibraryPage => {
+    const page = copyPageInto(row, getDocumentDir(documentId), 1, { keepId: keepIds });
+    if (keepIds) copySignatureFiles(annotations.filter((a) => a.documentId === doc.id && a.pageId === row.id), documentId);
+    else newIds?.set(row.id, page.id);
+    return page;
+  };
   if (isPdfLevel(doc)) {
     if (!doc.pdfUri) throw new Error(`splitDocument: ${doc.id} has no PDF`);
     const ids: string[] = [];
@@ -211,8 +283,7 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
     });
     return files.map((file, i): LibraryDocument => {
       const row = doc.pages[i];
-      const page = row ? copyPageInto(row, getDocumentDir(ids[i]), 1, { keepId: true }) : stubPage();
-      if (row) copySignatureFiles(annotations.filter((a) => a.documentId === doc.id && a.pageId === row.id), ids[i]);
+      const page = row ? copyPage(row, ids[i]) : stubPage();
       const name = `${doc.name}_p${i + 1}`;
       const indexed = !!page.thumbUri;
       return {
@@ -243,10 +314,8 @@ export async function splitDocument(doc: LibraryDocument, annotations: readonly 
   for (let i = 0; i < doc.pages.length; i++) {
     const source = doc.pages[i];
     const documentId = createId('doc');
-    const dir = getDocumentDir(documentId);
-    const page = copyPageInto(source, dir, 1, { keepId: true });
     // §18 W16: the page's signature rows follow it; their PNGs come along.
-    copySignatureFiles(annotations.filter((a) => a.documentId === doc.id && a.pageId === source.id), documentId);
+    const page = copyPage(source, documentId);
     const name = `${doc.name}_p${i + 1}`;
 
     // Always rebuilds a document.pdf, regardless of doc.format - the unified reader needs a real

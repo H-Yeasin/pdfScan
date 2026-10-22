@@ -672,8 +672,9 @@ As built (2026-10-22):
   `bootImports` and ratchet tests.
 
 ## U7 · Files (the Library) *(L)*
-Status: planned. JS only. Split point: (a) layout, filter sheet, sort, row menu, rename, import; (b)
-selection mode, bar, merge/split with progress + undo.
+Status: done in code (2026-10-22), both halves. JS only. Device check (Verification 7) open; never run on a
+phone. Split point: (a) layout, filter sheet, sort, row menu, rename, import; (b) selection mode, bar,
+merge/split with progress + undo.
 
 Goal: every document action is visible from the file itself, and the list reads like Google Files.
 
@@ -733,6 +734,87 @@ empty name refused, same name a no-op); the merge/split action with "keep origin
 adds a document; `a11yLabels` (checkbox state).
 
 Device check: Verification 7.
+
+As built (2026-10-22):
+- `LibraryScreen` (UI name "Files") is one FlashList: the header is `CourseFolders` (a tinted `Card` per
+  unarchived course with its count, Unsorted when it has documents, then a dashed Manage card →
+  `manageFolders`; hidden while searching), item 0 is `FilesToolbar` (sticky through
+  `stickyHeaderIndices`, spanning both columns in the grid through `overrideItemLayout`), then the
+  documents. Over it a large still `ScreenHeader` (Search, Import file, Select); in selection mode a
+  bar of its own: Close, "{n} selected" (polite live region), `SelectAllButton`. The old tabs
+  (`LibraryTabs`, `libraryUi.tab`, `SET_TAB`), `CourseFilterChips`, `SubmittedFilterChips` and the Courses
+  tab's `CourseList` in Files are gone; the course list stays on the Manage screen.
+- `services/library/documentFilters.ts` (`applyFilters`, `activeFilterCount`, `activeFilterChips`,
+  `withoutChip`, `importCourseId`; `UNSORTED_COURSE_ID` moved here, `CourseList` re-exports it):
+  courses and types match any of the picked, submitted / not submitted, bookmarked, starred, show
+  archived; archived documents are found by a search whatever the filter (K6). The filters are
+  `libraryUi.filters` (`SET_FILTERS`, `CLEAR_FILTERS`; a deleted course leaves them) and are **not**
+  saved: a list that opens narrowed by a forgotten filter looks like lost documents. The order and
+  list / grid are saved per device: `settings.filesView` (`services/library/filesView.ts`,
+  `settings/SET_FILES_VIEW`, `normalizeFilesView`). The plan put both in `librarySlice`; `library` is
+  only what is saved to the database, so they went to `libraryUi` and `settings`.
+- `FilterSheet` is on a new `components/ui/Sheet` (U3's first part, built early like W23's Menu: scrim,
+  handle, title, a scrolling body in a KeyboardAvoidingView, a pinned footer; no drag yet). The choices
+  are a draft until Apply; Clear empties it. Submitted and Bookmarked show only when any exist. Active
+  filters are removable `Chip`s under the toolbar; Starred is the toolbar's quick `FilterChip` and isn't
+  counted in Filter's badge.
+- Sort (`services/library/documentSort.ts`, `SortMenu` on `Menu`): date modified (default, newest
+  first), date created, name (numeric, case- and accent-blind `Intl.Collator`), size, course (the
+  courses' own order, Unsorted last both ways); each starts in its natural direction (`defaultDirFor`),
+  ties newest first then id. "Date modified" needed a date: `LibraryDocument.updatedAt` is loaded from
+  the existing `documents.updated_at` (no migration), and the reducer stamps it on the changes the
+  database counts as edits (UPDATE_FILE outside `NOT_EDITS`, star, move, type, archive), so the list
+  and the stored value agree. `NOT_EDITS` moved to `services/library/documentEdits.ts` (shared by
+  `libraryRepo.documentEdited` and the reducer) and now includes `updatedAt`.
+- `FileRow` is a `ListItem` (cover with course dot, star and lock; "N pages · size · modified"; a second
+  line for missing files, indexing or the search match; ⋯ "More for {name}"; a checkbox in selection
+  mode). Its star button went into the row menu and the Starred filter. `FileGridItem`: a card with the
+  3:4 cover, two lines of name, a ⋯; the check in the corner and a 2 dp accent border when selected.
+  `FileRowGap` is gone (the Course page uses the same rows with no gap).
+- Row ⋯ `Menu` (`components/library/fileTools.ts` `rowMenuSections`): Open, Share, Rename · Move to
+  course, Star/Remove star, Set type · Merge with…, Split into pages (not for one page), Compress, Sign,
+  Add cover (each only where `formatCapabilities` allows) · Delete. **A long-press still starts
+  selecting** (the plan gave a long-press to both the menu and selection; selecting is what a long-press
+  did and does in Google Files); the menu is the ⋯. "Merge with…" selects the row and asks for the
+  others. The Course page gets the same rows and menu (`useDocumentListActions` holds it).
+- Rename: `RenameSheet` (a `Sheet` with a `TextField`, prefilled and selected; Save off while
+  `renamedTo` says nothing would change, "Give it a name" when empty) → `documentActions.rename` →
+  `library/UPDATE_FILE { name }`. Shares already use the name (`shareService.shareFileName`). There is
+  no `searchHaystack` to rebuild (G4 removed it).
+- Selection bar: Share, Move, Merge, Delete and More (a `Menu` with Submit, Set type, Archive/Unarchive,
+  Export as zip, Split, Compress, Sign, Cover), five equal slots, no sideways scroll. A tool that can't
+  run is faded but answers with its reason in a snack (`fileTools.blockedReason`: "Select two or more
+  files to merge", "This works on one file at a time", "This works on PDFs and scans only", password,
+  "Convert to PDF first"); in More the reason is the item's hint. Share with several makes a zip
+  (§8 B3's export).
+- Merge and split: `KeepOriginalsSheet` (on `Sheet`, not U3's `useConfirm`, which isn't built) with a
+  "Delete the originals" checkbox, off by default; `TaskSheet` (a `Sheet` with an indeterminate
+  `ProgressBar`) while it runs, until U13's `useTask`. `runPageTool` (exported, tested without
+  rendering): keeping → `libraryOperations.mergeDocumentsKeeping` / `splitDocumentKeeping` (pages copied
+  under new ids, marks copied onto them by `copyMarks`, signature PNGs too) and `library/ADD_FILES`,
+  snack "Merged into "{name}" · Open"; deleting → the old `mergeDocuments` / `splitDocument` and
+  `REPLACE_FILES` at once, the folders after `services/library/pendingDeletes` `UNDO_WINDOW_MS` (8 s,
+  past the snack's 3.2 s so a queued snack still has a working Undo); Undo cancels it and replaces back
+  (`REPLACE_FILES` `submissions` brings back what the replace dropped) and deletes the new folders; an
+  Undo after the window says "Too late to undo". Closing the app inside the window leaves the folders as
+  orphans for Settings → Storage. The result is selected (merge) and scrolled to (`libraryUi/REVEAL`,
+  `REVEALED`). The Reader's Split (`documentActions.split`) still replaces the document.
+- Import file: `useImportFile` takes `{ stay, courseId }`; Files passes `stay` and the one filtered course
+  (`importCourseId`), so the document is added there (else Unsorted), scrolled to, and the snack says
+  "Added "{name}" · Open". Tools and the Scan sheet still open it (`stay` off).
+- Empty states: no documents → "Scan your first page" + Import file; a search with nothing → "Nothing
+  matches "{q}"" + Clear filters (or Clear search when no filter is on); filters with nothing → "Nothing
+  matches these filters" + Clear filters. They are `EmptyState` (inline, in the list's footer) until U4.
+- Icons: `ICONS.open`, `archive`, `exportZip`, `gridView`, `listView`.
+- Tests: `services/library/__tests__/{documentFilters,documentSort,rename}.test.ts` (every filter,
+  combined, archived rules, chips; every order, ties, Unsorted last; `normalizeFilesView`),
+  `components/library/__tests__/pageTools.test.ts` (keeping: no `deleteDocumentFiles`; deleting: once per
+  original, only after the window, fake timers; Undo in time and too late), `files.test.tsx` (import adds
+  under the filtered course and stays; `FileRow` is a checkbox with its state, the ⋯ calls back; Files
+  lists by the saved order and Starred narrows it), `librarySlice` (`updatedAt` stamps, `ADD_FILES`,
+  restored submissions), `libraryUiSlice` (filters, REVEAL), the updated `bulkDelete` and `coverTarget`
+  tests, plus the ratchet (Files' screen, row and bar are off the baseline), `a11yLabels`,
+  `hardcodedStrings` and `bootImports`.
 
 ## U8 · The Tools hub *(L)*
 Status: planned. JS only. Split point: (a) the hub + the pick → run → result flow for Organise and

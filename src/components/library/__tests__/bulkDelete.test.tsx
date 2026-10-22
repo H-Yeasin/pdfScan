@@ -29,7 +29,8 @@ const mixed = [
 ];
 
 describe('SelectionBar delete', () => {
-  it('is last and enabled for a mixed selection', () => {
+  // §17 U7: four tools and More; Delete is the last tool before More.
+  it('is the last tool before More and runs for a mixed selection', () => {
     const onPress = jest.fn();
     let root!: ReactTestRenderer;
     act(() => {
@@ -43,9 +44,9 @@ describe('SelectionBar delete', () => {
     });
     const tools = root.root.findAll((n) => typeof n.props.testID === 'string' && n.props.testID.startsWith('selection-tool-') && typeof n.type !== 'string');
     const ids = [...new Set(tools.map((n) => n.props.testID as string))];
-    expect(ids[ids.length - 1]).toBe('selection-tool-delete');
+    expect(ids).toEqual(['selection-tool-share', 'selection-tool-move', 'selection-tool-merge', 'selection-tool-delete', 'selection-tool-more']);
     const del = tools.find((n) => n.props.testID === 'selection-tool-delete')!;
-    expect(del.props.disabled).toBe(false);
+    expect(del.props.accessibilityState).toEqual({ disabled: false });
     act(() => del.props.onPress());
     expect(onPress).toHaveBeenCalledWith('delete');
   });

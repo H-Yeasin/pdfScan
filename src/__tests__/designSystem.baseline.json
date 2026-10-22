@@ -50,12 +50,6 @@
     "fontWeight": 1,
     "pressable": 9
   },
-  "components/courses/CourseFilterChips.tsx": {
-    "fontSize": 1,
-    "borderRadius": 1,
-    "fontWeight": 1,
-    "pressable": 1
-  },
   "components/courses/CourseList.tsx": {
     "fontSize": 7,
     "borderRadius": 1,
@@ -144,18 +138,7 @@
     "pressable": 3
   },
   "components/library/FileRow.tsx": {
-    "fontSize": 3,
-    "hexColor": 1,
-    "borderRadius": 1,
-    "fontWeight": 1,
-    "alert": 1,
-    "pressable": 3
-  },
-  "components/library/LibraryTabs.tsx": {
-    "fontSize": 1,
-    "borderRadius": 1,
-    "fontWeight": 1,
-    "pressable": 1
+    "alert": 1
   },
   "components/library/PageResults.tsx": {
     "fontSize": 4,
@@ -166,11 +149,6 @@
     "fontSize": 1
   },
   "components/library/SelectAllButton.tsx": {
-    "fontSize": 1,
-    "fontWeight": 1,
-    "pressable": 1
-  },
-  "components/library/SelectionBar.tsx": {
     "fontSize": 1,
     "fontWeight": 1,
     "pressable": 1
@@ -514,11 +492,6 @@
     "pressable": 1,
     "modal": 1
   },
-  "components/submit/SubmittedFilterChips.tsx": {
-    "fontSize": 1,
-    "fontWeight": 1,
-    "pressable": 1
-  },
   "screens/AcademicOptionsScreen.tsx": {
     "fontSize": 9,
     "fontWeight": 6,
@@ -546,12 +519,6 @@
     "fontSize": 6,
     "fontWeight": 3,
     "pressable": 7
-  },
-  "screens/LibraryScreen.tsx": {
-    "fontSize": 2,
-    "borderRadius": 1,
-    "fontWeight": 1,
-    "pressable": 4
   },
   "screens/ManageFoldersScreen.tsx": {
     "pressable": 1

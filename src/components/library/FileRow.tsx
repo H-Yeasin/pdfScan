@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { radii, spacing, useTheme } from '../../theme';
+import { Alert, StyleSheet, View } from 'react-native';
+import { ICON_SIZE, ICONS, radii, spacing, useTheme } from '../../theme';
 import type { LibraryDocument } from '../../types/models';
 import { formatBytes, formatRelativeDate } from '../../utils/format';
 import { isPageRasterFormat } from '../../services/documents/formatCapabilities';
+import { modifiedAt } from '../../services/library/documentSort';
 import { FileTypeIcon } from './FileTypeIcon';
 import { useT } from '../../i18n/useT';
 import { useAppSelector } from '../../store/AppStateContext';
@@ -13,150 +14,129 @@ import { useThumb } from '../shared/PageThumb';
 import { AppImage } from '../shared/AppImage';
 import { rotationStyle } from '../../utils/rotation';
 import { useRenderCount } from '../../utils/renderCounts';
-
-
-const LONG_PRESS_MS = 400;
+import { ListItem, Touchable } from '../ui';
 
 type FileRowProps = {
   doc: LibraryDocument;
   selected: boolean;
   selectionMode: boolean;
   matchSnippet?: string;
-  // The course's colour, shown as a dot before the name where rows from several courses mix
-  // (Library, search results). Undefined: no dot.
+  // The course's colour, shown as a dot on the cover where rows from several courses mix (Files,
+  // search results). Undefined: no dot.
   courseColor?: string;
   // Take the row's document, so the parent can pass one stable handler (`useStableCallback`) to
   // every row and `memo` can skip rows whose data didn't change (§9 O5).
   onPress: (doc: LibraryDocument) => void;
   onLongPress: (doc: LibraryDocument) => void;
-  onToggleStar: (doc: LibraryDocument) => void;
+  // §17 U7: the ⋯ that opens the row's menu (fileTools.rowMenuSections).
+  onMore: (doc: LibraryDocument) => void;
 };
 
-export const FileRow = memo(function FileRow({
-  doc,
-  selected,
-  selectionMode,
-  matchSnippet,
-  courseColor,
-  onPress,
-  onLongPress,
-  onToggleStar,
-}: FileRowProps) {
+// §17 U7: a document in a list, on the kit's ListItem: the cover, the name, what it is and when it
+// last changed, and a ⋯ for everything that can be done to it. In selection mode the row shows a
+// checkbox (TalkBack: "checkbox, checked") and the ⋯ steps aside.
+export const FileRow = memo(function FileRow({ doc, selected, selectionMode, matchSnippet, courseColor, onPress, onLongPress, onMore }: FileRowProps) {
   useRenderCount('FileRow');
-  const { tokens } = useTheme();
   const { t } = useT();
-  const cover = doc.pages[0];
-  // §16 G6: the 400 px thumbnail or the format's icon, never the master; a missing one is made.
-  const coverUri = useThumb(doc.id, cover);
   const indexNote = useIndexNote(doc);
 
+  const meta = `${isPageRasterFormat(doc.format) ? t('library.pages', { count: doc.pages.length }) : doc.format} · ${formatBytes(doc.sizeBytes)} · ${formatRelativeDate(modifiedAt(doc))}${doc.archived ? t('library.archivedSuffix') : ''}`;
+  // The second line carries what matters most right now: missing files, then the indexer, then the
+  // search match.
+  const note = doc.missingFiles ? t('library.filesMissing') : indexNote ?? (matchSnippet ? `“…${matchSnippet}…”` : undefined);
+
   return (
-    <Pressable accessibilityRole="button"
+    <ListItem
+      title={doc.name}
+      subtitle={note ? `${meta}\n${note}` : meta}
+      leading={<FileCover doc={doc} courseColor={courseColor} />}
+      trailing={selectionMode ? undefined : 'more'}
+      onMore={() => onMore(doc)}
+      moreLabel={t('library.rowMore', { name: doc.name })}
+      selected={selectionMode ? selected : undefined}
       onPress={() => onPress(doc)}
       onLongPress={() => onLongPress(doc)}
-      delayLongPress={LONG_PRESS_MS}
-      style={[
-        styles.row,
-        { backgroundColor: tokens.surface, borderColor: selected ? tokens.accent : tokens.edge },
-      ]}
-    >
-      <View style={[styles.cover, { backgroundColor: tokens.surface2 }]}>
-        {coverUri ? (
-          // The row is recycled (FlashList): keyed, so it never shows another document's cover.
-          <AppImage uri={coverUri} recyclingKey={doc.id} style={[styles.coverImage, rotationStyle(cover?.rotation)]} />
-        ) : (
-          <FileTypeIcon format={doc.format} size={18} />
-        )}
-        {doc.locked && (
-          <Pressable
-            style={styles.lockOverlay}
-            onPress={() => Alert.alert(t('library.notEncrypted'), t('library.lockDisclosure'))}
-            hitSlop={4}
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.lockInfo')}
-          >
-            <Ionicons name="lock-closed-outline" size={16} color="#fff" />
-          </Pressable>
-        )}
-      </View>
-
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          {courseColor ? <View style={[styles.courseDot, { backgroundColor: courseColor }]} /> : null}
-          <Text style={[styles.name, { color: tokens.ink }]} numberOfLines={1}>
-            {doc.name}
-          </Text>
-        </View>
-        <Text style={[styles.meta, { color: tokens.muted }]}>
-          {isPageRasterFormat(doc.format)
-            ? t('library.pages', { count: doc.pages.length })
-            : doc.format}{' '}
-          · {formatBytes(doc.sizeBytes)} · {formatRelativeDate(doc.createdAt)}
-          {doc.archived ? t('library.archivedSuffix') : ''}
-        </Text>
-        {doc.missingFiles ? (
-          <Text style={[styles.meta, { color: tokens.danger }]} numberOfLines={1}>
-            {t('library.filesMissing')}
-          </Text>
-        ) : null}
-        {indexNote ? (
-          <Text style={[styles.meta, { color: tokens.muted }]} numberOfLines={1}>
-            {indexNote}
-          </Text>
-        ) : null}
-        {matchSnippet ? (
-          <Text style={[styles.snippet, { color: tokens.accentInk }]} numberOfLines={1}>
-            “…{matchSnippet}…”
-          </Text>
-        ) : null}
-      </View>
-
-      {!selectionMode && (
-        <Pressable
-          onPress={() => onToggleStar(doc)}
-          hitSlop={12}
-          accessibilityRole="switch"
-          accessibilityLabel={t('a11y.star')}
-          accessibilityState={{ checked: !!doc.star }}
-        >
-          <Ionicons
-            name={doc.star ? 'star' : 'star-outline'}
-            size={19}
-            color={doc.star ? tokens.accent : tokens.muted}
-          />
-        </Pressable>
-      )}
-    </Pressable>
+      accessibilityHint={selectionMode ? undefined : t('library.rowHint')}
+      testID={`file-row-${doc.id}`}
+    />
   );
 });
 
-// The space between two rows of a document list. FlashList's content style takes padding only
-// (no `gap`), so the lists pass this as their ItemSeparatorComponent (§16 G6).
-export function FileRowGap() {
-  return <View style={styles.gap} />;
+// The 400 px thumbnail (§16 G6) or the format's icon, with the course dot, a star and the lock.
+export function FileCover({ doc, courseColor, large = false }: { doc: LibraryDocument; courseColor?: string; large?: boolean }) {
+  const { tokens } = useTheme();
+  const { t } = useT();
+  const cover = doc.pages[0];
+  const coverUri = useThumb(doc.id, cover);
+
+  return (
+    <View style={[large ? styles.coverLarge : styles.cover, { backgroundColor: tokens.surface2 }]}>
+      {coverUri ? (
+        // The row is recycled (FlashList): keyed, so it never shows another document's cover.
+        <AppImage uri={coverUri} recyclingKey={doc.id} style={[styles.coverImage, rotationStyle(cover?.rotation)]} />
+      ) : (
+        <FileTypeIcon format={doc.format} size={large ? 28 : 18} />
+      )}
+      {courseColor ? <View style={[styles.courseDot, { backgroundColor: courseColor, borderColor: tokens.surface }]} /> : null}
+      {doc.star ? (
+        <View style={[styles.star, { backgroundColor: tokens.surface }]} accessible accessibilityLabel={t('library.starredLabel')}>
+          <Ionicons name="star" size={ICON_SIZE.inline - 4} color={tokens.highlight} />
+        </View>
+      ) : null}
+      {doc.locked ? (
+        <Touchable
+          style={[styles.lockOverlay, { backgroundColor: tokens.scrim }]}
+          onPress={() => Alert.alert(t('library.notEncrypted'), t('library.lockDisclosure'))}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.lockInfo')}
+          scale={false}
+        >
+          <Ionicons name={ICONS.lock} size={ICON_SIZE.inline} color={tokens.surface} />
+        </Touchable>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  gap: {
-    height: spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: 1.5,
-  },
   cover: {
     width: 40,
     height: 52,
     borderRadius: radii.thumb,
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverLarge: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: radii.thumb,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   coverImage: {
     width: '100%',
     height: '100%',
+  },
+  courseDot: {
+    position: 'absolute',
+    left: spacing.xs,
+    top: spacing.xs,
+    width: 10,
+    height: 10,
+    borderRadius: radii.full,
+    borderWidth: 1.5,
+  },
+  star: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 16,
+    height: 16,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   lockOverlay: {
     position: 'absolute',
@@ -164,36 +144,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(32,30,29,.55)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  info: {
-    flex: 1,
-    minWidth: 0,
-    gap: 3,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  courseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  name: {
-    flexShrink: 1,
-    fontSize: 15.5,
-    fontWeight: '500',
-  },
-  meta: {
-    fontSize: 13,
-  },
-  snippet: {
-    fontSize: 12.5,
-    fontFamily: 'monospace',
   },
 });
 
