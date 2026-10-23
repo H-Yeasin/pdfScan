@@ -1,0 +1,33 @@
+# §19 J2, "find it again": a cold start with the seeded library, Files, search a word that is
+# inside the scans, open the first result. scripts/perf/README.md runs it under Flashlight; on its
+# own: `maestro test .maestro/j2-find.yaml`.
+# Needs: the 500-document seed with word boxes (Me → Developer → Filter Lab → "Seed with word
+# boxes", in a dev build of the same commit), then the release build installed over it.
+appId: com.yeasin.pdfscan
+name: J2 find it again
+env:
+  # A word from the seed's vocabulary (src/dev/seedLibrary.ts WORDS).
+  QUERY: matrix
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: tab-library
+    timeout: 20000
+- tapOn:
+    id: tab-library
+- tapOn:
+    id: files-search
+- inputText: ${QUERY}
+- extendedWaitUntil:
+    visible:
+      id: "file-row-.*"
+    timeout: 5000
+- tapOn:
+    id: "file-row-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: reader-tool-bar
+    timeout: 15000

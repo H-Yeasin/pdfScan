@@ -50,6 +50,12 @@ temp_interactive_push.bat
 modules/*/android/build/
 modules/*/ios/build/
 
+# §19 measurements (scripts/perf/README.md): each phone's photo-picker taps, the test files, and
+# the traces and numbers, which go into docs/qa/performance.md by hand.
+.maestro/local/
+perf-fixtures/
+perf-results/
+
 # Firebase config files come from EAS file environment variables (docs/firebase.md)
 google-services.json
 GoogleService-Info.plist

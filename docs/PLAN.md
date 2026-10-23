@@ -408,6 +408,22 @@ and DOCX/XLSX/CSV/TXT without their glitches. `react-native-pdf-jsi` is removed.
 janky frames, resumes on the right page with no jump, and zoom and position survive Find, selection,
 Mark and Sign; a 5 MB XLSX opens in under 3 s; Find shows "n of N" with prev/next in every format; and
 nothing is ever hidden under the bars, in portrait or landscape.
+
+### §19 Measure on the students' phones *(planned 2026-10-23; before §11)*
+Goal: make the three core journeys (J1 first scan to the teacher, J2 find it again, J3 read a big PDF)
+fast and easy on the phone a Bangladeshi student owns, and prove it with device measurements and real
+students rather than code review.
+
+**Detailed steps:** [`docs/plan/19-measure.md`](plan/19-measure.md)
+
+- [x] X1 Instruments: trace marks, `reportFullyDrawn`, profileable builds, Maestro flows, `scripts/perf` (done in code 2026-10-23; needs a new build; device check open)
+- [ ] X2 Baselines on phones (a) and (b), and the ranked problem list
+- [ ] X3 Fix the top three, each kept only if the numbers say so
+- [ ] X4 Usability study, 5 students a round (the kit is done: `docs/qa/usability-study.md`; the rounds are open)
+
+**Done when:** on a 2–3 GB phone every budget in `docs/qa/performance.md` §19 is met or has a written
+reason, 4 of 5 first-time students finish J1 unaided in under 90 s, and the Play pre-launch report shows
+no crashes or ANRs.
 ---
 
 ## 5. Phases

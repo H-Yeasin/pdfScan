@@ -1,0 +1,71 @@
+# §19 J3, "read a big PDF": open the 300-page PDF, fling through it, Find a word, highlight a word,
+# share (the export writes the mark into the copy that leaves the app).
+# Needs, once: the PDF from `node scripts/perf/make-fixtures.mjs` (or a real textbook; write down
+# which) pushed with scripts/perf/push-fixtures.sh, imported through Files → Import, and indexed
+# (wait until its row stops showing progress).
+appId: com.yeasin.pdfscan
+name: J3 big PDF
+env:
+  # The generated PDF's name; with a real textbook, its name in Files.
+  BOOK: pdfscan-300p
+  # On every page of the generated PDF (make-fixtures.mjs).
+  WORD: photosynthesis
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: tab-library
+    timeout: 20000
+- tapOn:
+    id: tab-library
+- tapOn:
+    id: files-search
+- inputText: ${BOOK}
+- tapOn:
+    id: "file-row-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: reader-tool-bar
+    timeout: 15000
+
+# Ten flings, the way a student hunts for a chapter.
+- repeat:
+    times: 10
+    commands:
+      - swipe:
+          start: 50%, 80%
+          end: 50%, 20%
+          duration: 120
+
+# The bars hide while scrolling; a tap on the page brings them back.
+- tapOn:
+    point: 50%, 50%
+- tapOn:
+    id: reader-find
+- inputText: ${WORD}
+- tapOn:
+    id: reader-find-next
+- tapOn:
+    id: reader-find-next
+- pressKey: back
+
+# A long press selects the word under the finger; every line of the generated pages is text.
+- longPressOn:
+    point: 50%, 45%
+- tapOn:
+    id: select-highlight
+
+# Share: the system share sheet opens once the marked copy is written; leave it without sending.
+- tapOn:
+    point: 50%, 50%
+- tapOn:
+    id: reader-more
+- tapOn:
+    id: menu-share
+- extendedWaitUntil:
+    notVisible:
+      id: reader-tool-bar
+    timeout: 20000
+- pressKey: back

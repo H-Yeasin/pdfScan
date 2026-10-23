@@ -1,0 +1,18 @@
+# §19 J1: the photo picker's taps. The picker belongs to Android (or Google Photos), not to PDF Scan,
+# and its ids change between Android versions, so each phone gets its own copy:
+#   mkdir -p .maestro/local && cp .maestro/pick-photos.example.yaml .maestro/local/pick-photos.yaml
+# then check every id below in `maestro studio` with the picker open (.maestro/local/ is not committed).
+# This one is for Android 13–15's system photo picker, newest photos first: the 20 pushed photos are
+# the first 20 cells when nothing newer was taken since push-fixtures.sh.
+appId: com.yeasin.pdfscan
+---
+- evalScript: ${output.cell = 0}
+- repeat:
+    times: 20
+    commands:
+      - tapOn:
+          id: "com.google.android.providers.media.module:id/icon_thumbnail"
+          index: ${output.cell}
+      - evalScript: ${output.cell = output.cell + 1}
+- tapOn:
+    text: "Add.*"

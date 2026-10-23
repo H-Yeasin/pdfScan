@@ -1,0 +1,56 @@
+# §19 J1, "first scan to the teacher", timed half: 20 photos of the same 20 sheets through Home →
+# Import photos (the same ingest as the scanner, plus our auto-crop), Review (auto-crop one page,
+# B&W on it), Save, Done. The clock in the trace starts at 'pdfscan.scan.batch', when the picker
+# hands the photos over, so the picker's own taps don't count.
+# The scanner half of J1 (Google's scanner, then Submit to WhatsApp) is done by hand, 5 times, on
+# a screen recording: neither can be driven the same way twice.
+# Needs: the 20 photos pushed with scripts/perf/push-fixtures.sh, and .maestro/local/pick-photos.yaml
+# recorded for this phone (copy pick-photos.example.yaml; `maestro studio` shows the picker's ids).
+appId: com.yeasin.pdfscan
+name: J1 gallery scan
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: home-import-photos
+    timeout: 20000
+- tapOn:
+    id: home-import-photos
+- runFlow: local/pick-photos.yaml
+
+# Review: every page in, then the snack ("Added 20 pages").
+- extendedWaitUntil:
+    visible:
+      id: review-next
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Added .*"
+    timeout: 180000
+
+- tapOn:
+    id: review-tool-crop
+- tapOn:
+    id: crop-auto
+- tapOn:
+    id: crop-confirm
+- tapOn:
+    id: review-tool-filter
+- tapOn:
+    id: filter-bw
+
+- tapOn:
+    id: review-next
+- extendedWaitUntil:
+    visible:
+      id: save-save
+    timeout: 15000
+- tapOn:
+    id: save-save
+- extendedWaitUntil:
+    visible:
+      id: done-done
+    timeout: 300000
+- tapOn:
+    id: done-done

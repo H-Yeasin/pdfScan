@@ -14,6 +14,9 @@ each set of numbers. A budget that's missed blocks the release, or gets a writte
 | 4 | A scan's progress updates | re-render only the progress UI |
 | 5 | Memory while processing a 20-page scan | under 350 MB |
 
+Since §19 (2026-10-23) these budgets, and the Reader's, are measured per journey on a students'
+phone with the scripts in `scripts/perf/`: see "§19: the three journeys" at the end of this file.
+
 ## How to measure
 
 **Seed the library first:** Settings → Developer → Filter Lab → **Seed library (500 docs)**
@@ -276,3 +279,87 @@ Checks (yes / no, with a note):
 | Date | Phone | Annotations: pdfium draws the highlight, old `renderPage` doesn't | Turned PDF: size and tile the right way up | `[pw]` opens; wrong password → `PdfWrongPasswordError`; none → `PdfEncryptedError` | Links and outline listed | Colour matrix (inverted image) | Image decode + region | Works again after 60 s idle | Rotation unlock under `"portrait"` |
 |---|---|---|---|---|---|---|---|---|---|
 | | | | | | | | | | |
+
+## §19: the three journeys on the students' phones
+
+`docs/plan/19-measure.md` has the why. These are the numbers that decide what gets fixed (§19 X2) and
+whether a fix stays (X3). How to build, set up and run everything: `scripts/perf/README.md`.
+
+**Phones:** (a) a 2–3 GB entry Android phone, the kind most students carry; (b) the ~4 GB phone of the
+sections above. **Builds:** release, profileable, one named commit per row. Every row says which phone,
+its Android version and the commit (`scripts/perf/*.sh` print all three). With a real textbook in place
+of `pdfscan-300p.pdf`, say which.
+
+### Budgets
+
+Written before the numbers. They hold on phone (a); a miss blocks the release or gets a written reason.
+
+| # | Budget | Target | Read from | From |
+|---|---|---|---|---|
+| 1 | Cold start to a usable start screen | median under 2 s | `cold-start.sh` "Fully drawn" | §9 O5 budget 1 |
+| 2 | Files scroll, 500 documents | ≤ 5 % janky frames | `frames.sh` | O5 budget 2, §16 |
+| 3 | Search answer after the debounce | under 150 ms | the trace: `files.search` | O5 budget 3 |
+| 4 | Memory during a 20-page save | under 350 MB PSS | `meminfo.sh` peak | O5 budget 5 |
+| 5 | Reader, `[300p]` open → first image | ≤ 1.2 s cold, ≤ 600 ms warm | the trace: `nav.reader` → `reader.firstImage` | §18 |
+| 6 | Reader memory after flinging `[300p]` | under 350 MB PSS | `meminfo.sh` | §18 |
+| 7 | Photos handed over → first page in Review | about 1 s | the trace: `scan.batch` start → `scan.firstPage` | §16 G7 |
+| 8 | Tap → first visible change | under 100 ms | a second phone filming at 240 fps, or the trace's input event → the next frame | §19 |
+| 9 | An unsaved scan survives the app being killed | the pages are still in Review | the "killed while scanning" run below | §19 |
+| 10 | J1 by a first-time student | 4 of 5 finish unaided, in under 90 s | `docs/qa/usability-study.md` | §9 O6, §19 |
+
+**Keeping a change (X3):** 10 runs before and 10 after, same phone, same build settings, only the
+change between the two commits. It counts when the after-median is outside the before-IQR
+(`scripts/perf/common.sh` `summarise` prints both). Otherwise it's noise, and the change goes.
+
+### Trace vocabulary
+
+What the app writes into a release build's trace (`src/utils/trace.ts`). In ui.perfetto.dev, search
+`pdfscan.` plus the name. A **mark** is a moment (a thin slice on the JS thread); a **stretch** is an
+async slice from its start to its end. Names never carry document text.
+
+| Name | Kind | Where | What it brackets |
+|---|---|---|---|
+| `boot.firstScreen` | mark | `AppNavigator` | boot done: the start screen is chosen and drawn, under the splash intro |
+| `boot.usable` | mark | `SplashIntro` (`reportFullyDrawn`) | the intro is gone: the start screen is what the student sees ("Fully drawn") |
+| `boot.loadLibrary` | stretch | `useLibraryPersistence` | opening the database and reading the library |
+| `nav.<screen>`, `tab.<tab>`, `nav.back` | mark | `navigation/router.tsx` | a change of screen asked for (the tap that caused it is just before) |
+| `scan.batch` | stretch | `ingestBatch` | the scanner or the picker hands the images over → every page is in the session |
+| `scan.page` | stretch | `ingestBatch` | one page: master and thumbnail (and auto-crop for photos) |
+| `scan.firstPage` | mark | `ingestBatch` | the first page goes into Review |
+| `scan.readPage` | stretch | `ingestBatch` (readTexts) | one page's filter stats and text, after the batch |
+| `save` | stretch | `saveScan` | the whole save, from the Save tap |
+| `save.render`, `save.ocr`, `save.pdf`, `save.files` | stretch | `saveScan` | a page's render; reading its text; building `document.pdf`; moving the files into the library |
+| `pdf.open` | stretch | `pdfNative.openDocument` | pdfium opening a PDF |
+| `reader.render` | stretch | `useRenderQueue` | one page or tile render |
+| `reader.firstImage` | mark | `useRenderQueue` | the open document's first rendered image |
+| `files.search` | stretch | `LibraryScreen` | the full-text query, from the debounce to its answer |
+
+Reading a journey off its trace: **J1** `scan.batch` (start → `scan.firstPage` → end), then `save` →
+`nav.done`; **J2** `tab.library` → `files.search` → `nav.reader` → `reader.firstImage`; **J3**
+`nav.reader` → `pdf.open` → `reader.firstImage`, then the flings' frames and `reader.render`s. Long
+slices on the app's main thread or `mqt_js` in between are where the time goes.
+
+### Stress runs
+
+On phone (a), by hand, once each per release candidate.
+
+| Run | How | What to write down |
+|---|---|---|
+| Killed while scanning | Developer options → "Don't keep activities" on. Scan 5 pages; in Review, switch to WhatsApp and back; then "Scan more" and come back | Are the pages still in Review? (budget 9) |
+| Little storage | Fill the phone until about 1 GB is free (`adb shell df -h /data`), then J1 with the 20 photos | Does the app warn before the scan? Does a save that runs out fail cleanly, with nothing half-written? |
+| Battery saver | On; J1 (timed) and J3 | The times, against a normal run |
+| Heat | Three J1 timed runs back to back, then a `trace.sh` of the fourth | The fourth's times; CPU frequency in the trace |
+| Memory pressure | J3 open, `adb shell am send-trim-memory com.yeasin.pdfscan RUNNING_CRITICAL`; then Home, `... COMPLETE`, and back | The Reader comes back sharp; nothing is lost |
+
+| Date | Phone | Commit | Killed while scanning | Little storage | Battery saver (J1 / J3) | Heat (4th J1) | Memory pressure |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
+
+### Results
+
+Medians of 10 (J1 by hand: of 5), with the IQR where the script prints one.
+
+| Date | Phone | Commit | Cold start: Fully drawn / TotalTime | J1: photos → first page / all 20 | J1: Save → Done | J1 by hand: scanner Save → Review / Submit sent | J2: search answer / tap → first image | Files jank % (p90 ms) | J3: open → first image, cold / warm | J3 fling jank % | Peak PSS: save / Reader | KB per page | APK MB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| | (a) | | | | | | | | | | | | |
+| | (b) | | | | | | | | | | | | |
