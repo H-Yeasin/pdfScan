@@ -14,6 +14,7 @@ import { ingestPage, pageFromMaster, readPage } from './ingest';
 import { beginProcessing, endProcessing } from './processingSession';
 import { processSequentially } from './processSequentially';
 import { logUsage } from '../telemetry/usage';
+import { traceBegin, traced, traceMark } from '../../utils/trace';
 
 export type IngestBatchOptions = {
   script: OcrScript;
@@ -130,7 +131,7 @@ async function readTexts(
       dispatch({ type: 'capture/UPDATE_PAGE', id: page.id, patch: { ocrPending: undefined } });
       continue;
     }
-    const { stats, ocr, ocrGeometry } = await readPage(page, script);
+    const { stats, ocr, ocrGeometry } = await traced('scan.readPage', () => readPage(page, script));
     if (stats) dispatch({ type: 'capture/SET_PAGE_STATS', id: page.id, uri: page.uri, stats });
     dispatch({ type: 'capture/UPDATE_PAGE', id: page.id, patch: { ocr, ocrGeometry, ocrPending: undefined } });
   }
@@ -174,13 +175,17 @@ export async function ingestBatch(
   const progressive = spec.postProcess !== 'idCard';
   const waiting: SessionPage[] = [];
 
+  // §19 X1: J1's clock starts here, when the scanner or the photo picker hands the images over;
+  // 'scan.firstPage' is the first page into Review, the stretch's end the last.
+  const endBatch = traceBegin('scan.batch');
   const result = await processSequentially(
     rawUris,
     async (uri) => {
-      const made = await ingestOne(uri, { script, spec, ownsInputs, autoCrop });
+      const made = await traced('scan.page', () => ingestOne(uri, { script, spec, ownsInputs, autoCrop }));
       if (!progressive) return made;
       for (const page of made) {
         const pending: SessionPage = { ...page, ocrPending: true };
+        if (waiting.length === 0) traceMark('scan.firstPage');
         dispatch({ type: 'capture/ADD_PAGE', page: pending, afterId: waiting[waiting.length - 1]?.id });
         waiting.push(pending);
       }
@@ -192,6 +197,7 @@ export async function ingestBatch(
       discardInput: ownsInputs ? (uri) => cleanTemporaryCache([uri]) : undefined,
     }
   );
+  endBatch();
   endProcessing(signal);
 
   dispatch({ type: 'capture/SET_PROGRESS', progress: null });

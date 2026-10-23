@@ -12,6 +12,7 @@ import PdfNative, {
   type PdfWord,
 } from '../../../modules/pdf-native';
 import { PdfEncryptedError, PdfWrongPasswordError } from './pdfErrors';
+import { traced } from '../../utils/trace';
 
 export type {
   PdfColorMatrix,
@@ -137,7 +138,8 @@ export function getPageText(uri: string, page: number): Promise<PdfPageText> {
 // Rejects with PdfEncryptedError (the PDF needs a password and none was given) or
 // PdfWrongPasswordError. `pages` are the shown sizes in points.
 export function openDocument(uri: string, password?: string): Promise<PdfOpenedDocument> {
-  return callV2((mod) => mod.openDocument(uri, password || null));
+  // §19 X1: J3's open of a big PDF, in a release build's trace.
+  return traced('pdf.open', () => callV2((mod) => mod.openDocument(uri, password || null)));
 }
 
 export function closeDocument(id: string): Promise<void> {

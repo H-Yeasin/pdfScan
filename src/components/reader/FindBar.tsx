@@ -52,6 +52,7 @@ export function FindBar({ query, onChangeQuery, count, onStep, onClose }: FindBa
         returnKeyType="search"
         submitBehavior="submit"
         onSubmitEditing={() => onStep?.(1)}
+        testID="reader-find-input"
         style={[styles.input, { color: tokens.ink }]}
       />
       {label ? (
@@ -77,6 +78,7 @@ export function FindBar({ query, onChangeQuery, count, onStep, onClose }: FindBa
             style={styles.step}
             disabled={!canStep}
             onPress={() => onStep(1)}
+            testID="reader-find-next"
             accessibilityRole="button"
             accessibilityLabel={t('reader.findNext')}
             accessibilityState={{ disabled: !canStep }}

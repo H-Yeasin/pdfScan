@@ -11,6 +11,7 @@ import { chooseStartScreen } from './startScreen';
 import { useDeferredBoot } from './useDeferredBoot';
 import { useRenderCount, useRenderCountsShown } from '../utils/renderCounts';
 import { markPerf } from '../utils/perfMarks';
+import { traceMark } from '../utils/trace';
 import { lazyScreens } from '../navigation/lazyScreens';
 import { onboardingDecision } from '../services/onboarding/onboarding';
 import { RestoreHost } from '../components/backup/RestoreHost';
@@ -122,9 +123,12 @@ export function AppNavigator() {
     // Runs once, when boot is ready; the counts are read as they are at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootReady, screen, navTick, replace]);
-  // §16 G9: when the first screen was up, for the dev performance overlay (a no-op in release).
+  // §16 G9: when the first screen was up, for the dev performance overlay (a no-op in release);
+  // §19 X1: and in a release build's trace (the splash intro may still be over it).
   useEffect(() => {
-    if (!booting) markPerf('firstScreen');
+    if (booting) return;
+    markPerf('firstScreen');
+    traceMark('boot.firstScreen');
   }, [booting]);
   useEffect(() => {
     if (!booting) return;

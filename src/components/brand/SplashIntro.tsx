@@ -25,6 +25,7 @@ import {
 import { useT } from '../../i18n/useT';
 import { isFileUri } from '../../store/useExternalFileLinking';
 import { CHROME_MAX_FONT_SCALE, spacing, SPLASH_TILE_DP, tokens, typeScale, type ThemeName } from '../../theme';
+import { reportFullyDrawn } from '../../utils/trace';
 import { BrandTile } from './BrandMark';
 import { IntroMark } from './IntroMark';
 import { TILE_SIZE } from './markGeometry';
@@ -181,6 +182,12 @@ export function SplashIntro({ booting, appLocked }: Props) {
     return () => cancelAnimationFrame(id);
   }, [exitNow, plan, exit]);
 
+  // §19 X1: the overlay is gone, so the start screen is what the student sees and can touch: the
+  // end of a cold start (Android's "Fully drawn"; `am start -W` stops at the first frame, under us).
+  useEffect(() => {
+    if (gone) reportFullyDrawn();
+  }, [gone]);
+
   const frame = useDerivedValue(() => introFrame(clock.value));
   // The tile moves up by half the wordmark's height (and gap) as it comes in, so the pair stays
   // centred; after a played intro it also grows a little as the overlay fades.
@@ -235,6 +242,8 @@ export class SplashIntroBoundary extends Component<{ children: ReactNode }, { fa
 
   componentDidCatch() {
     releaseSplash();
+    // §19 X1: the app shows now, without the overlay.
+    reportFullyDrawn();
   }
 
   render() {

@@ -118,6 +118,7 @@ export function ReaderTopChrome({
               style={styles.indicator}
               onPress={onJump}
               disabled={!onJump}
+              testID="reader-pages"
               accessibilityRole="button"
               accessibilityLabel={
                 page.last > page.first
@@ -133,7 +134,7 @@ export function ReaderTopChrome({
             </Pressable>
           ) : null}
           {onFind ? (
-            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} accessibilityRole="button" accessibilityLabel={t('reader.find')}>
+            <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onFind} testID="reader-find" accessibilityRole="button" accessibilityLabel={t('reader.find')}>
               <Ionicons name="search" size={19} color={tokens.ink} />
             </Pressable>
           ) : null}
@@ -150,7 +151,7 @@ export function ReaderTopChrome({
               <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={19} color={bookmarked ? tokens.accentInk : tokens.ink} />
             </Pressable>
           ) : null}
-          <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onOverflow} accessibilityRole="button" accessibilityLabel={t('a11y.moreActions')}>
+          <Pressable hitSlop={touchSlop(44)} style={styles.iconButton} onPress={onOverflow} testID="reader-more" accessibilityRole="button" accessibilityLabel={t('a11y.moreActions')}>
             <Ionicons name="ellipsis-vertical" size={18} color={tokens.ink} />
           </Pressable>
         </View>

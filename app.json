@@ -200,6 +200,7 @@
       "./plugins/withBackupRules",
       "./plugins/withDocumentIntentFilters",
       "./plugins/withDevSurfaceRestart",
+      "./plugins/withProfileable",
       [
         "expo-splash-screen",
         {

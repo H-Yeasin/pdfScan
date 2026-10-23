@@ -7,9 +7,12 @@ import android.graphics.Color
 import android.graphics.RectF
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.Trace
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
+import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.records.Field
@@ -126,6 +129,34 @@ class PdfNativeModule : Module() {
 
     // JavaScript checks this before it uses anything below (a build made before W7 has none).
     Function("nativeVersion") { NATIVE_VERSION }
+
+    // §19 X1: named stretches and moments of a run, for a Perfetto trace of a release build
+    // (scripts/perf). JavaScript calls these through src/utils/trace.ts, which checks they exist (a
+    // build made before X1, and iOS, have none). A stretch is an async section: a save or a scan's
+    // batch is awaited across many calls and threads and can overlap another, so each carries the
+    // cookie JavaScript gave it. Async sections need Android 10; older phones record no stretches.
+    // With no trace recording, the platform's tag check makes each call almost free.
+    Function("traceBegin") { name: String, cookie: Int ->
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.beginAsyncSection(name, cookie)
+    }
+
+    Function("traceEnd") { name: String, cookie: Int ->
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Trace.endAsyncSection(name, cookie)
+    }
+
+    // A moment: an empty slice on the JS thread (sync functions run there), found by name.
+    Function("traceMark") { name: String ->
+      Trace.beginSection(name)
+      Trace.endSection()
+    }
+
+    // The start screen is usable. Android logs "Fully drawn" (scripts/perf/cold-start.sh reads it),
+    // and Android vitals and Macrobenchmark take it as the time to full display; `am start -W`'s
+    // TotalTime ends at the first frame, under the splash intro. Only the first call counts.
+    AsyncFunction("reportFullyDrawn") {
+      appContext.currentActivity?.reportFullyDrawn()
+      Unit
+    }.runOnQueue(Queues.MAIN)
 
     AsyncFunction("openDocument") { uri: String, password: String?, promise: Promise ->
       settleOn(sessions.pdfium, promise) {

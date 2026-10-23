@@ -6,6 +6,7 @@ import { nightMatrix, paletteKey, type NightPalette } from '../../../services/re
 import type { PageCache } from '../../../services/reader/pageCache';
 import { RENDER_QUALITY, type PageRange, type RenderSpec } from '../../../services/reader/renderPlan';
 import { createRenderQueue, type RenderQueue } from '../../../services/reader/renderQueue';
+import { traced, traceMark } from '../../../utils/trace';
 
 // §18 W9: the render queue (services/reader/renderQueue) wired to the things that draw: a pdfium
 // session for PDF pages, decodeImage for scans, the page cache for where the files go. The
@@ -174,9 +175,16 @@ export function useRenderQueue({ cache, session, palette, annotations = true }: 
   useEffect(() => {
     if (!cache) return;
     const context: RenderContext = { cache, session, colorMatrix: palette ? nightMatrix(palette) : undefined, annotations };
+    // §19 X1: each render, and this queue's first image (J3's "first sharp page"), in a release
+    // build's trace.
+    let first = true;
     const built = createRenderQueue<RenderSpec, string>({
-      run: (spec) => renderToCache(spec, context),
-      onDone: (spec, uri) => images.add(spec, uri),
+      run: (spec) => traced('reader.render', () => renderToCache(spec, context)),
+      onDone: (spec, uri) => {
+        if (first) traceMark('reader.firstImage');
+        first = false;
+        images.add(spec, uri);
+      },
       // Rendering is best-effort: the page keeps what it shows (its thumbnail, a placeholder).
       onError: (spec) => images.fail(spec),
       // A PDF page before its session is open waits for the rebuild that the session causes.

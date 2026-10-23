@@ -71,6 +71,7 @@ export function FilterStrip({ page, value, onChange }: FilterStripProps) {
             style={styles.item}
             onPress={() => onChange(spec.id)}
             hitSlop={4}
+            testID={`filter-${spec.id}`}
           >
             <View
               style={[

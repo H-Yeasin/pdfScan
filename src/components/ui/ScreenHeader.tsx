@@ -38,6 +38,7 @@ export type HeaderAction = {
   badge?: boolean | number;
   selected?: boolean;
   disabled?: boolean;
+  testID?: string;
 };
 
 export type ScreenHeaderScroll = {
@@ -125,6 +126,7 @@ export function ScreenHeader({ title, subtitle, back, backIcon, backLabel, actio
               badge={a.badge}
               selected={a.selected}
               disabled={a.disabled}
+              testID={a.testID}
             />
           ))}
           {onMore ? <IconButton icon={ICONS.more} accessibilityLabel={moreLabel ?? t('a11y.moreActions')} onPress={onMore} /> : null}

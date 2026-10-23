@@ -1,6 +1,7 @@
 import { createContext, PropsWithChildren, useCallback, useContext, useMemo, useState } from 'react';
 import type { NavDir, ScreenName } from '../types/navigation';
 import { createId } from '../utils/id';
+import { traceMark } from '../utils/trace';
 import {
   initialNav,
   pop,
@@ -61,16 +62,21 @@ function applyChange(s: RouterState, change: NavChange): RouterState {
 export function RouterProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<RouterState>(INITIAL_STATE);
 
+  // §19 X1: each change of screen is a moment in a release build's trace ('nav.reader', 'tab.library',
+  // 'nav.back'), where a journey's step starts; the step ends at the next mark that matters.
   const go = useCallback((to: ScreenName, dir: NavDir = 'fwd') => {
+    traceMark(`nav.${to}`);
     const key = createId('screen');
     setState((s) => applyChange(s, resolveGo(s.nav, to, dir, key)));
   }, []);
 
   const back = useCallback(() => {
+    traceMark('nav.back');
     setState((s) => applyChange(s, { state: pop(s.nav), kind: 'slide', dir: 'back' }));
   }, []);
 
   const switchTab = useCallback((tab: TabId) => {
+    traceMark(`tab.${tab}`);
     setState((s) =>
       applyChange(
         s,

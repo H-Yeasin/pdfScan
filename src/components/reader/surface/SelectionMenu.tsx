@@ -59,6 +59,7 @@ export function SelectionMenu({ items, anchor, motion, band, busy = null, onPick
           disabled={busy === item}
           style={styles.item}
           onPress={() => onPick(item)}
+          testID={`select-${item}`}
         >
           {busy === item ? (
             <ActivityIndicator color={tokens.accentInk} />

@@ -74,7 +74,7 @@ export function ReaderToolBar({ visible, onHeight, tools, onPress }: ReaderToolB
     >
       <View style={styles.row}>
         {tools.map((tool) => (
-          <Pressable accessibilityRole="button" key={tool.id} style={styles.item} onPress={() => onPress(tool.id)}>
+          <Pressable accessibilityRole="button" key={tool.id} style={styles.item} onPress={() => onPress(tool.id)} testID={`reader-tool-${tool.id}`}>
             <View style={styles.iconRow}>
               <Ionicons name={ICONS[tool.id]} size={21} color={tokens.ink} />
               {tool.pro ? <ProBadge /> : null}

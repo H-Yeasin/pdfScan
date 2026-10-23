@@ -65,6 +65,13 @@ export type PdfNativeModule = {
   getSessionPageText(id: string, page: number): Promise<PdfPageText>;
   getPageLinks(id: string, page: number): Promise<PdfLink[]>;
   getOutline(id: string): Promise<PdfOutlineItem[]>;
+
+  // §19 X1, Android only, missing in a build made before X1: Perfetto trace sections and
+  // reportFullyDrawn. App code calls them through src/utils/trace.ts.
+  traceBegin?(name: string, cookie: number): void;
+  traceEnd?(name: string, cookie: number): void;
+  traceMark?(name: string): void;
+  reportFullyDrawn?(): Promise<void>;
 };
 
 // null in a build made before this module existed (or in Expo Go): callers treat that as

@@ -266,7 +266,7 @@ export function CropOverlay({
           </Text>
         ) : null}
         <View style={styles.altActions}>
-          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={() => void handleAuto()}>
+          <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={() => void handleAuto()} testID="crop-auto">
             <Text style={styles.ghostLabel}>{t('review.crop.auto')}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={handleWhole}>
@@ -281,7 +281,7 @@ export function CropOverlay({
           <Pressable accessibilityRole="button" style={styles.ghostButton} onPress={handleReset}>
             <Text style={styles.ghostLabel}>{t('review.crop.reset')}</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm}>
+          <Pressable accessibilityRole="button" style={[styles.primaryButton, { backgroundColor: tokens.accent }]} onPress={handleConfirm} testID="crop-confirm">
             <Text style={[styles.primaryLabel, { color: tokens.onAccent }]}>{t('review.crop.confirm')}</Text>
           </Pressable>
         </View>

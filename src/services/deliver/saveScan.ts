@@ -7,6 +7,7 @@ import type { ExportPreset } from '../capture/imageSpec';
 import type { AcademicConfig, LayoutMode } from '../pdf/pdfService';
 import type { PageSizeId } from '../pdf/pageSize';
 import type { SizedBuild } from '../submit/sizeTarget';
+import { traceBegin, traced } from '../../utils/trace';
 
 // §17 U9: the scan session → a library document, out of DeliverScreen (it was its
 // handleSaveInternal). The screen collects the options and shows the progress; this does the work,
@@ -113,6 +114,8 @@ export async function saveScan(options: SaveScanOptions, deps: SaveScanDeps, onP
   // left behind by a failure (masters, stamped copies, a rendered cover) until they are placed.
   const transient = new Set<string>();
   const made = new Set<string>();
+  // §19 X1: the Save tap to a saved document, and its costly parts, in a release build's trace.
+  const endSave = traceBegin('save');
 
   try {
     const contentPages: (LibraryInputPage & { exportUri: string })[] = [];
@@ -126,16 +129,16 @@ export async function saveScan(options: SaveScanOptions, deps: SaveScanDeps, onP
         stats: page.stats,
         filterOptions: page.filterOptions,
       };
-      const master = await deps.renderPage(page.uri, edits, deps.masterPreset);
+      const master = await traced('save.render', () => deps.renderPage(page.uri, edits, deps.masterPreset));
       made.add(master.uri);
-      const exported = encoding === 'as-is' ? master : await deps.renderPage(page.uri, edits, encoding);
+      const exported = encoding === 'as-is' ? master : await traced('save.render', () => deps.renderPage(page.uri, edits, encoding));
       if (exported !== master) transient.add(exported.uri);
       // §16 G7: the text read at scan time still describes this page when nothing but its look
       // changed since (same image, unturned, same script: geometryKey.ts) and the saved master has
       // the same pixels across, so its word boxes land where they did. Anything else - a turn, a
       // text read for another script, no text yet - is read from the master.
       const keepText = ocrFitsPage(page, ocrScript) && master.width === page.width && master.height === page.height;
-      const ocr = keepText ? page.ocr : await deps.runOcr(master.uri, ocrScript);
+      const ocr = keepText ? page.ocr : await traced('save.ocr', () => deps.runOcr(master.uri, ocrScript));
       contentPages.push({
         id: page.id,
         masterUri: master.uri,
@@ -180,18 +183,20 @@ export async function saveScan(options: SaveScanOptions, deps: SaveScanDeps, onP
     let oversize: SaveScanResult['oversize'] = null;
     if (sizeLimit !== null) {
       onProgress(t('deliver.progress.fitting', { size: formatLimit(sizeLimit) }));
-      const sized = await deps.buildPdfUnderLimit(documentId, pdfPages, sizeLimit, academic ?? undefined, layout, pageSize);
+      const sized = await traced('save.pdf', () => deps.buildPdfUnderLimit(documentId, pdfPages, sizeLimit, academic ?? undefined, layout, pageSize));
       if (!sized.fits) oversize = sized;
       pdf = sized;
     } else {
       onProgress(t('deliver.progress.building'));
-      pdf = await deps.buildPdfFromPages(documentId, pdfPages, 'as-is', academic ?? undefined, layout, pageSize);
+      pdf = await traced('save.pdf', () => deps.buildPdfFromPages(documentId, pdfPages, 'as-is', academic ?? undefined, layout, pageSize));
     }
 
     const libraryInputPages = coverPage ? [coverPage, ...contentPages] : contentPages;
-    const saved = await deps.saveImagesToLibrary(
-      documentId,
-      libraryInputPages.map((p) => ({ masterUri: p.masterUri, displayUri: p.displayUri, keepSource: p.keepSource }))
+    const saved = await traced('save.files', () =>
+      deps.saveImagesToLibrary(
+        documentId,
+        libraryInputPages.map((p) => ({ masterUri: p.masterUri, displayUri: p.displayUri, keepSource: p.keepSource }))
+      )
     );
     // Moved into the document's folder: no longer ours to clean up on a failure.
     made.clear();
@@ -234,6 +239,8 @@ export async function saveScan(options: SaveScanOptions, deps: SaveScanDeps, onP
     deps.deleteDocumentFiles(documentId);
     deps.cleanTemporaryCache([...transient, ...made]);
     throw error;
+  } finally {
+    endSave();
   }
 }
 

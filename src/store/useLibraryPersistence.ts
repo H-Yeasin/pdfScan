@@ -3,6 +3,7 @@ import { getDb, withWriteLock } from '../services/persistence/dbService';
 import { loadAll, syncLibrary, type LoadedLibrary } from '../services/persistence/libraryRepo';
 import { useAppDispatch, useAppSlices } from './AppStateContext';
 import { t } from '../i18n';
+import { traced } from '../utils/trace';
 
 // Loads the library from SQLite, then mirrors every later change to state.library.files/courses/
 // semesters back to disk as a diff (only rows whose object identity changed are written).
@@ -31,8 +32,8 @@ export function useLibraryPersistence(): boolean {
 
   useEffect(() => {
     let cancelled = false;
-    getDb()
-      .then(loadAll)
+    // §19 X1: the library's read at boot, in a release build's trace.
+    traced('boot.loadLibrary', () => getDb().then(loadAll))
       .then((stored) => {
         if (cancelled) return;
         committed.current = stored;

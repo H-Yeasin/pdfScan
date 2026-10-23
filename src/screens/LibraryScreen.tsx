@@ -32,6 +32,7 @@ import { ICONS, spacing, useTheme } from '../theme';
 import { useT } from '../i18n/useT';
 import { SkeletonRows } from '../components/library/SkeletonRows';
 import { useRenderCount } from '../utils/renderCounts';
+import { traced } from '../utils/trace';
 
 // The list's first item is the toolbar, which sticks at the top while the documents scroll under
 // it (stickyHeaderIndices). The course folders above it are the list's header and scroll away.
@@ -108,7 +109,8 @@ export function LibraryScreen() {
     const query = search.trim();
     if (!query) return;
     const timer = setTimeout(() => {
-      searchDocumentsByText(query)
+      // §19 X1: J2's search, from the debounce to the database's answer, in a release build's trace.
+      traced('files.search', () => searchDocumentsByText(query))
         .then((ids) => dispatch({ type: 'libraryUi/SET_SEARCH_RESULT_IDS', ids }))
         .catch((e) => {
           console.warn('dbService.searchDocumentsByText failed', e);
@@ -275,7 +277,7 @@ export function LibraryScreen() {
           large
           title={t('library.title')}
           actions={[
-            { icon: ICONS.find, label: t('library.search'), onPress: () => dispatch({ type: 'libraryUi/TOGGLE_SEARCH_OPEN' }), selected: searchOpen },
+            { icon: ICONS.find, label: t('library.search'), onPress: () => dispatch({ type: 'libraryUi/TOGGLE_SEARCH_OPEN' }), selected: searchOpen, testID: 'files-search' },
             { icon: ICONS.import, label: t('library.importFile'), onPress: () => void handleImport() },
             { icon: ICONS.select, label: t('library.select'), onPress: () => dispatch({ type: 'libraryUi/SET_SEL_MODE', on: true }), disabled: isEmptyLibrary },
           ]}

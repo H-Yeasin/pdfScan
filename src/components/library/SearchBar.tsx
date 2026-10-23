@@ -20,6 +20,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
       placeholder={t('library.searchPlaceholder')}
       placeholderTextColor={tokens.muted}
       autoFocus
+      testID="files-search-input"
       style={[
         styles.input,
         { borderColor: tokens.edge, backgroundColor: tokens.surface, color: tokens.ink },
