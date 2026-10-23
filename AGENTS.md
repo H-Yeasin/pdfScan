@@ -63,7 +63,7 @@ src/services/ads/       adPolicy (banner rules), adsSdk (consent + init), reward
 src/config/             appInfo (APP_VERSION); runtime switches come from services/remote/remoteConfig (Firebase Remote Config, §10 M2)
 src/utils/              fitBox (aspect-fit), sanitize, id (createId), format, docFormat
 modules/pdf-native/     local Expo module (§7 R1): PDF page count/size, render page → JPEG, page text + word boxes; version 2 (§18 W7): pdfium sessions (open once; page/region → JPEG, links, outline, password), decodeImage
-plugins/                local config plugins (withBackupRules: Android Auto Backup rules, §8 B1; withDocumentIntentFilters: strips the dev-client scheme from "Open with" filters)
+plugins/                local config plugins (withBackupRules: Android Auto Backup rules, §8 B1; withDocumentIntentFilters: strips the dev-client scheme from "Open with" filters; withDevSurfaceRestart: debug builds restart the React surface a fatal JS error left, so a reload after a RedBox isn't blank, docs/qa/reload-blank-and-consent.md)
 ```
 
 ## Main pipeline

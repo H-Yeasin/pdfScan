@@ -4,10 +4,13 @@ import { createElement } from 'react';
 
 export const consent = { canRequestAds: true, gdprApplies: false };
 export const AdsConsent = {
-  gatherConsent: jest.fn(async () => ({ canRequestAds: consent.canRequestAds })),
+  gatherConsent: jest.fn(async (_options?: unknown) => ({ canRequestAds: consent.canRequestAds })),
+  // What UMP holds after the consent step, whether or not the step succeeded.
+  getConsentInfo: jest.fn(async () => ({ canRequestAds: consent.canRequestAds })),
   getGdprApplies: jest.fn(async () => consent.gdprApplies),
   showPrivacyOptionsForm: jest.fn(async () => ({ canRequestAds: consent.canRequestAds })),
 };
+export const AdsConsentDebugGeography = { DISABLED: 0, EEA: 1, NOT_EEA: 2, REGULATED_US_STATE: 3, OTHER: 4 };
 const mobileAds = {
   initialize: jest.fn(async () => []),
   setRequestConfiguration: jest.fn(async () => {}),

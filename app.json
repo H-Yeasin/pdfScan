@@ -199,6 +199,7 @@
       ],
       "./plugins/withBackupRules",
       "./plugins/withDocumentIntentFilters",
+      "./plugins/withDevSurfaceRestart",
       [
         "expo-splash-screen",
         {

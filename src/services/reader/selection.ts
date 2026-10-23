@@ -85,8 +85,10 @@ export function handlePoints(first: ContentRect, last: ContentRect): HandlePoint
 
 // The handle under a touch (screen pixels), with the tips in content coordinates. The nearer of
 // the two when both are in reach (a one-word selection). Runs in the gesture worklet.
-export function handleAt(points: HandlePoints | null, view: ColumnView, x: number, y: number, reach = HANDLE_HIT): SelectionHandle | null {
+export function handleAt(points: HandlePoints | null, view: ColumnView, x: number, y: number, reachArg?: number): SelectionHandle | null {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const reach = reachArg ?? HANDLE_HIT;
   if (!points) return null;
   // The knob hangs under its tip.
   const ds = Math.hypot(points.start.x * view.scale + view.tx - x, points.start.y * view.scale + view.ty + HANDLE_RADIUS - y);

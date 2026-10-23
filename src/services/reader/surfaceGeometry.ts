@@ -130,8 +130,10 @@ export function pageAtY(layout: ColumnLayout, y: number): number {
 }
 
 // The page on screen: the one at the middle of the visible band (the viewport without the bars).
-export function currentPage(layout: ColumnLayout, view: ColumnView, viewportHeight: number, insets: ContentInsets = NO_INSETS): number {
+export function currentPage(layout: ColumnLayout, view: ColumnView, viewportHeight: number, insetsArg?: ContentInsets): number {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const middle = (insets.top + viewportHeight - insets.bottom) / 2;
   return pageAtY(layout, (middle - view.ty) / view.scale);
 }
@@ -173,8 +175,10 @@ export function clampZoom(scale: number): number {
 
 // How far the layer may move at a zoom: `max` shows the content's start just inside the insets,
 // `min` its end. Content smaller than the band stays at its start.
-export function scrollRange(layout: ColumnLayout, scale: number, viewport: Size, insets: ContentInsets = NO_INSETS) {
+export function scrollRange(layout: ColumnLayout, scale: number, viewport: Size, insetsArg?: ContentInsets) {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const maxTx = insets.left;
   const maxTy = insets.top;
   return {
@@ -186,8 +190,10 @@ export function scrollRange(layout: ColumnLayout, scale: number, viewport: Size,
 }
 
 // Keeps the content on screen: no scrolling past either end, no sideways drift when not zoomed in.
-export function clampView(layout: ColumnLayout, view: ColumnView, viewport: Size, insets: ContentInsets = NO_INSETS): ColumnView {
+export function clampView(layout: ColumnLayout, view: ColumnView, viewport: Size, insetsArg?: ContentInsets): ColumnView {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const scale = Math.max(1, view.scale);
   const range = scrollRange(layout, scale, viewport, insets);
   return { scale, tx: Math.min(range.maxTx, Math.max(range.minTx, view.tx)), ty: Math.min(range.maxTy, Math.max(range.minTy, view.ty)) };
@@ -195,8 +201,10 @@ export function clampView(layout: ColumnLayout, view: ColumnView, viewport: Size
 
 // The view that shows page `idx` at the top of the visible band (at the current zoom), clamped.
 // In the paged layout that is the top of the page's stretch, so the page sits centred.
-export function viewForPage(layout: ColumnLayout, idx: number, view: ColumnView, viewport: Size, insets: ContentInsets = NO_INSETS): ColumnView {
+export function viewForPage(layout: ColumnLayout, idx: number, view: ColumnView, viewport: Size, insetsArg?: ContentInsets): ColumnView {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const at = Math.max(0, Math.min(idx, layout.tops.length - 1));
   const top = (layout.slots ? layout.slots[at] : layout.tops[at]) ?? 0;
   return clampView(layout, { scale: view.scale, tx: view.tx, ty: insets.top - top * view.scale }, viewport, insets);
@@ -210,8 +218,10 @@ export function zoomAbout(view: ColumnView, nextScale: number, focalX: number, f
 }
 
 // A double tap: in to DOUBLE_TAP_ZOOM about the finger, or back out when already zoomed.
-export function doubleTapView(layout: ColumnLayout, view: ColumnView, x: number, y: number, viewport: Size, insets: ContentInsets = NO_INSETS): ColumnView {
+export function doubleTapView(layout: ColumnLayout, view: ColumnView, x: number, y: number, viewport: Size, insetsArg?: ContentInsets): ColumnView {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const next = view.scale > 1.05 ? 1 : DOUBLE_TAP_ZOOM;
   return clampView(layout, zoomAbout(view, next, x, y), viewport, insets);
 }
@@ -223,8 +233,10 @@ export function doubleTapView(layout: ColumnLayout, view: ColumnView, x: number,
 // once the pages are bigger.
 export type SurfaceAnchor = { page: number; fx: number; fy: number; dy?: number };
 
-export function anchorOf(layout: ColumnLayout, view: ColumnView, insets: ContentInsets = NO_INSETS): SurfaceAnchor {
+export function anchorOf(layout: ColumnLayout, view: ColumnView, insetsArg?: ContentInsets): SurfaceAnchor {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   if (!layout.tops.length) return { page: 0, fx: 0, fy: 0 };
   const at = screenToContent(view, insets.left, insets.top);
   const page = pageAtY(layout, at.y);
@@ -235,8 +247,10 @@ export function anchorOf(layout: ColumnLayout, view: ColumnView, insets: Content
   return { page, fx, fy: (at.y - box.y) / box.height };
 }
 
-export function viewForAnchor(layout: ColumnLayout, anchor: SurfaceAnchor, scale: number, viewport: Size, insets: ContentInsets = NO_INSETS): ColumnView {
+export function viewForAnchor(layout: ColumnLayout, anchor: SurfaceAnchor, scale: number, viewport: Size, insetsArg?: ContentInsets): ColumnView {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   if (!layout.tops.length) return clampView(layout, { scale, tx: insets.left, ty: insets.top }, viewport, insets);
   const box = pageBox(layout, Math.max(0, Math.min(anchor.page, layout.tops.length - 1)));
   const x = box.x + anchor.fx * box.width;
@@ -253,9 +267,11 @@ export function pagedSnap(
   viewport: Size,
   velocityY: number,
   from: number,
-  insets: ContentInsets = NO_INSETS
+  insetsArg?: ContentInsets
 ): { page: number; ty: number } | null {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const slots = layout.slots;
   if (!slots || slots.length < 2) return null;
   const count = slots.length - 1;
@@ -285,10 +301,13 @@ export function revealRect(
   view: ColumnView,
   rect: ContentRect,
   viewport: Size,
-  insets: ContentInsets = NO_INSETS,
-  margin: number = REVEAL_MARGIN
+  insetsArg?: ContentInsets,
+  marginArg?: number
 ): ColumnView {
   'worklet';
+  // Resolved here, not as defaults: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
+  const margin = marginArg ?? REVEAL_MARGIN;
   const left = insets.left + margin;
   const top = insets.top + margin;
   const right = viewport.width - insets.right - margin;

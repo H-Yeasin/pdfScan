@@ -18,15 +18,19 @@ export function showsFastScroll(pageCount: number): boolean {
 }
 
 // Where the thumb's top edge may be: from `top` over `length` screen pixels.
-export function thumbTrack(viewport: Size, insets: ContentInsets = NO_INSETS): { top: number; length: number } {
+export function thumbTrack(viewport: Size, insetsArg?: ContentInsets): { top: number; length: number } {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const top = insets.top + TRACK_PAD;
   return { top, length: Math.max(0, viewport.height - insets.bottom - TRACK_PAD - FAST_SCROLL_THUMB - top) };
 }
 
 // How far down the document the view is, 0 at its start to 1 at its end.
-export function scrollProgress(layout: ColumnLayout, view: ColumnView, viewport: Size, insets: ContentInsets = NO_INSETS): number {
+export function scrollProgress(layout: ColumnLayout, view: ColumnView, viewport: Size, insetsArg?: ContentInsets): number {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const range = scrollRange(layout, view.scale, viewport, insets);
   const span = range.maxTy - range.minTy;
   return span > 0 ? Math.min(1, Math.max(0, (range.maxTy - view.ty) / span)) : 0;
@@ -44,14 +48,18 @@ export function progressAtThumb(y: number, track: { top: number; length: number 
 }
 
 // The view at a progress, keeping the zoom and the sideways position.
-export function viewAtProgress(layout: ColumnLayout, view: ColumnView, progress: number, viewport: Size, insets: ContentInsets = NO_INSETS): ColumnView {
+export function viewAtProgress(layout: ColumnLayout, view: ColumnView, progress: number, viewport: Size, insetsArg?: ContentInsets): ColumnView {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   const range = scrollRange(layout, view.scale, viewport, insets);
   return clampView(layout, { scale: view.scale, tx: view.tx, ty: range.maxTy - progress * (range.maxTy - range.minTy) }, viewport, insets);
 }
 
 // The page the bubble names while dragging: the one the view at that progress would be on.
-export function pageAtProgress(layout: ColumnLayout, view: ColumnView, progress: number, viewport: Size, insets: ContentInsets = NO_INSETS): number {
+export function pageAtProgress(layout: ColumnLayout, view: ColumnView, progress: number, viewport: Size, insetsArg?: ContentInsets): number {
   'worklet';
+  // Resolved here, not as a default: the worklet plugin doesn't capture names used in defaults.
+  const insets = insetsArg ?? NO_INSETS;
   return currentPage(layout, viewAtProgress(layout, view, progress, viewport, insets), viewport.height, insets);
 }

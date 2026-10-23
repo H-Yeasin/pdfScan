@@ -53,16 +53,23 @@ Do these in order; each is needed for a release build to serve real ads (§14 Q2
    unit. Firebase ▸ Remote Config: set `ads_rewarded_unit_android`, `ads_banner_unit_android`,
    `ads_enabled = true`, `offline_free_tasks_per_day = 1`, `pro_tasks_free = false`, and
    **publish** the changes.
-3. [ ] **`app-ads.txt`** on the developer website listed in Play Console (AdMob requirement;
+3. [ ] **GDPR message (consent form).** AdMob ▸ Privacy & messaging ("Setup details" step 2).
+   Without it ads run in the EEA with no consent form. Check it on a dev build: set
+   `EXPO_PUBLIC_ADS_CONSENT_GEOGRAPHY=EEA` in `.env.local`, restart Metro, and the form shows the
+   next time the app starts the ads SDK (a start that can show a banner, or a Pro task's ad);
+   clear the app's data to see it again.
+4. [ ] **`app-ads.txt`** on the developer website listed in Play Console (AdMob requirement;
    "Setup details" step 5).
-4. [ ] **Check on a dev build:** Settings ▸ Developer ▸ "Ads setup" should read
+5. [ ] **Check on a dev build:** Settings ▸ Developer ▸ "Ads setup" should read
    `SDK: ready · Rewarded unit set: yes · Remote Config: fetched` (or `cached`). `Rewarded unit
    set: no` = step 2 isn't published or this phone hasn't fetched it yet (restart);
    `Remote Config: bundled defaults` = no Firebase files in this build or no fetch yet;
    `SDK: unavailable (consent)` = the consent form wasn't accepted (try Ad choices on a Pro
-   task's error sheet). Dev builds use test units, so this checks the configuration, not the
-   real app ID; for that, install the release build from the internal track and convert a file.
-5. [ ] **Watch the telemetry** after release (opt-in counts, `docs/firebase.md`):
+   task's error sheet); `SDK: unavailable (sdk)` with `Ads consent step failed` in logcat = the
+   consent request failed and UMP holds no answer that allows ads. Dev builds use test units, so
+   this checks the configuration, not the real app ID; for that, install the release build from
+   the internal track and convert a file.
+6. [ ] **Watch the telemetry** after release (opt-in counts, `docs/firebase.md`):
    `pro_task_ad_unavailable` by `reason` (1 ads off, 2 no unit, 3 SDK, 4 consent, 5 no fill,
    6 timeout) shows a broken setup; `pro_task_offline_free` counts the offline grace.
 
@@ -71,8 +78,14 @@ Do these in order; each is needed for a release build to serve real ads (§14 Q2
 1. **AdMob:** create an account, add the app (Android, and iOS later), and create one
    **Banner** and one **Rewarded** ad unit per platform (reward: any amount, e.g. "1 pass").
 2. **Consent form:** AdMob ▸ Privacy & messaging ▸ create a GDPR message for the app (Google's
-   consent form for the EEA, UK and Switzerland). Without it, `gatherConsent` can't show a form
-   there and ads stay off in those regions.
+   consent form for the EEA, UK and Switzerland). Without it, UMP's consent request fails on
+   **every** phone, inside the EEA or not: `consent-update-failed`, "Publisher misconfiguration:
+   … no form(s) configured for the input app ID" (logcat: `Ads consent step failed`). UMP then
+   still reports `canRequestAds: true` (status `UNKNOWN`), and the app follows Google's flow
+   (`services/ads/adsSdk.ts`), so **ads run everywhere with no consent message, the EEA
+   included**. Measured on 2026-10-23 with the release app ID under EEA and NOT_EEA debug
+   geography: `docs/qa/reload-blank-and-consent.md`. Make and publish the message before any
+   release.
 3. **App ids (build time):** add EAS environment variables (plain text, not secret: they end up
    in the app) for the production profile:
    - `ADMOB_ANDROID_APP_ID` = `ca-app-pub-…~…`
@@ -102,7 +115,12 @@ Do these in order; each is needed for a release build to serve real ads (§14 Q2
 - `pro_tasks_free = true`: Pro tasks run without the sheet.
 - No rewarded unit / no fill while online: the task sheet's error state, Try again asks again;
   in airplane mode one task a day runs with the "Offline: this one's free" snack.
-- With a VPN in an EEA country: the consent form shows once.
+- With a VPN in an EEA country: the consent form shows once. Without a VPN, dev builds take a
+  debug geography: `EXPO_PUBLIC_ADS_CONSENT_GEOGRAPHY=EEA` (or `NOT_EEA`) in `.env.local`, then
+  restart Metro. UMP honours it only on a test device: an emulator is one; for a phone, copy the
+  hashed id UMP prints in logcat (`addTestDeviceHashedId("…")`) into
+  `EXPO_PUBLIC_ADS_TEST_DEVICE_IDS` (comma-separated). Release builds ignore both. Dev builds
+  run the same consent step as release builds.
 - Pro screen: the test rewarded ad watched to the end gives Pro until now + 1 h (Settings
   shows "Pro until …", banners go, Pro covers, accents and app lock unlock); closing it early
   gives nothing; the fourth pass of a day is refused. When the pass ends: banners come back,
