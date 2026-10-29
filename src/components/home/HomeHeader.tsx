@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from '../../store/AppStateContext';
 import { ICON_SIZE, ICONS, radii, spacing, useTheme } from '../../theme';
 import type { Semester } from '../../types/models';
 import { Chip, FIELD_HEIGHT, Text, Touchable } from '../ui';
+import { ProPassBadge } from './ProPassBadge';
 
 type HomeHeaderProps = {
   // The semester Home shows; null without semesters (no chip then).
@@ -16,8 +17,9 @@ type HomeHeaderProps = {
   onOpenSemesters: () => void;
 };
 
-// §17 U6: "Good morning, Rahim", the shown semester as a chip that opens the switcher, and a search
-// bar that is one tap to searching everything (it opens Files with the search field focused).
+// §17 U6: "Good morning, Rahim" with the Pro pass on its right (ProPassBadge: the logo, the time left
+// as its exponent), the shown semester as a chip that opens the switcher, and a search bar that is
+// one tap to searching everything (it opens Files with the search field focused).
 export function HomeHeader({ shown, now, onOpenSemesters }: HomeHeaderProps) {
   const { t } = useT();
   const name = useAppSelector((s) => greetingName(s.settings.profile));
@@ -25,9 +27,12 @@ export function HomeHeader({ shown, now, onOpenSemesters }: HomeHeaderProps) {
 
   return (
     <View style={styles.header}>
-      <Text variant="headline" accessibilityRole="header" numberOfLines={2}>
-        {greeting}
-      </Text>
+      <View style={styles.top}>
+        <Text variant="headline" accessibilityRole="header" numberOfLines={2} style={styles.greeting}>
+          {greeting}
+        </Text>
+        <ProPassBadge />
+      </View>
       {shown ? (
         <Chip
           label={shown.name}
@@ -72,6 +77,15 @@ function SearchEntry() {
 const styles = StyleSheet.create({
   header: {
     gap: spacing.sm,
+  },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  greeting: {
+    flex: 1,
+    minWidth: 0,
   },
   search: {
     marginTop: spacing.xs,

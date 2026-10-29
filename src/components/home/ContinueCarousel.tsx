@@ -74,6 +74,9 @@ const styles = StyleSheet.create({
     // Room for the cards' shadow.
     paddingBottom: spacing.xs,
     gap: spacing.md,
+    // Centred while the cards fit (one, or two on a wide screen); more scroll from the left.
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   card: {
     width: CARD_WIDTH,

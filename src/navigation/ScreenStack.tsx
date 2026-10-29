@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { memo, useLayoutEffect, useMemo, useState, type ComponentType } from 'react';
 import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { TabBar } from '../components/shared/TabBar';
 import { useAppSelector } from '../store/AppStateContext';
@@ -70,8 +70,17 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
   // Library's selection bar takes the tab bar's place.
   const selecting = useAppSelector((s) => s.libraryUi.selMode);
 
-  // 0 at rest, so a transition's first frame already draws both layers where they start.
-  const progress = useRef(new Animated.Value(0)).current;
+  // A new value for each transition, at 0, so its first frame already draws both layers where they
+  // start, and never written once its transition has ended. On Android, RN 0.86 keeps every value
+  // the native driver writes to a view and puts it over whatever React sends for transform and
+  // opacity afterwards, until the view is deleted (SurfaceMountingManager's synchronous mount props
+  // override). One shared value reset to 0 after each transition did just that: a layer's animated
+  // node is disconnected in a microtask after the commit, and a commit that also carries a store
+  // update (useSyncExternalStore, so Sync lane) runs its effects before that, so the reset reached
+  // a layer still connected and moved it back to where it started, for good. Skip on onboarding,
+  // with its burst of store updates, left Home's shell a screen's width off to the right.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const progress = useMemo(() => new Animated.Value(0), [navTick]);
   const [settledTick, setSettledTick] = useState(navTick);
   const animating = transition.kind !== 'none' && navTick !== settledTick;
   const top = topEntry(nav);
@@ -85,10 +94,6 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
     // A new transition (navTick) starts a new animation; an interrupted one just stops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navTick]);
-  // After the layers are back at rest (their styles no longer read `progress`).
-  useEffect(() => {
-    if (!animating) progress.setValue(0);
-  }, [animating, progress]);
 
   const leaving = animating ? transition.from : null;
   const topIsRoot = isRootEntry(top);

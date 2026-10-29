@@ -14,7 +14,6 @@ import { CourseGrid } from '../components/home/CourseGrid';
 import { DueSoon } from '../components/home/DueSoon';
 import { HomeHeader } from '../components/home/HomeHeader';
 import { HOME_GUTTER } from '../components/home/layout';
-import { ProPassCard } from '../components/home/ProPassCard';
 import { QuickActions } from '../components/home/QuickActions';
 import { RecentFiles } from '../components/home/RecentFiles';
 import { HomeSkeleton } from '../components/home/HomeSkeleton';
@@ -41,10 +40,11 @@ import { useRenderCount } from '../utils/renderCounts';
 import { useDayClock } from '../utils/useDayClock';
 
 // §17 U6: Home answers "what do I do now?" - scan, continue, find, what's due. Top to bottom: the
-// greeting with the semester chip and a search bar (HomeHeader), "Scan as" (QuickActions),
-// Continue (3), the course cards, Due soon (only when something is), the banner, Recent files and
-// the Pro pass. Scan itself is the tab bar's centre button (U5). All derived data comes from
-// homeSelectors.ts; each section is in components/home.
+// greeting with the Pro pass on its right, the semester chip and a search bar (HomeHeader), the
+// course cards, Due soon (only when something is), the banner and Recent files; "Scan as"
+// (QuickActions) and Continue (3) are docked under the scroll, above the tab bar. Scan itself is the
+// tab bar's centre button (U5). All derived data comes from homeSelectors.ts; each section is in
+// components/home.
 export function HomeScreen() {
   useRenderCount('Home');
   const { tokens } = useTheme();
@@ -86,8 +86,6 @@ export function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <HomeHeader shown={shown} now={now} onOpenSemesters={() => setSwitcherOpen(true)} />
         <BackupReminderCard />
-        <QuickActions />
-        <ContinueCarousel items={resume} courses={courses} onOpen={openDocument} />
 
         {/* §17 U13: placeholders while the library loads, not the first-run card. */}
         {loadStatus === 'loading' ? (
@@ -150,8 +148,14 @@ export function HomeScreen() {
         <BannerSlot screen="home" inline={{ width: Math.round(width - 2 * HOME_GUTTER) }} />
 
         <RecentFiles files={recent} courses={courses} now={now} onOpen={openDocument} onSeeAll={() => go('library')} />
-        <ProPassCard />
       </ScrollView>
+      {/* Docked under the scroll, just above the tab bar. It carries the same gutter as the
+          scroll so the rows' edge bleed (QuickActions, ContinueCarousel) lands on the screen's
+          edges, not past them. */}
+      <View style={[styles.dock, { borderTopColor: tokens.edge }]}>
+        <QuickActions />
+        <ContinueCarousel items={resume} courses={courses} onOpen={openDocument} />
+      </View>
 
       <DeadlineEditorSheet visible={addingDeadline} onClose={() => setAddingDeadline(false)} />
       <SemesterSwitcher visible={switcherOpen} shown={shown} current={current} onClose={() => setSwitcherOpen(false)} />
@@ -173,5 +177,11 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
+  },
+  dock: {
+    paddingHorizontal: HOME_GUTTER,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

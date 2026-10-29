@@ -35,5 +35,9 @@ const styles = StyleSheet.create({
   row: {
     paddingHorizontal: HOME_GUTTER,
     gap: spacing.sm,
+    // Centred while the chips fit the width; once they don't, the row grows past it and scrolls
+    // from the left as before.
+    flexGrow: 1,
+    justifyContent: 'center',
   },
 });

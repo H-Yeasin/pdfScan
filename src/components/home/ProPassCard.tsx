@@ -32,12 +32,9 @@ export function proPassCardState(
   return adsEnabled ? { kind: 'offer' } : null;
 }
 
-// §17 U6: compact: "Pro pass active · 42 min left" on the marigold highlight, or "Get 1 hour of Pro"
-// as a ghost button. While a pass runs and Home is on screen it counts down by the minute.
-export function ProPassCard() {
-  const { t } = useT();
-  const { tokens } = useTheme();
-  const { go } = useRouter();
+// proPassCardState, kept current: while a pass runs and its screen is on top it counts down by the
+// minute. Me's card and Home's header badge (ProPassBadge) both read it.
+export function useProPassState() {
   const { adsEnabled, passHours } = useRemoteConfig();
   const entitlement = useEntitlement();
   const onScreen = useScreenRole() === 'active';
@@ -53,7 +50,16 @@ export function ProPassCard() {
     return () => clearInterval(id);
   }, [onScreen, running, entitlement]);
 
-  const state = proPassCardState(entitlement, active, adsEnabled, now);
+  return { state: proPassCardState(entitlement, active, adsEnabled, now), passHours };
+}
+
+// §17 U6: compact: "Pro pass active · 42 min left" on the marigold highlight, or "Get 1 hour of Pro"
+// as a ghost button. Me shows it; Home has the same state in its header (ProPassBadge).
+export function ProPassCard() {
+  const { t } = useT();
+  const { tokens } = useTheme();
+  const { go } = useRouter();
+  const { state, passHours } = useProPassState();
   if (!state) return null;
 
   if (state.kind === 'offer') {

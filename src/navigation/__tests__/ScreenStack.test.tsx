@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Animated, StyleSheet, Text } from 'react-native';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppStateProvider } from '../../store/AppStateContext';
@@ -171,5 +171,37 @@ describe('ScreenStack (§16 G2)', () => {
     nav(() => router.go('home'), FADE_DURATION_MS);
     expect(mounts).toEqual({ onboarding: 1, home: 1 });
     expect(unmounts).toEqual({ onboarding: 1 });
+  });
+
+  // On Android a value the native driver writes stays on the view, over what React sends next
+  // (RN 0.86's synchronous mount props override), so a write after a slide has started can put a
+  // layer back where it started, for good: after onboarding's Skip, Home's shell stayed a
+  // screen's width off to the right. The fake driver here can't show that; what it can show is
+  // that nothing writes to a slide's value once the slide is running.
+  it("never writes to a transition's value once it has started", () => {
+    const timing = jest.spyOn(Animated, 'timing');
+    const setValue = jest.spyOn(Animated.Value.prototype, 'setValue');
+    try {
+      mount('onboarding');
+      nav(() => router.go('home'));
+      nav(() => router.go('reader'));
+      nav(() => router.back());
+      nav(() => router.switchTab('library'), FADE_DURATION_MS);
+      expect(roles).toMatchObject({ home: 'hidden', library: 'active' });
+
+      const slides = timing.mock.calls
+        .map(([value, config], i) => ({ value, config, started: timing.mock.invocationCallOrder[i] }))
+        .filter(({ config }) => config.duration === SLIDE_DURATION_MS || config.duration === FADE_DURATION_MS);
+      expect(slides).toHaveLength(4);
+      // One value each.
+      expect(new Set(slides.map(({ value }) => value)).size).toBe(4);
+      for (const { value, started } of slides) {
+        const later = setValue.mock.contexts.filter((context, j) => context === value && setValue.mock.invocationCallOrder[j] > started);
+        expect(later).toHaveLength(0);
+      }
+    } finally {
+      timing.mockRestore();
+      setValue.mockRestore();
+    }
   });
 });

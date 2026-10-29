@@ -119,6 +119,10 @@ export const en = {
     passActive: 'Pro pass active · {left}',
     passMinutes: { one: '{count} min left', other: '{count} min left' },
     passHoursMinutes: '{hours} h {minutes} min left',
+    // The header badge's exponent (ProPassBadge): a few characters next to the logo.
+    passShortMinutes: '{count}m',
+    passShortHours: '{hours}h',
+    passShortHoursMinutes: '{hours}h {minutes}m',
     getPass: { one: 'Get {count} hour of Pro', other: 'Get {count} hours of Pro' },
   },
 

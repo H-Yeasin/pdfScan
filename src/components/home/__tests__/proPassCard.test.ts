@@ -1,6 +1,7 @@
 import { passLeftLabel, proPassCardState } from '../ProPassCard';
+import { passShortLabel } from '../ProPassBadge';
 
-// §17 U6: the compact Pro pass card on Home.
+// §17 U6: the Pro pass on Home (the header badge) and Me (the card).
 describe('proPassCardState', () => {
   const now = 1_000_000;
 
@@ -23,5 +24,14 @@ describe('passLeftLabel', () => {
   it('says minutes, then hours and minutes', () => {
     expect(passLeftLabel(42)).toBe('42 min left');
     expect(passLeftLabel(80)).toBe('1 h 20 min left');
+  });
+});
+
+// Home's header badge: the time left as the logo's exponent.
+describe('passShortLabel', () => {
+  it('fits in a few characters', () => {
+    expect(passShortLabel(42)).toBe('42m');
+    expect(passShortLabel(60)).toBe('1h');
+    expect(passShortLabel(80)).toBe('1h 20m');
   });
 });

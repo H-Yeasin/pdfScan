@@ -142,15 +142,40 @@ Home showed a banner labelled "Test Ad". So a release build with no GDPR message
 no consent form (test ads here only because the emulator is a test device); with the old code it
 would have shown none.
 
-## Also seen: blank after onboarding's Skip (not investigated)
+## Also seen: blank after onboarding's Skip (fixed 2026-10-29, device check open)
 
-Once, after tapping **Skip** on a fresh install's onboarding (no reload involved), the window
-stayed blank (250,250,250) with Home fully mounted underneath (`dumpsys activity top`: the
-scroll view, texts and tab bar), while uiautomator listed nothing below `SafeAreaProvider`: the
-layer holding Home was invisible to Android (opacity 0 or moved off screen). A reload cleared
-it. Skip calls `go('home')`, a slide that animates the shell layer with the native driver
-(`navigation/ScreenStack.tsx`). Not reproduced or explained yet; worth its own session, as it
-would reach new users in a release build.
+After tapping **Skip** on a fresh install's onboarding (no reload involved), the window stayed
+blank (250,250,250) with Home fully mounted underneath (`dumpsys activity top`: the scroll view,
+texts and tab bar, all `V`, inside one view, the shell `Animated.View`), while uiautomator listed
+nothing below `SafeAreaProvider`, and no JS error was logged. Seen twice, the second time on
+2026-10-29 on the Pixel_9a emulator. A reload cleared it.
+
+**Cause.** The shell was left a screen's width to the right, where its slide starts:
+1. `ScreenStack` drove every transition with one shared `Animated.Value` and reset it to 0 in an
+   effect once a transition ended, taking it that no layer read it any more.
+2. The layer's animated node is only disconnected natively in a microtask after that commit
+   (RN's `useAnimatedPropsLifecycle`).
+3. The store is read through `useSyncExternalStore`, so a dispatch is a Sync-lane update. React's
+   Fabric renderer renders Default with Sync (`lanes & 42`), and it runs a Sync commit's effects
+   before microtasks. So when a store update was pending as the slide ended, the reset came first,
+   and `setValue` on a native-driven value goes to native at once.
+4. The shell, still connected, was moved back to `translateX = width`. RN 0.86 on Android keeps
+   every native-driven write and puts it over what React sends for `transform`/`opacity` from
+   then on (`overrideBySynchronousMountPropsAtMountingAndroid`, on by default), so nothing moved
+   it back.
+
+Skip is where the race is easy to hit. The shell is the incoming layer there, and a burst of
+store updates lands as the slide ends (onboarding done, the course rows, persistence, Home's first
+mount, the ad gate).
+
+**Fix.** `ScreenStack` makes a new value for each transition (`useMemo` on `navTick`) and never
+writes to one after its transition has ended. Regression test: `ScreenStack.test.tsx`, "never
+writes to a transition's value once it has started" (it fails on the old code).
+
+**Device check (open):** on a fresh install (`adb shell pm clear com.yeasin.pdfscan`), Skip at
+least 5 times and Start once. Each time Home shows, and uiautomator lists its texts and the tab
+bar. Back from a pushed screen to its tab root, and two quick navigations in a row, still slide
+cleanly.
 
 ## Checks only the owner can do
 
