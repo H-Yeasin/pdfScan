@@ -259,7 +259,15 @@ exists. Backend: Firebase (free plan), Remote Config and opt-in usage counts, no
 
 Rule: never take away a feature that was free.
 
-### §11 Launch and growth
+### §11 Launch and growth *(planned 2026-10-30)*
+**Detailed steps:** [`docs/plan/11-launch.md`](plan/11-launch.md)
+
+- [x] L1 Release config: blocked permissions, one Sentry plugin, privacy policy and Play Console checklist up to date — done in code
+- [ ] L2 Production AAB, manifest and signature checks, release smoke test
+- [ ] L3 Privacy policy and `app-ads.txt` hosted; store listing (`docs/store/listing.md`), graphics, screenshots
+- [ ] L4 Internal testing, then a closed test (12+ testers, 14 days)
+- [ ] L5 Staged production rollout
+
 - [ ] Store listing aimed at student searches: "scan assignment to PDF", "notes scanner",
       "compress PDF for Google Classroom". (S)
 - [ ] Screenshots that show the Submit flow and handwriting before and after. (S)

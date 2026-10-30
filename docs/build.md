@@ -447,12 +447,12 @@ come from. Pick one route for Play uploads and use local builds for testing.
 changed the package's folder layout. Update `firebasePluginHalf` in `app.config.js` to the new
 path (look in `node_modules/@react-native-firebase/app/plugin/build/index.js` for the names).
 
-**`[@sentry/react-native/expo] Missing config for organization, project`.** `app.json` lists the
-Sentry plugin twice: `@sentry/react-native` (no options) and `@sentry/react-native/expo` (with
-`organization` and `project`). The plugin runs only once and the first entry wins, so the
-options in `app.json` are never used and `SENTRY_ORG` / `SENTRY_PROJECT` are. Harmless while
-those variables are set (`.env.local`, EAS). Removing the bare `"@sentry/react-native"` entry
-would make `app.json`'s options apply (a config-file change: review it as AGENTS.md says).
+**`[@sentry/react-native/expo] Missing config for organization, project`.** Until §11 L1,
+`app.json` listed the Sentry plugin twice: `@sentry/react-native` (no options) and
+`@sentry/react-native/expo` (with `organization` and `project`). The plugin runs only once and
+the first entry won, so `app.json`'s options were never used. L1 removed the bare entry, so
+`app.json`'s options now apply (`SENTRY_ORG` / `SENTRY_PROJECT` still take precedence). If the
+warning comes back, check that nobody added the bare entry again.
 
 **The Sentry step fails during a release build.** The `SENTRY_*` variables aren't in Gradle's
 environment. Build through `npx expo run:android --variant release`, or load `.env.local` first

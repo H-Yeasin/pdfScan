@@ -37,7 +37,9 @@
         "android.permission.CAMERA"
       ],
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_MEDIA_IMAGES"
       ],
       "intentFilters": [
         {
@@ -180,7 +182,6 @@
         }
       ],
       "expo-asset",
-      "@sentry/react-native",
       [
         "expo-notifications",
         {
