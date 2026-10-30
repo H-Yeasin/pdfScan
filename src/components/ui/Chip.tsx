@@ -103,9 +103,11 @@ export function FilterChip({ label, icon, count, selected, onPress, disabled = f
       haptic
       scale={false}
       testID={testID}
+      // inner before chip: inner's height '100%' is for the Touchable inside Chip's box; here it
+      // would override the chip's own 36 dp and, in a wrapping row, stretch the chip tall.
       style={[
-        styles.chip,
         styles.inner,
+        styles.chip,
         selected ? { backgroundColor: tokens.accentSoft, borderColor: tokens.accent } : { backgroundColor: tokens.surface, borderColor: tokens.edge },
         disabled && styles.disabled,
         style,
