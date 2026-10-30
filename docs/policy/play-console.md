@@ -13,8 +13,10 @@ on `ads_enabled` (M2/M5).
       Do **not** opt in to "Designed for Families". Appeal to children: no.
 - [ ] **Ads:** "Yes, my app contains ads" (set this before the first build with the AdMob SDK
       reaches any track, even while `ads_enabled` is off).
-- [ ] **Privacy policy:** the URL of the hosted [privacy-policy.md](privacy-policy.md) (§11 L3
-      hosts it).
+- [ ] **Privacy policy:** `https://toolsdigger.com/pdfscan/privacy`, a word-for-word copy of
+      [privacy-policy.md](privacy-policy.md) on the ToolsDigger site (separate repo,
+      `app/pdfscan/privacy/page.tsx`). When this file changes, copy the change there and update
+      its `LAST_UPDATED`.
 - [ ] **Data safety** (the table below).
 - [ ] **App access:** "All functionality is available without special access" (no login).
 - [ ] **Advertising ID:** "Yes, my app uses advertising ID", for Advertising or marketing (AdMob
@@ -55,5 +57,8 @@ Collected = leaves the phone. "Optional" = only when the user turns it on.
       `scripts/make-icons.mjs` from `assets/brand/pdfscan-mark.svg` and `pdfscan-tile.svg`, §15 V2;
       upload it again after the brand refresh).
 - [ ] Listing text, feature graphic and screenshots: [docs/store/listing.md](../store/listing.md).
-- [ ] **Contact details:** a developer email (required, shown on the listing), and the website that
-      hosts the privacy policy and `app-ads.txt` (§11 L3).
+- [ ] **Contact details:** a developer email (required, shown on the listing), and the website
+      `https://toolsdigger.com/pdfscan`. `app-ads.txt` goes at the domain root,
+      `https://toolsdigger.com/app-ads.txt` (`public/app-ads.txt` in the ToolsDigger repo), with
+      the exact line AdMob shows (`docs/ads.md` step 5). Flip `PLAY_LIVE` in that repo's
+      `app/pdfscan/content.ts` once the listing is live.

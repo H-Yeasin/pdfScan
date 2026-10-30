@@ -72,6 +72,19 @@ export function transitionStyle(
   }
 }
 
+// The resting values, as animated values that never change. A root that comes back while the shell
+// carries the movement (Skip from the introduction pushed on Me, to Home) gets no transition style
+// of its own, and on Android the plain RESTING_STYLE React sends loses to the last value the native
+// driver wrote to its view (RN 0.86's synchronous mount props override): if that root last left
+// through a tab switch, its view keeps the switch's opacity 0 and stays blank under a visible tab
+// bar. Driven by the transition's progress, the native driver writes the resting values to the
+// view every frame, and those replace what was kept. Both transform entries, in RESTING_STYLE's
+// order.
+export function settleStyle(progress: Animated.Value): object {
+  const constant = (value: number) => progress.interpolate({ inputRange: [0, 1], outputRange: [value, value] });
+  return { opacity: constant(1), transform: [{ translateX: constant(0) }, { translateY: constant(0) }] };
+}
+
 export function slideTransform(progress: Animated.Value, width: number, layer: 'incoming' | 'outgoing', dir: NavDir) {
   // fwd: incoming enters from the right, outgoing exits to the left.
   // back: incoming enters from the left, outgoing exits to the right.

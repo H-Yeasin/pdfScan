@@ -177,6 +177,35 @@ least 5 times and Start once. Each time Home shows, and uiautomator lists its te
 bar. Back from a pushed screen to its tab root, and two quick navigations in a row, still slide
 cleanly.
 
+### A second path: Skip from Me's "Show the introduction again" (fixed 2026-10-30, device check open)
+
+The owner's check of the fix above found another way in: **Home → Me → Help & feedback → "Show the
+introduction again" → Skip** left Home's content blank, the tab bar showing. Switching to another
+tab and back to Home brought it back.
+
+**Cause.** The same Android override, but no late write this time; Home's layer just never got a
+native write that put it back:
+1. Home → Me is a tab switch, so the native driver faded Home's root layer to `opacity 0`, and that
+   value was kept on its view.
+2. The introduction is pushed on the Me tab (`SettingsScreen`, `go('onboarding')`).
+3. Skip's `go('home')` goes from a pushed screen to a root, so `ScreenStack` moves the **shell**
+   (with the tab bar, which therefore shows), not Home's layer. React sent Home's layer plain
+   `RESTING_STYLE`, and the kept `0` won over it.
+4. A later tab switch to Home fades its layer in natively, which is why that fixed it.
+
+Any root that last left through a tab switch and comes back with the shell standing in can be hit
+the same way.
+
+**Fix.** `transitions.settleStyle(progress)`: the resting values as interpolations that never
+change. When the shell stands in for an incoming root, `ScreenStack` gives that root this style, so
+the native driver writes `opacity 1` and zero translations to its view every frame of the
+transition, over whatever was kept. Regression test: `ScreenStack.test.tsx`, "drives the root the
+shell reveals, so a kept opacity 0 is written over" (it fails on the old code).
+
+**Device check (open),** after a Metro reload: Home → Me → "Show the introduction again" → Skip, and
+again with Start: Home's content shows each time. Also the fresh-install Skip above, Home → Files →
+open a document → Back, and two quick tab taps in a row.
+
 ## Checks only the owner can do
 
 - AdMob ▸ Privacy & messaging: create and publish the GDPR message for the app.

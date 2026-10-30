@@ -173,6 +173,25 @@ describe('ScreenStack (§16 G2)', () => {
     expect(unmounts).toEqual({ onboarding: 1 });
   });
 
+  // The second way a kept native value blanks Home: Home → Me fades Home's layer to 0 natively;
+  // the introduction is pushed on Me, and its Skip goes to Home with the shell carrying the
+  // movement. Without native writes of its own, Home's layer kept the 0 under a visible tab bar.
+  it('drives the root the shell reveals, so a kept opacity 0 is written over', () => {
+    mount('home');
+    nav(() => router.switchTab('settings'), FADE_DURATION_MS);
+    nav(() => router.go('onboarding'));
+    act(() => router.go('home'));
+    let node: ReactTestInstance | null = root.root.find((n) => n.props.children === 'screen:home' && typeof n.type === 'string');
+    while (node && node.type !== Animated.View) node = node.parent;
+    const opacity = StyleSheet.flatten(node?.props.style)?.opacity as unknown;
+    expect(typeof opacity).toBe('object');
+    expect(opacity).toHaveProperty('__getValue');
+    act(() => {
+      jest.advanceTimersByTime(SLIDE_DURATION_MS + 50);
+    });
+    expect(roles.home).toBe('active');
+  });
+
   // On Android a value the native driver writes stays on the view, over what React sends next
   // (RN 0.86's synchronous mount props override), so a write after a slide has started can put a
   // layer back where it started, for good: after onboarding's Skip, Home's shell stayed a

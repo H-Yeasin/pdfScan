@@ -9,7 +9,7 @@ import { activeStack, isRootEntry, rootEntry, TABS, topEntry, type TabId } from 
 import { useRenderCount } from '../utils/renderCounts';
 import { useRouter } from './router';
 import { ScreenRoleContext, type ScreenRole } from './screenRole';
-import { pickTransition, RESTING_STYLE, runSlide, transitionDuration, transitionStyle, type TransitionKind } from './transitions';
+import { pickTransition, RESTING_STYLE, runSlide, settleStyle, transitionDuration, transitionStyle, type TransitionKind } from './transitions';
 
 // §16 G2: draws the router's stacks as layers, each screen instance in its own keyed layer, so a
 // navigation never mounts a screen twice:
@@ -107,7 +107,9 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
 
   // Which layers move. Root to root (a tab switch): the two roots, inside a shell that stays put
   // with its tab bar. Otherwise the outer layers, the shell standing in for whichever side is a
-  // root. Built once per transition so the memoised layers keep their props.
+  // root. Built once per transition so the memoised layers keep their props. A root revealed with
+  // the shell standing in also gets settleStyle: its view may still hold the opacity 0 of the tab
+  // switch it last left by, which only a native write clears (see there).
   const motion = useMemo(() => {
     const byKey: Record<string, object | undefined> = {};
     let shell: object | undefined;
@@ -117,8 +119,10 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
       byKey[top.key] = style('incoming');
       byKey[leaving.key] = style('outgoing');
     } else {
-      if (topIsRoot) shell = style('incoming');
-      else byKey[top.key] = style('incoming');
+      if (topIsRoot) {
+        shell = style('incoming');
+        byKey[top.key] = settleStyle(progress);
+      } else byKey[top.key] = style('incoming');
       if (leavingIsRoot) shell = style('outgoing');
       else byKey[leaving.key] = style('outgoing');
     }

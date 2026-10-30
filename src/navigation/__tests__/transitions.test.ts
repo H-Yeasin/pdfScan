@@ -4,6 +4,7 @@ import {
   modalAnimation,
   pickTransition,
   RESTING_STYLE,
+  settleStyle,
   SLIDE_DURATION_MS,
   transitionDuration,
   transitionStyle,
@@ -81,5 +82,17 @@ describe('transition styles', () => {
     expect(Array.isArray(RESTING_STYLE.transform)).toBe(true);
     expect(keysOf(RESTING_STYLE)).toEqual(['translateX', 'translateY']);
     expect(typeof RESTING_STYLE.opacity).toBe('number');
+  });
+
+  // A root revealed with the shell standing in is written back to rest by the native driver.
+  it('settle a layer at rest from start to end', () => {
+    const valueOf = (v: unknown) => (v as { __getValue(): number }).__getValue();
+    for (const at of [0, 1]) {
+      const style = settleStyle(new Animated.Value(at)) as { opacity: unknown; transform: Record<string, unknown>[] };
+      expect(keysOf(style)).toEqual(['translateX', 'translateY']);
+      expect(valueOf(style.opacity)).toBe(1);
+      expect(valueOf(style.transform[0].translateX)).toBe(0);
+      expect(valueOf(style.transform[1].translateY)).toBe(0);
+    }
   });
 });
