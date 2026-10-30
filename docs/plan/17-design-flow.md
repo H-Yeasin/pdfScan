@@ -658,9 +658,9 @@ As built (2026-10-22):
   can be watched for). Both open the Pro screen.
   Revised 2026-10-29 (owner): on Home the pass is `ProPassBadge`, in the header to the right of the
   greeting: the launcher icon's foreground (`assets/android-icon-foreground.png`, the mark without its
-  tile; the middle half of the PNG in a 40 dp box) with the Pro diamond at its top-right like an exponent
-  (marigold while a pass runs, grey without one) and the time left at its bottom-left ("42m", "1h 20m",
-  "2h": `passShortLabel`; a marigold plus while there is no pass). TalkBack reads the card's sentences. Me keeps
+  tile; the middle half of the PNG in a 40 dp box) with a "Pro" `Badge` over its bottom edge (marigold while a pass
+  runs, grey without one) and the time left at its top-right like an exponent ("42m", "1h 20m", "2h":
+  `passShortLabel`; a plus while there is no pass). TalkBack reads the card's sentences. Me keeps
   `ProPassCard`; both read `useProPassState()`.
 - Banner: `BannerSlot` takes `inline={{ width }}`: an `INLINE_ADAPTIVE_BANNER` of Home's content width,
   `maxHeight` 100 (`INLINE_BANNER_MAX_HEIGHT`), between Courses/Due soon and Recent files. Library keeps
