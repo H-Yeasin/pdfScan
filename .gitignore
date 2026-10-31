@@ -60,4 +60,4 @@ perf-results/
 google-services.json
 GoogleService-Info.plist
 
-.env.local
+config.bat
