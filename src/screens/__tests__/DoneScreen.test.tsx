@@ -27,11 +27,11 @@ function mount(done: SavedScan) {
     root = create(
       <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
         <ThemeProvider>
-          <RouterProvider>
-            <AppStateProvider>
+          <AppStateProvider>
+            <RouterProvider>
               <Capture />
-            </AppStateProvider>
-          </RouterProvider>
+            </RouterProvider>
+          </AppStateProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     );

@@ -35,7 +35,7 @@ export function useOpenCoverOptions() {
 // Academic options' side, in target mode: `leave` goes back (and clears the target), `apply`
 // builds the cover and dispatches the result. `busy` while it runs, for the progress overlay.
 export function useApplyCover(target: CoverTarget | null, doc: LibraryDocument | undefined) {
-  const { go } = useRouter();
+  const { go, reopen } = useRouter();
   const dispatch = useAppDispatch();
   const { annotations, bookmarks } = useAppSlices('library').library;
   const [busy, setBusy] = useState(false);
@@ -73,12 +73,12 @@ export function useApplyCover(target: CoverTarget | null, doc: LibraryDocument |
           if (result.bookmarks) dispatch({ type: 'library/SET_BOOKMARKS', bookmarks: result.bookmarks });
         }
         // A Replace made from the Reader shows the new PDF in a fresh Reader: the one kept under
-        // Academic options (§16 G2) still has the old file open at the same path. Opening the
-        // Reader again drops that one from the stack (navStack.push keeps one per stack).
+        // Academic options (§16 G2) still has the old file open at the same path. Reopening it
+        // (navStack.reopen) puts a fresh instance in that one's place.
         const showingIt = target?.from === 'reader' && mode === 'replace';
         if (showingIt) {
           dispatch({ type: 'deliver/SET_COVER_TARGET', target: null });
-          go('reader');
+          reopen('reader');
         } else {
           leave();
         }
@@ -99,7 +99,7 @@ export function useApplyCover(target: CoverTarget | null, doc: LibraryDocument |
         dispatch({ type: 'ui/SHOW_SNACK', msg });
       }
     },
-    [doc, busy, annotations, bookmarks, dispatch, go, target, leave, openInReader]
+    [doc, busy, annotations, bookmarks, dispatch, reopen, target, leave, openInReader]
   );
 
   return { busy, apply, leave };

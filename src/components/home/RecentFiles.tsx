@@ -8,7 +8,7 @@ import { DocThumb } from './DocThumb';
 import { SectionHeader } from './SectionHeader';
 
 type RecentFilesProps = {
-  // recentFiles(): the newest five.
+  // recentFiles(): the newest three, without the Continue document.
   files: readonly LibraryDocument[];
   courses: readonly Course[];
   now: number;
@@ -16,7 +16,7 @@ type RecentFilesProps = {
   onSeeAll: () => void;
 };
 
-// §17 U6: the five newest documents, "See all" → Files. Nothing for an empty library.
+// §17 U6: the newest documents (three), "See all" → Files. Nothing for an empty library.
 export function RecentFiles({ files, courses, now, onOpen, onSeeAll }: RecentFilesProps) {
   const { t } = useT();
   if (files.length === 0) return null;

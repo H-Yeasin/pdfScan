@@ -10,13 +10,16 @@ import type { TabId } from './navStack';
 // the app-level handler that calls this; (2) selection or Library search is left; (3) the screen
 // goes back: since §16 G2 that's a pop to wherever it was opened from, apart from the few
 // screens below with a fixed way back; Review asks before it drops an unsaved scan (§17 U5); (4) on
-// a tab's root: to Home from any other, and out of the app from Home.
+// a tab's root: back to the tab left last (navStack.tabTrail), else to Home from any other tab,
+// and out of the app from Home. So Back is one last-in, first-out history across the tabs.
 
 export type BackContext = {
   // The screen on top, its tab, and whether there's a screen under it on that tab's stack.
   screen: ScreenName;
   tab: TabId;
   canPop: boolean;
+  // The tab left last, which Back on a tab's root returns to (the end of navStack's tabTrail).
+  prevTab?: TabId | null;
   selMode: boolean;
   searchOpen: boolean;
   // Pages in the unsaved scan session. They live only in memory, so leaving the app asks first.
@@ -33,6 +36,8 @@ export type BackStep =
   | { kind: 'dispatch'; actions: AppAction[] }
   | { kind: 'pop'; actions: AppAction[] }
   | { kind: 'go'; to: ScreenName; actions: AppAction[] }
+  // From a tab's root to the tab left last, or Home (router.backToTab).
+  | { kind: 'tab'; actions: AppAction[] }
   // Asks before the unsaved scan goes; then the app closes (`exit`) or Review pops (`pop`, §17 U5:
   // with no Capture screen under it, Review is the session, and leaving it ends the session).
   | { kind: 'confirmDiscard'; count: number; then: 'exit' | 'pop' }
@@ -89,7 +94,6 @@ export function resolveBack(ctx: BackContext): BackStep {
   if (ctx.canPop) return { kind: 'pop', actions };
 
   // A tab's root.
-  const start = rootScreen();
-  if (ctx.tab !== start) return { kind: 'go', to: start, actions };
+  if (ctx.prevTab || ctx.tab !== rootScreen()) return { kind: 'tab', actions };
   return ctx.sessionPageCount > 0 ? { kind: 'confirmDiscard', count: ctx.sessionPageCount, then: 'exit' } : { kind: 'exit' };
 }

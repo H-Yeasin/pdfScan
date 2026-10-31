@@ -1,5 +1,5 @@
 import { resolveBack, type BackContext, type BackStep } from '../backHandling';
-import { activeStack, initialNav, pop, replace, resolveGo, topEntry, type NavState } from '../navStack';
+import { activeStack, backToTab, initialNav, pop, replace, resolveGo, switchTab, topEntry, type NavState } from '../navStack';
 import type { ScreenName } from '../../types/navigation';
 
 const base: BackContext = {
@@ -22,8 +22,10 @@ function walk(start: NavState, ...screens: ScreenName[]): NavState {
 
 // One Back press, resolved from the stack and applied the way AppNavigator applies it.
 function pressBack(nav: NavState, patch: Partial<BackContext> = {}): { step: BackStep; nav: NavState } {
-  const step = resolveBack(ctx({ screen: topEntry(nav).screen, tab: nav.tab, canPop: activeStack(nav).length > 1, ...patch }));
+  const prevTab = nav.tabTrail[nav.tabTrail.length - 1] ?? null;
+  const step = resolveBack(ctx({ screen: topEntry(nav).screen, tab: nav.tab, canPop: activeStack(nav).length > 1, prevTab, ...patch }));
   if (step.kind === 'pop') return { step, nav: pop(nav) };
+  if (step.kind === 'tab') return { step, nav: backToTab(nav).state };
   if (step.kind === 'go') return { step, nav: resolveGo(nav, step.to, 'back', `k${++keys}`).state };
   return { step, nav };
 }
@@ -45,7 +47,7 @@ describe('resolveBack order', () => {
       kind: 'dispatch',
       actions: [{ type: 'libraryUi/TOGGLE_SEARCH_OPEN' }],
     });
-    expect(resolveBack(ctx({ screen: 'library', tab: 'library' }))).toEqual({ kind: 'go', to: 'home', actions: [] });
+    expect(resolveBack(ctx({ screen: 'library', tab: 'library' }))).toEqual({ kind: 'tab', actions: [] });
   });
 
   it('ignores a stale selection on screens without a document list', () => {
@@ -103,10 +105,11 @@ describe('resolveBack order', () => {
     });
   });
 
-  it('on a root: to Home from another tab, out of the app from Home', () => {
+  it('on a root: to the tab left last, else Home from another tab, out of the app from Home', () => {
     expect(resolveBack(ctx({ screen: 'home' }))).toEqual({ kind: 'exit' });
+    expect(resolveBack(ctx({ screen: 'home', prevTab: 'tools' }))).toEqual({ kind: 'tab', actions: [] });
     for (const tab of ['library', 'tools', 'settings'] as const) {
-      expect(resolveBack(ctx({ screen: tab, tab }))).toEqual({ kind: 'go', to: 'home', actions: [] });
+      expect(resolveBack(ctx({ screen: tab, tab }))).toEqual({ kind: 'tab', actions: [] });
     }
     // Applied: the Library tab's root goes to Home's.
     const { nav } = pressBack(initialNav('library'));
@@ -117,7 +120,28 @@ describe('resolveBack order', () => {
   it('asks before exiting with an unsaved scan', () => {
     expect(resolveBack(ctx({ screen: 'home', sessionPageCount: 8 }))).toEqual({ kind: 'confirmDiscard', count: 8, then: 'exit' });
     // Another tab's root goes Home first, the pages kept.
-    expect(resolveBack(ctx({ screen: 'tools', tab: 'tools', sessionPageCount: 8 })).kind).toBe('go');
+    expect(resolveBack(ctx({ screen: 'tools', tab: 'tools', sessionPageCount: 8 })).kind).toBe('tab');
+  });
+
+  it('is one history across the tabs: Home → Files → Tools, then Back ×3 leaves the app', () => {
+    let nav = switchTab(switchTab(home, 'library'), 'tools');
+    const seen: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const pressed = pressBack(nav);
+      seen.push(pressed.step.kind === 'exit' ? 'exit' : topEntry(pressed.nav).screen);
+      nav = pressed.nav;
+    }
+    expect(seen).toEqual(['library', 'home', 'exit']);
+  });
+
+  it('a tab left with a screen open shows it again on the way back', () => {
+    // Home → a course → Files (tab bar) → Back: the course, then Home, then out.
+    let nav = switchTab(walk(home, 'course'), 'library');
+    nav = pressBack(nav).nav;
+    expect(topEntry(nav).screen).toBe('course');
+    nav = pressBack(nav).nav;
+    expect(topEntry(nav).screen).toBe('home');
+    expect(pressBack(nav).step).toEqual({ kind: 'exit' });
   });
 
   it('§17 U5: Back from Review asks before the scan goes, then returns to the tab it was started on', () => {

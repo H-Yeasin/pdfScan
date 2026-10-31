@@ -1,26 +1,35 @@
 import {
   activeStack,
+  backToTab,
   initialNav,
   isRootEntry,
-  MAX_PUSHED,
+  MAX_HISTORY,
   pop,
   popTo,
   push,
   replace,
   resetTab,
+  reopen,
   resolveGo,
+  restoreSubject,
   rootEntry,
+  sameSubject,
+  subjectFor,
   switchTab,
   TABS,
   topEntry,
+  type EntrySubject,
   type NavState,
 } from '../navStack';
+import { initialAppState } from '../../store/initialState';
 import type { NavDir, ScreenName } from '../../types/navigation';
 
 let keys = 0;
 const key = () => `k${++keys}`;
 const screens = (nav: NavState, tab = nav.tab) => nav.stacks[tab].map((e) => e.screen);
-const go = (nav: NavState, to: ScreenName, dir: NavDir = 'fwd') => resolveGo(nav, to, dir, key());
+const go = (nav: NavState, to: ScreenName, dir: NavDir = 'fwd', subject?: EntrySubject) => resolveGo(nav, to, dir, key(), subject);
+const doc = (id: string): EntrySubject => ({ kind: 'doc', id });
+const course = (id: string): EntrySubject => ({ kind: 'course', id });
 
 describe('navStack (§16 G2)', () => {
   it('starts every tab at its root, with fixed root keys', () => {
@@ -44,20 +53,37 @@ describe('navStack (§16 G2)', () => {
     expect(screens(nav)).toEqual(['home']);
   });
 
-  it('keeps one instance of a screen per stack', () => {
-    const nav = push(push(push(initialNav('library'), 'reader', 'r1'), 'academicOptions', 'a1'), 'reader', 'r2');
-    // The Reader lower down (showing the store's current document) is dropped with what was above it.
-    expect(activeStack(nav)).toEqual([rootEntry('library'), { key: 'r2', screen: 'reader' }]);
-    // Already on top: nothing changes, the instance stays.
-    expect(push(nav, 'reader', 'r3')).toBe(nav);
+  it('pushes a screen again with its own subject; Back gives each one back in turn', () => {
+    // Reader A → its course → Reader B.
+    let nav = push(push(push(initialNav('library'), 'reader', 'rA', doc('A')), 'course', 'c1', course('C')), 'reader', 'rB', doc('B'));
+    expect(screens(nav)).toEqual(['library', 'reader', 'course', 'reader']);
+    nav = pop(nav);
+    expect(topEntry(nav)).toEqual({ key: 'c1', screen: 'course', subject: course('C') });
+    nav = pop(nav);
+    expect(topEntry(nav)).toEqual({ key: 'rA', screen: 'reader', subject: doc('A') });
+    // Already on top with the same subject: nothing changes, the instance stays.
+    expect(push(nav, 'reader', 'r3', doc('A'))).toBe(nav);
+    // Another document: pushed over it.
+    expect(screens(push(nav, 'reader', 'r4', doc('B')))).toEqual(['library', 'reader', 'reader']);
     // A root is never pushed: that's back to it.
     expect(screens(push(nav, 'library', 'x'))).toEqual(['library']);
+  });
+
+  it('keeps one scan flow: Review opened again is the one on the stack', () => {
+    const nav = push(push(push(initialNav('home'), 'review', 'v1'), 'academicOptions', 'a1'), 'review', 'v2');
+    expect(activeStack(nav)).toEqual([rootEntry('home'), { key: 'v1', screen: 'review' }]);
+  });
+
+  it('reopen puts a fresh instance in place of the nearest one', () => {
+    const nav = push(push(initialNav('library'), 'reader', 'rA', doc('A')), 'academicOptions', 'a1');
+    expect(activeStack(reopen(nav, 'reader', 'rA2'))).toEqual([rootEntry('library'), { key: 'rA2', screen: 'reader', subject: doc('A') }]);
+    expect(screens(reopen(initialNav('home'), 'storage', 's1'))).toEqual(['home', 'storage']);
   });
 
   it('switching tabs keeps each tab’s stack; a second tap resets', () => {
     let nav = push(push(initialNav('library'), 'course', 'c1'), 'reader', 'r1');
     nav = switchTab(nav, 'home');
-    expect(nav).toMatchObject({ tab: 'home', prevTab: 'library' });
+    expect(nav).toMatchObject({ tab: 'home', tabTrail: ['library'] });
     nav = switchTab(nav, 'library');
     expect(screens(nav)).toEqual(['library', 'course', 'reader']);
     expect(topEntry(nav).key).toBe('r1');
@@ -84,12 +110,69 @@ describe('navStack (§16 G2)', () => {
     expect(activeStack(nav)).toEqual([rootEntry('home')]);
   });
 
-  it(`caps each tab at ${MAX_PUSHED} pushed screens, dropping the oldest`, () => {
-    const many: ScreenName[] = ['course', 'reader', 'academicOptions', 'pro', 'onboarding', 'storage', 'backup', 'manageFolders'];
-    const nav = many.reduce((n, s) => push(n, s, `p-${s}`), initialNav('home'));
-    expect(activeStack(nav)).toHaveLength(MAX_PUSHED + 1);
+  it('keeps a long history: nothing is dropped below the safety cap', () => {
+    const many: ScreenName[] = ['course', 'reader', 'academicOptions', 'pro', 'onboarding', 'storage', 'backup', 'manageFolders', 'pro', 'storage'];
+    const nav = many.reduce((n, s, i) => push(n, s, `p-${i}`), initialNav('home'));
+    expect(screens(nav)).toEqual(['home', ...many]);
+    let back = nav;
+    for (const s of [...many].reverse()) {
+      expect(topEntry(back).screen).toBe(s);
+      back = pop(back);
+    }
+    expect(screens(back)).toEqual(['home']);
+  });
+
+  it(`drops the oldest entry above the root past ${MAX_HISTORY}`, () => {
+    let nav = initialNav('home');
+    for (let i = 0; i < MAX_HISTORY + 5; i++) nav = push(nav, 'reader', `r${i}`, doc(`d${i}`));
+    expect(activeStack(nav)).toHaveLength(MAX_HISTORY + 1);
     expect(activeStack(nav)[0]).toEqual(rootEntry('home'));
-    expect(screens(nav)).toEqual(['home', ...many.slice(many.length - MAX_PUSHED)]);
+    expect(activeStack(nav)[1].key).toBe('r5');
+  });
+
+  it('records the tabs left, most recent last, each once', () => {
+    let nav = initialNav('home');
+    nav = switchTab(nav, 'library');
+    nav = switchTab(nav, 'tools');
+    expect(nav.tabTrail).toEqual(['home', 'library']);
+    nav = switchTab(nav, 'home');
+    expect(nav.tabTrail).toEqual(['library', 'tools']);
+    nav = switchTab(nav, 'tools');
+    expect(nav.tabTrail).toEqual(['library', 'home']);
+  });
+
+  it('backToTab returns to the tabs left, in reverse, then Home', () => {
+    let nav = switchTab(switchTab(push(initialNav('home'), 'storage', 's1'), 'library'), 'tools');
+    let change = backToTab(nav);
+    expect(change).toMatchObject({ kind: 'fade', dir: 'back', state: { tab: 'library', tabTrail: ['home'] } });
+    nav = backToTab(change.state).state;
+    // Home as it was left, with its pushed screen.
+    expect(nav).toMatchObject({ tab: 'home', tabTrail: [] });
+    expect(screens(nav)).toEqual(['home', 'storage']);
+    // Nothing left: Home, unrecorded, so there's no loop between two tabs.
+    change = backToTab({ ...initialNav('settings') });
+    expect(change.state).toMatchObject({ tab: 'home', tabTrail: [] });
+    expect(backToTab(initialNav('home')).state).toEqual(initialNav('home'));
+  });
+
+  it('subjects: compared, read from the store and restored to it', () => {
+    expect(sameSubject(doc('A'), doc('A'))).toBe(true);
+    expect(sameSubject(doc('A'), doc('B'))).toBe(false);
+    expect(sameSubject(doc('A'), course('A'))).toBe(false);
+    expect(sameSubject(undefined, undefined)).toBe(true);
+    expect(sameSubject(doc('A'), undefined)).toBe(false);
+    const ext = { uri: 'file:///x.pdf', name: 'x.pdf', format: 'PDF', sizeBytes: 1, sourceUri: 'content://x', importedAt: 1 } as const;
+    expect(sameSubject({ kind: 'external', doc: ext }, { kind: 'external', doc: { ...ext } })).toBe(true);
+
+    const state = { ...initialAppState, reader: { ...initialAppState.reader, readerId: 'B' }, libraryUi: { ...initialAppState.libraryUi, activeCourseId: 'C' } };
+    expect(subjectFor('reader', state)).toEqual(doc('B'));
+    expect(subjectFor('course', state)).toEqual(course('C'));
+    expect(subjectFor('storage', state)).toBeUndefined();
+    expect(restoreSubject({ key: 'r', screen: 'reader', subject: doc('A') }, state)).toEqual({ type: 'reader/SET_READER_ID', id: 'A' });
+    expect(restoreSubject({ key: 'r', screen: 'reader', subject: doc('B') }, state)).toBeNull();
+    expect(restoreSubject({ key: 'c', screen: 'course', subject: course('D') }, state)).toEqual({ type: 'libraryUi/SET_ACTIVE_COURSE', id: 'D' });
+    expect(restoreSubject({ key: 'x', screen: 'reader', subject: { kind: 'external', doc: ext } }, state)).toEqual({ type: 'reader/SET_EXTERNAL', doc: ext });
+    expect(restoreSubject({ key: 's', screen: 'storage' }, state)).toBeNull();
   });
 
   it('replace at boot: a root becomes the tab, anything else is alone on the stack', () => {
@@ -123,13 +206,20 @@ describe('resolveGo: what router.go(to, dir) does', () => {
     expect(activeStack(nav.state)).toEqual([rootEntry('home')]);
   });
 
-  it('another tab root: a cross-fading jump that leaves both tabs at their roots', () => {
+  it('another tab root: a cross-fading jump that ends a scan flow and keeps the rest', () => {
     // The Library after a save: the scan flow is over.
-    const flow = go(go(initialNav('home'), 'review').state, 'deliver').state;
+    const flow = go(go(go(initialNav('home'), 'course', 'fwd', course('C')).state, 'review').state, 'deliver').state;
     const saved = go(flow, 'library');
-    expect(saved).toMatchObject({ kind: 'fade', state: { tab: 'library', prevTab: 'home' } });
-    expect(screens(saved.state, 'home')).toEqual(['home']);
+    expect(saved).toMatchObject({ kind: 'fade', state: { tab: 'library', tabTrail: ['home'] } });
+    expect(screens(saved.state, 'home')).toEqual(['home', 'course']);
     expect(screens(saved.state, 'library')).toEqual(['library']);
+    // Done is left behind too.
+    const done = go(go(go(initialNav('home'), 'review').state, 'deliver').state, 'done').state;
+    expect(screens(go(done, 'library').state, 'home')).toEqual(['home']);
+    // Home's "See all": Home keeps what it had open, and Back returns to it.
+    const seeAll = go(go(initialNav('home'), 'storage').state, 'library').state;
+    expect(screens(seeAll, 'home')).toEqual(['home', 'storage']);
+    expect(screens(backToTab(seeAll).state)).toEqual(['home', 'storage']);
   });
 
   it('§17 U5: a scan is pushed on the tab it was started from', () => {
@@ -162,8 +252,11 @@ describe('resolveGo: what router.go(to, dir) does', () => {
     const fromCourse = go(go(go(initialNav('home'), 'course').state, 'review').state, 'deliver').state;
     expect(screens(go(fromCourse, 'course').state)).toEqual(['home', 'course']);
     // Pages added to a document: a fresh Reader where it was.
-    const added = go(go(go(go(initialNav('library'), 'reader').state, 'review').state, 'deliver').state, 'reader');
+    const reader = go(initialNav('library'), 'reader', 'fwd', doc('A')).state;
+    const added = go(go(go(reader, 'review').state, 'deliver').state, 'reader', 'fwd', doc('A'));
     expect(screens(added.state)).toEqual(['library', 'reader']);
+    expect(topEntry(added.state).key).not.toBe(topEntry(reader).key);
+    expect(topEntry(added.state).subject).toEqual(doc('A'));
   });
 
   it('detours from the scan flow stay on top of it', () => {
@@ -181,7 +274,15 @@ describe('resolveGo: what router.go(to, dir) does', () => {
 
   it('opening the saved file from Done leaves Done behind', () => {
     const done = go(go(go(initialNav('library'), 'review').state, 'deliver').state, 'done').state;
-    expect(screens(go(done, 'reader').state)).toEqual(['library', 'reader']);
+    expect(screens(go(done, 'reader', 'fwd', doc('A')).state)).toEqual(['library', 'reader']);
+    // Pages added to the Reader the scan started from: Done gives way to a fresh instance of it.
+    const reader = go(initialNav('library'), 'reader', 'fwd', doc('A')).state;
+    const added = go(go(go(go(reader, 'review').state, 'deliver').state, 'done').state, 'reader', 'fwd', doc('A')).state;
+    expect(screens(added)).toEqual(['library', 'reader']);
+    expect(topEntry(added).key).not.toBe(topEntry(reader).key);
+    // Another document from that Done: pushed over the first.
+    const other = go(go(go(go(reader, 'review').state, 'deliver').state, 'done').state, 'reader', 'fwd', doc('B')).state;
+    expect(screens(other)).toEqual(['library', 'reader', 'reader']);
   });
 
   it('a scan started on another tab takes a finished Done off this one', () => {

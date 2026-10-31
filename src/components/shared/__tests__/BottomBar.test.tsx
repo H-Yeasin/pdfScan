@@ -30,9 +30,9 @@ function wrap(children: React.ReactNode) {
   return (
     <SafeAreaProvider initialMetrics={metrics}>
       <ThemeProvider>
-        <RouterProvider>
-          <AppStateProvider>{children}</AppStateProvider>
-        </RouterProvider>
+        <AppStateProvider>
+          <RouterProvider>{children}</RouterProvider>
+        </AppStateProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

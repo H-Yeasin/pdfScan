@@ -24,6 +24,8 @@ import { cardBackground } from '../components/ui/Card';
 import { courseBookmarks } from '../services/study/bookmarks';
 import { useShareSubmission } from '../store/useSubmitDocument';
 import { useRouter } from '../navigation/router';
+import { useScreenRole } from '../navigation/screenRole';
+import { heldSubject } from '../services/documents/readerPosition';
 import { docTypeCounts, docTypeOf, getDocType } from '../services/courses/docTypes';
 import {
   coursePageItemKey,
@@ -65,7 +67,13 @@ export function CourseScreen() {
   const state = useAppSlices('library', 'libraryUi', 'pack', 'settings');
   const store = useAppStore();
   const { files, courses } = state.library;
-  const { activeCourseId, selection, selMode, highlightDeadlineId } = state.libraryUi;
+  const { selection, selMode, highlightDeadlineId } = state.libraryUi;
+  // Like the Reader (readerPosition.heldSubject): only the course page on screen follows the store,
+  // so one left under another course's page keeps its own course, list and scroll for Back.
+  const role = useScreenRole();
+  const held = useRef<string | null>(null);
+  held.current = heldSubject(role, state.libraryUi.activeCourseId, held.current) ?? state.libraryUi.activeCourseId;
+  const activeCourseId = held.current;
   const { selectedDocs, handlePressRow, handleLongPress, handleMore, handleSelectionTool, overlays } = useDocumentListActions();
   // §8 B3: "Export course…" (Unsorted: its documents).
   const { exportScope, overlay: exportOverlay } = useBackupExport();

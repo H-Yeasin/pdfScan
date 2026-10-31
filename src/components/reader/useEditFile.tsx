@@ -5,6 +5,7 @@ import { isEditFormat, saveEditedText, type EditTarget } from '../../services/ed
 import { isSheetEditFormat, saveEditedSheet } from '../../services/edit/sheetEdit';
 import { saveEditedDocx } from '../../services/edit/docxEdit';
 import { carryProTaskGrant } from '../../services/pro/proTaskFlow';
+import { useRouter } from '../../navigation/router';
 import { useAppDispatch } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import { FileEditor, type EditorFile, type EditorOutput } from './FileEditor';
@@ -25,6 +26,7 @@ export const EDIT_FILE_KIND = 'editFile';
 export function useEditFile(opts: { preload: boolean }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
+  const { go } = useRouter();
   const gate = useProTask('editFiles', { preload: opts.preload });
   const { start: startTask } = gate;
   const [editing, setEditing] = useState<{ target: EditTarget; file: EditorFile } | null>(null);
@@ -52,7 +54,9 @@ export function useEditFile(opts: { preload: boolean }) {
           const copy = output.kind === 'sheet' ? await saveEditedSheet(target, output.edits) : await saveEditedDocx(target, output.html, output.images);
           dispatch({ type: 'library/ADD_FILE', file: copy });
           await carryProTaskGrant('editFiles', target.doc ? target.doc.id : target.external.uri, copy.id);
+          // The copy opens over the original, so Back returns to it.
           dispatch({ type: 'reader/SET_READER_ID', id: copy.id });
+          go('reader');
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.editFile.savedCopy') });
           setEditing(null);
           return true;
@@ -66,6 +70,7 @@ export function useEditFile(opts: { preload: boolean }) {
           dispatch({ type: 'library/ADD_FILE', file: result.doc });
           if (target.external) await carryProTaskGrant('editFiles', target.external.uri, result.doc.id);
           dispatch({ type: 'reader/SET_READER_ID', id: result.doc.id });
+          go('reader');
           dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.editFile.savedToLibrary') });
         }
         setEditing(null);
@@ -77,7 +82,7 @@ export function useEditFile(opts: { preload: boolean }) {
         return false;
       }
     },
-    [editing, dispatch, t]
+    [editing, dispatch, t, go]
   );
 
   const element: ReactElement = (

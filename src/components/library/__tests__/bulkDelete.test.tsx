@@ -119,11 +119,11 @@ describe('Select all', () => {
       root = create(
         <SafeAreaProvider initialMetrics={metrics}>
           <ThemeProvider>
-            <RouterProvider>
-              <AppStateProvider>
+            <AppStateProvider>
+              <RouterProvider>
                 <Probe />
-              </AppStateProvider>
-            </RouterProvider>
+              </RouterProvider>
+            </AppStateProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       );

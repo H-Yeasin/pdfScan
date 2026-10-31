@@ -6,6 +6,7 @@ import { canUsePageTools } from '../../services/documents/formatCapabilities';
 import { PdfEncryptedError } from '../../services/pdf/pdfErrors';
 import { appendDocuments } from '../../services/persistence/libraryOperations';
 import { extractToNewDocument, PagesNotReadyError, savePageEdit, type PageEdit } from '../../services/persistence/pageEdits';
+import { useRouter } from '../../navigation/router';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import type { LibraryDocument } from '../../types/models';
 import { t } from '../../i18n';
@@ -16,6 +17,7 @@ import { t } from '../../i18n';
 // the page being read, §18 W5). Render `overlays` once.
 export function useEditPages(doc: LibraryDocument | undefined, onChanged: (before: LibraryDocument, after: LibraryDocument) => void) {
   const dispatch = useAppDispatch();
+  const { go } = useRouter();
   const state = useAppSlices('capture', 'library', 'settings');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,11 +77,15 @@ export function useEditPages(doc: LibraryDocument | undefined, onChanged: (befor
           type: 'ui/SHOW_SNACK',
           msg: t('reader.edit.extracted', { name: extracted.name }),
           action: t('library.open'),
-          onAction: () => dispatch({ type: 'reader/SET_READER_ID', id: extracted.id }),
+          // Pushed over this Reader, so Back returns to the document the pages came from.
+          onAction: () => {
+            dispatch({ type: 'reader/SET_READER_ID', id: extracted.id });
+            go('reader');
+          },
         });
       });
     },
-    [doc, run, dispatch]
+    [doc, run, dispatch, go]
   );
 
   const handleAddFromScan = useCallback(() => {

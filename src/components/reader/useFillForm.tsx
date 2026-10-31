@@ -6,6 +6,7 @@ import { FormFillSheet, type FormFillRequest } from './FormFillSheet';
 import { PreviewTooLargeError } from '../../services/documents/sheetService';
 import { formSourceFor, PdfFormLockedError, readPdfForm, saveFilledForm, type FormTarget, type FormValues } from '../../services/edit/pdfForm';
 import { carryProTaskGrant, checkProTask } from '../../services/pro/proTaskFlow';
+import { useRouter } from '../../navigation/router';
 import { useAppDispatch, useAppStore } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import type { LibraryDocument } from '../../types/models';
@@ -31,6 +32,7 @@ function grantIdOf(target: FormTarget): string {
 export function useFillForm(opts: { preload: boolean; onSaved?: (copy: LibraryDocument) => void }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
+  const { go } = useRouter();
   // Read when the copy is made (the document's marks go into it), not subscribed to.
   const store = useAppStore();
   const gate = useProTask('pdfForms', { preload: opts.preload });
@@ -79,7 +81,9 @@ export function useFillForm(opts: { preload: boolean; onSaved?: (copy: LibraryDo
           onSaved(copy);
           return true;
         }
+        // The filled copy opens over the form, so Back returns to it.
         dispatch({ type: 'reader/SET_READER_ID', id: copy.id });
+        go('reader');
         dispatch({ type: 'ui/SHOW_SNACK', msg: t('reader.form.saved') });
         return true;
       } catch (e) {
@@ -89,7 +93,7 @@ export function useFillForm(opts: { preload: boolean; onSaved?: (copy: LibraryDo
         return false;
       }
     },
-    [open, dispatch, t, store, onSaved]
+    [open, dispatch, t, store, onSaved, go]
   );
 
   // Mark mode's Text tool on `doc`: `onUnlocked` runs once the gate lets it through (straight

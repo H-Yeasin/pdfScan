@@ -34,11 +34,15 @@ import { SkeletonRows } from '../components/library/SkeletonRows';
 import { useRenderCount } from '../utils/renderCounts';
 import { traced } from '../utils/trace';
 
-// The list's first item is the toolbar, which sticks at the top while the documents scroll under
-// it (stickyHeaderIndices). The course folders above it are the list's header and scroll away.
+// The list's first item is the course folders, which scroll away; the next is the toolbar, which
+// sticks at the top while the documents scroll under it (stickyHeaderIndices). The folders are an
+// item, not the ListHeaderComponent: FlashList 2.0.2 works out the sticky item from a scroll offset
+// that leaves the header out, so at rest it drew the toolbar's sticky copy at the top, over the
+// folders (two toolbars, the folder cards cut off). src/__tests__/stickyHeaders.test.ts keeps the
+// two apart. While searching there are no folders and the toolbar is first.
 const TOOLBAR = 'toolbar' as const;
-type Item = LibraryDocument | typeof TOOLBAR;
-const STICKY = [0];
+const FOLDERS = 'folders' as const;
+type Item = LibraryDocument | typeof TOOLBAR | typeof FOLDERS;
 
 // §17 U7: Files - the course folders, the toolbar (Filter, Starred, Sort, list / grid), then every
 // document, as a list or a grid. A row's ⋯ holds everything that can be done to it; a long-press
@@ -138,15 +142,26 @@ export function LibraryScreen() {
     return sortDocuments(filtered, view.sort, courses);
   }, [files, searching, search, searchResultIds, filters, submittedIds, bookmarkedIds, view.sort, courses]);
 
-  const data = useMemo<Item[]>(() => [TOOLBAR, ...visibleFiles], [visibleFiles]);
+  const data = useMemo<Item[]>(() => (searching ? [TOOLBAR, ...visibleFiles] : [FOLDERS, TOOLBAR, ...visibleFiles]), [searching, visibleFiles]);
+  const sticky = useMemo(() => [searching ? 0 : 1], [searching]);
 
   const courseColors = useMemo(() => new Map(courses.map((c) => [c.id, courseColorValue(c.color, tokens)])), [courses, tokens]);
+
+  const openCourse = useCallback(
+    (id: string) => {
+      dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id });
+      go('course');
+    },
+    [dispatch, go]
+  );
+  const manageCourses = useCallback(() => go('manageFolders'), [go]);
 
   const grid = view.layout === 'grid';
   // §16 G6: one function for the list, and primitives for the row, so the memo'd rows skip every
   // row whose own document, selection, snippet and colour are what they were.
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Item>) => {
+      if (item === FOLDERS) return <CourseFolders courses={courses} files={files} onOpen={openCourse} onManage={manageCourses} />;
       if (item === TOOLBAR) {
         return (
           <FilesToolbar
@@ -185,27 +200,19 @@ export function LibraryScreen() {
         />
       );
     },
-    [filters, view.sort, view.layout, courses, setFilters, setLayout, courseColors, grid, selection, selMode, search, onRowPress, onRowLongPress, onRowMore]
+    [filters, view.sort, view.layout, courses, files, openCourse, manageCourses, setFilters, setLayout, courseColors, grid, selection, selMode, search, onRowPress, onRowLongPress, onRowMore]
   );
 
   // A merge's or an import's result: scroll to it once it is in the list, then forget it. One
   // that the filters hide is only forgotten.
   useEffect(() => {
     if (!revealId) return;
-    const index = data.findIndex((item) => item !== TOOLBAR && item.id === revealId);
-    if (index > 0) void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+    const index = data.findIndex((item) => typeof item !== 'string' && item.id === revealId);
+    if (index >= 0) void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
     dispatch({ type: 'libraryUi/REVEALED' });
   }, [revealId, data, dispatch]);
 
   const handleImport = useCallback(() => importFile({ stay: true, courseId: importCourseId(filters) }), [importFile, filters]);
-  const openCourse = useCallback(
-    (id: string) => {
-      dispatch({ type: 'libraryUi/SET_ACTIVE_COURSE', id });
-      go('course');
-    },
-    [dispatch, go]
-  );
-  const manageCourses = useCallback(() => go('manageFolders'), [go]);
 
   const isEmptyLibrary = files.length === 0;
   const filtered = hasFilters(filters);
@@ -313,10 +320,9 @@ export function LibraryScreen() {
           getItemType={itemType}
           numColumns={grid ? 2 : 1}
           overrideItemLayout={(layout, item) => {
-            if (item === TOOLBAR) layout.span = 2;
+            if (typeof item === 'string') layout.span = 2;
           }}
-          stickyHeaderIndices={STICKY}
-          ListHeaderComponent={searching ? null : <CourseFolders courses={courses} files={files} onOpen={openCourse} onManage={manageCourses} />}
+          stickyHeaderIndices={sticky}
           ListFooterComponent={footer}
           contentContainerStyle={grid ? styles.gridContent : styles.listContent}
           keyboardShouldPersistTaps="handled"
@@ -348,8 +354,8 @@ export function LibraryScreen() {
   );
 }
 
-const itemKey = (item: Item) => (item === TOOLBAR ? TOOLBAR : item.id);
-const itemType = (item: Item) => (item === TOOLBAR ? TOOLBAR : 'doc');
+const itemKey = (item: Item) => (typeof item === 'string' ? item : item.id);
+const itemType = (item: Item) => (typeof item === 'string' ? item : 'doc');
 
 const styles = StyleSheet.create({
   container: {

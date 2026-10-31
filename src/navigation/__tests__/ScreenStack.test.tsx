@@ -7,7 +7,7 @@ import { ThemeProvider } from '../../theme';
 import type { ScreenName } from '../../types/navigation';
 import { RouterProvider, useRouter } from '../router';
 import { useScreenRole, type ScreenRole } from '../screenRole';
-import { ScreenStack, type ScreenMap } from '../ScreenStack';
+import { MAX_MOUNTED, ScreenStack, type ScreenMap } from '../ScreenStack';
 import { FADE_DURATION_MS, SLIDE_DURATION_MS } from '../transitions';
 
 // Its async first read would land outside act(); the slides are what's tested here.
@@ -59,11 +59,11 @@ function mount(start: ScreenName = 'home') {
     root = create(
       <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
         <ThemeProvider>
-          <RouterProvider>
-            <AppStateProvider>
+          <AppStateProvider>
+            <RouterProvider>
               <Boot start={start} />
-            </AppStateProvider>
-          </RouterProvider>
+            </RouterProvider>
+          </AppStateProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     );
@@ -120,6 +120,22 @@ describe('ScreenStack (§16 G2)', () => {
     expect(unmounts).toEqual({ reader: 1, course: 1 });
     expect(mounts.home).toBe(1);
     expect(roles.home).toBe('active');
+  });
+
+  it(`mounts only the top ${MAX_MOUNTED} pushed screens; deeper ones mount again when Back reaches them`, () => {
+    mount('home');
+    const many: ScreenName[] = ['course', 'storage', 'backup', 'pro', 'manageFolders', 'examPack', 'academicOptions', 'uiGallery'];
+    for (const s of many) nav(() => router.go(s));
+    const shown = many.filter((s) => rendered(s) > 0);
+    expect(shown).toEqual(many.slice(-MAX_MOUNTED));
+    expect(unmounts).toMatchObject({ course: 1, storage: 1 });
+    // Back ×(n-1): each screen in turn, the deep ones mounted afresh.
+    for (const s of [...many].reverse().slice(1)) {
+      nav(() => router.back());
+      expect(roles[s]).toBe('active');
+      expect(rendered(s)).toBe(1);
+    }
+    expect(mounts).toMatchObject({ course: 2, storage: 2 });
   });
 
   it('keeps the screen that leaves until its slide has ended', () => {

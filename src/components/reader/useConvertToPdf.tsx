@@ -4,6 +4,7 @@ import { useProTask } from '../pro/useProTask';
 import { convertParams, OFFICE_TO_PDF_KIND } from '../../services/convert/convertTask';
 import { convertToPdf, type ConvertSource } from '../../services/convert/toPdf';
 import { PreviewTooLargeError } from '../../services/documents/sheetService';
+import { useRouter } from '../../navigation/router';
 import { useAppDispatch } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import { radii, spacing, useTheme } from '../../theme';
@@ -25,6 +26,7 @@ const LOSSY: ReadonlySet<string> = new Set(['DOCX', 'XLSX', 'XLS']);
 export function useConvertToPdf(opts: { preload: boolean; onDone?: (doc: LibraryDocument) => void }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
+  const { go } = useRouter();
   const gate = useProTask('convert', { preload: opts.preload });
   const { start: startTask } = gate;
   const [converting, setConverting] = useState(false);
@@ -44,7 +46,11 @@ export function useConvertToPdf(opts: { preload: boolean; onDone?: (doc: Library
           type: 'ui/SHOW_SNACK',
           msg: t('reader.convert.done'),
           action: t('reader.convert.open'),
-          onAction: () => dispatch({ type: 'reader/SET_READER_ID', id: doc.id }),
+          // Pushed over the source, so Back returns to it.
+          onAction: () => {
+            dispatch({ type: 'reader/SET_READER_ID', id: doc.id });
+            go('reader');
+          },
         });
       } catch (e) {
         console.warn('useConvertToPdf: conversion failed', e);
@@ -55,7 +61,7 @@ export function useConvertToPdf(opts: { preload: boolean; onDone?: (doc: Library
         setConverting(false);
       }
     },
-    [dispatch, t, onDone]
+    [dispatch, t, onDone, go]
   );
 
   const begin = useCallback(

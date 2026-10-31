@@ -15,8 +15,9 @@ import { pickTransition, RESTING_STYLE, runSlide, settleStyle, transitionDuratio
 // navigation never mounts a screen twice:
 // - the shell: every visited tab's root (mounted on its first visit, then kept) above the one
 //   tab bar. It's shown while a root is on top;
-// - the active tab's pushed screens above it, all kept mounted under the top one (up to
-//   navStack.MAX_PUSHED), so Back finds each where it was left: scrolled, filtered, loaded;
+// - the active tab's pushed screens above it, the top MAX_MOUNTED of them kept mounted, so Back
+//   finds each where it was left: scrolled, filtered, loaded. Deeper ones stay in the history
+//   and mount again when Back reaches them (the Reader opens where reading stopped);
 // - during a transition, the screen that was on top, until it has slid or faded away. A popped
 //   screen unmounts then.
 //
@@ -36,6 +37,9 @@ const CONTENT_MAX_WIDTH = 720;
 const FULL_BLEED: ReadonlySet<ScreenName> = new Set(['review', 'reader']);
 
 export type ScreenMap = Record<ScreenName, ComponentType>;
+
+// Pushed screens mounted at once on the active tab, so a long history doesn't hold on to memory.
+export const MAX_MOUNTED = 6;
 
 // Memoised, with stable props, so a layer changing role or style doesn't re-render its screen.
 const ScreenFrame = memo(function ScreenFrame({ Screen, fullBleed, background }: { Screen: ComponentType; fullBleed: boolean; background: string }) {
@@ -129,7 +133,9 @@ export function ScreenStack({ screens }: { screens: ScreenMap }) {
     return { byKey, shell };
   }, [leaving, transition, kind, top.key, topIsRoot, leavingIsRoot, progress, width, height]);
 
-  const pushed = activeStack(nav).filter((entry) => !isRootEntry(entry));
+  const pushed = activeStack(nav)
+    .filter((entry) => !isRootEntry(entry))
+    .slice(-MAX_MOUNTED);
   if (leaving && !leavingIsRoot && !pushed.some((entry) => entry.key === leaving.key)) pushed.push(leaving);
 
   return (

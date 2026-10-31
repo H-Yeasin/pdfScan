@@ -37,13 +37,13 @@ function mount() {
     root = create(
       <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
         <ThemeProvider>
-          <RouterProvider>
-            <AppStateProvider>
+          <AppStateProvider>
+            <RouterProvider>
               <Screens />
               {/* §17 U5: the Scan hint points at the tab bar's Scan button. */}
               <TabBar />
-            </AppStateProvider>
-          </RouterProvider>
+            </RouterProvider>
+          </AppStateProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     );

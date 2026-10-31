@@ -595,6 +595,24 @@ Tests:
 - `SelectionBar`: Cover enabled for one PDF, disabled for two docs or a DOCX.
 - `backHandling` returns to the right screen and clears the target.
 
+## Q8 · Files: one toolbar, whole course folders *(S)*
+Status: done in code (2026-10-30); device check open (Verification 17–18).
+
+Found on the device: Files showed its toolbar (Filter · Starred · sort · list/grid) twice, and the
+course folders under it looked cut off (no Unsorted icon, the top of "Add a course" missing). One bug:
+the toolbar was data item 0 with `stickyHeaderIndices={[0]}` and the folders were the
+`ListHeaderComponent`. FlashList 2.0.2 (Expo SDK 57 pins it, so no upgrade or patch) works out the
+sticky item from the last scroll offset without taking the header's height off it, so at rest item 0
+counted as scrolled past and its sticky copy was drawn at the top, over the folders. (The grey gear
+under the row is `expo-dev-menu`'s button, dev builds only.)
+
+As built: in `screens/LibraryScreen.tsx` the folders are the list's first item (`FOLDERS`, span 2 in
+the grid, its own key and type) and the toolbar the second, so the toolbar only sticks once the folders
+have scrolled away; `ListHeaderComponent` is gone. While searching there are no folders, the toolbar is
+item 0 and sticks from the start. The reveal-on-import effect looks for a document, not a non-toolbar
+item. Guard test `src/__tests__/stickyHeaders.test.ts`: no FlashList in `src/` has both
+`stickyHeaderIndices` and `ListHeaderComponent`.
+
 ---
 
 ## Verification
@@ -637,3 +655,11 @@ a 360 dp phone; font scale 1.3)
     page after that lands on the right page. "Change cover page" replaces the cover, not adding a second.
 15. A photo cover (imported image) on a converted PDF. A DOCX shows "Convert to PDF first".
 16. Search still finds text in a document after Replace, and opens the right page.
+
+**Q8 Files toolbar**
+17. Files with a course and one document, list and grid: one toolbar, right under the folder cards,
+    which are whole (badge or icon, name, count; "Add a course" with its icon) and span both columns
+    in the grid. With enough documents, the toolbar pins at the top once the folders scroll away and
+    unpins on the way back. The cards' shadows aren't clipped by their row.
+18. Search with a query: no folders, the toolbar first and sticky. An import scrolls to the new row.
+    Selection mode and the empty library look as before.

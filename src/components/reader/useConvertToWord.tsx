@@ -4,6 +4,7 @@ import { useProTask } from '../pro/useProTask';
 import { Converting } from './useConvertToPdf';
 import { PDF_TO_WORD_KIND, wordParams, wordSourceFor, type WordTarget } from '../../services/convert/convertTask';
 import { convertToWord, type WordProgress } from '../../services/convert/toDocx';
+import { useRouter } from '../../navigation/router';
 import { useAppDispatch, useAppSlices } from '../../store/AppStateContext';
 import { useT } from '../../i18n/useT';
 import type { LibraryDocument } from '../../types/models';
@@ -20,6 +21,7 @@ import type { LibraryDocument } from '../../types/models';
 export function useConvertToWord(opts: { preload: boolean; onDone?: (doc: LibraryDocument) => void }) {
   const { t } = useT();
   const dispatch = useAppDispatch();
+  const { go } = useRouter();
   const state = useAppSlices('library', 'settings');
   const gate = useProTask('convert', { preload: opts.preload });
   const { start: startTask } = gate;
@@ -42,7 +44,11 @@ export function useConvertToWord(opts: { preload: boolean; onDone?: (doc: Librar
           type: 'ui/SHOW_SNACK',
           msg: t('reader.word.done'),
           action: t('reader.convert.open'),
-          onAction: () => dispatch({ type: 'reader/SET_READER_ID', id: doc.id }),
+          // Pushed over the source, so Back returns to it.
+          onAction: () => {
+            dispatch({ type: 'reader/SET_READER_ID', id: doc.id });
+            go('reader');
+          },
         });
       } catch (e) {
         console.warn('useConvertToWord: conversion failed', e);
@@ -53,7 +59,7 @@ export function useConvertToWord(opts: { preload: boolean; onDone?: (doc: Librar
         setProgress(null);
       }
     },
-    [dispatch, state, t, onDone]
+    [dispatch, state, t, onDone, go]
   );
 
   const start = useCallback(

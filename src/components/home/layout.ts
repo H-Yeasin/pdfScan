@@ -1,5 +1,4 @@
 import { spacing } from '../../theme';
 
-// §17 U6: Home's side padding. The horizontal rows (Scan as, Continue) bleed through it so they
-// scroll to the screen's edges.
+// §17 U6: Home's side padding; the inline banner's width is the screen less this on each side.
 export const HOME_GUTTER = spacing.lg;

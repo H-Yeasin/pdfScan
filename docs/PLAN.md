@@ -313,6 +313,7 @@ cover for documents already in the Library, and the bottom of the app under the 
 - [x] Q5 Bulk delete and Select all in the Library
 - [x] Q6 Add a cover to a library PDF: service (copy or replace, index shift)
 - [x] Q7 Add a cover to a library PDF: UI (Selection bar, Reader menu, "Save as a copy" / "Replace")
+- [x] Q8 Files: one toolbar over whole course folders (folders as a list item; guard test)
 
 **Done when:** on a release build with a 3-button nav bar, a conversion never runs without an ad
 (online), nothing sits under the system bar, five documents can be deleted at once, and a converted

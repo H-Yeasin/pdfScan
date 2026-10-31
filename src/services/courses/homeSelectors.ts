@@ -53,9 +53,8 @@ export function courseActivity(files: readonly LibraryDocument[]): {
 
 export type LastOpened = { id: string; at: number };
 
-// How many documents settings.recentOpened keeps; Home shows CONTINUE_MAX of them.
+// How many documents settings.recentOpened keeps; Home shows the newest that still exists.
 export const RECENT_OPENED_MAX = 10;
-export const CONTINUE_MAX = 3;
 
 // settings/SET_LAST_OPENED: the document goes to the front, once; the list stops at
 // RECENT_OPENED_MAX. A document deleted since is dropped when Home reads the list.
@@ -77,26 +76,16 @@ export function normalizeRecentOpened(raw: unknown): LastOpened[] {
   return out.sort((a, b) => b.at - a.at).slice(0, RECENT_OPENED_MAX);
 }
 
-export type ContinueItem = { doc: LibraryDocument; reason: 'opened' | 'saved' };
-
-// §17 U6, Home's "Continue": the documents last opened in the Reader, newest first, with the
-// newest saved document among them when it came after (a scan just saved is what a student
-// picks up next). At most CONTINUE_MAX; deleted and archived documents drop out. Empty for an
-// empty library.
-export function continueDocuments(files: readonly LibraryDocument[], recent: readonly LastOpened[], max = CONTINUE_MAX): ContinueItem[] {
+// §17 U6, Home's "Continue reading": the document last opened in the Reader that still exists and
+// isn't archived, or null. Only an opened one: the newest saved scan used to stand in here, but it
+// is always Recent files' first row too, so Home showed the same document twice.
+export function continueDocument(files: readonly LibraryDocument[], recent: readonly LastOpened[]): LibraryDocument | null {
   const byId = new Map(files.map((f) => [f.id, f]));
-  const entries: (ContinueItem & { at: number })[] = [];
-  for (const { id, at } of recent) {
+  for (const { id } of recent) {
     const doc = byId.get(id);
-    if (doc && !doc.archived) entries.push({ doc, reason: 'opened', at });
+    if (doc && !doc.archived) return doc;
   }
-  let newest: LibraryDocument | null = null;
-  for (const file of files) if (!file.archived && (!newest || file.createdAt > newest.createdAt)) newest = file;
-  if (newest && !entries.some((e) => e.doc.id === newest.id)) entries.push({ doc: newest, reason: 'saved', at: newest.createdAt });
-  return entries
-    .sort((a, b) => b.at - a.at)
-    .slice(0, max)
-    .map(({ doc, reason }) => ({ doc, reason }));
+  return null;
 }
 
 // "Page 12 of 40" on a Continue card: the library page reading stopped on (1-based) and the page
@@ -118,10 +107,12 @@ export function continueProgress(doc: Pick<LibraryDocument, 'format' | 'pages' |
   return { page: Math.min(Math.max(Math.floor(index), 0), count - 1) + 1, count };
 }
 
-// Home's "Recent files": the newest saved documents, archived ones left out.
-export function recentFiles(files: readonly LibraryDocument[], max = 5): LibraryDocument[] {
+// Home's "Recent files": the newest saved documents, archived ones left out, and the one Continue
+// already shows (`exceptId`) so no document is on Home twice. Three: the list sits under the
+// courses and the banner, and "See all" opens Files for the rest.
+export function recentFiles(files: readonly LibraryDocument[], max = 3, exceptId?: string): LibraryDocument[] {
   return files
-    .filter((f) => !f.archived)
+    .filter((f) => !f.archived && f.id !== exceptId)
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, max);
 }

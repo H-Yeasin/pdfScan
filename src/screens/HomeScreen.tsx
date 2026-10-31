@@ -9,7 +9,7 @@ import { QuickSetupSheet } from '../components/courses/QuickSetupSheet';
 import { SemesterSwitcher } from '../components/courses/SemesterSwitcher';
 import { DeadlineEditorSheet } from '../components/deadlines/DeadlineEditorSheet';
 import { BackupReminderCard } from '../components/home/BackupReminderCard';
-import { ContinueCarousel } from '../components/home/ContinueCarousel';
+import { ContinueCard } from '../components/home/ContinueCard';
 import { CourseGrid } from '../components/home/CourseGrid';
 import { DueSoon } from '../components/home/DueSoon';
 import { HomeHeader } from '../components/home/HomeHeader';
@@ -25,7 +25,7 @@ import { useT } from '../i18n/useT';
 import { useRouter } from '../navigation/router';
 import { useScreenRole } from '../navigation/screenRole';
 import {
-  continueDocuments,
+  continueDocument,
   courseActivity,
   currentSemester,
   homeCourses,
@@ -39,12 +39,13 @@ import type { Course } from '../types/models';
 import { useRenderCount } from '../utils/renderCounts';
 import { useDayClock } from '../utils/useDayClock';
 
-// §17 U6: Home answers "what do I do now?" - scan, continue, find, what's due. Top to bottom: the
-// greeting with the Pro pass on its right, the semester chip and a search bar (HomeHeader), the
-// course cards, Due soon (only when something is), the banner and Recent files; "Scan as"
-// (QuickActions) and Continue (3) are docked under the scroll, above the tab bar. Scan itself is the
-// tab bar's centre button (U5). All derived data comes from homeSelectors.ts; each section is in
-// components/home.
+// §17 U6: Home answers "what do I do now?" - scan, continue, find, what's due. One scroll, top to
+// bottom: the greeting with the Pro pass on its right, the semester chip and a search bar
+// (HomeHeader), the Scan as chips (QuickActions), Continue reading (one card, only for a document
+// opened), the backup reminder, the course cards, Due soon (only when something is), the banner and
+// Recent files (three, without the Continue document). Nothing is docked above the tab bar: a dock
+// took a third of a phone's height and cut the scroll short. Scan itself is the tab bar's centre
+// button (U5). All derived data comes from homeSelectors.ts; each section is in components/home.
 export function HomeScreen() {
   useRenderCount('Home');
   const { tokens } = useTheme();
@@ -70,8 +71,8 @@ export function HomeScreen() {
   const shown = useMemo(() => homeSemester(semesters, homeSemesterId, today), [semesters, homeSemesterId, today]);
   const gridCourses = useMemo(() => homeCourses(courses, shown), [courses, shown]);
   const activity = useMemo(() => courseActivity(files), [files]);
-  const resume = useMemo(() => continueDocuments(files, recentOpened), [files, recentOpened]);
-  const recent = useMemo(() => recentFiles(files), [files]);
+  const resume = useMemo(() => continueDocument(files, recentOpened), [files, recentOpened]);
+  const recent = useMemo(() => recentFiles(files, undefined, resume?.id), [files, resume]);
   const hasActiveCourse = courses.some((c) => !c.archived);
   // §4 S8: the next 7 days' deadlines, overdue first.
   const soon = useMemo(() => dueSoon(deadlines, now), [deadlines, now]);
@@ -85,6 +86,8 @@ export function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: tokens.bg }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <HomeHeader shown={shown} now={now} onOpenSemesters={() => setSwitcherOpen(true)} />
+        <QuickActions />
+        <ContinueCard doc={resume} courses={courses} onOpen={openDocument} />
         <BackupReminderCard />
 
         {/* §17 U13: placeholders while the library loads, not the first-run card. */}
@@ -149,13 +152,6 @@ export function HomeScreen() {
 
         <RecentFiles files={recent} courses={courses} now={now} onOpen={openDocument} onSeeAll={() => go('library')} />
       </ScrollView>
-      {/* Docked under the scroll, just above the tab bar. It carries the same gutter as the
-          scroll so the rows' edge bleed (QuickActions, ContinueCarousel) lands on the screen's
-          edges, not past them. */}
-      <View style={[styles.dock, { borderTopColor: tokens.edge }]}>
-        <QuickActions />
-        <ContinueCarousel items={resume} courses={courses} onOpen={openDocument} />
-      </View>
 
       <DeadlineEditorSheet visible={addingDeadline} onClose={() => setAddingDeadline(false)} />
       <SemesterSwitcher visible={switcherOpen} shown={shown} current={current} onClose={() => setSwitcherOpen(false)} />
@@ -177,11 +173,5 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
-  },
-  dock: {
-    paddingHorizontal: HOME_GUTTER,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

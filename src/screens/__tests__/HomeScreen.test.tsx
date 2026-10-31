@@ -39,11 +39,11 @@ function mount() {
     root = create(
       <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } }}>
         <ThemeProvider>
-          <RouterProvider>
-            <AppStateProvider>
+          <AppStateProvider>
+            <RouterProvider>
               <Screens />
-            </AppStateProvider>
-          </RouterProvider>
+            </RouterProvider>
+          </AppStateProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     );
@@ -182,7 +182,7 @@ describe('Home sections', () => {
     expect(texts(root)).not.toContain('Add a deadline');
   });
 
-  it('continues at most three documents and lists five recent ones', () => {
+  it('continues the document opened last and keeps it out of Recent files', () => {
     const { root, ctx } = mount();
     act(() => {
       const { dispatch } = ctx().app;
@@ -190,12 +190,11 @@ describe('Home sections', () => {
       for (const id of ['d0', 'd1', 'd2', 'd3']) dispatch({ type: 'settings/SET_LAST_OPENED', lastOpened: { id, at: 5000 + Number(id[1]) } });
     });
     const continued = root.root.findAll((n) => typeof n.props.testID === 'string' && n.props.testID.startsWith('home-continue-') && typeof n.type === 'string');
-    expect(new Set(continued.map((n) => n.props.testID))).toEqual(new Set(['home-continue-d3', 'home-continue-d2', 'home-continue-d1']));
+    expect(new Set(continued.map((n) => n.props.testID))).toEqual(new Set(['home-continue-d3']));
     const recent = new Set(
       root.root.findAll((n) => typeof n.props.testID === 'string' && n.props.testID.startsWith('home-recent-')).map((n) => n.props.testID)
     );
-    expect(recent.size).toBe(5);
-    expect(recent.has('home-recent-d0')).toBe(false);
+    expect(recent).toEqual(new Set(['home-recent-d5', 'home-recent-d4', 'home-recent-d2']));
   });
 
   it('opens Files with the search open from the search bar', () => {
@@ -210,6 +209,17 @@ describe('Home sections', () => {
     pressId(root, 'home-mode-board');
     expect(ctx().app.state.settings.lastCaptureMode).toBe('board');
     expect(ctx().app.state.capture.scannerRequested).toBe(true);
+  });
+
+  it('draws the remembered mode selected, and follows a new pick', () => {
+    const { ctx, root } = mount();
+    const selected = () =>
+      root.root
+        .findAll((n) => typeof n.props.testID === 'string' && n.props.testID.startsWith('home-mode-') && n.props.accessibilityState?.selected === true)
+        .map((n) => n.props.testID);
+    expect(new Set(selected())).toEqual(new Set([`home-mode-${ctx().app.state.settings.lastCaptureMode}`]));
+    pressId(root, 'home-mode-book');
+    expect(new Set(selected())).toEqual(new Set(['home-mode-book']));
   });
 
   it("archives a course from its card's ⋯ menu", () => {

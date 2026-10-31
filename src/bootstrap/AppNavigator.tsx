@@ -4,7 +4,7 @@ import { BootEffects } from './BootEffects';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import { useRouter } from '../navigation/router';
 import { resolveBack, type BackContext } from '../navigation/backHandling';
-import { activeStack } from '../navigation/navStack';
+import { activeStack, topEntry } from '../navigation/navStack';
 import { ScreenStack, type ScreenMap } from '../navigation/ScreenStack';
 import { SPLASH_TIMEOUT_MS } from './splash';
 import { chooseStartScreen } from './startScreen';
@@ -77,7 +77,7 @@ export function AppNavigator() {
   const [booting, setBooting] = useState(true);
   // §9 O5: true a moment after the start screen is up; work the first screen doesn't need waits.
   const afterBoot = useDeferredBoot(!booting);
-  const { screen, nav, navTick, go, back, replace } = useRouter();
+  const { screen, nav, navTick, go, back, backToTab, replace, syncTopSubject } = useRouter();
   const { tokens, theme } = useTheme();
   // §16 G4: fonts gate the first screen here, with the data, instead of in a gate above the store
   // (AppProviders' old FontGate): the boot hooks (BootEffects) start on the first render either way. Ready
@@ -93,6 +93,15 @@ export function AppNavigator() {
   const processingStatus = useAppSelector((s) => s.capture.processingStatus);
   const errorMessage = useAppSelector((s) => s.capture.errorMessage);
   const prevProcessingStatus = useRef(processingStatus);
+  // What the Reader and a course page show, so the entry on top keeps up when it changes without
+  // a go() (router.syncTopSubject): the Reader's "Add to Library" makes the open file a document.
+  const readerId = useAppSelector((s) => s.reader.readerId);
+  const readerExternal = useAppSelector((s) => s.reader.external);
+  const activeCourseId = useAppSelector((s) => s.libraryUi.activeCourseId);
+  const topKey = topEntry(nav).key;
+  useEffect(() => {
+    syncTopSubject();
+  }, [topKey, readerId, readerExternal, activeCourseId, syncTopSubject]);
 
   // Start screen (§9 O1, `chooseStartScreen`): picked once settings, the library index and the
   // fonts are in, before the first real render, while the splash still covers the app (the native one, then the
@@ -149,6 +158,7 @@ export function AppNavigator() {
         screen: where.current.screen,
         tab: where.current.nav.tab,
         canPop: activeStack(where.current.nav).length > 1,
+        prevTab: where.current.nav.tabTrail[where.current.nav.tabTrail.length - 1] ?? null,
         selMode: libraryUi.selMode,
         searchOpen: libraryUi.searchOpen,
         sessionPageCount: capture.pages.length,
@@ -170,6 +180,10 @@ export function AppNavigator() {
           step.actions.forEach(dispatch);
           go(step.to, 'back');
           return true;
+        case 'tab':
+          step.actions.forEach(dispatch);
+          backToTab();
+          return true;
         case 'confirmDiscard':
           // §17 U5: from Review, back to the tab the scan was started on.
           askDiscardScan(dispatch, step.count, () => (step.then === 'pop' ? back() : BackHandler.exitApp()));
@@ -180,7 +194,7 @@ export function AppNavigator() {
       }
     });
     return () => sub.remove();
-  }, [dispatch, store, go, back]);
+  }, [dispatch, store, go, back, backToTab]);
 
   // Lives here (always mounted) rather than on ReviewScreen, which isn't on screen until a scan
   // has landed. Navigating to Review as soon as the raw scan lands - instead of waiting for the

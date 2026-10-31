@@ -1,7 +1,7 @@
 import { makeDoc, makePage } from '../../../test/fixtures';
 import type { Course, Semester } from '../../../types/models';
 import {
-  continueDocuments,
+  continueDocument,
   continueProgress,
   courseActivity,
   currentSemester,
@@ -102,47 +102,23 @@ describe('courseActivity', () => {
   });
 });
 
-describe('continueDocuments', () => {
+describe('continueDocument', () => {
   const older = makeDoc({ id: 'older', createdAt: 100 });
   const newer = makeDoc({ id: 'newer', createdAt: 200 });
-  const third = makeDoc({ id: 'third', createdAt: 50 });
-  const fourth = makeDoc({ id: 'fourth', createdAt: 40 });
 
-  it('is empty for an empty library', () => {
-    expect(continueDocuments([], [{ id: 'x', at: 1 }])).toEqual([]);
+  it('is null for an empty library or when nothing was opened', () => {
+    expect(continueDocument([], [{ id: 'x', at: 1 }])).toBeNull();
+    // The newest save isn't offered: it is Recent files' first row already.
+    expect(continueDocument([older, newer], [])).toBeNull();
   });
 
-  it('lists the opened documents newest first, with the newest save where it falls', () => {
-    const items = continueDocuments([older, newer, third], [
-      { id: 'older', at: 250 },
-      { id: 'third', at: 150 },
-    ]);
-    expect(items.map((i) => [i.doc.id, i.reason])).toEqual([
-      ['older', 'opened'],
-      ['newer', 'saved'],
-      ['third', 'opened'],
-    ]);
+  it('gives the document opened last', () => {
+    expect(continueDocument([older, newer], [{ id: 'older', at: 250 }, { id: 'newer', at: 210 }])).toBe(older);
   });
 
-  it('keeps at most three', () => {
-    const recent = [
-      { id: 'older', at: 400 },
-      { id: 'third', at: 300 },
-      { id: 'fourth', at: 250 },
-    ];
-    const items = continueDocuments([older, newer, third, fourth], recent);
-    expect(items).toHaveLength(3);
-    expect(items.map((i) => i.doc.id)).toEqual(['older', 'third', 'fourth']);
-  });
-
-  it('drops deleted and archived documents, and offers the newest save without any opened', () => {
+  it('skips deleted and archived documents', () => {
     const archived = makeDoc({ id: 'gone', createdAt: 300, archived: true });
-    expect(continueDocuments([older, newer, archived], [{ id: 'deleted', at: 999 }, { id: 'gone', at: 998 }])).toEqual([{ doc: newer, reason: 'saved' }]);
-    expect(continueDocuments([older, newer], [])).toEqual([{ doc: newer, reason: 'saved' }]);
-  });
-
-  it("doesn't list the newest save twice when it was opened too", () => {
-    expect(continueDocuments([older, newer], [{ id: 'newer', at: 210 }])).toEqual([{ doc: newer, reason: 'opened' }]);
+    expect(continueDocument([older, newer, archived], [{ id: 'deleted', at: 999 }, { id: 'gone', at: 998 }, { id: 'newer', at: 5 }])).toBe(newer);
   });
 });
 
@@ -189,9 +165,14 @@ describe('continueProgress', () => {
 });
 
 describe('recentFiles', () => {
-  it('gives the newest five, archived ones left out', () => {
+  it('gives the newest three, archived ones left out', () => {
     const files = Array.from({ length: 7 }, (_, i) => makeDoc({ id: `d${i}`, createdAt: i, archived: i === 6 }));
-    expect(recentFiles(files).map((f) => f.id)).toEqual(['d5', 'd4', 'd3', 'd2', 'd1']);
+    expect(recentFiles(files).map((f) => f.id)).toEqual(['d5', 'd4', 'd3']);
+  });
+
+  it("leaves out the document Continue shows", () => {
+    const files = Array.from({ length: 5 }, (_, i) => makeDoc({ id: `d${i}`, createdAt: i }));
+    expect(recentFiles(files, 3, 'd4').map((f) => f.id)).toEqual(['d3', 'd2', 'd1']);
   });
 });
 

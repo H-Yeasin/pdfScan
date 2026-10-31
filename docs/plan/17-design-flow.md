@@ -676,6 +676,23 @@ As built (2026-10-22):
   (greeting, Due soon only when due, Continue ≤ 3 and Recent 5, search opens Files, Scan as scans in
   the mode, the ⋯ menu archives), plus the existing pseudo-locale, `a11yLabels`, `hardcodedStrings`,
   `bootImports` and ratchet tests.
+- Revised 2026-10-30 (owner, from a phone screenshot): the dock is gone. "Scan as" and Continue sat
+  under the scroll above the tab bar, took about a third of a phone's height and cut Recent files
+  off, and the newest scan showed twice (Continue's "Latest scan" and Recent files' first row). Home
+  is now one scroll: header, the Scan as chips (no title row; the row's `accessibilityLabel` is
+  `home.scanAs`), `ContinueCard` (replaces `ContinueCarousel`: one full-width card,
+  `homeSelectors.continueDocument`, the last *opened* document only, or nothing), the backup
+  reminder, Courses, Due soon, the banner, Recent files (`recentFiles(files, 3, exceptId)`: three,
+  without the Continue document). `continueDocuments`, `CONTINUE_MAX`, `home.continue` and
+  `home.latestScan` are gone.
+- Revised 2026-10-30 (owner): Scan as went unnoticed as a row of outline pills (it looked like
+  filters). `QuickActions` is now one `Card`: five equal mode tiles in one row (a 44 dp icon well and
+  the label under it, no scrolling), then Import photos and Import a file as ghost buttons under a
+  `Divider`. The remembered mode (`settings.lastCaptureMode`, what a plain tap on Scan uses) is drawn
+  selected (accent well, bold label, `accessibilityState.selected`) and follows the last pick, so
+  the card also says what the Scan button will do. It stays in the scroll: moving it next to the
+  Scan button would bring back the dock. Test: `HomeScreen.test.tsx` "draws the remembered mode
+  selected".
 
 ## U7 · Files (the Library) *(L)*
 Status: done in code (2026-10-22), both halves. JS only. Device check (Verification 7) open; never run on a
