@@ -42,6 +42,18 @@ describe('release manifest (§11 L1)', () => {
     expect(pluginNames.filter((name) => name.startsWith('@sentry/react-native'))).toEqual(['@sentry/react-native/expo']);
   });
 
+  it('keeps predictive back off, so Android 13-15 deliver Back to JS', () => {
+    // With the opt-in on (`enableOnBackInvokedCallback="true"`), Android 13-15 stop calling
+    // `Activity.onBackPressed()` and only run OnBackPressedDispatcher callbacks. React Native 0.86's
+    // `ReactActivity` registers its callback only on Android 16+ with targetSdk 36
+    // (`AndroidVersion.isAtLeastTargetSdk36`), so on an Android 13-15 phone the press never reached
+    // `hardwareBackPress` and the activity finished: Back and the edge swipe closed the app from
+    // any screen (a Galaxy A51, Android 13). The API 36 emulator hid it. On Android 16 predictive
+    // back is enforced whatever this says, and RN's callback handles it there.
+    const android = app.expo.android as { predictiveBackGestureEnabled?: boolean };
+    expect(android.predictiveBackGestureEnabled).toBe(false);
+  });
+
   it("keeps Google's sample AdMob app id in app.json", () => {
     const ads = (app.expo.plugins ?? []).find((p) => Array.isArray(p) && p[0] === 'react-native-google-mobile-ads');
     const options = (Array.isArray(ads) ? ads[1] : {}) as { androidAppId?: string };

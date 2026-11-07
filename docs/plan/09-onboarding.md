@@ -94,6 +94,8 @@ As built:
   still shows the app (with F3's load-error state).
 - Turn on Android's predictive back gesture (`predictiveBackGestureEnabled: true`) once the
   handler is in place, and check that the slide transitions still look right.
+  **Reverted 2026-11-07:** with it on, Back closed the app on Android 13–15 (RN 0.86 registers its
+  back callback only on Android 16+); see `src/__tests__/releaseManifest.test.ts`.
 - Tests: the back-handling order (sheet, selection, screen, exit) as a pure function of the
   navigation state; the start-screen choice for new user / no courses / courses; the splash
   timeout.
